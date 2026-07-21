@@ -335,8 +335,31 @@ export function growthPage() {
   const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 
   return shell('growth', `${heading('Growth tracking', 'Track height, weight, and BMI for every child. Identify growth problems early.', `<button class="button button--primary" type="submit" form="growth-form">${icon('plus')}Add measurement</button>`)}
-  <div class="form-layout"><form class="card" id="growth-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">New measurement</h2><p>Record height and weight for a child. BMI will be auto-calculated.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>${field('Date *', 'date', '', 'date', '', new Date().toISOString().slice(0, 10))}${field('Height (cm) *', 'height', 'e.g. 140', 'number')}${field('Weight (kg) *', 'weight', 'e.g. 35', 'number')}</div></section></form>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">Recent measurements</h2><p class="card__caption">All growth records across children</p></div></header><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Child</th><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead><tbody>${tableHTML}</tbody></table></div></section></div>`);
+  <div class="form-layout">
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <form class="card" id="growth-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">New measurement</h2><p>Record height and weight for a child. BMI will be auto-calculated.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>${field('Date *', 'date', '', 'date', '', new Date().toISOString().slice(0, 10))}${field('Height (cm) *', 'height', 'e.g. 140', 'number')}${field('Weight (kg) *', 'weight', 'e.g. 35', 'number')}</div></section></form>
+      <section class="card"><header class="card__header"><div><h2 class="card__title">Recent measurements</h2><p class="card__caption">All growth records across children</p></div></header><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Child</th><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead><tbody>${tableHTML}</tbody></table></div></section>
+    </div>
+    <aside class="card form-aside">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">BMI Reference</h2>
+          <p class="card__caption">WHO growth standards</p>
+        </div>
+      </header>
+      <div class="card__body">
+        <div class="detail-list detail-list--single" style="font-size: 13px;">
+          <div class="detail-row"><span>&lt; 16.0</span><b><span class="badge badge--danger">Severely Underweight</span></b></div>
+          <div class="detail-row"><span>16.0 – 18.5</span><b><span class="badge badge--warning">Underweight</span></b></div>
+          <div class="detail-row"><span>18.5 – 25.0</span><b><span class="badge badge--success">Normal</span></b></div>
+          <div class="detail-row"><span>&gt; 25.0</span><b><span class="badge badge--warning">Overweight</span></b></div>
+        </div>
+        <div style="margin-top: 18px; font-size: 12px; color: var(--color-text-muted); line-height: 1.5;">
+          BMI is calculated automatically from height and weight inputs. Regular assessments help identify signs of undernourishment or growth problems early.
+        </div>
+      </div>
+    </aside>
+  </div>`);
 }
 
 /* ═══════════════════════════════════════════════════════
