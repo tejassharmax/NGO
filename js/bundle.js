@@ -1046,8 +1046,36 @@
     const childOptions = children.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
     return shell("medicines", `${heading("Medicine management", "Track all medicines given to children including prescriptions, dosage, and treatment completion.", `<button class="button button--primary" type="submit" form="medicine-form">${icon("plus")}Add prescription</button>`)}
   <div class="stat-grid" style="margin-bottom:24px">${statCard("Active prescriptions", activeMeds.length.toLocaleString(), activeMeds.length > 0 ? "Ongoing" : "None", "pill", "blue")}${statCard("Completed", completedMeds.length.toLocaleString(), completedMeds.length > 0 ? "Finished" : "None", "check", "green")}</div>
-  <div class="form-layout"><form class="card" id="medicine-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">New prescription</h2></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>${field("Medicine name *", "medicineName", "e.g. Amoxicillin", "text")}${field("Dosage *", "dosage", "e.g. 250mg twice daily", "text")}${field("Frequency", "frequency", "e.g. Every 8 hours", "text")}${field("Start date *", "startDate", "", "date", "", (/* @__PURE__ */ new Date()).toISOString().slice(0, 10))}${field("End date *", "endDate", "", "date")}</div></section></form>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">All prescriptions</h2></div></header><div class="card__body">${medsHTML}</div></section></div>`);
+  <div class="form-layout">
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <form class="card" id="medicine-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">New prescription</h2></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>${field("Medicine name *", "medicineName", "e.g. Amoxicillin", "text")}${field("Dosage *", "dosage", "e.g. 250mg twice daily", "text")}${field("Frequency", "frequency", "e.g. Every 8 hours", "text")}${field("Start date *", "startDate", "", "date", "", (/* @__PURE__ */ new Date()).toISOString().slice(0, 10))}${field("End date *", "endDate", "", "date")}</div></section></form>
+      <section class="card"><header class="card__header"><div><h2 class="card__title">All prescriptions</h2></div></header><div class="card__body">${medsHTML}</div></section>
+    </div>
+    <aside class="card form-aside">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">Safety Guidelines</h2>
+          <p class="card__caption">NGO health standard</p>
+        </div>
+      </header>
+      <div class="card__body">
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; line-height: 1.5;">
+          <div style="border-left: 3px solid var(--color-primary); padding-left: 8px;">
+            <b style="color: var(--color-primary); display: block;">Double Check</b>
+            Verify child name, medicine name, and exact dosage before administering.
+          </div>
+          <div style="border-left: 3px solid var(--color-warning); padding-left: 8px;">
+            <b style="color: var(--color-warning); display: block;">Storage Safety</b>
+            Keep all medicines in a cool, dry, locked cabinet, out of reach of children.
+          </div>
+          <div style="border-left: 3px solid var(--color-success); padding-left: 8px;">
+            <b style="color: var(--color-success); display: block;">Adherence</b>
+            Always complete the full course of treatment even if the child recovers early.
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>`);
   }
   function appointmentsPage() {
     const children = getChildren();
