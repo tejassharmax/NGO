@@ -33,6 +33,7 @@ let page = 'dashboard';
     const app = document.querySelector('#app');
     if (app) {
       app.innerHTML = renderPage(page);
+      applyColumnVisibility();
     }
 
     // Initialize interactive chart if on dashboard or reports
@@ -101,6 +102,39 @@ let page = 'dashboard';
     if (target.matches('[data-filter-toggle]')) { const row = document.querySelector('[data-filter-row]'); row.hidden = !row.hidden; }
     if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }
     if (target.matches('[data-clear-filters]')) { document.querySelectorAll('[data-filter-status], [data-filter-blood]').forEach((input) => { input.value = ''; }); applyTableFilters(); }
+    if (target.matches('[data-column-visibility-toggle]')) {
+      const columns = [
+        { id: 'age', label: 'Age' },
+        { id: 'gender', label: 'Gender' },
+        { id: 'blood', label: 'Blood group' },
+        { id: 'status', label: 'Status' }
+      ];
+      const states = JSON.parse(localStorage.getItem('chm-col-visibility') || '{"age":true,"gender":true,"blood":true,"status":true}');
+      const formHTML = columns.map(col => `
+        <label class="checkbox" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" data-col-id="${col.id}" ${states[col.id] ? 'checked' : ''}>
+          <span>${col.label}</span>
+        </label>
+      `).join('');
+      modal({
+        title: 'Configure columns',
+        body: `<div style="display:flex; flex-direction:column; gap:4px; padding: 10px 0;">
+          <p style="margin-bottom:12px; font-size:12px; color:var(--color-text-muted);">Toggle columns to customize your data table view.</p>
+          ${formHTML}
+        </div>`,
+        confirmText: 'Apply changes',
+        onConfirm: () => {
+          const newStates = {};
+          columns.forEach(col => {
+            const checked = document.querySelector(`input[data-col-id="${col.id}"]`)?.checked;
+            newStates[col.id] = checked;
+          });
+          localStorage.setItem('chm-col-visibility', JSON.stringify(newStates));
+          applyColumnVisibility();
+          toast('View updated', 'Your custom columns have been applied.');
+        }
+      });
+    }
     
     if (target.matches('[data-delete]')) {
       const id = target.dataset.delete;
@@ -660,6 +694,17 @@ function applyTableFilters() {
 
   const btnNext = document.getElementById('btn-next');
   if (btnNext) btnNext.disabled = currentPage === totalPages;
+  applyColumnVisibility();
+}
+
+function applyColumnVisibility() {
+  const states = JSON.parse(localStorage.getItem('chm-col-visibility') || '{"age":true,"gender":true,"blood":true,"status":true}');
+  Object.keys(states).forEach(colId => {
+    const visible = states[colId];
+    document.querySelectorAll(`[data-column="${colId}"]`).forEach(el => {
+      el.style.display = visible ? '' : 'none';
+    });
+  });
 }
 
 function applyDocumentFilters() {

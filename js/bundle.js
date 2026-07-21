@@ -600,8 +600,8 @@
       const age = calculateAge(child.dob);
       return `<tr>
     <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
-    <td><a class="table-person" href="${pagePath("child-profile")}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span><b>${child.name}</b><span>${child.id}</span></span></a></td>
-    <td>${age || "\u2014"}</td><td class="hide-tablet">${child.gender || "\u2014"}</td><td class="hide-tablet">${child.blood || "\u2014"}</td><td>${healthDot(hs.level)} ${statusBadge(child.status)}</td>
+    <td><a class="table-person" href="${pagePath("child-profile")}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name">${child.name}</span><span class="table-person__id">${child.id}</span></div></a></td>
+    <td data-column="age">${age || "\u2014"}</td><td class="hide-tablet" data-column="gender">${child.gender || "\u2014"}</td><td class="hide-tablet" data-column="blood">${child.blood || "\u2014"}</td><td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>
     <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath("child-profile")}?id=${child.id}">${icon("eye")}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon("pencil")}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon("trash")}</button></div></td>
   </tr>`;
     }).join("");
@@ -883,7 +883,7 @@
     const totalPages = Math.ceil(totalItems / itemsPerPage2) || 1;
     const paginated = children.slice(0, itemsPerPage2);
     return shell("children", `${heading("Children", "Search, monitor, and manage every child record in one place.", `<button class="button" type="button" data-bulk-export>${icon("export")}Export</button><a class="button button--primary" href="${pagePath("register-child")}">${icon("plus")}Register child</a>`)}
-  <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon("search")}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID\u2026" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon("filter")}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns">${icon("settings")}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon("chevronDown")}</button></th><th data-resizable>Age</th><th class="hide-tablet">Gender</th><th class="hide-tablet">Blood group</th><th>Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon("chevronLeft")}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? "disabled" : ""}>Next${icon("chevronRight")}</button></div></footer></section>`);
+  <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon("search")}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID\u2026" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon("filter")}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon("settings")}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon("chevronDown")}</button></th><th data-resizable data-column="age">Age</th><th class="hide-tablet" data-column="gender">Gender</th><th class="hide-tablet" data-column="blood">Blood group</th><th data-column="status">Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon("chevronLeft")}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? "disabled" : ""}>Next${icon("chevronRight")}</button></div></footer></section>`);
   }
   function childProfilePage() {
     const id = new URLSearchParams(window.location.search).get("id");
@@ -1449,6 +1449,7 @@
       const app = document.querySelector("#app");
       if (app) {
         app.innerHTML = renderPage(page);
+        applyColumnVisibility();
       }
       if (page === "dashboard" || page === "reports") {
         initChart();
@@ -1530,6 +1531,39 @@
         input.value = "";
       });
       applyTableFilters();
+    }
+    if (target.matches("[data-column-visibility-toggle]")) {
+      const columns = [
+        { id: "age", label: "Age" },
+        { id: "gender", label: "Gender" },
+        { id: "blood", label: "Blood group" },
+        { id: "status", label: "Status" }
+      ];
+      const states = JSON.parse(localStorage.getItem("chm-col-visibility") || '{"age":true,"gender":true,"blood":true,"status":true}');
+      const formHTML = columns.map((col) => `
+        <label class="checkbox" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" data-col-id="${col.id}" ${states[col.id] ? "checked" : ""}>
+          <span>${col.label}</span>
+        </label>
+      `).join("");
+      modal({
+        title: "Configure columns",
+        body: `<div style="display:flex; flex-direction:column; gap:4px; padding: 10px 0;">
+          <p style="margin-bottom:12px; font-size:12px; color:var(--color-text-muted);">Toggle columns to customize your data table view.</p>
+          ${formHTML}
+        </div>`,
+        confirmText: "Apply changes",
+        onConfirm: () => {
+          const newStates = {};
+          columns.forEach((col) => {
+            const checked = document.querySelector(`input[data-col-id="${col.id}"]`)?.checked;
+            newStates[col.id] = checked;
+          });
+          localStorage.setItem("chm-col-visibility", JSON.stringify(newStates));
+          applyColumnVisibility();
+          toast("View updated", "Your custom columns have been applied.");
+        }
+      });
     }
     if (target.matches("[data-delete]")) {
       const id = target.dataset.delete;
@@ -2032,6 +2066,16 @@
     if (btnPrev) btnPrev.disabled = currentPage === 1;
     const btnNext = document.getElementById("btn-next");
     if (btnNext) btnNext.disabled = currentPage === totalPages;
+    applyColumnVisibility();
+  }
+  function applyColumnVisibility() {
+    const states = JSON.parse(localStorage.getItem("chm-col-visibility") || '{"age":true,"gender":true,"blood":true,"status":true}');
+    Object.keys(states).forEach((colId) => {
+      const visible = states[colId];
+      document.querySelectorAll(`[data-column="${colId}"]`).forEach((el) => {
+        el.style.display = visible ? "" : "none";
+      });
+    });
   }
   function applyDocumentFilters() {
     const searchVal = document.querySelector("[data-document-search]")?.value.toLowerCase().trim() || "";
