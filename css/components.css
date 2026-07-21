@@ -60,6 +60,8 @@
 .data-table tbody tr { transition: background var(--transition); }
 .data-table tbody tr:hover { background: #fafafa; }
 .data-table tbody tr:last-child td { border-bottom: 0; }
+.data-table th:first-child, .data-table td:first-child { padding-left: 24px; }
+.data-table th:last-child, .data-table td:last-child { padding-right: 24px; }
 .sort-button { display: inline-flex; align-items: center; gap: 5px; padding: 0; color: inherit; background: none; border: 0; font: inherit; text-transform: inherit; }
 .sort-button svg { width: 14px; height: 14px; }
 .table-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
