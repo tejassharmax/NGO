@@ -32,3 +32,6 @@ Thumbs.db
 
 # Design docs (not needed in production)
 DESIGN_SYSTEM.md
+
+# Backup directories
+orbit-original/
