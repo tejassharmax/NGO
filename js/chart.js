@@ -1,7 +1,7 @@
-import { getStudents } from './storage.js';
+import { getChildren, getGrowthRecords, getExpenses } from './storage.js';
 
 export function getChartData() {
-  const students = getStudents();
+  const children = getChildren();
   const now = new Date();
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const fullMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -10,13 +10,13 @@ export function getChartData() {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const monthStr = String(d.getMonth() + 1).padStart(2, '0');
     const yearStr = String(d.getFullYear());
-    const count = students.filter(s => s.admission && s.admission.includes(`${yearStr}-${monthStr}-`)).length;
+    const count = children.filter(c => c.registeredDate && c.registeredDate.includes(`${yearStr}-${monthStr}-`)).length;
     data.push({ month: months[d.getMonth()], value: count, label: fullMonths[d.getMonth()] });
   }
   return data;
 }
 
-export function admissionsChart() {
+export function registrationChart() {
   const chartData = getChartData();
   const currentValue = chartData[chartData.length - 1]?.value || 0;
   const prevValue = chartData[chartData.length - 2]?.value || 0;
@@ -24,8 +24,8 @@ export function admissionsChart() {
   const changeText = pctChange >= 0 ? `+${pctChange}%` : `${pctChange}%`;
 
   return `<div class="chart-summary"><b>${currentValue}</b><span>${changeText} vs. last month</span></div>
-  <div class="chart-interactive" id="admissions-chart">
-    <svg class="chart-canvas" viewBox="0 0 640 180" preserveAspectRatio="none" aria-label="Admissions overview chart">
+  <div class="chart-interactive" id="registration-chart">
+    <svg class="chart-canvas" viewBox="0 0 640 180" preserveAspectRatio="none" aria-label="Children registered chart">
       <defs>
         <linearGradient id="chartAreaGradient" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.22"/>
@@ -44,7 +44,7 @@ export function admissionsChart() {
 }
 
 export function initChart() {
-  const chart = document.getElementById('admissions-chart');
+  const chart = document.getElementById('registration-chart');
   if (!chart) return;
 
   const chartData = getChartData();
@@ -108,7 +108,6 @@ export function initChart() {
     const rect = svg.getBoundingClientRect();
     const mouseX = ((event.clientX - rect.left) / rect.width) * W;
 
-    // Find closest point
     let closest = points[0];
     let minDist = Math.abs(points[0].x - mouseX);
     points.forEach(p => {
@@ -119,7 +118,6 @@ export function initChart() {
       }
     });
 
-    // Show hover line and circle
     hoverLine.setAttribute('x1', String(closest.x));
     hoverLine.setAttribute('x2', String(closest.x));
     hoverLine.style.display = '';
@@ -128,11 +126,9 @@ export function initChart() {
     hoverCircle.setAttribute('cy', String(closest.y));
     hoverCircle.style.display = '';
 
-    // Show tooltip
-    tooltip.innerHTML = `<strong>${closest.label}</strong><div>${closest.value} admission${closest.value !== 1 ? 's' : ''}</div>`;
+    tooltip.innerHTML = `<strong>${closest.label}</strong><div>${closest.value} registration${closest.value !== 1 ? 's' : ''}</div>`;
     tooltip.style.opacity = '1';
     
-    // Position tooltip
     const tipRect = tooltip.getBoundingClientRect();
     const svgRect = svg.getBoundingClientRect();
     const tooltipX = (closest.x / W) * svgRect.width - tipRect.width / 2;

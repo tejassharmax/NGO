@@ -119,3 +119,16 @@
 .global-search__result b, .global-search__result small { display: block; }
 .global-search__result b { font-size: 12px; }.global-search__result small { margin-top: 2px; color: var(--color-text-muted); font-size: 10px; }
 .global-search__go { margin-left: auto; color: var(--color-text-muted); }.global-search__go svg { width: 16px; }
+
+/* Health status dots */
+.health-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
+.health-dot--good { background: var(--color-success); box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15); }
+.health-dot--warning { background: var(--color-warning); box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15); }
+.health-dot--critical { background: var(--color-danger); box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15); animation: pulse-dot 1.5s ease infinite; }
+@keyframes pulse-dot { 0%, 100% { box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.15); } 50% { box-shadow: 0 0 0 5px rgba(220, 38, 38, 0.08); } }
+
+/* Document grid for cards */
+.document-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+
+/* Stat card amber variant */
+.stat-card__icon--amber { color: #d97706; background: var(--color-warning-soft); }

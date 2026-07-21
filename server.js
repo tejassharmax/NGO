@@ -244,7 +244,14 @@ function cleanValue(val) {
 function parseOCRText(text, silent = false) {
   const result = {
     firstName: '', lastName: '', dob: '', gender: '',
-    blood: '', father: '', mother: '', phone: '', idNumber: ''
+    blood: '', father: '', mother: '', phone: '', idNumber: '',
+    // CBC / Blood Report specific fields
+    isBloodReport: false,
+    hemoglobin: '',
+    wbc: '',
+    rbc: '',
+    platelets: '',
+    pcv: ''
   };
 
   const cleanText = text.replace(/[|`¢~©®™•°§¶]/g, '').trim();
@@ -258,6 +265,8 @@ function parseOCRText(text, silent = false) {
     docType = 'birth_certificate';
   } else if (/aadh[ae]+r|gov[eao]?r?n?ment\s*of\s*ind|unique\s*ident|uid|आधार|मेरा\s*आधार|भारत\s*सरकार|\d{4}\s\d{4}\s\d{4}/i.test(headerText)) {
     docType = 'aadhaar';
+  } else if (/padmavathi|diagnostic|pathology|haemoglobin|w\.b\.c|rbc|platelets|cbc|cbp|blood\s*report|clinical|biological|interval/i.test(headerText)) {
+    docType = 'blood_report';
   }
 
   // Secondary classification: if we see an Aadhaar number pattern anywhere, it's likely Aadhaar
@@ -265,6 +274,8 @@ function parseOCRText(text, silent = false) {
     const fullText = lines.join(' ');
     if (/\b\d{4}\s\d{4}\s\d{4}\b/.test(fullText) && !/vid/i.test(fullText.split(/\d{4}\s\d{4}\s\d{4}/)[0].slice(-20))) {
       docType = 'aadhaar';
+    } else if (/haemoglobin|w\.b\.c|cbc|cbp|platelets/i.test(fullText)) {
+      docType = 'blood_report';
     }
   }
 
@@ -272,6 +283,8 @@ function parseOCRText(text, silent = false) {
 
   if (docType === 'birth_certificate') {
     parseBirthCertificate(cleanText, lines, result);
+  } else if (docType === 'blood_report') {
+    parseBloodReport(cleanText, lines, result);
   } else {
     parseAadhaarCard(cleanText, lines, result);
   }
@@ -424,6 +437,80 @@ function parseAadhaarCard(cleanText, lines, result) {
         }
       }
     }
+  }
+}
+
+
+/* ───────────────────────────────────────────────────────
+   BLOOD REPORT PARSER
+   ─────────────────────────────────────────────────────── */
+
+function parseBloodReport(cleanText, lines, result) {
+  result.isBloodReport = true;
+
+  // ── Patient Name ──
+  const nameLine = lines.find(l => /\bname\b/i.test(l));
+  if (nameLine) {
+    const m = nameLine.match(/\bname\s*[:\-]\s*(?:mr\.|mrs\.|ms\.)?\s*([a-zA-Z\s.]+)/i);
+    if (m) {
+      setNameFields(m[1].trim(), result);
+    }
+  }
+
+  // ── Age / Gender ──
+  const ageSexLine = lines.find(l => /\bage\s*&\s*sex\b/i.test(l) || /\bage\s*\/s*sex\b/i.test(l) || /\bage\s*sex\b/i.test(l));
+  if (ageSexLine) {
+    const m = ageSexLine.match(/age\s*(?:&|\/)?\s*sex\s*[:\-]\s*(\d+)\s*(?:years?|yr|mo)?\s*\|\s*(male|female|transgender)/i);
+    if (m) {
+      result.gender = m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase();
+      const age = parseInt(m[1], 10);
+      const birthYear = new Date().getFullYear() - age;
+      result.dob = `${birthYear}-01-01`; // Estimate DOB
+    }
+  }
+
+  // ── Guardian / Father's name (mapped from referred by if matches) ──
+  const refLine = lines.find(l => /\breferred\b/i.test(l));
+  if (refLine) {
+    const m = refLine.match(/referred\s*(?:by)?\s*[:\-]\s*(?:dr\.)?\s*([a-zA-Z\s.]+)/i);
+    if (m) {
+      result.father = m[1].replace(/[^a-zA-Z\s.']/g, '').trim();
+    }
+  }
+
+  // ── Hemoglobin ──
+  const hbLine = lines.find(l => /\bhaemoglobin\b/i.test(l) || /\bhemoglobin\b/i.test(l) || /\bhb\b/i.test(l));
+  if (hbLine) {
+    const m = hbLine.match(/(?:haemoglobin|hemoglobin|hb)\s*(\d+\.?\d*)/i);
+    if (m) result.hemoglobin = m[1];
+  }
+
+  // ── WBC Count ──
+  const wbcLine = lines.find(l => /\bw\.b\.c\b/i.test(l) || /\bwbc\b/i.test(l));
+  if (wbcLine) {
+    const m = wbcLine.match(/(?:total\s*)?(?:w\.b\.c|wbc)(?:\s*count)?\s*(\d+)/i);
+    if (m) result.wbc = m[1];
+  }
+
+  // ── RBC Count ──
+  const rbcLine = lines.find(l => /\br\.b\.c\b/i.test(l) || /\brbc\b/i.test(l));
+  if (rbcLine) {
+    const m = rbcLine.match(/(?:total\s*)?(?:r\.b\.c|rbc)(?:\s*count)?\s*(\d+\.?\d*)/i);
+    if (m) result.rbc = m[1];
+  }
+
+  // ── Platelets Count ──
+  const platLine = lines.find(l => /\bplatelet\b/i.test(l));
+  if (platLine) {
+    const m = platLine.match(/platelets?(?:\s*count)?\s*(\d+\.?\d*)/i);
+    if (m) result.platelets = m[1];
+  }
+
+  // ── PCV ──
+  const pcvLine = lines.find(l => /\bpcv\b/i.test(l));
+  if (pcvLine) {
+    const m = pcvLine.match(/pcv\s*(\d+\.?\d*)/i);
+    if (m) result.pcv = m[1];
   }
 }
 

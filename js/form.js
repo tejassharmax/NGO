@@ -1,46 +1,53 @@
-import { updateStudent, getStudent } from './storage.js';
+import { updateChild, getChild } from './storage.js';
 
-export function collectStudent(form) {
+export function collectChild(form) {
   const values = Object.fromEntries(new FormData(form));
   let id = values.id;
-  let admission = values.admissionDate || new Date().toISOString().slice(0, 10);
+  let registeredDate = values.registeredDate || new Date().toISOString().slice(0, 10);
   let status = 'Active';
 
-  // If there's an existing student with this ID, preserve their admission date, status and other missing fields
+  // If editing, preserve existing registration date and status
   if (id) {
-    const existing = getStudent(id);
+    const existing = getChild(id);
     if (existing) {
-      admission = existing.admission || admission;
+      registeredDate = existing.registeredDate || registeredDate;
       status = existing.status || status;
     }
   } else {
-    // Generate new ID
-    id = `ST-${String(1025 + Math.floor(Math.random() * 75))}`;
+    id = `CH-${String(1025 + Math.floor(Math.random() * 9975)).padStart(4, '0')}`;
   }
 
   const mother = values.mother || '';
-  const dob = values.dob || values.birthDate || 'Not specified';
+  const dob = values.dob || values.birthDate || '';
   const idNumber = values.idNumber || '';
 
   return {
     id,
-    name: `${values.firstName || 'New'} ${values.lastName || 'Student'}`.trim(),
-    email: values.email || 'No email added',
-    class: `${values.grade || 'Grade 8'} · ${values.section || 'A'}`,
-    gender: values.gender || 'Not specified',
-    blood: values.blood || 'Not added',
-    father: values.father || 'Not added',
-    mother: mother || 'Not added',
-    phone: values.phone || 'Not added',
+    name: `${values.firstName || 'New'} ${values.lastName || 'Child'}`.trim(),
+    email: values.email || '',
+    gender: values.gender || '',
+    blood: values.blood || '',
+    father: values.father || '',
+    mother: mother || '',
+    phone: values.phone || '',
     address: values.address || '',
     notes: values.notes || '',
-    admission,
+    registeredDate,
     status,
     dob,
-    idNumber
+    idNumber,
+    // Health baseline fields
+    height: values.height || '',
+    weight: values.weight || '',
+    medicalConditions: values.medicalConditions || '',
+    allergies: values.allergies || '',
+    medications: values.medications || '',
+    emergencyContact: values.emergencyContact || '',
+    emergencyPhone: values.emergencyPhone || '',
+    hospitalName: values.hospitalName || ''
   };
 }
 
-export function saveStudent(form) {
-  return updateStudent(collectStudent(form));
+export function saveChild(form) {
+  return updateChild(collectChild(form));
 }

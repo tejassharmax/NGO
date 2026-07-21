@@ -1,7 +1,7 @@
 {
-  "name": "sample-student-management",
-  "version": "1.0.0",
-  "description": "NGO Student Management System with OCR",
+  "name": "child-health-management",
+  "version": "2.0.0",
+  "description": "NGO Child Health Management Platform with Medical Document OCR",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

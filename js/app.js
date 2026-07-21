@@ -1,14 +1,14 @@
 import { renderPage } from './router.js';
-import { deleteStudent, getStudents, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs } from './storage.js';
-import { updateStudentTable, studentRows } from './table.js';
-import { searchStudents, globalSearchMarkup } from './search.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addSponsor, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord } from './storage.js';
+import { updateChildTable, childRows } from './table.js';
+import { searchChildren, globalSearchMarkup } from './search.js';
 import { toast } from './toast.js';
 import { modal, closeModal } from './modal.js';
-import { saveStudent } from './form.js';
+import { saveChild } from './form.js';
 import { pagePath, icon } from './utils.js';
 import { initChart } from './chart.js';
 
-let activeSort = { field: 'admission', direction: 'desc' };
+let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
 let currentPage = 1;
 const itemsPerPage = 5;
@@ -45,16 +45,23 @@ if (!isLoggedIn && page !== 'login') {
 
     if (target.matches('[data-topbar-back]')) {
       const prevPageMap = {
-        'student-profile': 'students',
-        'add-student': 'students',
+        'child-profile': 'children',
+        'register-child': 'children',
         'ocr-review': 'ocr-upload',
         'ocr-details': 'ocr-review',
         'ocr-processing': 'ocr-upload',
-        'students': 'dashboard',
+        'children': 'dashboard',
         'documents': 'dashboard',
         'reports': 'dashboard',
         'export': 'dashboard',
-        'settings': 'dashboard'
+        'settings': 'dashboard',
+        'growth': 'dashboard',
+        'nutrition': 'dashboard',
+        'medicines': 'dashboard',
+        'appointments': 'dashboard',
+        'emergency': 'dashboard',
+        'sponsors': 'dashboard',
+        'expenses': 'dashboard'
       };
       const prev = prevPageMap[page] || 'dashboard';
       window.location.href = pagePath(prev);
@@ -64,7 +71,7 @@ if (!isLoggedIn && page !== 'login') {
     if (target.matches('[data-open-sidebar]')) { document.querySelector('.app-shell').classList.add('sidebar-open'); document.querySelector('.mobile-backdrop').hidden = false; }
     if (target.matches('[data-close-sidebar]')) { document.querySelector('.app-shell').classList.remove('sidebar-open'); target.hidden = true; }
     if (target.matches('[data-theme-toggle]')) setTheme(!document.body.classList.contains('theme-dark'));
-    if (target.matches('[data-notifications]')) toast('You’re all caught up', 'No new notifications need your attention.');
+    if (target.matches('[data-notifications]')) toast('You\u2019re all caught up', 'No new health alerts need your attention.');
     if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
     
     if (target.matches('[data-sign-out]')) {
@@ -77,7 +84,7 @@ if (!isLoggedIn && page !== 'login') {
       toast('Connecting to Google...', 'Redirecting to secure single sign-on.');
       window.setTimeout(() => {
         localStorage.setItem('sample-logged-in', 'true');
-        toast('Google Login Successful', 'Logged in as Aarushi (admin-sample@gmail.com).');
+        toast('Google Login Successful', 'Logged in as Admin (admin@childcare.org).');
         window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
       }, 1200);
     }
@@ -85,17 +92,17 @@ if (!isLoggedIn && page !== 'login') {
     if (target.matches('[data-global-search]')) openGlobalSearch();
     if (target.matches('[data-filter-toggle]')) { const row = document.querySelector('[data-filter-row]'); row.hidden = !row.hidden; }
     if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }
-    if (target.matches('[data-clear-filters]')) { document.querySelectorAll('[data-filter-status], [data-filter-grade], [data-filter-blood]').forEach((input) => { input.value = ''; }); applyTableFilters(); }
+    if (target.matches('[data-clear-filters]')) { document.querySelectorAll('[data-filter-status], [data-filter-blood]').forEach((input) => { input.value = ''; }); applyTableFilters(); }
     
     if (target.matches('[data-delete]')) {
       const id = target.dataset.delete;
-      const student = getStudents().find((item) => item.id === id);
-      modal({ title: `Remove ${student?.name || 'student'}?`, body: 'This removes the student record from this demo workspace. This action cannot be undone.', confirmText: 'Remove student', confirmClass: 'button--danger', onConfirm: () => { deleteStudent(id); applyTableFilters(); toast('Student removed', 'The record has been removed from this workspace.'); } });
+      const child = getChildren().find((item) => item.id === id);
+      modal({ title: `Remove ${child?.name || 'child'}?`, body: 'This removes the child record from this workspace. This action cannot be undone.', confirmText: 'Remove child', confirmClass: 'button--danger', onConfirm: () => { deleteChild(id); applyTableFilters(); toast('Child removed', 'The record has been removed from this workspace.'); } });
     }
 
     if (target.matches('[data-edit]')) {
       const id = target.dataset.edit;
-      window.location.href = `${pagePath('add-student')}?method=manual&edit=${id}`;
+      window.location.href = `${pagePath('register-child')}?method=manual&edit=${id}`;
     }
 
     if (target.matches('#btn-prev')) {
@@ -105,18 +112,18 @@ if (!isLoggedIn && page !== 'login') {
       }
     }
     if (target.matches('#btn-next')) {
-      const students = filteredStudents();
-      const totalPages = Math.ceil(students.length / itemsPerPage) || 1;
+      const children = filteredChildren();
+      const totalPages = Math.ceil(children.length / itemsPerPage) || 1;
       if (currentPage < totalPages) {
         currentPage++;
         applyTableFilters();
       }
     }
 
-    const docCard = target.closest('[data-student-id]');
-    if (docCard && !target.matches('button, a')) {
-      const studentId = docCard.dataset.studentId;
-      window.location.href = `${pagePath('student-profile')}?id=${studentId}`;
+    const childCard = target.closest('[data-child-id]');
+    if (childCard && !target.matches('button, a')) {
+      const childId = childCard.dataset.childId;
+      window.location.href = `${pagePath('child-profile')}?id=${childId}`;
     }
 
     const docCardClick = target.closest('[data-document-idx]');
@@ -126,7 +133,7 @@ if (!isLoggedIn && page !== 'login') {
       const doc = docs[idx];
       if (doc) {
         modal({
-          title: `${doc.name} - ${doc.student}`,
+          title: `${doc.name} - ${doc.child || doc.student || '—'}`,
           body: doc.image 
             ? `<div style="text-align:center; max-height: 70vh; overflow: auto;"><img src="${doc.image}" style="max-width:100%; max-height: 55vh; object-fit:contain; border-radius:6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>`
             : `<div class="empty-state" style="padding: 24px;"><span class="empty-state__icon">${icon('file')}</span><p>No preview image available for this document.</p></div>`,
@@ -137,7 +144,7 @@ if (!isLoggedIn && page !== 'login') {
     }
 
     if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
-      exportStudentsToExcel();
+      exportChildrenToExcel();
     }
 
     if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
@@ -177,7 +184,6 @@ if (!isLoggedIn && page !== 'login') {
 
     if (target.matches('[data-ocr-continue]')) {
       if (document.querySelector('[data-ocr-confirm]')?.checked) {
-        // Collect edited values from the review page forms
         const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
         const formFields = document.querySelectorAll('form.card input, form.card select');
         formFields.forEach(field => {
@@ -228,11 +234,17 @@ if (!isLoggedIn && page !== 'login') {
       target.closest('.settings-nav').querySelectorAll('button').forEach((button) => button.classList.toggle('active', button === target));
       toast(`${target.textContent.trim()} settings`, 'This section is ready for configuration.');
     }
+
+    // Delete emergency contact
+    if (target.matches('[data-delete-contact]')) {
+      const contactId = target.dataset.deleteContact;
+      modal({ title: 'Remove contact?', body: 'This will permanently remove this emergency contact.', confirmText: 'Remove', confirmClass: 'button--danger', onConfirm: () => { deleteEmergencyContact(contactId); toast('Contact removed', 'Emergency contact has been deleted.'); window.setTimeout(() => window.location.reload(), 500); } });
+    }
   });
 
   // Inputs
   document.addEventListener('input', (event) => {
-    if (event.target.matches('#student-search, [data-filter-status], [data-filter-grade], [data-filter-blood]')) {
+    if (event.target.matches('#child-search, [data-filter-status], [data-filter-blood]')) {
       currentPage = 1;
       applyTableFilters();
     }
@@ -241,7 +253,7 @@ if (!isLoggedIn && page !== 'login') {
 
   // Changes
   document.addEventListener('change', (event) => {
-    if (event.target.matches('[data-filter-status], [data-filter-grade], [data-filter-blood]')) {
+    if (event.target.matches('[data-filter-status], [data-filter-blood]')) {
       currentPage = 1;
       applyTableFilters();
     }
@@ -278,45 +290,214 @@ if (!isLoggedIn && page !== 'login') {
     }
   });
 
-  // Form Submissions
-  document.querySelector('#student-form')?.addEventListener('submit', (event) => {
+  // ─── Form Submissions ───
+
+  // Child registration form
+  document.querySelector('#child-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-    const student = saveStudent(form);
-    toast('Student saved', `${student.name}’s record is ready.`);
-    window.setTimeout(() => { window.location.href = `${pagePath('student-profile')}?id=${student.id}`; }, 500);
+    const child = saveChild(form);
+    toast('Child saved', `${child.name}'s record is ready.`);
+    window.setTimeout(() => { window.location.href = `${pagePath('child-profile')}?id=${child.id}`; }, 500);
   });
 
+  // OCR additional form
   document.querySelector('#ocr-additional-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
-    const student = saveStudent(form);
-    logActivity('doc_processed', student.name, 'OCR-verified student saved');
-    addPendingDoc('Student record', student.name);
+    const child = saveChild(form);
+    logActivity('doc_processed', child.name, 'OCR-verified child saved');
+    addPendingDoc('Health record', child.name);
     
-    // Save document to uploaded docs storage for previewing
     const fileData = localStorage.getItem('ocr-upload-file');
-    const fileName = localStorage.getItem('ocr-upload-filename') || 'Aadhaar Card';
-    let docLabel = 'Aadhaar Card';
-    if (fileName.toLowerCase().includes('birth') || fileName.toLowerCase().includes('cert')) {
+    const fileName = localStorage.getItem('ocr-upload-filename') || 'Medical Document';
+    let docLabel = 'Medical Report';
+    if (fileName.toLowerCase().includes('aadhaar') || fileName.toLowerCase().includes('aadhar')) {
+      docLabel = 'Aadhaar Card';
+    } else if (fileName.toLowerCase().includes('birth') || fileName.toLowerCase().includes('cert')) {
       docLabel = 'Birth Certificate';
-    } else if (fileName.toLowerCase().includes('report') || fileName.toLowerCase().includes('mark')) {
-      docLabel = 'Report Card';
+    } else if (fileName.toLowerCase().includes('blood') || fileName.toLowerCase().includes('cbc') || fileName.toLowerCase().includes('test')) {
+      docLabel = 'Blood Test Report';
     }
-    addUploadedDoc(docLabel, student.name, fileData, 'Verified');
+    addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel);
 
-    toast('Verified student saved', `${student.name}’s record is now active.`);
-    window.setTimeout(() => { window.location.href = `${pagePath('student-profile')}?id=${student.id}`; }, 500);
+    // Save blood report test results to health records
+    const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
+    if (ocrData.isBloodReport || ocrData.hemoglobin || ocrData.rbc) {
+      addHealthRecord({
+        childId: child.id,
+        childName: child.name,
+        type: 'cbc',
+        date: new Date().toISOString().slice(0, 10),
+        hemoglobin: ocrData.hemoglobin || '',
+        wbc: ocrData.wbc || '',
+        rbc: ocrData.rbc || '',
+        platelets: ocrData.platelets || '',
+        pcv: ocrData.pcv || ''
+      });
+      
+      const alerts = [];
+      if (ocrData.hemoglobin && parseFloat(ocrData.hemoglobin) < 11.0) {
+        alerts.push('Low Hemoglobin (Anemia risk)');
+      }
+      if (ocrData.rbc && parseFloat(ocrData.rbc) > 4.8) {
+        alerts.push('High RBC Count');
+      }
+      
+      if (alerts.length > 0) {
+        logActivity('health_alert', child.name, `Abnormal blood values: ${alerts.join(', ')}`);
+      } else {
+        logActivity('health_alert', child.name, `Normal blood test processed`);
+      }
+    }
+
+    toast('Verified child saved', `${child.name}'s record is now active.`);
+    window.setTimeout(() => { window.location.href = `${pagePath('child-profile')}?id=${child.id}`; }, 500);
   });
 
+  // Growth form
+  document.querySelector('#growth-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const values = Object.fromEntries(new FormData(form));
+    const child = getChild(values.childId);
+    addGrowthRecord({
+      childId: values.childId,
+      childName: child ? child.name : 'Unknown',
+      date: values.date,
+      height: parseFloat(values.height),
+      weight: parseFloat(values.weight)
+    });
+    toast('Growth recorded', 'Measurement has been saved.');
+    window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Meal form
+  document.querySelector('#meal-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const values = Object.fromEntries(new FormData(form));
+    const child = getChild(values.childId);
+    addMeal({
+      childId: values.childId,
+      childName: child ? child.name : 'Unknown',
+      mealType: values.mealType,
+      date: values.date,
+      description: values.description,
+      calories: values.calories || ''
+    });
+    toast('Meal logged', 'Nutrition entry has been saved.');
+    window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Medicine form
+  document.querySelector('#medicine-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const values = Object.fromEntries(new FormData(form));
+    const child = getChild(values.childId);
+    addMedicine({
+      childId: values.childId,
+      childName: child ? child.name : 'Unknown',
+      medicineName: values.medicineName,
+      dosage: values.dosage,
+      frequency: values.frequency || 'As directed',
+      startDate: values.startDate,
+      endDate: values.endDate,
+      status: 'Active'
+    });
+    toast('Prescription added', 'Medicine tracking has started.');
+    window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Appointment form
+  document.querySelector('#appointment-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const values = Object.fromEntries(new FormData(form));
+    const child = getChild(values.childId);
+    addAppointment({
+      childId: values.childId,
+      childName: child ? child.name : 'Unknown',
+      type: values.type,
+      date: values.date,
+      time: values.time || '',
+      doctor: values.doctor || '',
+      notes: values.notes || '',
+      status: 'Upcoming'
+    });
+    toast('Appointment scheduled', 'Reminder has been set.');
+    window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Emergency contact form
+  document.querySelector('#emergency-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const values = Object.fromEntries(new FormData(form));
+    addEmergencyContact({
+      name: values.name,
+      type: values.type,
+      phone: values.phone,
+      specialty: values.specialty || '',
+      address: values.address || ''
+    });
+    toast('Contact added', 'Emergency contact has been saved.');
+    window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Sponsor form
+  document.querySelector('#sponsor-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const formData = new FormData(form);
+    const values = Object.fromEntries(formData);
+    const childrenIds = formData.getAll('childrenIds');
+    addSponsor({
+      name: values.name,
+      phone: values.phone || '',
+      email: values.email || '',
+      totalContribution: parseFloat(values.contribution) || 0,
+      childrenIds: childrenIds
+    });
+    toast('Sponsor registered', 'Sponsor record has been created.');
+    window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Expense form
+  document.querySelector('#expense-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const values = Object.fromEntries(new FormData(form));
+    const child = values.childId ? getChild(values.childId) : null;
+    addExpense({
+      date: values.date,
+      category: values.category,
+      amount: values.amount,
+      description: values.description,
+      childId: values.childId || '',
+      childName: child ? child.name : ''
+    });
+    toast('Expense logged', 'Transaction has been recorded.');
+    window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Login form
   document.querySelector('[data-login-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const adminIdInput = event.target.querySelector('[data-admin-id-input]')?.value.trim();
     if (adminIdInput === 'admin-ngo') {
       localStorage.setItem('sample-logged-in', 'true');
-      toast('Login Successful', 'Welcome to the Sample school workspace.');
+      toast('Login Successful', 'Welcome to the Child Health Management workspace.');
       window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
     } else {
       toast('Access Denied', 'Incorrect Admin User ID. Please check the demo credentials.', 'danger');
@@ -339,7 +520,6 @@ if (!isLoggedIn && page !== 'login') {
       const progressPctText = document.querySelector('.ocr-progress-pct');
       let currentProgress = 0;
       
-      // Simulate progress bar going from 0 to 90% while uploading
       const progressTimer = window.setInterval(() => {
         if (currentProgress < 90) {
           currentProgress += Math.floor(Math.random() * 8) + 2;
@@ -358,7 +538,6 @@ if (!isLoggedIn && page !== 'login') {
 
           const startTime = Date.now();
 
-          // Submit to server running on port 3000
           fetch('/api/ocr', {
             method: 'POST',
             body: formData
@@ -370,7 +549,6 @@ if (!isLoggedIn && page !== 'login') {
             .then(result => {
               window.clearInterval(progressTimer);
               if (result.success) {
-                // Complete progress bar
                 if (progressBar) progressBar.style.width = '100%';
                 if (progressPctText) progressPctText.textContent = '100%';
 
@@ -392,17 +570,15 @@ if (!isLoggedIn && page !== 'login') {
               console.error('Live OCR failed:', err);
               localStorage.removeItem('ocr-parsed-data');
               
-              // Show an error modal
               modal({
                 title: 'Extraction Failed',
-                body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate).</p>',
+                body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
                 confirmText: 'Try Again',
                 onConfirm: () => {
                   window.location.href = pagePath('ocr-upload');
                 }
               });
 
-              // Visually indicate failure on the processing screen
               const processingContainer = document.querySelector('.ocr-processing');
               if (processingContainer) {
                 processingContainer.innerHTML = `<span class="ocr-processing__sample" style="color:var(--color-danger)">${icon('alertCircle') || '⚠️'}</span><h2>Extraction failed</h2><p>Please try again with a clearer image.</p>`;
@@ -457,42 +633,36 @@ function openGlobalSearch(query = '') {
   root.querySelector('.modal-backdrop')?.addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
 }
 
-function filteredStudents() {
-  const query = document.querySelector('#student-search')?.value || '';
+function filteredChildren() {
+  const query = document.querySelector('#child-search')?.value || '';
   const status = document.querySelector('[data-filter-status]')?.value || '';
-  const grade = document.querySelector('[data-filter-grade]')?.value || '';
   const blood = document.querySelector('[data-filter-blood]')?.value || '';
-  return searchStudents(query).filter((student) => (!status || student.status === status) && (!grade || student.class.includes(grade)) && (!blood || student.blood === blood));
+  return searchChildren(query).filter((child) => (!status || child.status === status) && (!blood || child.blood === blood));
 }
 
 function applyTableFilters() {
-  const students = filteredStudents().sort((a, b) => String(a[activeSort.field] || '').localeCompare(String(b[activeSort.field] || '')) * (activeSort.direction === 'asc' ? 1 : -1));
+  const children = filteredChildren().sort((a, b) => String(a[activeSort.field] || '').localeCompare(String(b[activeSort.field] || '')) * (activeSort.direction === 'asc' ? 1 : -1));
   
-  const totalItems = students.length;
+  const totalItems = children.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   if (currentPage > totalPages) currentPage = totalPages;
   if (currentPage < 1) currentPage = 1;
 
   const start = (currentPage - 1) * itemsPerPage;
-  const paginated = students.slice(start, start + itemsPerPage);
+  const paginated = children.slice(start, start + itemsPerPage);
 
-  updateStudentTable(paginated);
+  updateChildTable(paginated);
 
-  // Update pagination controls
-  const countSpan = document.getElementById('student-count');
+  const countSpan = document.getElementById('child-count');
   if (countSpan) {
-    countSpan.textContent = `${totalItems} students (Page ${currentPage} of ${totalPages})`;
+    countSpan.textContent = `${totalItems} children (Page ${currentPage} of ${totalPages})`;
   }
 
   const btnPrev = document.getElementById('btn-prev');
-  if (btnPrev) {
-    btnPrev.disabled = currentPage === 1;
-  }
+  if (btnPrev) btnPrev.disabled = currentPage === 1;
 
   const btnNext = document.getElementById('btn-next');
-  if (btnNext) {
-    btnNext.disabled = currentPage === totalPages;
-  }
+  if (btnNext) btnNext.disabled = currentPage === totalPages;
 }
 
 function applyDocumentFilters() {
@@ -566,36 +736,40 @@ function loadSheetJS(callback) {
   document.head.appendChild(script);
 }
 
-function exportStudentsToExcel() {
-  const students = getStudents();
-  if (students.length === 0) {
-    toast('No data to export', 'Add some student records first.');
+function exportChildrenToExcel() {
+  const children = getChildren();
+  if (children.length === 0) {
+    toast('No data to export', 'Register some children first.');
     return;
   }
 
   loadSheetJS(() => {
-    const data = students.map(s => ({
-      'Student ID': s.id || '',
-      'Name': s.name || '',
-      'Email': s.email || '',
-      'Class': s.class || '',
-      'Gender': s.gender || '',
-      'Blood Group': s.blood || '',
-      'Father Name': s.father || '',
-      'Mother Name': s.mother || '',
-      'Phone Number': s.phone || '',
-      'Admission Date': s.admission || '',
-      'Address': s.address || '',
-      'Internal Notes': s.notes || '',
-      'Verification Status': s.status || 'Active'
+    const data = children.map(c => ({
+      'Child ID': c.id || '',
+      'Name': c.name || '',
+      'Date of Birth': c.dob || '',
+      'Age': calculateAge(c.dob) || '',
+      'Gender': c.gender || '',
+      'Blood Group': c.blood || '',
+      'Father / Guardian': c.father || '',
+      'Mother': c.mother || '',
+      'Phone': c.phone || '',
+      'Registration Date': c.registeredDate || '',
+      'Height (cm)': c.height || '',
+      'Weight (kg)': c.weight || '',
+      'Medical Conditions': c.medicalConditions || '',
+      'Allergies': c.allergies || '',
+      'Address': c.address || '',
+      'Health Status': healthStatus(c).label,
+      'Verification Status': c.status || 'Active'
     }));
 
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Student Records");
-    XLSX.writeFile(wb, "Sample_Student_Records.xlsx");
+    XLSX.utils.book_append_sheet(wb, ws, "Children Health Records");
+    XLSX.writeFile(wb, "ChildCare_Health_Records.xlsx");
     
-    logActivity('export_created', 'Excel file', 'Exported all student data to Excel');
-    toast('Export complete', 'Your student records Excel file has been downloaded.');
+    logActivity('export_created', 'Excel file', 'Exported all children health data to Excel');
+    toast('Export complete', 'Your children health records Excel file has been downloaded.');
   });
 }
