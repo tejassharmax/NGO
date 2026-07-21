@@ -417,7 +417,7 @@ function parseAadhaarCard(cleanText, lines, result) {
   // ── Father / Guardian (S/O, D/O, C/O, W/O) ──
   if (!result.father) {
     for (const line of lines) {
-      const m = line.match(/(?:s\s*\/\s*o|d\s*\/\s*o|c\s*\/\s*o|w\s*\/\s*o|son\s*of|daughter\s*of|care\s*of|wife\s*of)\s*[:\-.]?\s*(.+)/i);
+      const m = line.match(/(?:s\s*\/\s*o|d\s*\/\s*o|c\s*\/\s*o|w\s*\/\s*o|son\s*of|daughter\s*of|care\s*of|wife\s*of)\s*[:\-.]?\s*([^,\n\r]+)/i);
       if (m && m[1]) {
         const name = m[1].replace(/^[:\-.\s]+/, '').trim();
         if (name.length > 2 && /[a-zA-Z]/.test(name)) {
@@ -430,7 +430,7 @@ function parseAadhaarCard(cleanText, lines, result) {
   // Also try explicit "Father" / "Guardian" label
   if (!result.father) {
     for (const line of lines) {
-      const m = line.match(/(?:father|guardian|parent)(?:'s)?(?:\s*name)?\s*[:\-.]?\s*(.+)/i);
+      const m = line.match(/(?:father|guardian|parent)(?:'s)?(?:\s*name)?\s*[:\-.]?\s*([^,\n\r]+)/i);
       if (m && m[1]) {
         const name = m[1].trim();
         if (name.length > 2 && /[a-zA-Z]{2}/.test(name)) {
@@ -438,6 +438,14 @@ function parseAadhaarCard(cleanText, lines, result) {
           break;
         }
       }
+    }
+  }
+
+  // ── Address ──
+  if (!result.address) {
+    const addressMatch = cleanText.match(/(?:address|पता)\s*[:\-]\s*([\s\S]+?)(?=\s*(?:\d{4}\s\d{4}\s\d{4}|help@uidai|www\.uidai|\d{10}|\d{12}))/i);
+    if (addressMatch && addressMatch[1]) {
+      result.address = addressMatch[1].replace(/\n+/g, ' ').replace(/\s+/g, ' ').trim();
     }
   }
 }
