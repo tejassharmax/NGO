@@ -273,7 +273,7 @@ export function ocrUploadPage() {
 }
 
 export function ocrProcessingPage() {
-  return shell('ocr-processing', `${heading('Processing document', 'We\u2019re creating a draft from your upload. This never creates or updates a child record automatically.')}<section class="card"><div class="ocr-processing"><span class="ocr-processing__sample">${icon('scan')}</span><h2>Extracting information</h2><p>Reading document structure, identifying details, and preparing them for your review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span>Processing document</span><span class="ocr-progress-pct">0%</span></div><div class="progress"><div class="progress__bar ocr-progress-bar" style="width: 0%"></div></div></div></div></section>`);
+  return shell('ocr-processing', `${heading('Processing document', 'We\u2019re creating a draft from your upload. This never creates or updates a child record automatically.')}<section class="card"><div class="ocr-processing"><div class="ocr-processing__orbit">${icon('scan')}</div><h2>Extracting information</h2><p>Reading document structure, identifying details, and preparing them for your review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span>Processing document</span><span class="ocr-progress-pct">0%</span></div><div class="progress"><div class="progress__bar ocr-progress-bar" style="width: 0%"></div></div></div></div></section>`);
 }
 
 export function ocrReviewPage() {
