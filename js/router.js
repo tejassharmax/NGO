@@ -11,7 +11,7 @@ const nav = [
   { section: 'Overview', items: [['dashboard', 'Dashboard', 'grid']] },
   { section: 'Children', items: [['children', 'Children', 'users'], ['growth', 'Growth', 'ruler'], ['nutrition', 'Nutrition', 'apple']] },
   { section: 'Health', items: [['medicines', 'Medicines', 'pill'], ['appointments', 'Appointments', 'calendar'], ['documents', 'Documents', 'file']] },
-  { section: 'Management', items: [['sponsors', 'Sponsors', 'heart'], ['expenses', 'Expenses', 'wallet'], ['emergency', 'Emergency', 'phone']] },
+  { section: 'Management', items: [['expenses', 'Expenses', 'wallet'], ['emergency', 'Emergency', 'phone']] },
   { section: 'Workspace', items: [['reports', 'Reports', 'chart'], ['export', 'Export', 'export']] }
 ];
 
@@ -33,7 +33,6 @@ const pageTitles = {
   medicines: 'Medicine management',
   appointments: 'Appointments',
   emergency: 'Emergency contacts',
-  sponsors: 'Sponsor management',
   expenses: 'Expense management'
 };
 
@@ -565,31 +564,6 @@ export function emergencyPage() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   SPONSORS
-   ═══════════════════════════════════════════════════════ */
-
-export function sponsorsPage() {
-  const sponsors = getSponsors();
-  const children = getChildren();
-
-  let sponsorsHTML = '';
-  if (sponsors.length === 0) {
-    sponsorsHTML = `<div class="empty-state" style="padding:48px 24px"><span class="empty-state__icon">${icon('heart')}</span><h3>No sponsors registered</h3><p>Add sponsors to track their contributions and the children they support.</p></div>`;
-  } else {
-    sponsorsHTML = `<div class="document-grid">${sponsors.map(s => {
-      const linkedChildren = children.filter(c => (s.childrenIds || []).includes(c.id));
-      return `<article class="card document-card card--interactive"><div class="document-card__body" style="padding:16px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px"><h3 style="font-size:14px; font-weight:600; margin:0">${s.name}</h3><span class="badge badge--blue">${linkedChildren.length} children</span></div><div class="detail-list detail-list--single" style="font-size:13px"><div class="detail-row"><span>Contact</span><b>${s.phone || s.email || '—'}</b></div><div class="detail-row"><span>Total contribution</span><b>₹${(s.totalContribution || 0).toLocaleString()}</b></div><div class="detail-row"><span>Children</span><b>${linkedChildren.map(c => c.name).join(', ') || 'None linked'}</b></div></div></div></article>`;
-    }).join('')}</div>`;
-  }
-
-  const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-
-  return shell('sponsors', `${heading('Sponsor management', 'Track sponsors, their contributions, and the children they support.', `<button class="button button--primary" type="submit" form="sponsor-form">${icon('plus')}Add sponsor</button>`)}
-  <div class="form-layout"><form class="card" id="sponsor-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Register sponsor</h2></div><div class="form-grid--two">${field('Sponsor name *', 'name', 'e.g. Rajesh Kumar', 'text')}${field('Phone', 'phone', '+91 00000 00000', 'tel')}${field('Email', 'email', 'sponsor@example.com', 'email')}${field('Initial contribution (₹)', 'contribution', 'e.g. 5000', 'number')}<label class="field form-span-all"><span class="field__label">Link to children</span><select class="select" name="childrenIds" multiple style="min-height:80px">${childOptions}</select><span class="field__hint">Hold Ctrl/Cmd to select multiple children</span></label></div></section></form>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">All sponsors</h2></div></header><div class="card__body">${sponsorsHTML}</div></section></div>`);
-}
-
-/* ═══════════════════════════════════════════════════════
    EXPENSES
    ═══════════════════════════════════════════════════════ */
 
@@ -786,7 +760,6 @@ export function renderPage(page) {
     medicines: medicinesPage,
     appointments: appointmentsPage,
     emergency: emergencyPage,
-    sponsors: sponsorsPage,
     expenses: expensesPage
   };
   return (pages[page] || dashboardPage)();

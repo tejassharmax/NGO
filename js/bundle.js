@@ -267,18 +267,6 @@
     const all = getEmergencyContacts().filter((c) => c.id !== id);
     localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
   }
-  function getSponsors() {
-    return JSON.parse(localStorage.getItem(SPONSORS_KEY) || "[]");
-  }
-  function addSponsor(sponsor) {
-    const all = getSponsors();
-    sponsor.id = sponsor.id || `SP-${Date.now()}`;
-    sponsor.timestamp = Date.now();
-    all.unshift(sponsor);
-    localStorage.setItem(SPONSORS_KEY, JSON.stringify(all));
-    logActivity("sponsor_added", sponsor.name, "New sponsor registered");
-    return sponsor;
-  }
   function getExpenses(month) {
     const all = JSON.parse(localStorage.getItem(EXPENSES_KEY) || "[]");
     if (month) return all.filter((e) => e.date && e.date.startsWith(month));
@@ -696,7 +684,7 @@
     { section: "Overview", items: [["dashboard", "Dashboard", "grid"]] },
     { section: "Children", items: [["children", "Children", "users"], ["growth", "Growth", "ruler"], ["nutrition", "Nutrition", "apple"]] },
     { section: "Health", items: [["medicines", "Medicines", "pill"], ["appointments", "Appointments", "calendar"], ["documents", "Documents", "file"]] },
-    { section: "Management", items: [["sponsors", "Sponsors", "heart"], ["expenses", "Expenses", "wallet"], ["emergency", "Emergency", "phone"]] },
+    { section: "Management", items: [["expenses", "Expenses", "wallet"], ["emergency", "Emergency", "phone"]] },
     { section: "Workspace", items: [["reports", "Reports", "chart"], ["export", "Export", "export"]] }
   ];
   var pageTitles = {
@@ -717,7 +705,6 @@
     medicines: "Medicine management",
     appointments: "Appointments",
     emergency: "Emergency contacts",
-    sponsors: "Sponsor management",
     expenses: "Expense management"
   };
   function navItem(item, active) {
@@ -1139,23 +1126,6 @@
   <div class="form-layout"><form class="card" id="emergency-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Add emergency contact</h2></div><div class="form-grid--two">${field("Name *", "name", "e.g. Apollo Hospital", "text")}<label class="field"><span class="field__label">Type *</span><select class="select" name="type" required><option>Hospital</option><option>Doctor</option><option>Guardian</option><option>Caregiver</option><option>Staff</option></select></label>${field("Phone *", "phone", "+91 00000 00000", "tel")}${field("Specialty", "specialty", "e.g. Pediatrics", "text")}<label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Full address"></textarea></label></div></section></form>
   <section class="card"><header class="card__header"><div><h2 class="card__title">All contacts</h2></div></header><div class="card__body">${contactsHTML}</div></section></div>`);
   }
-  function sponsorsPage() {
-    const sponsors = getSponsors();
-    const children = getChildren();
-    let sponsorsHTML = "";
-    if (sponsors.length === 0) {
-      sponsorsHTML = `<div class="empty-state" style="padding:48px 24px"><span class="empty-state__icon">${icon("heart")}</span><h3>No sponsors registered</h3><p>Add sponsors to track their contributions and the children they support.</p></div>`;
-    } else {
-      sponsorsHTML = `<div class="document-grid">${sponsors.map((s) => {
-        const linkedChildren = children.filter((c) => (s.childrenIds || []).includes(c.id));
-        return `<article class="card document-card card--interactive"><div class="document-card__body" style="padding:16px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px"><h3 style="font-size:14px; font-weight:600; margin:0">${s.name}</h3><span class="badge badge--blue">${linkedChildren.length} children</span></div><div class="detail-list detail-list--single" style="font-size:13px"><div class="detail-row"><span>Contact</span><b>${s.phone || s.email || "\u2014"}</b></div><div class="detail-row"><span>Total contribution</span><b>\u20B9${(s.totalContribution || 0).toLocaleString()}</b></div><div class="detail-row"><span>Children</span><b>${linkedChildren.map((c) => c.name).join(", ") || "None linked"}</b></div></div></div></article>`;
-      }).join("")}</div>`;
-    }
-    const childOptions = children.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
-    return shell("sponsors", `${heading("Sponsor management", "Track sponsors, their contributions, and the children they support.", `<button class="button button--primary" type="submit" form="sponsor-form">${icon("plus")}Add sponsor</button>`)}
-  <div class="form-layout"><form class="card" id="sponsor-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Register sponsor</h2></div><div class="form-grid--two">${field("Sponsor name *", "name", "e.g. Rajesh Kumar", "text")}${field("Phone", "phone", "+91 00000 00000", "tel")}${field("Email", "email", "sponsor@example.com", "email")}${field("Initial contribution (\u20B9)", "contribution", "e.g. 5000", "number")}<label class="field form-span-all"><span class="field__label">Link to children</span><select class="select" name="childrenIds" multiple style="min-height:80px">${childOptions}</select><span class="field__hint">Hold Ctrl/Cmd to select multiple children</span></label></div></section></form>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">All sponsors</h2></div></header><div class="card__body">${sponsorsHTML}</div></section></div>`);
-  }
   function expensesPage() {
     const allExpenses = getExpenses();
     const currentMonth = (/* @__PURE__ */ new Date()).toISOString().slice(0, 7);
@@ -1306,7 +1276,6 @@
       medicines: medicinesPage,
       appointments: appointmentsPage,
       emergency: emergencyPage,
-      sponsors: sponsorsPage,
       expenses: expensesPage
     };
     return (pages[page2] || dashboardPage)();
@@ -1444,7 +1413,6 @@
           "medicines": "dashboard",
           "appointments": "dashboard",
           "emergency": "dashboard",
-          "sponsors": "dashboard",
           "expenses": "dashboard"
         };
         const prev = prevPageMap[page] || "dashboard";
@@ -1829,23 +1797,6 @@
         address: values.address || ""
       });
       toast("Contact added", "Emergency contact has been saved.");
-      window.setTimeout(() => window.location.reload(), 500);
-    });
-    document.querySelector("#sponsor-form")?.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const form = event.currentTarget;
-      if (!form.reportValidity()) return;
-      const formData = new FormData(form);
-      const values = Object.fromEntries(formData);
-      const childrenIds = formData.getAll("childrenIds");
-      addSponsor({
-        name: values.name,
-        phone: values.phone || "",
-        email: values.email || "",
-        totalContribution: parseFloat(values.contribution) || 0,
-        childrenIds
-      });
-      toast("Sponsor registered", "Sponsor record has been created.");
       window.setTimeout(() => window.location.reload(), 500);
     });
     document.querySelector("#expense-form")?.addEventListener("submit", (event) => {

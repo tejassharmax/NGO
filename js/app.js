@@ -60,7 +60,6 @@ if (!isLoggedIn && page !== 'login') {
         'medicines': 'dashboard',
         'appointments': 'dashboard',
         'emergency': 'dashboard',
-        'sponsors': 'dashboard',
         'expenses': 'dashboard'
       };
       const prev = prevPageMap[page] || 'dashboard';
@@ -461,26 +460,8 @@ if (!isLoggedIn && page !== 'login') {
     window.setTimeout(() => window.location.reload(), 500);
   });
 
-  // Sponsor form
-  document.querySelector('#sponsor-form')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-    const formData = new FormData(form);
-    const values = Object.fromEntries(formData);
-    const childrenIds = formData.getAll('childrenIds');
-    addSponsor({
-      name: values.name,
-      phone: values.phone || '',
-      email: values.email || '',
-      totalContribution: parseFloat(values.contribution) || 0,
-      childrenIds: childrenIds
-    });
-    toast('Sponsor registered', 'Sponsor record has been created.');
-    window.setTimeout(() => window.location.reload(), 500);
-  });
-
   // Expense form
+
   document.querySelector('#expense-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const form = event.currentTarget;
