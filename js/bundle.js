@@ -1099,7 +1099,7 @@
   <div class="form-layout">
     <div style="display: flex; flex-direction: column; gap: 24px;">
       <form class="card" id="appointment-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Schedule appointment</h2></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label><label class="field"><span class="field__label">Type *</span><select class="select" name="type" required><option>Doctor visit</option><option>Immunization</option><option>Deworming</option><option>Dental checkup</option><option>Lab test</option><option>Follow-up</option></select></label>${field("Date *", "date", "", "date")}${field("Time", "time", "", "time")}${field("Doctor / Hospital", "doctor", "e.g. Dr. Kumar, Apollo", "text")}${field("Notes", "notes", "e.g. Bring previous reports", "text")}</div></section></form>
-      <section class="card"><header class="card__header"><div><h2 class="card__title">All appointments</h2></div></header><div class="card__body" style="padding:0">${apptsHTML}</div></section>
+      <section class="card"><header class="card__header"><div><h2 class="card__title">All appointments</h2></div></header>${apptsHTML}</section>
     </div>
     <aside class="card form-aside">
       <header class="card__header">
