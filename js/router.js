@@ -1,5 +1,5 @@
 import { icon, initials, pagePath, statusBadge, escapeHTML, formatDate } from './utils.js';
-import { getStudents, getStudent, getActivities, getPendingDocs, timeAgo, activityIcon, activityLabel } from './storage.js';
+import { getStudents, getStudent, getActivities, getPendingDocs, timeAgo, activityIcon, activityLabel, getUploadedDocs } from './storage.js';
 import { studentRows } from './table.js';
 import { admissionsChart } from './chart.js';
 
@@ -31,15 +31,15 @@ function navItem(item, active) {
 }
 
 export function shell(page, content) {
-  const orgName = localStorage.getItem('orbit-org-name') || 'An Organisation';
+  const orgName = localStorage.getItem('sample-org-name') || 'An Organisation';
   const orgInitials = orgName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'AO';
   return `<div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
-      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Orbit home"><span class="brand-mark">${icon('users')}</span><span class="brand-name">orbit</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
+      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Sample home"><span class="brand-mark">${icon('users')}</span><span class="brand-name">sample</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
       <nav class="sidebar__nav">${nav.map((item) => navItem(item, page)).join('')}<div class="sidebar__label">Workspace</div><a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Settings</span></a></nav>
       <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${orgInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${orgName}</span><span class="workspace-user__role">Admin</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
-    <main class="app-main" id="app-main"><header class="topbar">${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}<div class="topbar__crumbs"><span>Orbit</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div><label class="topbar-search"><span class="sr-only">Search student records</span>${icon('search')}<input type="search" placeholder="Search student records" data-global-search><kbd>⌘ K</kbd></label><div class="topbar__actions"><button class="icon-button tooltip" data-tooltip="Toggle theme" data-theme-toggle type="button" aria-label="Toggle color theme">${icon('sun')}</button><button class="icon-button tooltip" data-tooltip="Notifications" type="button" aria-label="Notifications" data-notifications>${icon('bell')}</button><div class="topbar-profile"><button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false"><span class="avatar">AD</span><span class="topbar-profile__name">Admin</span>${icon('chevronDown')}</button><div class="dropdown" hidden data-profile-dropdown><a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account settings</a><div class="divider"></div><button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button></div></div></div></header><section class="content page-enter">${content}</section></main></div>`;
+    <main class="app-main" id="app-main"><header class="topbar">${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}<div class="topbar__crumbs"><span>Sample</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div><label class="topbar-search"><span class="sr-only">Search student records</span>${icon('search')}<input type="search" placeholder="Search student records" data-global-search><kbd>⌘ K</kbd></label><div class="topbar__actions"><button class="icon-button tooltip" data-tooltip="Toggle theme" data-theme-toggle type="button" aria-label="Toggle color theme">${icon('sun')}</button><button class="icon-button tooltip" data-tooltip="Notifications" type="button" aria-label="Notifications" data-notifications>${icon('bell')}</button><div class="topbar-profile"><button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false"><span class="avatar">AD</span><span class="topbar-profile__name">Admin</span>${icon('chevronDown')}</button><div class="dropdown" hidden data-profile-dropdown><a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account settings</a><div class="divider"></div><button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button></div></div></div></header><section class="content page-enter">${content}</section></main></div>`;
 }
 
 const heading = (title, description, actions) => `<div class="page-heading"><div class="page-heading__copy"><h1>${title}</h1><p>${description}</p></div>${actions ? `<div class="page-heading__actions">${actions}</div>` : ''}</div>`;
@@ -96,7 +96,7 @@ export function dashboardPage() {
 }
 
 export function loginPage() {
-  return `<main class="login-page"><section class="login-panel"><div class="login-panel__brand" aria-label="Orbit home"><span class="brand-mark">${icon('users')}</span><b>orbit</b></div><div class="card login-card"><h1>Workspace access</h1>
+  return `<main class="login-page"><section class="login-panel"><div class="login-panel__brand" aria-label="Sample home"><span class="brand-mark">${icon('users')}</span><b>sample</b></div><div class="card login-card"><h1>Workspace access</h1>
   
   <div style="background:rgba(37,99,235,0.1); color:var(--color-primary); padding:10px 14px; border-radius:8px; font-size:12px; margin-bottom:18px; border:1px solid rgba(37,99,235,0.15); line-height:1.4">
     🔑 <b>Demo Admin Credentials:</b> Use ID <code>admin-ngo</code>
@@ -210,7 +210,7 @@ export function ocrUploadPage() {
 }
 
 export function ocrProcessingPage() {
-  return shell('ocr-processing', `${heading('Processing document', 'We’re creating a draft from your upload. This never creates or updates a student record automatically.')}<section class="card"><div class="ocr-processing"><span class="ocr-processing__orbit">${icon('scan')}</span><h2>Extracting information</h2><p>Reading document structure, identifying student details, and preparing them for your review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span>Processing document</span><span class="ocr-progress-pct">0%</span></div><div class="progress"><div class="progress__bar ocr-progress-bar" style="width: 0%"></div></div></div></div></section>`);
+  return shell('ocr-processing', `${heading('Processing document', 'We’re creating a draft from your upload. This never creates or updates a student record automatically.')}<section class="card"><div class="ocr-processing"><span class="ocr-processing__sample">${icon('scan')}</span><h2>Extracting information</h2><p>Reading document structure, identifying student details, and preparing them for your review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span>Processing document</span><span class="ocr-progress-pct">0%</span></div><div class="progress"><div class="progress__bar ocr-progress-bar" style="width: 0%"></div></div></div></div></section>`);
 }
 
 export function ocrReviewPage() {
@@ -254,15 +254,38 @@ export function ocrDetailsPage() {
 }
 
 export function documentsPage() {
-  const docs = [
-    ['Admission form', 'Aarav Sharma', 'PDF · 1.8 MB', 'Verified'],
-    ['Birth certificate', 'Ananya Iyer', 'PDF · 860 KB', 'Verified'],
-    ['Medical record', 'Vihaan Mehta', 'JPG · 2.1 MB', 'Pending'],
-    ['Transfer certificate', 'Mira Nair', 'PDF · 1.2 MB', 'Pending'],
-    ['Address proof', 'Kabir Singh', 'PDF · 480 KB', 'Verified'],
-    ['Immunization record', 'Diya Patel', 'JPG · 1.5 MB', 'Verified']
-  ];
-  return shell('documents', `${heading('Documents', 'A focused workspace for reviewing, validating, and organizing student files.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Smart upload</a>`)}<section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" type="search" placeholder="Search documents or students" data-document-search></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-docs>${icon('filter')}Status: All</button></div></div><div class="card__body"><div class="document-grid" id="document-grid">${docs.map(([name, student, meta, status]) => `<article class="card document-card card--interactive" data-document="${name.toLowerCase()} ${student.toLowerCase()}"><div class="document-card__preview">${icon('file')}</div><div class="document-card__body"><div class="document-card__title-line"><h2 class="document-card__title">${name}</h2>${statusBadge(status)}</div><div class="document-card__meta"><span>${student}</span><span>${meta}</span></div></div></article>`).join('')}</div></div></section>`);
+  const docs = getUploadedDocs();
+  let contentHTML = '';
+  
+  if (docs.length === 0) {
+    contentHTML = `<div class="empty-state" style="padding:48px 24px">
+      <span class="empty-state__icon">${icon('file')}</span>
+      <h3>No documents submitted yet</h3>
+      <p>Use Smart Upload to extract details and verify document records.</p>
+    </div>`;
+  } else {
+    contentHTML = `<div class="document-grid" id="document-grid">
+      ${docs.map((doc, idx) => `
+        <article class="card document-card card--interactive" data-document-idx="${idx}" data-document="${doc.name.toLowerCase()} ${doc.student.toLowerCase()}">
+          <div class="document-card__preview" style="position:relative; width:100%; height:120px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
+            ${doc.image ? `<img src="${doc.image}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
+          </div>
+          <div class="document-card__body" style="padding-top:12px;">
+            <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center;">
+              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0;">${doc.name}</h2>
+              ${statusBadge(doc.status)}
+            </div>
+            <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between;">
+              <span>${doc.student}</span>
+              <span>${doc.meta}</span>
+            </div>
+          </div>
+        </article>
+      `).join('')}
+    </div>`;
+  }
+
+  return shell('documents', `${heading('Documents', 'A focused workspace for reviewing, validating, and organizing student files.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Smart upload</a>`)}<section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" type="search" placeholder="Search documents or students" data-document-search></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-docs>${icon('filter')}Status: All</button></div></div><div class="card__body">${contentHTML}</div></section>`);
 }
 
 export function reportsPage() {
@@ -278,10 +301,10 @@ export function exportPage() {
 }
 
 export function settingsPage() {
-  const orgName = localStorage.getItem('orbit-org-name') || 'An Organisation';
-  const orgCode = localStorage.getItem('orbit-org-code') || 'ORG-IND-01';
-  const orgEmail = localStorage.getItem('orbit-org-email') || 'admin@organisation.org';
-  const orgTimezone = localStorage.getItem('orbit-org-timezone') || 'Asia / Kolkata';
+  const orgName = localStorage.getItem('sample-org-name') || 'An Organisation';
+  const orgCode = localStorage.getItem('sample-org-code') || 'ORG-IND-01';
+  const orgEmail = localStorage.getItem('sample-org-email') || 'admin@organisation.org';
+  const orgTimezone = localStorage.getItem('sample-org-timezone') || 'Asia / Kolkata';
 
   return shell('settings', `${heading('Settings', 'Keep your workspace secure, consistent, and ready for your organisation.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}<div class="settings-layout"><nav class="card settings-nav" aria-label="Settings sections"><button type="button" class="active">Workspace</button><button type="button">Profile & team</button><button type="button">Student fields</button><button type="button">Notifications</button><button type="button">Security</button></nav><section class="card settings-panel"><h2>Workspace</h2><p class="muted">Manage the details that appear across your workspace.</p><div class="form-grid--two form-gap">${field('Organisation name', 'schoolName', 'An Organisation', 'text', '', orgName)}${field('Organisation code', 'schoolCode', 'ORG-IND-01', 'text', '', orgCode)}${field('Primary contact email', 'contact', 'admin@organisation.org', 'email', '', orgEmail)}${field('Timezone', 'timezone', 'Asia / Kolkata', 'text', '', orgTimezone)}</div><div class="settings-row"><div><b>Admission notifications</b><p>Notify administrators when a new record is added.</p></div><label class="switch"><input type="checkbox" checked><span class="switch__track"></span><span class="sr-only">Admission notifications</span></label></div><div class="settings-row"><div><b>Document review reminders</b><p>Send a weekly reminder for records awaiting verification.</p></div><label class="switch"><input type="checkbox" checked><span class="switch__track"></span><span class="sr-only">Document review reminders</span></label></div><div class="settings-row"><div><b>Two-factor authentication</b><p>Require administrators to use an additional security step at sign in.</p></div><button class="button button--sm" type="button" data-2fa>Configure</button></div></section></div>`);
 }

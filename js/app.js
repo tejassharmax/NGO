@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteStudent, getStudents, logActivity, addPendingDoc, getActivities } from './storage.js';
+import { deleteStudent, getStudents, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs } from './storage.js';
 import { updateStudentTable, studentRows } from './table.js';
 import { searchStudents, globalSearchMarkup } from './search.js';
 import { toast } from './toast.js';
@@ -14,7 +14,7 @@ let currentPage = 1;
 const itemsPerPage = 5;
 
 // ─── Authentication Guard ───
-const isLoggedIn = localStorage.getItem('orbit-logged-in') === 'true';
+const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
 const page = document.body.dataset.page || 'dashboard';
 
 if (!isLoggedIn && page !== 'login') {
@@ -68,7 +68,7 @@ if (!isLoggedIn && page !== 'login') {
     if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
     
     if (target.matches('[data-sign-out]')) {
-      localStorage.removeItem('orbit-logged-in');
+      localStorage.removeItem('sample-logged-in');
       toast('Signed out', 'You have securely signed out of your workspace.');
       window.setTimeout(() => { window.location.href = pagePath('login'); }, 850);
     }
@@ -76,8 +76,8 @@ if (!isLoggedIn && page !== 'login') {
     if (target.closest('[data-google-login]')) {
       toast('Connecting to Google...', 'Redirecting to secure single sign-on.');
       window.setTimeout(() => {
-        localStorage.setItem('orbit-logged-in', 'true');
-        toast('Google Login Successful', 'Logged in as Aarushi (admin-orbit@gmail.com).');
+        localStorage.setItem('sample-logged-in', 'true');
+        toast('Google Login Successful', 'Logged in as Aarushi (admin-sample@gmail.com).');
         window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
       }, 1200);
     }
@@ -119,6 +119,23 @@ if (!isLoggedIn && page !== 'login') {
       window.location.href = `${pagePath('student-profile')}?id=${studentId}`;
     }
 
+    const docCardClick = target.closest('[data-document-idx]');
+    if (docCardClick && !target.matches('button, a')) {
+      const idx = docCardClick.dataset.documentIdx;
+      const docs = getUploadedDocs();
+      const doc = docs[idx];
+      if (doc) {
+        modal({
+          title: `${doc.name} - ${doc.student}`,
+          body: doc.image 
+            ? `<div style="text-align:center; max-height: 70vh; overflow: auto;"><img src="${doc.image}" style="max-width:100%; max-height: 55vh; object-fit:contain; border-radius:6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>`
+            : `<div class="empty-state" style="padding: 24px;"><span class="empty-state__icon">${icon('file')}</span><p>No preview image available for this document.</p></div>`,
+          confirmText: 'Close',
+          onConfirm: () => {}
+        });
+      }
+    }
+
     if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
       exportStudentsToExcel();
     }
@@ -133,10 +150,10 @@ if (!isLoggedIn && page !== 'login') {
       const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
       const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
 
-      localStorage.setItem('orbit-org-name', orgNameInput);
-      localStorage.setItem('orbit-org-code', orgCodeInput);
-      localStorage.setItem('orbit-org-email', orgEmailInput);
-      localStorage.setItem('orbit-org-timezone', orgTimezoneInput);
+      localStorage.setItem('sample-org-name', orgNameInput);
+      localStorage.setItem('sample-org-code', orgCodeInput);
+      localStorage.setItem('sample-org-email', orgEmailInput);
+      localStorage.setItem('sample-org-timezone', orgTimezoneInput);
 
       toast('Settings saved', 'Your workspace preferences are up to date.');
       window.setTimeout(() => { window.location.reload(); }, 600);
@@ -278,6 +295,18 @@ if (!isLoggedIn && page !== 'login') {
     const student = saveStudent(form);
     logActivity('doc_processed', student.name, 'OCR-verified student saved');
     addPendingDoc('Student record', student.name);
+    
+    // Save document to uploaded docs storage for previewing
+    const fileData = localStorage.getItem('ocr-upload-file');
+    const fileName = localStorage.getItem('ocr-upload-filename') || 'Aadhaar Card';
+    let docLabel = 'Aadhaar Card';
+    if (fileName.toLowerCase().includes('birth') || fileName.toLowerCase().includes('cert')) {
+      docLabel = 'Birth Certificate';
+    } else if (fileName.toLowerCase().includes('report') || fileName.toLowerCase().includes('mark')) {
+      docLabel = 'Report Card';
+    }
+    addUploadedDoc(docLabel, student.name, fileData, 'Verified');
+
     toast('Verified student saved', `${student.name}’s record is now active.`);
     window.setTimeout(() => { window.location.href = `${pagePath('student-profile')}?id=${student.id}`; }, 500);
   });
@@ -286,8 +315,8 @@ if (!isLoggedIn && page !== 'login') {
     event.preventDefault();
     const adminIdInput = event.target.querySelector('[data-admin-id-input]')?.value.trim();
     if (adminIdInput === 'admin-ngo') {
-      localStorage.setItem('orbit-logged-in', 'true');
-      toast('Login Successful', 'Welcome to the Orbit school workspace.');
+      localStorage.setItem('sample-logged-in', 'true');
+      toast('Login Successful', 'Welcome to the Sample school workspace.');
       window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
     } else {
       toast('Access Denied', 'Incorrect Admin User ID. Please check the demo credentials.', 'danger');
@@ -376,7 +405,7 @@ if (!isLoggedIn && page !== 'login') {
               // Visually indicate failure on the processing screen
               const processingContainer = document.querySelector('.ocr-processing');
               if (processingContainer) {
-                processingContainer.innerHTML = `<span class="ocr-processing__orbit" style="color:var(--color-danger)">${icon('alertCircle') || '⚠️'}</span><h2>Extraction failed</h2><p>Please try again with a clearer image.</p>`;
+                processingContainer.innerHTML = `<span class="ocr-processing__sample" style="color:var(--color-danger)">${icon('alertCircle') || '⚠️'}</span><h2>Extraction failed</h2><p>Please try again with a clearer image.</p>`;
               }
             });
         });
@@ -410,10 +439,10 @@ function enableColumnResize() {
 
 function setTheme(isDark) {
   document.body.classList.toggle('theme-dark', isDark);
-  localStorage.setItem('orbit-theme', isDark ? 'dark' : 'light');
+  localStorage.setItem('sample-theme', isDark ? 'dark' : 'light');
 }
 
-setTheme(localStorage.getItem('orbit-theme') === 'dark');
+setTheme(localStorage.getItem('sample-theme') === 'dark');
 
 function openGlobalSearch(query = '') {
   const root = document.querySelector('#modal-root');
@@ -564,7 +593,7 @@ function exportStudentsToExcel() {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Student Records");
-    XLSX.writeFile(wb, "Orbit_Student_Records.xlsx");
+    XLSX.writeFile(wb, "Sample_Student_Records.xlsx");
     
     logActivity('export_created', 'Excel file', 'Exported all student data to Excel');
     toast('Export complete', 'Your student records Excel file has been downloaded.');

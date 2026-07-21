@@ -1,15 +1,9 @@
-const KEY = 'orbit-students';
-const ACTIVITY_KEY = 'orbit-activity';
-const PENDING_KEY = 'orbit-pending-docs';
+const KEY = 'sample-students';
+const ACTIVITY_KEY = 'sample-activity';
+const PENDING_KEY = 'sample-pending-docs';
+const DOCS_KEY = 'sample-uploaded-docs';
 
-const seedStudents = [
-  { id: 'ST-1024', name: 'Aarav Sharma', email: 'aarav.sharma@orbit.edu', class: 'Grade 8 · A', gender: 'Male', blood: 'B+', father: 'Rohan Sharma', phone: '+91 98221 40393', admission: '2026-07-13', status: 'Active' },
-  { id: 'ST-1023', name: 'Ananya Iyer', email: 'ananya.iyer@orbit.edu', class: 'Grade 7 · B', gender: 'Female', blood: 'O+', father: 'S. Iyer', phone: '+91 98304 28013', admission: '2026-07-12', status: 'Active' },
-  { id: 'ST-1022', name: 'Vihaan Mehta', email: 'vihaan.mehta@orbit.edu', class: 'Grade 9 · A', gender: 'Male', blood: 'A+', father: 'Arjun Mehta', phone: '+91 99021 12340', admission: '2026-07-12', status: 'Pending' },
-  { id: 'ST-1021', name: 'Diya Patel', email: 'diya.patel@orbit.edu', class: 'Grade 6 · C', gender: 'Female', blood: 'AB+', father: 'Kunal Patel', phone: '+91 98188 67521', admission: '2026-07-11', status: 'Active' },
-  { id: 'ST-1020', name: 'Kabir Singh', email: 'kabir.singh@orbit.edu', class: 'Grade 8 · B', gender: 'Male', blood: 'O−', father: 'Vikram Singh', phone: '+91 99580 71900', admission: '2026-07-10', status: 'Verified' },
-  { id: 'ST-1019', name: 'Mira Nair', email: 'mira.nair@orbit.edu', class: 'Grade 7 · A', gender: 'Female', blood: 'A−', father: 'Arun Nair', phone: '+91 98711 84510', admission: '2026-07-09', status: 'Active' }
-];
+const seedStudents = [];
 
 export function getStudents() {
   const data = localStorage.getItem(KEY);
@@ -119,4 +113,21 @@ export function removePendingDoc(index) {
   const docs = getPendingDocs();
   docs.splice(index, 1);
   localStorage.setItem(PENDING_KEY, JSON.stringify(docs));
+}
+
+export function getUploadedDocs() {
+  return JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
+}
+
+export function addUploadedDoc(docName, studentName, fileData, status = 'Verified') {
+  const docs = getUploadedDocs();
+  docs.unshift({
+    name: docName,
+    student: studentName,
+    meta: fileData ? `Image · ${Math.round(fileData.length * 0.75 / 1024)} KB` : 'No file',
+    status: status,
+    image: fileData,
+    timestamp: Date.now()
+  });
+  localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
 }

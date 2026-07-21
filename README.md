@@ -1,4 +1,4 @@
-# Orbit — Student Management SaaS
+# Sample — Student Management SaaS
 
 A production-style frontend prototype for a student-record management workspace, built with HTML5, CSS3, and vanilla ES modules.
 

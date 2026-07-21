@@ -1,5 +1,5 @@
 {
-  "name": "orbit-student-management",
+  "name": "sample-student-management",
   "version": "1.0.0",
   "description": "NGO Student Management System with OCR",
   "main": "server.js",
