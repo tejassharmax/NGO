@@ -348,11 +348,23 @@ export function growthPage() {
         </div>
       </header>
       <div class="card__body">
-        <div class="detail-list detail-list--single" style="font-size: 13px;">
-          <div class="detail-row"><span>&lt; 16.0</span><b><span class="badge badge--danger">Severely Underweight</span></b></div>
-          <div class="detail-row"><span>16.0 – 18.5</span><b><span class="badge badge--warning">Underweight</span></b></div>
-          <div class="detail-row"><span>18.5 – 25.0</span><b><span class="badge badge--success">Normal</span></b></div>
-          <div class="detail-row"><span>&gt; 25.0</span><b><span class="badge badge--warning">Overweight</span></b></div>
+        <div style="display: flex; flex-direction: column; gap: 4px; font-size: 13px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-border);">
+            <span style="color: var(--color-text-muted); font-weight: 500;">&lt; 16.0</span>
+            <span class="badge badge--danger" style="margin-left: auto;">Severely Underweight</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-border);">
+            <span style="color: var(--color-text-muted); font-weight: 500;">16.0 – 18.5</span>
+            <span class="badge badge--warning" style="margin-left: auto;">Underweight</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-border);">
+            <span style="color: var(--color-text-muted); font-weight: 500;">18.5 – 25.0</span>
+            <span class="badge badge--success" style="margin-left: auto;">Normal</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-border);">
+            <span style="color: var(--color-text-muted); font-weight: 500;">&gt; 25.0</span>
+            <span class="badge badge--warning" style="margin-left: auto;">Overweight</span>
+          </div>
         </div>
         <div style="margin-top: 18px; font-size: 12px; color: var(--color-text-muted); line-height: 1.5;">
           BMI is calculated automatically from height and weight inputs. Regular assessments help identify signs of undernourishment or growth problems early.
