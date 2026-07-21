@@ -617,8 +617,36 @@ export function expensesPage() {
 
   return shell('expenses', `${heading('Expense management', 'Manage expenses for food, medical, education, and daily needs with monthly reports.', `<button class="button button--primary" type="submit" form="expense-form">${icon('plus')}Log expense</button>`)}
   <div class="stat-grid" style="margin-bottom:24px">${statCard('This month', '₹' + totalThisMonth.toLocaleString(), Object.keys(catTotals).length + ' categories', 'wallet', 'blue')}${statCard('Food', '₹' + (catTotals['Food'] || 0).toLocaleString(), catTotals['Food'] ? 'Spent' : 'None', 'apple', 'green')}${statCard('Medical', '₹' + (catTotals['Medical'] || 0).toLocaleString(), catTotals['Medical'] ? 'Spent' : 'None', 'heartPulse', 'amber')}${statCard('Education', '₹' + (catTotals['Education'] || 0).toLocaleString(), catTotals['Education'] ? 'Spent' : 'None', 'clipboard', 'violet')}</div>
-  <div class="form-layout"><form class="card" id="expense-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Log expense</h2></div><div class="form-grid--two">${field('Date *', 'date', '', 'date', '', new Date().toISOString().slice(0, 10))}<label class="field"><span class="field__label">Category *</span><select class="select" name="category" required><option>Food</option><option>Medical</option><option>Education</option><option>Daily needs</option><option>Other</option></select></label>${field('Amount (₹) *', 'amount', 'e.g. 500', 'number')}${field('Description *', 'description', 'e.g. Monthly groceries', 'text')}<label class="field"><span class="field__label">Child (optional)</span><select class="select" name="childId"><option value="">General expense</option>${childOptions}</select></label></div></section></form>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">Expense log</h2></div></header><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Child</th></tr></thead><tbody>${expenseRows}</tbody></table></div></section></div>`);
+  <div class="form-layout">
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <form class="card" id="expense-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Log expense</h2></div><div class="form-grid--two">${field('Date *', 'date', '', 'date', '', new Date().toISOString().slice(0, 10))}<label class="field"><span class="field__label">Category *</span><select class="select" name="category" required><option>Food</option><option>Medical</option><option>Education</option><option>Daily needs</option><option>Other</option></select></label>${field('Amount (₹) *', 'amount', 'e.g. 500', 'number')}${field('Description *', 'description', 'e.g. Monthly groceries', 'text')}<label class="field"><span class="field__label">Child (optional)</span><select class="select" name="childId"><option value="">General expense</option>${childOptions}</select></label></div></section></form>
+      <section class="card"><header class="card__header"><div><h2 class="card__title">Expense log</h2></div></header><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Date</th><th>Category</th><th>Description</th><th>Amount</th><th>Child</th></tr></thead><tbody>${expenseRows}</tbody></table></div></section>
+    </div>
+    <aside class="card form-aside">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">Expense Guidelines</h2>
+          <p class="card__caption">Budget classifications</p>
+        </div>
+      </header>
+      <div class="card__body">
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; line-height: 1.5;">
+          <div style="border-left: 3px solid var(--color-primary); padding-left: 8px;">
+            <b style="color: var(--color-primary); display: block;">Food & Kitchen</b>
+            Groceries, milk, vegetables, and kitchen supplies for communal meals.
+          </div>
+          <div style="border-left: 3px solid var(--color-warning); padding-left: 8px;">
+            <b style="color: var(--color-warning); display: block;">Medical & Care</b>
+            Clinical checkups, prescription medicines, diagnostic reports, and medical camps.
+          </div>
+          <div style="border-left: 3px solid var(--color-success); padding-left: 8px;">
+            <b style="color: var(--color-success); display: block;">Education & School</b>
+            School fees, books, bags, school uniforms, and stationeries.
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>`);
 }
 
 /* ═══════════════════════════════════════════════════════
