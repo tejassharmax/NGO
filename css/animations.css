@@ -1,0 +1,8 @@
+@keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pop { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { 50% { opacity: .45; } }
+.page-enter { animation: enter 280ms ease both; }
+.modal { animation: pop 180ms ease both; }
+.spinner { width: 18px; height: 18px; border: 2px solid #dbeafe; border-top-color: var(--color-primary); border-radius: 50%; animation: spin 650ms linear infinite; }
+.skeleton { background: linear-gradient(90deg, #f3f4f6 25%, #f9fafb 38%, #f3f4f6 63%); background-size: 400% 100%; border-radius: 5px; animation: pulse 1.3s ease infinite; }
