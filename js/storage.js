@@ -20,16 +20,15 @@ const HEALTH_RECORDS_KEY = 'chm-health-records';
 /* ─── Children (was Students) ─── */
 
 export function getChildren() {
-  const data = localStorage.getItem(CHILDREN_KEY);
-  // Migrate from old key if needed
-  if (!data) {
+  let data = localStorage.getItem(CHILDREN_KEY);
+  if (!data || JSON.parse(data).length === 0) {
     const oldData = localStorage.getItem('sample-students');
-    if (oldData) {
+    if (oldData && JSON.parse(oldData).length > 0) {
       localStorage.setItem(CHILDREN_KEY, oldData);
       return JSON.parse(oldData);
     }
-    localStorage.setItem(CHILDREN_KEY, '[]');
-    return [];
+    seedDatabase();
+    data = localStorage.getItem(CHILDREN_KEY);
   }
   return JSON.parse(data);
 }
@@ -433,4 +432,221 @@ export function healthStatus(child) {
   if (flags.length === 0) return { level: 'good', label: 'Healthy', flags };
   if (flags.some(f => f.includes('Anemia') || f.includes('Undernourished'))) return { level: 'critical', label: 'Needs attention', flags };
   return { level: 'warning', label: 'Review needed', flags };
+}
+
+/* ─── Database Seeder ─── */
+function seedDatabase() {
+  const children = [
+    {
+      id: 'CH-1025',
+      name: 'Naveen Roy',
+      dob: '2013-06-15',
+      gender: 'Male',
+      blood: 'O+',
+      idNumber: '3948 2938 1029',
+      father: 'A.N. Roy',
+      mother: 'Priya Roy',
+      phone: '+91 98765 43210',
+      address: 'Sector 4, Ludhiana, Punjab - 141001',
+      status: 'Verified',
+      registeredDate: '2026-03-10',
+      height: '142',
+      weight: '36',
+      medicalConditions: 'Anemia history',
+      allergies: 'Dust',
+      medications: 'Iron supplements',
+      emergencyContact: 'Dr. Amit Kumar',
+      emergencyPhone: '+91 98888 77777',
+      hospitalName: 'Ludhiana Children Hospital',
+      notes: 'Recovering from mild anemia.'
+    },
+    {
+      id: 'CH-1026',
+      name: 'Aisha Khan',
+      dob: '2021-02-18',
+      gender: 'Female',
+      blood: 'A+',
+      idNumber: '8392 1029 3847',
+      father: 'Kabir Khan',
+      mother: 'Yasmin Khan',
+      phone: '+91 91234 56789',
+      address: 'Civil Lines, Ludhiana, Punjab - 141001',
+      status: 'Active',
+      registeredDate: '2026-05-15',
+      height: '105',
+      weight: '13.5',
+      medicalConditions: 'Undernourished',
+      allergies: 'Lactose intolerance',
+      medications: 'Multivitamin Syrup',
+      emergencyContact: 'Sarita Devi (Caregiver)',
+      emergencyPhone: '+91 98221 40393',
+      hospitalName: 'Sanjeevani Clinic',
+      notes: 'Needs daily monitoring of dietary intake.'
+    },
+    {
+      id: 'CH-1027',
+      name: 'Aarav Sharma',
+      dob: '2018-09-10',
+      gender: 'Male',
+      blood: 'B+',
+      idNumber: '9203 8472 1092',
+      father: 'Rohan Sharma',
+      mother: 'Seema Sharma',
+      phone: '+91 98123 45678',
+      address: 'Dholewal, Ludhiana, Punjab - 141003',
+      status: 'Verified',
+      registeredDate: '2026-01-20',
+      height: '128',
+      weight: '28',
+      medicalConditions: 'None',
+      allergies: 'Peanuts',
+      medications: 'Vitamin D drops',
+      emergencyContact: 'Rohan Sharma',
+      emergencyPhone: '+91 98123 45678',
+      hospitalName: 'Apollo Hospital',
+      notes: 'Healthy active child.'
+    },
+    {
+      id: 'CH-1028',
+      name: 'Ananya Patil',
+      dob: '2016-11-22',
+      gender: 'Female',
+      blood: 'AB+',
+      idNumber: '4829 3019 4829',
+      father: 'Sunil Patil',
+      mother: 'Neha Patil',
+      phone: '+91 97654 32109',
+      address: 'Model Town, Ludhiana, Punjab - 141002',
+      status: 'Verified',
+      registeredDate: '2026-02-28',
+      height: '135',
+      weight: '31',
+      medicalConditions: 'Cavity (Oral health)',
+      allergies: 'None',
+      medications: 'Fluoride rinse',
+      emergencyContact: 'Neha Patil',
+      emergencyPhone: '+91 97654 32109',
+      hospitalName: 'Fortis Hospital',
+      notes: 'Scheduled for dental cleaning.'
+    },
+    {
+      id: 'CH-1029',
+      name: 'Diya Nair',
+      dob: '2023-04-05',
+      gender: 'Female',
+      blood: 'O-',
+      idNumber: '1092 3847 2938',
+      father: 'Ramesh Nair',
+      mother: 'Lekha Nair',
+      phone: '+91 95432 10987',
+      address: 'Sarabha Nagar, Ludhiana, Punjab - 141001',
+      status: 'Pending',
+      registeredDate: '2026-07-12',
+      height: '92',
+      weight: '11.5',
+      medicalConditions: 'None',
+      allergies: 'None',
+      medications: 'None',
+      emergencyContact: 'Ramesh Nair',
+      emergencyPhone: '+91 95432 10987',
+      hospitalName: 'Apollo Hospital',
+      notes: 'Recent registration, waiting for physical verification documents.'
+    }
+  ];
+
+  localStorage.setItem(CHILDREN_KEY, JSON.stringify(children));
+
+  const growth = [
+    { childId: 'CH-1025', childName: 'Naveen Roy', date: '2026-04-10', height: 140, weight: 35, bmi: 17.9 },
+    { childId: 'CH-1025', childName: 'Naveen Roy', date: '2026-05-15', height: 141, weight: 35.5, bmi: 17.9 },
+    { childId: 'CH-1025', childName: 'Naveen Roy', date: '2026-07-15', height: 142, weight: 36.0, bmi: 17.9 },
+
+    { childId: 'CH-1026', childName: 'Aisha Khan', date: '2026-05-15', height: 104, weight: 13.0, bmi: 12.0 },
+    { childId: 'CH-1026', childName: 'Aisha Khan', date: '2026-07-15', height: 105, weight: 13.5, bmi: 12.2 },
+
+    { childId: 'CH-1027', childName: 'Aarav Sharma', date: '2026-03-20', height: 126, weight: 27, bmi: 17.0 },
+    { childId: 'CH-1027', childName: 'Aarav Sharma', date: '2026-06-20', height: 128, weight: 28, bmi: 17.1 }
+  ];
+  localStorage.setItem(GROWTH_KEY, JSON.stringify(growth));
+
+  const meals = [
+    { childId: 'CH-1027', childName: 'Aarav Sharma', mealType: 'Breakfast', date: '2026-07-21', description: 'Milk and Oats with Honey', calories: 250 },
+    { childId: 'CH-1027', childName: 'Aarav Sharma', mealType: 'Lunch', date: '2026-07-21', description: 'Roti, Dal Tadka, and Potato Sabzi', calories: 450 },
+    { childId: 'CH-1027', childName: 'Aarav Sharma', mealType: 'Snack', date: '2026-07-21', description: 'One Apple and Almonds', calories: 120 },
+    
+    { childId: 'CH-1026', childName: 'Aisha Khan', mealType: 'Breakfast', date: '2026-07-21', description: 'Ragi Porridge and Banana', calories: 300 },
+    { childId: 'CH-1026', childName: 'Aisha Khan', mealType: 'Lunch', date: '2026-07-21', description: 'Khichdi with ghee and spinach', calories: 380 },
+    
+    { childId: 'CH-1025', childName: 'Naveen Roy', mealType: 'Lunch', date: '2026-07-21', description: 'Rice, Fish Curry, and Cabbage', calories: 500 }
+  ];
+  localStorage.setItem(NUTRITION_KEY, JSON.stringify(meals));
+
+  const medicines = [
+    { id: 'MED-1', childId: 'CH-1027', childName: 'Aarav Sharma', medicineName: 'Vitamin D3 Drops', dosage: '400 IU daily', frequency: 'Once a day after breakfast', startDate: '2026-07-10', endDate: '2026-08-10', status: 'Active' },
+    { id: 'MED-2', childId: 'CH-1026', childName: 'Aisha Khan', medicineName: 'Iron Syrup (Dexorange)', dosage: '5ml twice daily', frequency: 'Morning and evening after meals', startDate: '2026-07-16', endDate: '2026-08-15', status: 'Active' },
+    { id: 'MED-3', childId: 'CH-1025', childName: 'Naveen Roy', medicineName: 'Folic Acid Tab', dosage: '5mg once daily', frequency: 'Night before bedtime', startDate: '2026-07-01', endDate: '2026-07-15', status: 'Completed' }
+  ];
+  localStorage.setItem(MEDICINES_KEY, JSON.stringify(medicines));
+
+  const appointments = [
+    { id: 'APT-1', childId: 'CH-1025', childName: 'Naveen Roy', type: 'Doctor visit', date: '2026-07-24', time: '10:00 AM', doctor: 'Dr. Amit Kumar (Pediatrician)', notes: 'Blood test follow-up for RBC and Haemoglobin levels', status: 'Upcoming' },
+    { id: 'APT-2', childId: 'CH-1026', childName: 'Aisha Khan', type: 'Follow-up', date: '2026-07-26', time: '11:30 AM', doctor: 'Dr. Amit Kumar', notes: 'Check weight and progress of iron syrup therapy', status: 'Upcoming' },
+    { id: 'APT-3', childId: 'CH-1027', childName: 'Aarav Sharma', type: 'Dental checkup', date: '2026-07-16', time: '02:00 PM', doctor: 'Dr. Ritu Goel (Dentist)', notes: 'Routine checkup, no issues found', status: 'Completed' },
+    { id: 'APT-4', childId: 'CH-1029', childName: 'Diya Nair', type: 'Deworming', date: '2026-07-19', time: '09:30 AM', doctor: 'Caregiver Clinic', notes: 'Albendazole 400mg dose scheduled', status: 'Upcoming' }
+  ];
+  localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(appointments));
+
+  const emergency = [
+    { id: 'EMC-1', name: 'Ludhiana Children Hospital', type: 'Hospital', phone: '+91 161 4567890', specialty: '24/7 Pediatrics & Emergency', address: 'Ferozepur Road, Ludhiana' },
+    { id: 'EMC-2', name: 'Dr. Amit Kumar', type: 'Doctor', phone: '+91 98888 77777', specialty: 'Pediatric Consultant', address: 'Model Town, Ludhiana' },
+    { id: 'EMC-3', name: 'Sarita Devi', type: 'Caregiver', phone: '+91 98221 40393', specialty: 'NGO Incharge', address: 'Ludhiana Shelter' },
+    { id: 'EMC-4', name: 'Pediatric Cardiac Care', type: 'Hospital', phone: '+91 161 8881234', specialty: 'Cardiology', address: 'Sarabha Nagar, Ludhiana' }
+  ];
+  localStorage.setItem(EMERGENCY_KEY, JSON.stringify(emergency));
+
+  const sponsors = [
+    { id: 'SP-1', name: 'Rotary Club Ludhiana', phone: '+91 161 9991111', email: 'rotary.ludhiana@gmail.com', totalContribution: 50000, childrenIds: ['CH-1027', 'CH-1028'] },
+    { id: 'SP-2', name: 'Dr. Meera Sen', phone: '+91 98111 22222', email: 'meera.sen@outlook.com', totalContribution: 15000, childrenIds: ['CH-1026'] }
+  ];
+  localStorage.setItem(SPONSORS_KEY, JSON.stringify(sponsors));
+
+  const expenses = [
+    { id: 'EXP-1', date: '2026-07-05', category: 'Food', amount: '8500', description: 'Fresh vegetables, milk, pulses for shelter', childId: '', childName: '' },
+    { id: 'EXP-2', date: '2026-07-10', category: 'Medical', amount: '12000', description: 'Pediatric consult & laboratory testing fees', childId: '', childName: '' },
+    { id: 'EXP-3', date: '2026-07-12', category: 'Education', amount: '6200', description: 'School bags, uniforms, books for supported children', childId: 'CH-1027', childName: 'Aarav Sharma' },
+    { id: 'EXP-4', date: '2026-07-15', category: 'Daily needs', amount: '1500', description: 'Toothbrushes, soaps, dental hygiene kits', childId: '', childName: '' }
+  ];
+  localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
+
+  const healthRecords = [
+    {
+      id: 'HR-1',
+      childId: 'CH-1025',
+      childName: 'Naveen Roy',
+      type: 'cbc',
+      date: '2026-06-27',
+      hemoglobin: '9.5',
+      wbc: '9300',
+      rbc: '5.4',
+      platelets: '3.25',
+      pcv: '49.8'
+    }
+  ];
+  localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(healthRecords));
+
+  const activity = [
+    { type: 'child_added', subject: 'Naveen Roy', description: 'New child registered', timestamp: Date.now() - 3600000 * 24 * 5 },
+    { type: 'doc_processed', subject: 'Naveen Roy', description: 'Blood Test Report processed via OCR', timestamp: Date.now() - 3600000 * 24 * 4 },
+    { type: 'health_alert', subject: 'Naveen Roy', description: 'Abnormal blood values: Low Hemoglobin (Anemia risk), High RBC Count', timestamp: Date.now() - 3600000 * 24 * 4 },
+    { type: 'growth_logged', subject: 'Aisha Khan', description: 'Growth recorded - Height: 105cm, Weight: 13.5kg', timestamp: Date.now() - 3600000 * 2 },
+    { type: 'meal_logged', subject: 'Aisha Khan', description: 'Breakfast: Ragi Porridge and Banana', timestamp: Date.now() - 600000 }
+  ];
+  localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activity));
+
+  const alerts = [
+    { id: 'ALR-1', type: 'critical', childName: 'Naveen Roy', message: 'Critical: Anemia risk flagged (Hemoglobin: 9.5 g/dL)', timestamp: Date.now() - 3600000 * 24, dismissed: false },
+    { id: 'ALR-2', type: 'warning', childName: 'Aisha Khan', message: 'Warning: Aisha Khan is undernourished (BMI: 12.2)', timestamp: Date.now() - 3600000 * 12, dismissed: false },
+    { id: 'ALR-3', type: 'info', childName: 'Diya Nair', message: 'Reminder: Overdue deworming appointment for Diya Nair', timestamp: Date.now() - 3600000 * 6, dismissed: false }
+  ];
+  localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
 }

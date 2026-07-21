@@ -123,7 +123,7 @@ async function performOCR(buffer) {
     console.log(`  → ${pass.label}…`);
     try {
       const processed = await preprocessImage(buffer, pass.mode);
-      const result = await Tesseract.recognize(processed, 'eng');
+      const result = await Tesseract.recognize(processed, 'eng', { langPath: __dirname });
       const text = result.data.text || '';
       const confidence = result.data.confidence || 0;
       const parsed = parseOCRText(text, true); // silent mode for evaluation
@@ -151,7 +151,7 @@ async function performOCR(buffer) {
   if (bestFields < 2) {
     console.log('  → raw image (no preprocessing)…');
     try {
-      const result = await Tesseract.recognize(buffer, 'eng');
+      const result = await Tesseract.recognize(buffer, 'eng', { langPath: __dirname });
       const text = result.data.text || '';
       const confidence = result.data.confidence || 0;
       const parsed = parseOCRText(text, true);
@@ -172,8 +172,8 @@ async function performOCR(buffer) {
 }
 
 function countExtractedFields(parsed) {
-  return ['firstName', 'idNumber', 'dob', 'gender', 'father', 'mother', 'phone']
-    .filter(k => parsed[k] && parsed[k].trim().length > 0).length;
+  return ['firstName', 'idNumber', 'dob', 'gender', 'father', 'mother', 'phone', 'hemoglobin', 'rbc', 'wbc', 'platelets']
+    .filter(k => parsed[k] && String(parsed[k]).trim().length > 0).length;
 }
 
 
@@ -200,10 +200,10 @@ app.post('/api/ocr', upload.single('document'), async (req, res) => {
 
     const parsedData = parseOCRText(rawText);
 
-    if (!parsedData.firstName && !parsedData.idNumber && !parsedData.dob && !parsedData.father && !parsedData.mother) {
+    if (!parsedData.firstName && !parsedData.idNumber && !parsedData.dob && !parsedData.father && !parsedData.mother && !parsedData.hemoglobin && !parsedData.rbc) {
       console.warn('✗ Could not extract any identifiable fields');
       return res.status(422).json({
-        error: 'Could not extract valid information from this document. Please ensure the image is clear and is a supported document (e.g. Aadhaar Card, Birth Certificate).'
+        error: 'Could not extract valid information from this document. Please ensure the image is clear and is a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).'
       });
     }
 

@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addSponsor, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addSponsor, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert } from './storage.js';
 import { updateChildTable, childRows } from './table.js';
 import { searchChildren, globalSearchMarkup } from './search.js';
 import { toast } from './toast.js';
@@ -239,6 +239,14 @@ if (!isLoggedIn && page !== 'login') {
     if (target.matches('[data-delete-contact]')) {
       const contactId = target.dataset.deleteContact;
       modal({ title: 'Remove contact?', body: 'This will permanently remove this emergency contact.', confirmText: 'Remove', confirmClass: 'button--danger', onConfirm: () => { deleteEmergencyContact(contactId); toast('Contact removed', 'Emergency contact has been deleted.'); window.setTimeout(() => window.location.reload(), 500); } });
+    }
+
+    // Dismiss health alert
+    if (target.closest('[data-dismiss-alert]')) {
+      const alertId = target.closest('[data-dismiss-alert]').dataset.dismissAlert;
+      dismissAlert(alertId);
+      toast('Alert dismissed', 'The notification has been archived.');
+      window.setTimeout(() => window.location.reload(), 500);
     }
   });
 
