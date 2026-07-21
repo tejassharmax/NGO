@@ -993,8 +993,36 @@
     }
     const childOptions = children.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
     return shell("nutrition", `${heading("Nutrition tracker", "Document daily meals and help improve diets based on health reports.", `<button class="button button--primary" type="submit" form="meal-form">${icon("plus")}Log meal</button>`)}
-  <div class="form-layout"><form class="card" id="meal-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Log a meal</h2><p>Record what a child ate today.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label><label class="field"><span class="field__label">Meal type *</span><select class="select" name="mealType" required><option>Breakfast</option><option>Lunch</option><option>Snack</option><option>Dinner</option></select></label>${field("Date *", "date", "", "date", "", today)}${field("Calories (optional)", "calories", "e.g. 350", "number")}<label class="field form-span-all"><span class="field__label">Description *</span><textarea class="textarea" name="description" placeholder="e.g. Rice, dal, vegetables, curd" required></textarea></label></div></section></form>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">Meal log</h2><p class="card__caption">Today: ${todayMeals.length} meals logged</p></div></header><div class="card__body">${mealsHTML}</div></section></div>`);
+  <div class="form-layout">
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <form class="card" id="meal-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Log a meal</h2><p>Record what a child ate today.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label><label class="field"><span class="field__label">Meal type *</span><select class="select" name="mealType" required><option>Breakfast</option><option>Lunch</option><option>Snack</option><option>Dinner</option></select></label>${field("Date *", "date", "", "date", "", today)}${field("Calories (optional)", "calories", "e.g. 350", "number")}<label class="field form-span-all"><span class="field__label">Description *</span><textarea class="textarea" name="description" placeholder="e.g. Rice, dal, vegetables, curd" required></textarea></label></div></section></form>
+      <section class="card"><header class="card__header"><div><h2 class="card__title">Meal log</h2><p class="card__caption">Today: ${todayMeals.length} meals logged</p></div></header><div class="card__body">${mealsHTML}</div></section>
+    </div>
+    <aside class="card form-aside">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">Dietary Guidelines</h2>
+          <p class="card__caption">NGO health standard</p>
+        </div>
+      </header>
+      <div class="card__body">
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; line-height: 1.5;">
+          <div style="border-left: 3px solid var(--color-danger); padding-left: 8px;">
+            <b style="color: var(--color-danger); display: block;">Anemia Diet</b>
+            Include iron-rich foods: spinach, beetroots, pomegranate, lentils, eggs, and fortified grains.
+          </div>
+          <div style="border-left: 3px solid var(--color-warning); padding-left: 8px;">
+            <b style="color: var(--color-warning); display: block;">Undernourished Diet</b>
+            Provide protein and calorie-dense meals: dal, milk, curd, nuts, paneer, and bananas.
+          </div>
+          <div style="border-left: 3px solid var(--color-success); padding-left: 8px;">
+            <b style="color: var(--color-success); display: block;">General Wellness</b>
+            Ensure a balanced intake of green vegetables, whole grains, and clean drinking water daily.
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>`);
   }
   function medicinesPage() {
     const children = getChildren();
