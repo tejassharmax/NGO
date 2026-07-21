@@ -513,8 +513,36 @@ export function appointmentsPage() {
 
   return shell('appointments', `${heading('Appointments & reminders', 'Schedule and track medical appointments, immunizations, deworming, and dental checkups.', `<button class="button button--primary" type="submit" form="appointment-form">${icon('plus')}Add appointment</button>`)}
   <div class="stat-grid" style="margin-bottom:24px">${statCard('Upcoming', upcoming.length.toLocaleString(), upcoming.length > 0 ? 'Scheduled' : 'None', 'calendar', 'blue')}${statCard('Overdue', overdue.length.toLocaleString(), overdue.length > 0 ? 'Need attention' : 'All clear', 'alertCircle', overdue.length > 0 ? 'amber' : 'green')}${statCard('Completed', completed.length.toLocaleString(), completed.length > 0 ? 'Done' : 'None', 'check', 'green')}</div>
-  <div class="form-layout"><form class="card" id="appointment-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Schedule appointment</h2></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label><label class="field"><span class="field__label">Type *</span><select class="select" name="type" required><option>Doctor visit</option><option>Immunization</option><option>Deworming</option><option>Dental checkup</option><option>Lab test</option><option>Follow-up</option></select></label>${field('Date *', 'date', '', 'date')}${field('Time', 'time', '', 'time')}${field('Doctor / Hospital', 'doctor', 'e.g. Dr. Kumar, Apollo', 'text')}${field('Notes', 'notes', 'e.g. Bring previous reports', 'text')}</div></section></form>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">All appointments</h2></div></header><div class="card__body">${apptsHTML}</div></section></div>`);
+  <div class="form-layout">
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <form class="card" id="appointment-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Schedule appointment</h2></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label><label class="field"><span class="field__label">Type *</span><select class="select" name="type" required><option>Doctor visit</option><option>Immunization</option><option>Deworming</option><option>Dental checkup</option><option>Lab test</option><option>Follow-up</option></select></label>${field('Date *', 'date', '', 'date')}${field('Time', 'time', '', 'time')}${field('Doctor / Hospital', 'doctor', 'e.g. Dr. Kumar, Apollo', 'text')}${field('Notes', 'notes', 'e.g. Bring previous reports', 'text')}</div></section></form>
+      <section class="card"><header class="card__header"><div><h2 class="card__title">All appointments</h2></div></header><div class="card__body" style="padding:0">${apptsHTML}</div></section>
+    </div>
+    <aside class="card form-aside">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">Appointment Guide</h2>
+          <p class="card__caption">Checkup classifications</p>
+        </div>
+      </header>
+      <div class="card__body">
+        <div style="display: flex; flex-direction: column; gap: 12px; font-size: 13px; line-height: 1.5;">
+          <div style="border-left: 3px solid var(--color-primary); padding-left: 8px;">
+            <b style="color: var(--color-primary); display: block;">Doctor visit</b>
+            Standard pediatric consults or follow-ups for flagged health alerts.
+          </div>
+          <div style="border-left: 3px solid var(--color-warning); padding-left: 8px;">
+            <b style="color: var(--color-warning); display: block;">Deworming</b>
+            Routine preventative doses, scheduled twice annually.
+          </div>
+          <div style="border-left: 3px solid var(--color-success); padding-left: 8px;">
+            <b style="color: var(--color-success); display: block;">Dental & Vaccine</b>
+            Regular bi-annual oral checkups and mandatory immunizations.
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>`);
 }
 
 /* ═══════════════════════════════════════════════════════
