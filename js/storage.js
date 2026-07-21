@@ -650,3 +650,61 @@ function seedDatabase() {
   ];
   localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
 }
+
+/* ───────────────────────────────────────────────────────
+   DATA SYNC WITH SERVER-SIDE DB
+   ─────────────────────────────────────────────────────── */
+let isSyncing = false;
+
+export async function syncWithServer() {
+  if (isSyncing) return;
+  try {
+    isSyncing = true;
+    const keys = [
+      CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
+      NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
+      EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY,
+      'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
+    ];
+
+    // Pack local state
+    const payload = {};
+    keys.forEach(k => {
+      payload[k] = localStorage.getItem(k);
+    });
+
+    // POST payload to merge/save on server
+    const res = await fetch('/api/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      const serverData = await res.json();
+      // Apply merged state from server
+      Object.keys(serverData).forEach(k => {
+        if (serverData[k] !== null && serverData[k] !== undefined) {
+          localStorage.setItem(k, serverData[k]);
+        }
+      });
+    }
+  } catch (err) {
+    console.warn('Sync failed (offline or server starting):', err);
+  } finally {
+    isSyncing = false;
+  }
+}
+
+function triggerSync() {
+  syncWithServer().catch(err => console.warn('Background sync failed:', err));
+}
+
+// Intercept localStorage sets to trigger background sync when key changes
+const originalSetItem = localStorage.setItem.bind(localStorage);
+localStorage.setItem = function(key, value) {
+  originalSetItem(key, value);
+  if (!isSyncing && (key.startsWith('chm-') || key.startsWith('sample-org-'))) {
+    triggerSync();
+  }
+};

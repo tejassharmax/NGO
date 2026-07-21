@@ -13,6 +13,8 @@ const sharp = require('sharp');
 require('dotenv').config();
 
 const app = express();
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } }); // Max 15MB
 
 // CORS
@@ -654,6 +656,84 @@ function setNameFields(fullName, result) {
     result.lastName = '';
   }
 }
+
+/* ───────────────────────────────────────────────────────
+   DATABASE SYNC API
+   ─────────────────────────────────────────────────────── */
+const fs = require('fs');
+const path = require('path');
+
+const DB_DIR = path.join(__dirname, 'data');
+const DB_FILE = path.join(DB_DIR, 'db.json');
+
+// Ensure db directory exists
+if (!fs.existsSync(DB_DIR)) {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+}
+
+// GET /api/sync - Returns the entire database
+app.get('/api/sync', (req, res) => {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const data = fs.readFileSync(DB_FILE, 'utf8');
+      return res.json(JSON.parse(data || '{}'));
+    }
+    return res.json({});
+  } catch (err) {
+    console.error('Failed to read db file:', err);
+    return res.status(500).json({ error: 'Failed to read database' });
+  }
+});
+
+// POST /api/sync - Merges and saves the database
+app.post('/api/sync', (req, res) => {
+  try {
+    let serverData = {};
+    if (fs.existsSync(DB_FILE)) {
+      serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
+    }
+
+    const clientData = req.body || {};
+    const mergedData = {};
+    const keys = [
+      'chm-children', 'chm-activity', 'chm-pending-docs', 'chm-documents', 'chm-growth',
+      'chm-nutrition', 'chm-medicines', 'chm-appointments', 'chm-emergency',
+      'chm-expenses', 'chm-alerts', 'chm-health-records'
+    ];
+
+    keys.forEach(k => {
+      let hasServerVal = false;
+      if (serverData[k]) {
+        try {
+          const parsed = JSON.parse(serverData[k]);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            hasServerVal = true;
+          } else if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            hasServerVal = true;
+          } else if (typeof parsed === 'boolean' || typeof parsed === 'number') {
+            hasServerVal = true;
+          }
+        } catch (e) {
+          if (serverData[k].trim().length > 0) {
+            hasServerVal = true;
+          }
+        }
+      }
+
+      if (hasServerVal) {
+        mergedData[k] = serverData[k];
+      } else {
+        mergedData[k] = clientData[k] || null;
+      }
+    });
+
+    fs.writeFileSync(DB_FILE, JSON.stringify(mergedData, null, 2), 'utf8');
+    return res.json(mergedData);
+  } catch (err) {
+    console.error('Failed to write db file:', err);
+    return res.status(500).json({ error: 'Failed to sync database' });
+  }
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

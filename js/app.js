@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addSponsor, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer } from './storage.js';
 import { updateChildTable, childRows } from './table.js';
 import { searchChildren, globalSearchMarkup } from './search.js';
 import { toast } from './toast.js';
@@ -12,29 +12,38 @@ let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
 let currentPage = 1;
 const itemsPerPage = 5;
+let page = 'dashboard';
 
-// ─── Authentication Guard ───
-const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
-const page = document.body.dataset.page || 'dashboard';
+// ─── Authentication Guard & Async App Start ───
+(async () => {
+  const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
+  page = document.body.dataset.page || 'dashboard';
 
-if (!isLoggedIn && page !== 'login') {
-  window.location.href = pagePath('login');
-} else if (isLoggedIn && page === 'login') {
-  window.location.href = pagePath('dashboard');
-} else {
-  // Render the active page
-  const app = document.querySelector('#app');
-  if (app) {
-    app.innerHTML = renderPage(page);
+  if (!isLoggedIn && page !== 'login') {
+    window.location.href = pagePath('login');
+  } else if (isLoggedIn && page === 'login') {
+    window.location.href = pagePath('dashboard');
+  } else {
+    // Await database sync from server if logged in
+    if (page !== 'login') {
+      await syncWithServer();
+    }
+
+    // Render the active page
+    const app = document.querySelector('#app');
+    if (app) {
+      app.innerHTML = renderPage(page);
+    }
+
+    // Initialize interactive chart if on dashboard or reports
+    if (page === 'dashboard' || page === 'reports') {
+      initChart();
+    }
+
+    // Initialize Column Resize functionality on tables
+    enableColumnResize();
   }
-
-  // Initialize interactive chart if on dashboard or reports
-  if (page === 'dashboard' || page === 'reports') {
-    initChart();
-  }
-
-  // Initialize Column Resize functionality on tables
-  enableColumnResize();
+})();
 
   // ─── Event Listeners ───
 
@@ -578,7 +587,6 @@ if (!isLoggedIn && page !== 'login') {
       window.setTimeout(() => { window.location.href = pagePath('ocr-review'); }, 1850);
     }
   }
-}
 
 // ─── Core Helpers ───
 

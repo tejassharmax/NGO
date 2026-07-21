@@ -8,7 +8,10 @@
 .sidebar__toggle { display: grid; flex: 0 0 32px; width: 32px; height: 32px; place-items: center; background: none; border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text-muted); cursor: pointer; transition: color var(--transition), background var(--transition), border-color var(--transition); }
 .sidebar__toggle:hover { color: var(--color-text); background: var(--color-hover); border-color: transparent; }
 .sidebar__toggle svg { width: 18px; height: 18px; }
-.sidebar__nav { display: grid; gap: 3px; }
+.sidebar__nav { display: grid; gap: 3px; overflow-y: auto; flex: 1; min-height: 0; padding-right: 4px; }
+.sidebar__nav::-webkit-scrollbar { width: 4px; }
+.sidebar__nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar__nav::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
 .sidebar__label { padding: 0 10px 8px; margin-top: 8px; color: #9ca3af; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; }
 .nav-item { display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 10px; color: var(--color-text-muted); border-radius: var(--radius-sm); font-weight: 600; transition: color var(--transition), background var(--transition); }
 .nav-item:hover { color: var(--color-text); background: var(--color-hover); }
