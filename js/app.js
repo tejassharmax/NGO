@@ -645,7 +645,7 @@ let page = 'dashboard';
 
           const startTime = Date.now();
 
-          fetch('/api/ocr', {
+          fetch('http://localhost:3000/api/ocr', {
             method: 'POST',
             body: formData
           })

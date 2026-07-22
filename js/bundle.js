@@ -741,7 +741,7 @@
       });
 
       // POST payload to merge/save on server
-      const res = await fetch('/api/sync', {
+      const res = await fetch('http://localhost:3000/api/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -2532,7 +2532,7 @@
 
             const startTime = Date.now();
 
-            fetch('/api/ocr', {
+            fetch('http://localhost:3000/api/ocr', {
               method: 'POST',
               body: formData
             })
