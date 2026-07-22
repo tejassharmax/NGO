@@ -71,9 +71,9 @@
 .activity-copy { color: var(--color-text-muted); font-size: 12px; }
 .activity-copy b { color: var(--color-text); font-weight: 700; }
 .activity-copy time { display: block; margin-top: 2px; color: #9ca3af; font-size: 10px; }
-.quick-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-.quick-action { display: flex; align-items: center; gap: 10px; padding: 13px; background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 12px; font-weight: 700; text-align: left; transition: background var(--transition), border var(--transition), transform var(--transition); }
-.quick-action:hover { background: #fafafa; border-color: #d1d5db; transform: translateY(-1px); }
+.quick-actions { display: flex; flex-direction: column; gap: 6px; }
+.quick-action { display: flex; align-items: center; gap: 12px; padding: 11px 12px; background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-md); font-size: 13px; font-weight: 700; text-align: left; transition: background var(--transition), border var(--transition); }
+.quick-action:hover { background: #fafafa; border-color: #d1d5db; }
 .quick-action__icon { display: grid; flex: 0 0 29px; width: 29px; height: 29px; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 7px; place-items: center; }
 .quick-action__icon svg { width: 15px; }
 .list-row { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #f1f2f4; }

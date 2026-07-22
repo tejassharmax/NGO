@@ -706,32 +706,15 @@ app.post('/api/sync', (req, res) => {
     const keys = [
       'chm-children', 'chm-activity', 'chm-pending-docs', 'chm-documents', 'chm-growth',
       'chm-nutrition', 'chm-medicines', 'chm-appointments', 'chm-emergency',
-      'chm-expenses', 'chm-alerts', 'chm-health-records'
+      'chm-expenses', 'chm-alerts', 'chm-health-records',
+      'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
     ];
 
     keys.forEach(k => {
-      let hasServerVal = false;
-      if (serverData[k]) {
-        try {
-          const parsed = JSON.parse(serverData[k]);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            hasServerVal = true;
-          } else if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
-            hasServerVal = true;
-          } else if (typeof parsed === 'boolean' || typeof parsed === 'number') {
-            hasServerVal = true;
-          }
-        } catch (e) {
-          if (serverData[k].trim().length > 0) {
-            hasServerVal = true;
-          }
-        }
-      }
-
-      if (hasServerVal) {
-        mergedData[k] = serverData[k];
+      if (clientData[k] !== undefined && clientData[k] !== null) {
+        mergedData[k] = clientData[k];
       } else {
-        mergedData[k] = clientData[k] || null;
+        mergedData[k] = serverData[k] || null;
       }
     });
 

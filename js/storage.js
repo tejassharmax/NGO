@@ -170,10 +170,9 @@ export function addUploadedDoc(docName, childName, fileData, status = 'Verified'
   localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
 }
 
-/* ─── Growth Records ─── */
-
 export function getGrowthRecords(childId) {
   const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
+  all.sort((a, b) => (b.timestamp || new Date(b.date).getTime() || 0) - (a.timestamp || new Date(a.date).getTime() || 0));
   return childId ? all.filter(r => r.childId === childId) : all;
 }
 
@@ -353,7 +352,91 @@ export function addHealthRecord(record) {
 /* ─── Alerts ─── */
 
 export function getAlerts() {
-  return JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+  let alerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+  const children = getChildren();
+  const appointments = getAppointments();
+  const medicines = getMedicines();
+  const now = Date.now();
+  const dynamicAlerts = [];
+
+  // 1. Check for overdue appointments
+  appointments.forEach(appt => {
+    if (appt.status === 'Upcoming' && new Date(appt.date).getTime() < now - 24 * 3600 * 1000) {
+      const alertId = `ALR-OVERDUE-${appt.id}`;
+      if (!alerts.some(a => a.id === alertId)) {
+        dynamicAlerts.push({
+          id: alertId,
+          type: 'warning',
+          childName: appt.childName,
+          message: `Reminder: Overdue appointment: ${appt.type} with ${appt.doctor} was scheduled for ${appt.date}`,
+          timestamp: now,
+          dismissed: false
+        });
+      }
+    }
+  });
+
+  // 2. Check for missing Aadhaar or ID documents
+  children.forEach(child => {
+    if (!child.idNumber || child.idNumber.trim() === '') {
+      const alertId = `ALR-MISSING-ID-${child.id}`;
+      if (!alerts.some(a => a.id === alertId)) {
+        dynamicAlerts.push({
+          id: alertId,
+          type: 'info',
+          childName: child.name,
+          message: `Missing records: No ID card/Aadhaar registered for ${child.name}`,
+          timestamp: now,
+          dismissed: false
+        });
+      }
+    }
+  });
+
+  // 3. Check for alarming blood test reports (hemoglobin < 11.0)
+  const healthRecords = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+  healthRecords.forEach(record => {
+    if (record.hemoglobin && parseFloat(record.hemoglobin) < 11.0) {
+      const alertId = `ALR-ANEMIA-${record.childId}-${record.date}`;
+      if (!alerts.some(a => a.id === alertId)) {
+        dynamicAlerts.push({
+          id: alertId,
+          type: 'critical',
+          childName: record.childName,
+          message: `Critical blood values: Low Hemoglobin (${record.hemoglobin} g/dL) detected on ${record.date}`,
+          timestamp: now,
+          dismissed: false
+        });
+      }
+    }
+  });
+
+  // 4. Check for low supplies (medication ending soon)
+  medicines.forEach(med => {
+    if (med.status === 'Active' && med.endDate) {
+      const remainingTime = new Date(med.endDate).getTime() - now;
+      if (remainingTime > 0 && remainingTime < 3 * 24 * 3600 * 1000) {
+        const alertId = `ALR-MED-LOW-${med.id}`;
+        if (!alerts.some(a => a.id === alertId)) {
+          dynamicAlerts.push({
+            id: alertId,
+            type: 'warning',
+            childName: med.childName,
+            message: `Running low: Medication "${med.medicineName}" supply ending soon (${med.endDate})`,
+            timestamp: now,
+            dismissed: false
+          });
+        }
+      }
+    }
+  });
+
+  if (dynamicAlerts.length > 0) {
+    alerts = [...dynamicAlerts, ...alerts];
+    localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
+  }
+
+  return alerts;
 }
 
 export function addAlert(alert) {

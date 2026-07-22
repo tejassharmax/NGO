@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, addSponsor } from './storage.js';
 import { updateChildTable, childRows } from './table.js';
 import { searchChildren, globalSearchMarkup } from './search.js';
 import { toast } from './toast.js';
@@ -34,6 +34,7 @@ let page = 'dashboard';
     if (app) {
       app.innerHTML = renderPage(page);
       applyColumnVisibility();
+      initFormListeners();
     }
 
     // Initialize interactive chart if on dashboard or reports
@@ -70,6 +71,7 @@ let page = 'dashboard';
         'medicines': 'dashboard',
         'appointments': 'dashboard',
         'emergency': 'dashboard',
+        'sponsors': 'dashboard',
         'expenses': 'dashboard'
       };
       const prev = prevPageMap[page] || 'dashboard';
@@ -80,8 +82,8 @@ let page = 'dashboard';
     if (target.matches('[data-open-sidebar]')) { document.querySelector('.app-shell').classList.add('sidebar-open'); document.querySelector('.mobile-backdrop').hidden = false; }
     if (target.matches('[data-close-sidebar]')) { document.querySelector('.app-shell').classList.remove('sidebar-open'); target.hidden = true; }
     if (target.matches('[data-theme-toggle]')) setTheme(!document.body.classList.contains('theme-dark'));
-    if (target.matches('[data-notifications]')) toast('You\u2019re all caught up', 'No new health alerts need your attention.');
-    if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
+    if (target.matches('[data-notifications]')) { const dropdown = document.querySelector('[data-notif-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-profile-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
+    if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-notif-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
     
     if (target.matches('[data-sign-out]')) {
       localStorage.removeItem('sample-logged-in');
@@ -219,6 +221,54 @@ let page = 'dashboard';
       applyDocumentFilters();
     }
 
+    if (target.closest('[data-add-measurement]')) {
+      const firstSelect = document.querySelector('.growth-form-instance select[name="childId"]');
+      const childOptionsHTML = firstSelect ? firstSelect.innerHTML : '<option value="">Select child</option>';
+      const container = document.querySelector('#growth-forms-container');
+      if (container) {
+        const formCount = container.querySelectorAll('.growth-form-instance').length;
+        const newForm = document.createElement('form');
+        newForm.className = 'card growth-form-instance page-enter';
+        newForm.style.marginTop = '24px';
+        newForm.innerHTML = `
+          <section class="form-section">
+            <div class="form-section__heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <div>
+                <h2 class="card__title">New measurement #${formCount + 1}</h2>
+                <p>Record height and weight for another child.</p>
+              </div>
+              <button class="icon-button remove-form-btn tooltip" data-tooltip="Remove" type="button" aria-label="Remove form" style="border: none; background: transparent; cursor: pointer; color: var(--color-danger); display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;">
+                ${icon('trash')}
+              </button>
+            </div>
+            <div class="form-grid--two">
+              <label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required>${childOptionsHTML}</select></label>
+              <label class="field"><span class="field__label">Date *</span><input class="input" name="date" type="date" value="${new Date().toISOString().slice(0, 10)}" required></label>
+              <label class="field"><span class="field__label">Height (cm) *</span><input class="input" name="height" type="number" placeholder="e.g. 140" required></label>
+              <label class="field"><span class="field__label">Weight (kg) *</span><input class="input" name="weight" type="number" placeholder="e.g. 35" required></label>
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+              <button class="button button--primary" type="submit">${icon('check')} Save measurement</button>
+            </div>
+          </section>
+        `;
+        container.appendChild(newForm);
+        newForm.scrollIntoView({ behavior: 'smooth' });
+        const select = newForm.querySelector('select[name="childId"]');
+        if (select) select.focus();
+        toast('Form added', 'Another measurement form has been added at the bottom.');
+      }
+    }
+
+    if (target.closest('.remove-form-btn')) {
+      const btn = target.closest('.remove-form-btn');
+      const form = btn.closest('.growth-form-instance');
+      if (form) {
+        form.remove();
+        toast('Form removed', 'Measurement form was removed.');
+      }
+    }
+
     if (target.matches('[data-activity]')) toast('Activity feed', 'Your activity history is up to date.');
     if (target.matches('[data-start-ocr]')) document.querySelector('[data-upload-input]')?.click();
     if (target.matches('[data-upload-zone]')) document.querySelector('[data-upload-input]')?.click();
@@ -341,6 +391,8 @@ let page = 'dashboard';
   });
 
   // ─── Form Submissions ───
+  function initFormListeners() {
+    console.log("initFormListeners called for page:", page);
 
   // Child registration form
   document.querySelector('#child-form')?.addEventListener('submit', (event) => {
@@ -407,22 +459,24 @@ let page = 'dashboard';
     window.setTimeout(() => { window.location.href = `${pagePath('child-profile')}?id=${child.id}`; }, 500);
   });
 
-  // Growth form
-  document.querySelector('#growth-form')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    if (!form.reportValidity()) return;
-    const values = Object.fromEntries(new FormData(form));
-    const child = getChild(values.childId);
-    addGrowthRecord({
-      childId: values.childId,
-      childName: child ? child.name : 'Unknown',
-      date: values.date,
-      height: parseFloat(values.height),
-      weight: parseFloat(values.weight)
-    });
-    toast('Growth recorded', 'Measurement has been saved.');
-    window.setTimeout(() => window.location.reload(), 500);
+  // Growth form (using delegated submit handler for dynamic form cards)
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (form.classList.contains('growth-form-instance') || form.id === 'growth-form') {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const values = Object.fromEntries(new FormData(form));
+      const child = getChild(values.childId);
+      addGrowthRecord({
+        childId: values.childId,
+        childName: child ? child.name : 'Unknown',
+        date: values.date,
+        height: parseFloat(values.height),
+        weight: parseFloat(values.weight)
+      });
+      toast('Growth recorded', `Measurement for ${child ? child.name : 'Child'} has been saved.`);
+      window.setTimeout(() => window.location.reload(), 500);
+    }
   });
 
   // Meal form
@@ -488,6 +542,7 @@ let page = 'dashboard';
 
   // Emergency contact form
   document.querySelector('#emergency-form')?.addEventListener('submit', (event) => {
+    console.log("Emergency form submit captured!");
     event.preventDefault();
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
@@ -500,6 +555,25 @@ let page = 'dashboard';
       address: values.address || ''
     });
     toast('Contact added', 'Emergency contact has been saved.');
+    window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Sponsor form
+  document.querySelector('#sponsor-form')?.addEventListener('submit', (event) => {
+    console.log("Sponsor form submit captured!");
+    event.preventDefault();
+    const form = event.currentTarget;
+    if (!form.reportValidity()) return;
+    const formData = new FormData(form);
+    const values = Object.fromEntries(formData);
+    addSponsor({
+      name: values.name,
+      phone: values.phone || '',
+      email: values.email || '',
+      totalContribution: parseFloat(values.contribution) || 0,
+      childrenIds: []
+    });
+    toast('Sponsor registered', 'Sponsor record has been created.');
     window.setTimeout(() => window.location.reload(), 500);
   });
 
@@ -535,6 +609,7 @@ let page = 'dashboard';
       toast('Access Denied', 'Incorrect Admin User ID. Please check the demo credentials.', 'danger');
     }
   });
+}
 
   document.addEventListener('keydown', (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openGlobalSearch(); }

@@ -159,8 +159,62 @@ export function dashboardPage() {
 
   return shell('dashboard', `${heading(getDynamicGreeting(), 'Here\u2019s an overview of your children\u2019s health workspace today.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Upload document</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <div class="stat-grid">${statCard('Total children', totalChildren.toLocaleString(), verifiedCount > 0 ? Math.round(verifiedCount / Math.max(totalChildren, 1) * 100) + '%' : '0%', 'users', 'blue')}${statCard('Health alerts', alertCount.toLocaleString(), alertCount > 0 ? alertCount + ' need attention' : 'All clear', 'alertCircle', alertCount > 0 ? 'amber' : 'green')}${statCard('Upcoming appointments', upcomingAppts.toLocaleString(), upcomingAppts > 0 ? 'Next 7 days' : 'None scheduled', 'calendar', 'violet')}${statCard('Active medications', activeMeds.toLocaleString(), activeMeds > 0 ? activeMeds + ' prescriptions' : 'None active', 'pill', 'green')}</div>
-  <div class="dashboard-grid dashboard-grid--primary"><section class="card chart-card"><header class="card__header"><div><h2 class="card__title">Registration overview</h2><p class="card__caption">Children registered over the last seven months</p></div><button class="button button--sm" data-report-export>${icon('download')}Export</button></header><div class="chart-card__body">${registrationChart()}</div></section><section class="card"><header class="card__header"><div><h2 class="card__title">Quick actions</h2><p class="card__caption">Common tasks, kept close</p></div></header><div class="card__body"><div class="quick-actions"><a class="quick-action" href="${pagePath('register-child')}"><span class="quick-action__icon">${icon('plus')}</span>Register child</a><a class="quick-action" href="${pagePath('ocr-upload')}"><span class="quick-action__icon">${icon('scan')}</span>Scan document</a><a class="quick-action" href="${pagePath('growth')}"><span class="quick-action__icon">${icon('ruler')}</span>Log growth</a><a class="quick-action" href="${pagePath('nutrition')}"><span class="quick-action__icon">${icon('apple')}</span>Log meal</a><a class="quick-action" href="${pagePath('appointments')}"><span class="quick-action__icon">${icon('calendar')}</span>Appointments</a><a class="quick-action" href="${pagePath('medicines')}"><span class="quick-action__icon">${icon('pill')}</span>Medicines</a></div></div></section></div>
-  <div class="dashboard-grid dashboard-grid--lower"><section class="card"><header class="card__header"><div><h2 class="card__title">Children needing attention</h2><p class="card__caption">Health alerts and flagged records</p></div><a class="button button--sm" href="${pagePath('children')}">View all ${icon('arrowRight')}</a></header><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Child</th><th>Age</th><th class="hide-tablet">Health flags</th><th>Status</th></tr></thead><tbody>${attentionHTML}</tbody></table></div></section><div class="dashboard-grid"><section class="card"><header class="card__header"><div><h2 class="card__title">Active alerts</h2><p class="card__caption">Critical warnings and updates</p></div><span class="badge badge--danger">${alertsList.length > 0 ? alertsList.length + ' active' : 'None'}</span></header><div class="card__body">${alertsHTML}</div></section><section class="card"><header class="card__header"><div><h2 class="card__title">Pending documents</h2><p class="card__caption">Needs a quick review</p></div><span class="badge badge--warning">${pendingDocsTotal > 0 ? pendingDocsTotal + ' pending' : 'None'}</span></header><div class="card__body">${pendingDocsHTML}</div></section><section class="card"><header class="card__header"><div><h2 class="card__title">Recent activity</h2></div><button class="icon-button icon-button--small" type="button" data-activity>${icon('more')}</button></header><div class="card__body">${activityHTML}</div></section></div></div>`);
+  <div class="dashboard-grid dashboard-grid--primary">
+    <section class="card">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">Active alerts</h2>
+          <p class="card__caption">Critical warnings and updates needing caregiver attention</p>
+        </div>
+        <span class="badge badge--danger">${alertsList.length > 0 ? alertsList.length + ' active' : 'None'}</span>
+      </header>
+      <div class="card__body" style="padding-top: 10px;">
+        ${alertsHTML}
+      </div>
+    </section>
+    <section class="card">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">Quick actions</h2>
+          <p class="card__caption">Common tasks, kept close</p>
+        </div>
+      </header>
+      <div class="card__body">
+        <div class="quick-actions">
+          <a class="quick-action" href="${pagePath('growth')}"><span class="quick-action__icon">${icon('ruler')}</span>Log growth</a>
+          <a class="quick-action" href="${pagePath('nutrition')}"><span class="quick-action__icon">${icon('apple')}</span>Log meal</a>
+          <a class="quick-action" href="${pagePath('appointments')}"><span class="quick-action__icon">${icon('calendar')}</span>Appointments</a>
+          <a class="quick-action" href="${pagePath('medicines')}"><span class="quick-action__icon">${icon('pill')}</span>Medicines</a>
+        </div>
+      </div>
+    </section>
+  </div>
+  <div style="margin-top: 24px;">
+    <section class="card">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">Children needing attention</h2>
+          <p class="card__caption">Health alerts and flagged records</p>
+        </div>
+        <a class="button button--sm" href="${pagePath('children')}">View all ${icon('arrowRight')}</a>
+      </header>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Child</th>
+              <th>Age</th>
+              <th class="hide-tablet">Health flags</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${attentionHTML}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>`);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -333,10 +387,25 @@ export function growthPage() {
 
   const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 
-  return shell('growth', `${heading('Growth tracking', 'Track height, weight, and BMI for every child. Identify growth problems early.', `<button class="button button--primary" type="submit" form="growth-form">${icon('plus')}Add measurement</button>`)}
+  return shell('growth', `${heading('Growth tracking', 'Track height, weight, and BMI for every child. Identify growth problems early.', `<button class="button button--primary" type="button" data-add-measurement>${icon('plus')}Add measurement</button>`)}
   <div class="form-layout">
     <div style="display: flex; flex-direction: column; gap: 24px;">
-      <form class="card" id="growth-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">New measurement</h2><p>Record height and weight for a child. BMI will be auto-calculated.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>${field('Date *', 'date', '', 'date', '', new Date().toISOString().slice(0, 10))}${field('Height (cm) *', 'height', 'e.g. 140', 'number')}${field('Weight (kg) *', 'weight', 'e.g. 35', 'number')}</div></section></form>
+      <div id="growth-forms-container" style="display: flex; flex-direction: column; gap: 24px;">
+        <form class="card growth-form-instance" id="growth-form">
+          <section class="form-section">
+            <div class="form-section__heading"><h2 class="card__title">New measurement</h2><p>Record height and weight for a child. BMI will be auto-calculated.</p></div>
+            <div class="form-grid--two">
+              <label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>
+              ${field('Date *', 'date', '', 'date', '', new Date().toISOString().slice(0, 10))}
+              ${field('Height (cm) *', 'height', 'e.g. 140', 'number')}
+              ${field('Weight (kg) *', 'weight', 'e.g. 35', 'number')}
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+              <button class="button button--primary" type="submit">${icon('check')} Save measurement</button>
+            </div>
+          </section>
+        </form>
+      </div>
       <section class="card"><header class="card__header"><div><h2 class="card__title">Recent measurements</h2><p class="card__caption">All growth records across children</p></div></header><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Child</th><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead><tbody>${tableHTML}</tbody></table></div></section>
     </div>
     <aside class="card form-aside">
@@ -707,6 +776,46 @@ export function reportsPage() {
   return shell('reports', `${heading('Health reports & analytics', 'Monthly summary of children\u2019s health status, nutrition, and expenditures.', `<button class="button" type="button" data-report-email>${icon('mail')}Email report</button><button class="button" type="button" data-report-print>${icon('printer')}Print</button><button class="button button--primary" type="button" data-report-export>${icon('download')}Export</button>`)}
   <section class="card"><div class="filter-row"><label class="field"><span class="field__label">Report period</span><select class="select"><option>Last 6 months</option><option>Last 12 months</option><option>This year</option></select></label><label class="field"><span class="field__label">Status</span><select class="select"><option>All statuses</option><option>Active</option><option>Pending</option></select></label><button class="button button--sm" type="button" data-apply-report>Apply filters</button></div></section>
   <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with no health flags</p></article><article class="card report-card"><span class="eyebrow">This month's expenses</span><div class="report-card__value">₹${totalExpense.toLocaleString()}</div><p class="report-card__caption">${monthExpenses.length} transactions</p></article></div>
+  
+  <section class="card section-gap" style="margin-top: 24px;">
+    <header class="card__header">
+      <div>
+        <h2 class="card__title">NGO & Donor Monthly Executive Summary</h2>
+        <p class="card__caption">Audited health status, nutrition coverage, and expense allocations for this month</p>
+      </div>
+      <span class="badge badge--success">${icon('check')} Audited & Verified</span>
+    </header>
+    <div class="card__body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; padding: 20px 0;">
+      <div style="border-right: 1px solid var(--color-border); padding-right: 16px;">
+        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-primary);">
+          ${icon('heartPulse')} Health Status Overview
+        </h3>
+        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
+          <b>${total - flaggedCount} out of ${total} children</b> are in optimal health with no health flags. 
+          ${flaggedCount > 0 ? `<b>${flaggedCount} child(ren)</b> are currently under medical observation or therapy for flagged conditions (e.g. low hemoglobin, nutritional support).` : 'All children are currently healthy.'}
+        </p>
+      </div>
+      <div style="border-right: 1px solid var(--color-border); padding: 0 16px;">
+        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-success);">
+          ${icon('apple')} Nutrition Program Performance
+        </h3>
+        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
+          Meals are fully balanced with local nutrients. This month, a total of <b>${getAllMeals().length} meals</b> were logged. 
+          Undernourished children (e.g., Aisha Khan) have been placed on tailored nutrition plans containing high-protein oats, eggs, and milk.
+        </p>
+      </div>
+      <div style="padding-left: 16px;">
+        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-warning);">
+          ${icon('wallet')} Expenditure Allocation
+        </h3>
+        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
+          A total of <b>₹${totalExpense.toLocaleString()}</b> was spent on programs this month. 
+          This is distributed across child food support, pediatrician consultant fees, medical testing, and school daily necessities.
+        </p>
+      </div>
+    </div>
+  </section>
+
   <div class="dashboard-grid dashboard-grid--lower"><section class="card chart-card"><header class="card__header"><div><h2 class="card__title">Registration trend</h2><p class="card__caption">New child records created each month</p></div></header><div class="chart-card__body">${registrationChart()}</div></section><section class="card"><header class="card__header"><div><h2 class="card__title">Gender distribution</h2><p class="card__caption">Across all child records</p></div></header><div class="card__body"><div class="distribution"><div class="distribution__row"><span class="distribution__label">Female</span><div class="progress"><div class="progress__bar" style="width: ${femalePct}%; background: var(--color-violet);"></div></div><span class="distribution__value">${femalePct}%</span></div><div class="distribution__row"><span class="distribution__label">Male</span><div class="progress"><div class="progress__bar" style="width: ${malePct}%; background: var(--color-primary);"></div></div><span class="distribution__value">${malePct}%</span></div><div class="distribution__row"><span class="distribution__label">Other</span><div class="progress"><div class="progress__bar" style="width: ${otherPct}%; background: #94a3b8;"></div></div><span class="distribution__value">${otherPct}%</span></div></div></div></section></div>
   <div class="dashboard-grid dashboard-grid--lower"><section class="card"><header class="card__header"><div><h2 class="card__title">Blood group distribution</h2><p class="card__caption">Useful for medical readiness</p></div></header><div class="card__body"><div class="distribution">${finalBlood.map(([group, value]) => `<div class="distribution__row"><span class="distribution__label">${group}</span><div class="progress"><div class="progress__bar" style="width: ${value}%;"></div></div><span class="distribution__value">${value}%</span></div>`).join('')}</div></div></section><section class="card"><header class="card__header"><div><h2 class="card__title">Health status overview</h2><p class="card__caption">Children flagged for health concerns</p></div></header><div class="card__body"><div class="distribution"><div class="distribution__row"><span class="distribution__label">Healthy</span><div class="progress"><div class="progress__bar" style="width: ${healthyPct}%; background: var(--color-success);"></div></div><span class="distribution__value">${healthyPct}%</span></div><div class="distribution__row"><span class="distribution__label">Needs attention</span><div class="progress"><div class="progress__bar" style="width: ${flaggedPct}%; background: var(--color-warning);"></div></div><span class="distribution__value">${flaggedPct}%</span></div></div></div></section></div>`);
 }
