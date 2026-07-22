@@ -2291,7 +2291,7 @@
       if (!form.reportValidity()) return;
       const child = saveChild(form);
       toast('Child saved', `${child.name}'s record is ready.`);
-      window.setTimeout(() => { window.location.href = `${pagePath('child-profile')}?id=${child.id}`; }, 500);
+      window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
     });
 
     // OCR additional form
@@ -2346,7 +2346,7 @@
       }
 
       toast('Verified child saved', `${child.name}'s record is now active.`);
-      window.setTimeout(() => { window.location.href = `${pagePath('child-profile')}?id=${child.id}`; }, 500);
+      window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
     });
 
     // Growth form (using delegated submit handler for dynamic form cards)
