@@ -628,8 +628,10 @@ export function emergencyPage() {
   }
 
   return shell('emergency', `${heading('Emergency contacts', 'Quick-access directory for hospitals, doctors, guardians, and caregivers.', `<button class="button button--primary" type="submit" form="emergency-form">${icon('plus')}Add contact</button>`)}
-  <div class="form-layout"><form class="card" id="emergency-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Add emergency contact</h2></div><div class="form-grid--two">${field('Name *', 'name', 'e.g. Apollo Hospital', 'text')}<label class="field"><span class="field__label">Type *</span><select class="select" name="type" required><option>Hospital</option><option>Doctor</option><option>Guardian</option><option>Caregiver</option><option>Staff</option></select></label>${field('Phone *', 'phone', '+91 00000 00000', 'tel')}${field('Specialty', 'specialty', 'e.g. Pediatrics', 'text')}<label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Full address"></textarea></label></div></section></form>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">All contacts</h2></div></header><div class="card__body">${contactsHTML}</div></section></div>`);
+  <div style="display: flex; flex-direction: column; gap: 24px;">
+    <form class="card" id="emergency-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Add emergency contact</h2></div><div class="form-grid--two">${field('Name *', 'name', 'e.g. Apollo Hospital', 'text')}<label class="field"><span class="field__label">Type *</span><select class="select" name="type" required><option>Hospital</option><option>Doctor</option><option>Guardian</option><option>Caregiver</option><option>Staff</option></select></label>${field('Phone *', 'phone', '+91 00000 00000', 'tel')}${field('Specialty', 'specialty', 'e.g. Pediatrics', 'text')}<label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Full address"></textarea></label></div></section></form>
+    <section class="card"><header class="card__header"><div><h2 class="card__title">All contacts</h2></div></header><div class="card__body">${contactsHTML}</div></section>
+  </div>`);
 }
 
 /* ═══════════════════════════════════════════════════════
