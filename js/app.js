@@ -317,11 +317,27 @@ let page = 'dashboard';
     }
 
     if (target.matches('.accordion__trigger')) target.closest('.accordion__item').classList.toggle('is-open');
-    if (target.matches('.tab')) {
-      target.closest('.tabs').querySelectorAll('.tab').forEach((tab) => {
-        tab.classList.toggle('tab--active', tab === target);
-        tab.setAttribute('aria-selected', String(tab === target));
-      });
+    if (target.closest('.tab')) {
+      const tabBtn = target.closest('.tab');
+      const tabsGroup = tabBtn.closest('.tabs');
+      if (tabsGroup) {
+        const allTabs = Array.from(tabsGroup.querySelectorAll('.tab'));
+        const index = allTabs.indexOf(tabBtn);
+        allTabs.forEach((t) => {
+          t.classList.toggle('tab--active', t === tabBtn);
+          t.setAttribute('aria-selected', String(t === tabBtn));
+        });
+
+        const profileContainer = document.querySelector('.profile-tab-content-container');
+        if (profileContainer) {
+          const panels = Array.from(profileContainer.querySelectorAll('[data-tab-panel]'));
+          const panelNames = ['overview', 'guardian', 'health', 'growth', 'documents', 'timeline', 'notes'];
+          const selectedPanelName = tabBtn.dataset.profileTab || panelNames[index] || 'overview';
+          panels.forEach((p) => {
+            p.style.display = (p.dataset.tabPanel === selectedPanelName) ? 'block' : 'none';
+          });
+        }
+      }
     }
     if (target.closest('.settings-nav button')) {
       target.closest('.settings-nav').querySelectorAll('button').forEach((button) => button.classList.toggle('active', button === target));
@@ -425,6 +441,16 @@ let page = 'dashboard';
       docLabel = 'Blood Test Report';
     }
     addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel);
+
+    const addInput = form.querySelector('[data-additional-doc-input]');
+    if (addInput && addInput.files && addInput.files[0]) {
+      const addFile = addInput.files[0];
+      const addReader = new FileReader();
+      addReader.onload = function(e) {
+        addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record');
+      };
+      addReader.readAsDataURL(addFile);
+    }
 
     // Save blood report test results to health records
     const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');

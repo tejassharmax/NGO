@@ -242,6 +242,15 @@
     return record;
   }
 
+  /* ─── Nutrition / Meal Log ─── */
+
+  function getMeals(childId, dateStr) {
+    const all = JSON.parse(localStorage.getItem(NUTRITION_KEY) || '[]');
+    let filtered = all;
+    if (childId) filtered = filtered.filter(m => m.childId === childId);
+    return filtered;
+  }
+
   function getAllMeals() {
     return JSON.parse(localStorage.getItem(NUTRITION_KEY) || '[]');
   }
@@ -1203,13 +1212,266 @@
     const latestGrowth = growth[0];
     const appts = getAppointments(child.id);
     const meds = getMedicines(child.id).filter(m => m.status === 'Active');
+    const docs = getUploadedDocs().filter(d => (d.childName && d.childName.toLowerCase() === child.name.toLowerCase()) || d.childId === child.id);
+    const healthRecs = getHealthRecords(child.id);
+    const meals = getMeals(child.id);
+    const activities = getActivities().filter(a => (a.childName && a.childName.toLowerCase() === child.name.toLowerCase()) || (a.detail && a.detail.includes(child.name)));
+
+    // Docs HTML for Documents tab
+    let docsHTML = '';
+    if (docs.length === 0) {
+      docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records and certificates uploaded for ${child.name} will appear here.</p></div>`;
+    } else {
+      docsHTML = `<div class="document-grid">${docs.map(d => `<article class="card document-card"><div class="document-card__body" style="padding:16px;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><h3 style="font-size:14px; font-weight:600; margin:0;">${d.title || d.fileName || 'Medical Document'}</h3><span class="badge badge--success">${d.status || 'Verified'}</span></div><div class="detail-list detail-list--single" style="font-size:13px;"><div class="detail-row"><span>Category</span><b>${d.category || 'Medical Report'}</b></div><div class="detail-row"><span>Uploaded</span><b>${d.uploadDate || formatDate(d.timestamp) || 'Recently'}</b></div></div>${d.fileData ? `<div style="margin-top:12px;"><a class="button button--sm" href="${d.fileData}" target="_blank" download="${d.title || 'document'}.png">${icon('download')} View / Download</a></div>` : ''}</div></article>`).join('')}</div>`;
+    }
+
+    // Health records HTML
+    let healthRecsHTML = '';
+    if (healthRecs.length === 0 && meds.length === 0) {
+      healthRecsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('heartPulse')}</span><h3>No lab reports logged</h3><p>Blood test results and clinical lab reports will appear here.</p></div>`;
+    } else {
+      healthRecsHTML = `
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        ${healthRecs.length > 0 ? `
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Date</th><th>Test Type</th><th>Hemoglobin</th><th>WBC</th><th>RBC</th><th>Platelets</th></tr>
+              </thead>
+              <tbody>
+                ${healthRecs.map(r => `<tr><td>${r.date || 'Today'}</td><td><span class="badge badge--blue">${(r.type || 'CBC').toUpperCase()}</span></td><td><b>${r.hemoglobin ? r.hemoglobin + ' g/dL' : '—'}</b></td><td>${r.wbc || '—'}</td><td>${r.rbc || '—'}</td><td>${r.platelets || '—'}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : ''}
+        <div class="detail-list">
+          <div class="detail-row"><span>Known Medical Conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
+          <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
+          <div class="detail-row"><span>Active Prescriptions</span><b>${meds.length > 0 ? meds.map(m => `${m.medicineName} (${m.dosage})`).join(', ') : 'None active'}</b></div>
+        </div>
+      </div>`;
+    }
+
+    // Growth & Nutrition HTML
+    let growthHTML = '';
+    if (growth.length === 0 && meals.length === 0) {
+      growthHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('ruler')}</span><h3>No growth records</h3><p>Height, weight, and meal logs will appear here.</p></div>`;
+    } else {
+      growthHTML = `
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        ${growth.length > 0 ? `
+          <h3 style="font-size:14px; font-weight:600;">Growth Measurements History</h3>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th></tr></thead>
+              <tbody>
+                ${growth.map(g => `<tr><td>${formatDate(g.date || g.timestamp)}</td><td><b>${g.height} cm</b></td><td><b>${g.weight} kg</b></td><td><span class="badge badge--neutral">${g.bmi || '—'}</span></td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : ''}
+        ${meals.length > 0 ? `
+          <h3 style="font-size:14px; font-weight:600; margin-top: 10px;">Logged Meals & Nutrition</h3>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Date / Time</th><th>Meal Type</th><th>Description</th></tr></thead>
+              <tbody>
+                ${meals.map(m => `<tr><td>${formatDate(m.timestamp)}</td><td><span class="badge badge--success">${m.mealType}</span></td><td>${m.description}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : ''}
+      </div>`;
+    }
+
+    // Timeline HTML
+    let timelineHTML = '';
+    if (activities.length === 0) {
+      timelineHTML = `<div class="timeline"><div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>Child registered</b><p>Record created in the health management workspace.</p><time>${child.registeredDate ? formatDate(child.registeredDate) : 'Recently'}</time></div></div></div>`;
+    } else {
+      timelineHTML = `<div class="timeline">${activities.map(a => `<div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>${a.action ? a.action.replace(/_/g, ' ').toUpperCase() : 'ACTIVITY'}</b><p>${a.detail || a.childName}</p><time>${timeAgo(a.timestamp)}</time></div></div>`).join('')}</div>`;
+    }
 
     return shell('child-profile', `${heading('Child profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-profile-print>${icon('printer')}Print</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
-  <section class="card"><div class="profile-header"><span class="profile-header__avatar">${initials(child.name)}</span><div class="profile-header__copy"><h1>${child.name}</h1><p>${child.id} · ${age ? age + ' old' : 'Age unknown'}</p><div class="profile-header__meta">${healthDot(hs.level)} ${statusBadge(child.status)}<span class="badge badge--neutral">${child.gender || 'Not specified'}</span><span class="badge badge--blue">Blood: ${child.blood || 'Unknown'}</span>${hs.flags.length ? `<span class="badge badge--warning">${hs.flags.join(', ')}</span>` : ''}</div></div><div class="profile-header__actions"><button class="icon-button tooltip" type="button" data-tooltip="More actions" aria-label="More actions">${icon('more')}</button></div></div><div class="profile-tabs"><div class="tabs" role="tablist"><button class="tab tab--active" role="tab" aria-selected="true">Overview</button><button class="tab" role="tab">Guardian & Emergency</button><button class="tab" role="tab">Health Records</button><button class="tab" role="tab">Growth & Nutrition</button><button class="tab" role="tab">Documents</button><button class="tab" role="tab">Timeline</button><button class="tab" role="tab">Notes</button></div></div></section>
-  <div class="profile-layout"><div class="dashboard-grid"><section class="card"><header class="card__header"><div><h2 class="card__title">Personal information</h2><p class="card__caption">Core details</p></div><button class="icon-button icon-button--small" type="button" data-edit="${child.id}" aria-label="Edit personal information">${icon('pencil')}</button></header><div class="card__body"><div class="detail-list"><div class="detail-row"><span>Full name</span><b>${child.name}</b></div><div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div><div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div><div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div><div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div><div class="detail-row"><span>ID number</span><b>${child.idNumber || 'Not specified'}</b></div><div class="detail-row"><span>Phone</span><b>${child.phone || 'Not specified'}</b></div><div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div></div></div></section>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">Health summary</h2><p class="card__caption">Latest vitals and health status</p></div></header><div class="card__body"><div class="detail-list"><div class="detail-row"><span>Health status</span><b>${healthDot(hs.level)} ${hs.label}</b></div><div class="detail-row"><span>Height</span><b>${latestGrowth ? latestGrowth.height + ' cm' : child.height ? child.height + ' cm' : '—'}</b></div><div class="detail-row"><span>Weight</span><b>${latestGrowth ? latestGrowth.weight + ' kg' : child.weight ? child.weight + ' kg' : '—'}</b></div><div class="detail-row"><span>BMI</span><b>${latestGrowth && latestGrowth.bmi ? latestGrowth.bmi : '—'}</b></div><div class="detail-row"><span>Medical conditions</span><b>${child.medicalConditions || 'None reported'}</b></div><div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div><div class="detail-row"><span>Active medications</span><b>${meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : 'None'}</b></div><div class="detail-row"><span>Upcoming appointments</span><b>${appts.filter(a => a.status !== 'Completed' && new Date(a.date) >= new Date()).length || 'None'}</b></div></div></div></section></div>
-  <div class="dashboard-grid"><section class="card"><header class="card__header"><div><h2 class="card__title">Record timeline</h2><p class="card__caption">Recent changes and events</p></div></header><div class="card__body"><div class="timeline"><div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>Profile verified</b><p>Health information and contacts confirmed.</p><time>Today, 10:32 AM</time></div></div><div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>Document added</b><p>Medical document uploaded by administrator.</p><time>12 Jul 2026</time></div></div><div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>Child registered</b><p>Record created in the health management workspace.</p><time>${child.registeredDate ? formatDate(child.registeredDate) : 'Recently'}</time></div></div></div></div></section>
-  <section class="card"><header class="card__header"><div><h2 class="card__title">Guardian & Emergency</h2></div></header><div class="card__body"><div class="detail-list detail-list--single"><div class="detail-row"><span>Father / guardian</span><b>${child.father || 'Not specified'}</b></div><div class="detail-row"><span>Mother</span><b>${child.mother || 'Not specified'}</b></div><div class="detail-row"><span>Phone</span><b>${child.phone || 'Not specified'}</b></div><div class="detail-row"><span>Emergency contact</span><b>${child.emergencyContact || 'Not specified'}</b></div><div class="detail-row"><span>Emergency phone</span><b>${child.emergencyPhone || 'Not specified'}</b></div><div class="detail-row"><span>Hospital</span><b>${child.hospitalName || 'Not specified'}</b></div></div></div></section></div></div>`);
+  <section class="card">
+    <div class="profile-header">
+      <span class="profile-header__avatar">${initials(child.name)}</span>
+      <div class="profile-header__copy">
+        <h1>${child.name}</h1>
+        <p>${child.id} · ${age ? age + ' old' : 'Age unknown'}</p>
+        <div class="profile-header__meta">
+          ${healthDot(hs.level)} ${statusBadge(child.status)}
+          <span class="badge badge--neutral">${child.gender || 'Not specified'}</span>
+          <span class="badge badge--blue">Blood: ${child.blood || 'Unknown'}</span>
+          ${hs.flags.length ? `<span class="badge badge--warning">${hs.flags.join(', ')}</span>` : ''}
+        </div>
+      </div>
+      <div class="profile-header__actions">
+        <button class="icon-button tooltip" type="button" data-tooltip="More actions" aria-label="More actions">${icon('more')}</button>
+      </div>
+    </div>
+    <div class="profile-tabs">
+      <div class="tabs" role="tablist">
+        <button class="tab tab--active" type="button" data-profile-tab="overview">Overview</button>
+        <button class="tab" type="button" data-profile-tab="guardian">Guardian & Emergency</button>
+        <button class="tab" type="button" data-profile-tab="health">Health Records</button>
+        <button class="tab" type="button" data-profile-tab="growth">Growth & Nutrition</button>
+        <button class="tab" type="button" data-profile-tab="documents">Documents (${docs.length})</button>
+        <button class="tab" type="button" data-profile-tab="timeline">Timeline</button>
+        <button class="tab" type="button" data-profile-tab="notes">Notes</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="profile-tab-content-container">
+    <!-- OVERVIEW TAB -->
+    <div data-tab-panel="overview">
+      <div class="profile-layout">
+        <div class="dashboard-grid">
+          <section class="card">
+            <header class="card__header">
+              <div><h2 class="card__title">Personal information</h2><p class="card__caption">Core details</p></div>
+              <button class="icon-button icon-button--small" type="button" data-edit="${child.id}">${icon('pencil')}</button>
+            </header>
+            <div class="card__body">
+              <div class="detail-list">
+                <div class="detail-row"><span>Full name</span><b>${child.name}</b></div>
+                <div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div>
+                <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
+                <div class="detail-row"><span>ID number</span><b>${child.idNumber || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Phone</span><b>${child.phone || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div>
+              </div>
+            </div>
+          </section>
+          <section class="card">
+            <header class="card__header">
+              <div><h2 class="card__title">Health summary</h2><p class="card__caption">Latest vitals and health status</p></div>
+            </header>
+            <div class="card__body">
+              <div class="detail-list">
+                <div class="detail-row"><span>Health status</span><b>${healthDot(hs.level)} ${hs.label}</b></div>
+                <div class="detail-row"><span>Height</span><b>${latestGrowth ? latestGrowth.height + ' cm' : child.height ? child.height + ' cm' : '—'}</b></div>
+                <div class="detail-row"><span>Weight</span><b>${latestGrowth ? latestGrowth.weight + ' kg' : child.weight ? child.weight + ' kg' : '—'}</b></div>
+                <div class="detail-row"><span>BMI</span><b>${latestGrowth && latestGrowth.bmi ? latestGrowth.bmi : '—'}</b></div>
+                <div class="detail-row"><span>Medical conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
+                <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
+                <div class="detail-row"><span>Active medications</span><b>${meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : 'None'}</b></div>
+                <div class="detail-row"><span>Upcoming appointments</span><b>${appts.filter(a => a.status !== 'Completed' && new Date(a.date) >= new Date()).length || 'None'}</b></div>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div class="dashboard-grid">
+          <section class="card">
+            <header class="card__header">
+              <div><h2 class="card__title">Record timeline</h2><p class="card__caption">Recent changes and events</p></div>
+            </header>
+            <div class="card__body">
+              ${timelineHTML}
+            </div>
+          </section>
+          <section class="card">
+            <header class="card__header">
+              <div><h2 class="card__title">Guardian & Emergency</h2></div>
+            </header>
+            <div class="card__body">
+              <div class="detail-list detail-list--single">
+                <div class="detail-row"><span>Father / guardian</span><b>${child.father || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Mother</span><b>${child.mother || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Phone</span><b>${child.phone || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Emergency contact</span><b>${child.emergencyContact || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Emergency phone</span><b>${child.emergencyPhone || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Hospital</span><b>${child.hospitalName || 'Not specified'}</b></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- GUARDIAN & EMERGENCY TAB -->
+    <div data-tab-panel="guardian" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Guardian & Emergency Details</h2><p class="card__caption">Primary contact numbers and emergency preferences</p></div>
+        </header>
+        <div class="card__body">
+          <div class="detail-list detail-list--single">
+            <div class="detail-row"><span>Father / Primary Guardian</span><b>${child.father || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Mother Name</span><b>${child.mother || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Contact Phone</span><b>${child.phone ? `<a href="tel:${child.phone}">${child.phone}</a>` : 'Not specified'}</b></div>
+            <div class="detail-row"><span>Guardian Email</span><b>${child.email ? `<a href="mailto:${child.email}">${child.email}</a>` : 'Not specified'}</b></div>
+            <div class="detail-row"><span>Emergency Contact Person</span><b>${child.emergencyContact || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Emergency Phone</span><b>${child.emergencyPhone ? `<a href="tel:${child.emergencyPhone}">${child.emergencyPhone}</a>` : 'Not specified'}</b></div>
+            <div class="detail-row"><span>Preferred Hospital / Clinic</span><b>${child.hospitalName || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Residential Address</span><b>${child.address || 'Not specified'}</b></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- HEALTH RECORDS TAB -->
+    <div data-tab-panel="health" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Clinical & Medical Health Records</h2><p class="card__caption">Lab test reports, CBC panels, and clinical flags</p></div>
+        </header>
+        <div class="card__body">
+          ${healthRecsHTML}
+        </div>
+      </section>
+    </div>
+
+    <!-- GROWTH & NUTRITION TAB -->
+    <div data-tab-panel="growth" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Growth Tracking & Meals Log</h2><p class="card__caption">Height, weight, BMI progression and daily meal nutrition</p></div>
+        </header>
+        <div class="card__body">
+          ${growthHTML}
+        </div>
+      </section>
+    </div>
+
+    <!-- DOCUMENTS TAB -->
+    <div data-tab-panel="documents" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Uploaded Medical Records & Documents</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports</p></div>
+        </header>
+        <div class="card__body">
+          ${docsHTML}
+        </div>
+      </section>
+    </div>
+
+    <!-- TIMELINE TAB -->
+    <div data-tab-panel="timeline" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Full Activity Timeline</h2><p class="card__caption">Complete audit history for ${child.name}</p></div>
+        </header>
+        <div class="card__body">
+          ${timelineHTML}
+        </div>
+      </section>
+    </div>
+
+    <!-- NOTES TAB -->
+    <div data-tab-panel="notes" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Caregiver & Pediatrician Notes</h2><p class="card__caption">Special observations and clinical history notes</p></div>
+        </header>
+        <div class="card__body">
+          <div style="font-size:14px; line-height:1.6; padding: 16px; background: var(--color-hover); border-radius: 6px; margin-bottom: 20px;">
+            ${child.notes ? child.notes : 'No specific caregiver notes added yet.'}
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -2207,11 +2469,27 @@
       }
 
       if (target.matches('.accordion__trigger')) target.closest('.accordion__item').classList.toggle('is-open');
-      if (target.matches('.tab')) {
-        target.closest('.tabs').querySelectorAll('.tab').forEach((tab) => {
-          tab.classList.toggle('tab--active', tab === target);
-          tab.setAttribute('aria-selected', String(tab === target));
-        });
+      if (target.closest('.tab')) {
+        const tabBtn = target.closest('.tab');
+        const tabsGroup = tabBtn.closest('.tabs');
+        if (tabsGroup) {
+          const allTabs = Array.from(tabsGroup.querySelectorAll('.tab'));
+          const index = allTabs.indexOf(tabBtn);
+          allTabs.forEach((t) => {
+            t.classList.toggle('tab--active', t === tabBtn);
+            t.setAttribute('aria-selected', String(t === tabBtn));
+          });
+
+          const profileContainer = document.querySelector('.profile-tab-content-container');
+          if (profileContainer) {
+            const panels = Array.from(profileContainer.querySelectorAll('[data-tab-panel]'));
+            const panelNames = ['overview', 'guardian', 'health', 'growth', 'documents', 'timeline', 'notes'];
+            const selectedPanelName = tabBtn.dataset.profileTab || panelNames[index] || 'overview';
+            panels.forEach((p) => {
+              p.style.display = (p.dataset.tabPanel === selectedPanelName) ? 'block' : 'none';
+            });
+          }
+        }
       }
       if (target.closest('.settings-nav button')) {
         target.closest('.settings-nav').querySelectorAll('button').forEach((button) => button.classList.toggle('active', button === target));
@@ -2315,6 +2593,16 @@
         docLabel = 'Blood Test Report';
       }
       addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel);
+
+      const addInput = form.querySelector('[data-additional-doc-input]');
+      if (addInput && addInput.files && addInput.files[0]) {
+        const addFile = addInput.files[0];
+        const addReader = new FileReader();
+        addReader.onload = function(e) {
+          addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record');
+        };
+        addReader.readAsDataURL(addFile);
+      }
 
       // Save blood report test results to health records
       const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
