@@ -626,16 +626,30 @@ let page = 'dashboard';
     if (fileData) {
       const progressBar = document.querySelector('.ocr-progress-bar');
       const progressPctText = document.querySelector('.ocr-progress-pct');
+      const progressStatusText = document.querySelector('.ocr-progress-status');
       let currentProgress = 0;
       
+      const statusSteps = [
+        { min: 0, text: 'Preprocessing image & normalizing contrast...' },
+        { min: 20, text: 'Scanning text with Tesseract multi-pass OCR...' },
+        { min: 45, text: 'Extracting document fields (Name, DOB, ID)...' },
+        { min: 70, text: 'Verifying confidence scores & structuring draft...' },
+        { min: 88, text: 'Finalizing review draft...' }
+      ];
+
       const progressTimer = window.setInterval(() => {
-        if (currentProgress < 90) {
-          currentProgress += Math.floor(Math.random() * 8) + 2;
-          if (currentProgress > 90) currentProgress = 90;
+        if (currentProgress < 92) {
+          currentProgress += Math.floor(Math.random() * 5) + 3;
+          if (currentProgress > 92) currentProgress = 92;
           if (progressBar) progressBar.style.width = `${currentProgress}%`;
           if (progressPctText) progressPctText.textContent = `${currentProgress}%`;
+          
+          const step = statusSteps.filter(s => currentProgress >= s.min).pop();
+          if (step && progressStatusText) {
+            progressStatusText.textContent = step.text;
+          }
         }
-      }, 200);
+      }, 180);
 
       fetch(fileData)
         .then(res => res.blob())

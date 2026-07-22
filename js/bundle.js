@@ -1261,7 +1261,7 @@
   }
 
   function ocrProcessingPage() {
-    return shell('ocr-processing', `${heading('Processing document', 'We\u2019re creating a draft from your upload. This never creates or updates a child record automatically.')}<section class="card"><div class="ocr-processing"><div class="ocr-processing__orbit">${icon('scan')}</div><h2>Extracting information</h2><p>Reading document structure, identifying details, and preparing them for your review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span>Processing document</span><span class="ocr-progress-pct">0%</span></div><div class="progress"><div class="progress__bar ocr-progress-bar" style="width: 0%"></div></div></div></div></section>`);
+    return shell('ocr-processing', `${heading('Processing document', 'We\u2019re creating a draft from your upload. This never creates or updates a child record automatically.')}<section class="card"><div class="ocr-processing"><div class="ocr-processing__orbit" style="box-shadow: 0 0 25px rgba(59, 130, 246, 0.35);">${icon('scan')}</div><h2>Extracting information</h2><p>Reading document structure, identifying details, and preparing them for your review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span class="ocr-progress-status" style="font-weight: 600; color: var(--color-primary);">Preprocessing image & normalizing contrast...</span><span class="ocr-progress-pct" style="font-weight: 700;">0%</span></div><div class="progress" style="height: 10px; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);"><div class="progress__bar ocr-progress-bar" style="width: 0%; transition: width 0.25s ease-out;"></div></div></div></div></section>`);
   }
 
   function ocrReviewPage() {
@@ -2515,16 +2515,30 @@
       if (fileData) {
         const progressBar = document.querySelector('.ocr-progress-bar');
         const progressPctText = document.querySelector('.ocr-progress-pct');
+        const progressStatusText = document.querySelector('.ocr-progress-status');
         let currentProgress = 0;
         
+        const statusSteps = [
+          { min: 0, text: 'Preprocessing image & normalizing contrast...' },
+          { min: 20, text: 'Scanning text with Tesseract multi-pass OCR...' },
+          { min: 45, text: 'Extracting document fields (Name, DOB, ID)...' },
+          { min: 70, text: 'Verifying confidence scores & structuring draft...' },
+          { min: 88, text: 'Finalizing review draft...' }
+        ];
+
         const progressTimer = window.setInterval(() => {
-          if (currentProgress < 90) {
-            currentProgress += Math.floor(Math.random() * 8) + 2;
-            if (currentProgress > 90) currentProgress = 90;
+          if (currentProgress < 92) {
+            currentProgress += Math.floor(Math.random() * 5) + 3;
+            if (currentProgress > 92) currentProgress = 92;
             if (progressBar) progressBar.style.width = `${currentProgress}%`;
             if (progressPctText) progressPctText.textContent = `${currentProgress}%`;
+            
+            const step = statusSteps.filter(s => currentProgress >= s.min).pop();
+            if (step && progressStatusText) {
+              progressStatusText.textContent = step.text;
+            }
           }
-        }, 200);
+        }, 180);
 
         fetch(fileData)
           .then(res => res.blob())
