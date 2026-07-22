@@ -35,6 +35,7 @@ let page = 'dashboard';
       app.innerHTML = renderPage(page);
       applyColumnVisibility();
       initFormListeners();
+      initOCRProcessing();
     }
 
     // Initialize interactive chart if on dashboard or reports
@@ -617,100 +618,101 @@ let page = 'dashboard';
   });
 
   // OCR processing backend fetch logic
-  if (page === 'ocr-processing' && !window.__ocrStarted) {
-    window.__ocrStarted = true;
-    const fileData = localStorage.getItem('ocr-upload-file');
-    const fileName = localStorage.getItem('ocr-upload-filename') || 'document.png';
-    const fileType = localStorage.getItem('ocr-upload-filetype') || 'image/png';
+function initOCRProcessing() {
+  if (page !== 'ocr-processing' || window.__ocrStarted) return;
+  window.__ocrStarted = true;
+  const fileData = localStorage.getItem('ocr-upload-file');
+  const fileName = localStorage.getItem('ocr-upload-filename') || 'document.png';
+  const fileType = localStorage.getItem('ocr-upload-filetype') || 'image/png';
 
-    if (fileData) {
-      const progressBar = document.querySelector('.ocr-progress-bar');
-      const progressPctText = document.querySelector('.ocr-progress-pct');
-      const progressStatusText = document.querySelector('.ocr-progress-status');
-      let currentProgress = 0;
-      
-      const statusSteps = [
-        { min: 0, text: 'Preprocessing image & normalizing contrast...' },
-        { min: 20, text: 'Scanning text with Tesseract multi-pass OCR...' },
-        { min: 45, text: 'Extracting document fields (Name, DOB, ID)...' },
-        { min: 70, text: 'Verifying confidence scores & structuring draft...' },
-        { min: 88, text: 'Finalizing review draft...' }
-      ];
+  if (fileData) {
+    const progressBar = document.querySelector('.ocr-progress-bar');
+    const progressPctText = document.querySelector('.ocr-progress-pct');
+    const progressStatusText = document.querySelector('.ocr-progress-status');
+    let currentProgress = 0;
+    
+    const statusSteps = [
+      { min: 0, text: 'Preprocessing image & normalizing contrast...' },
+      { min: 20, text: 'Scanning text with Tesseract multi-pass OCR...' },
+      { min: 45, text: 'Extracting document fields (Name, DOB, ID)...' },
+      { min: 70, text: 'Verifying confidence scores & structuring draft...' },
+      { min: 88, text: 'Finalizing review draft...' }
+    ];
 
-      const progressTimer = window.setInterval(() => {
-        if (currentProgress < 92) {
-          currentProgress += Math.floor(Math.random() * 5) + 3;
-          if (currentProgress > 92) currentProgress = 92;
-          if (progressBar) progressBar.style.width = `${currentProgress}%`;
-          if (progressPctText) progressPctText.textContent = `${currentProgress}%`;
-          
-          const step = statusSteps.filter(s => currentProgress >= s.min).pop();
-          if (step && progressStatusText) {
-            progressStatusText.textContent = step.text;
-          }
+    const progressTimer = window.setInterval(() => {
+      if (currentProgress < 92) {
+        currentProgress += Math.floor(Math.random() * 5) + 3;
+        if (currentProgress > 92) currentProgress = 92;
+        if (progressBar) progressBar.style.width = `${currentProgress}%`;
+        if (progressPctText) progressPctText.textContent = `${currentProgress}%`;
+        
+        const step = statusSteps.filter(s => currentProgress >= s.min).pop();
+        if (step && progressStatusText) {
+          progressStatusText.textContent = step.text;
         }
-      }, 180);
+      }
+    }, 180);
 
-      fetch(fileData)
-        .then(res => res.blob())
-        .then(blob => {
-          const file = new File([blob], fileName, { type: fileType });
-          const formData = new FormData();
-          formData.append('document', file);
+    fetch(fileData)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], fileName, { type: fileType });
+        const formData = new FormData();
+        formData.append('document', file);
 
-          const startTime = Date.now();
+        const startTime = Date.now();
 
-          fetch('http://localhost:3000/api/ocr', {
-            method: 'POST',
-            body: formData
+        fetch('http://localhost:3000/api/ocr', {
+          method: 'POST',
+          body: formData
+        })
+          .then(response => {
+            if (!response.ok) throw new Error('OCR API failed');
+            return response.json();
           })
-            .then(response => {
-              if (!response.ok) throw new Error('OCR API failed');
-              return response.json();
-            })
-            .then(result => {
-              window.clearInterval(progressTimer);
-              if (result.success) {
-                if (progressBar) progressBar.style.width = '100%';
-                if (progressPctText) progressPctText.textContent = '100%';
+          .then(result => {
+            window.clearInterval(progressTimer);
+            if (result.success) {
+              if (progressBar) progressBar.style.width = '100%';
+              if (progressPctText) progressPctText.textContent = '100%';
 
-                localStorage.setItem('ocr-parsed-data', JSON.stringify(result.data));
-                const name = [result.data.firstName, result.data.lastName].filter(Boolean).join(' ') || 'Unknown';
-                logActivity('doc_processed', name, 'Document extracted via OCR');
-                
-                const elapsed = Date.now() - startTime;
-                const remaining = Math.max(0, 1000 - elapsed);
-                window.setTimeout(() => {
-                  window.location.href = pagePath('ocr-review');
-                }, remaining);
-              } else {
-                throw new Error(result.error || 'Extraction failed');
-              }
-            })
-            .catch(err => {
-              window.clearInterval(progressTimer);
-              console.error('Live OCR failed:', err);
-              localStorage.removeItem('ocr-parsed-data');
+              localStorage.setItem('ocr-parsed-data', JSON.stringify(result.data));
+              const name = [result.data.firstName, result.data.lastName].filter(Boolean).join(' ') || 'Unknown';
+              logActivity('doc_processed', name, 'Document extracted via OCR');
               
-              modal({
-                title: 'Extraction Failed',
-                body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
-                confirmText: 'Try Again',
-                onConfirm: () => {
-                  window.location.href = pagePath('ocr-upload');
-                }
-              });
-
-              const processingContainer = document.querySelector('.ocr-processing');
-              if (processingContainer) {
-                processingContainer.innerHTML = `<span class="ocr-processing__sample" style="color:var(--color-danger)">${icon('alertCircle') || '⚠️'}</span><h2>Extraction failed</h2><p>Please try again with a clearer image.</p>`;
+              const elapsed = Date.now() - startTime;
+              const remaining = Math.max(0, 1000 - elapsed);
+              window.setTimeout(() => {
+                window.location.href = pagePath('ocr-review');
+              }, remaining);
+            } else {
+              throw new Error(result.error || 'Extraction failed');
+            }
+          })
+          .catch(err => {
+            window.clearInterval(progressTimer);
+            console.error('Live OCR failed:', err);
+            localStorage.removeItem('ocr-parsed-data');
+            
+            modal({
+              title: 'Extraction Failed',
+              body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
+              confirmText: 'Try Again',
+              onConfirm: () => {
+                window.location.href = pagePath('ocr-upload');
               }
             });
-        });
-    } else {
-      window.setTimeout(() => { window.location.href = pagePath('ocr-review'); }, 1850);
-    }
+
+            const processingContainer = document.querySelector('.ocr-processing');
+            if (processingContainer) {
+              processingContainer.innerHTML = `<span class="ocr-processing__sample" style="color:var(--color-danger)">${icon('alertCircle') || '⚠️'}</span><h2>Extraction failed</h2><p>Please try again with a clearer image.</p>`;
+            }
+          });
+      });
+  } else {
+    window.setTimeout(() => { window.location.href = pagePath('ocr-review'); }, 1850);
   }
+}
 
 // ─── Core Helpers ───
 
