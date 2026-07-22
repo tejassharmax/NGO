@@ -693,6 +693,43 @@ app.get('/api/sync', (req, res) => {
   }
 });
 
+function mergeJSONArrays(clientJSON, serverJSON) {
+  if (!clientJSON && !serverJSON) return null;
+  if (!clientJSON) return serverJSON;
+  if (!serverJSON) return clientJSON;
+  try {
+    const clientArr = JSON.parse(clientJSON);
+    const serverArr = JSON.parse(serverJSON);
+    if (!Array.isArray(clientArr) || !Array.isArray(serverArr)) return clientJSON;
+    
+    const mergedMap = new Map();
+    serverArr.forEach(item => {
+      const key = item.id || JSON.stringify(item);
+      mergedMap.set(key, item);
+    });
+    clientArr.forEach(item => {
+      const key = item.id || JSON.stringify(item);
+      mergedMap.set(key, item);
+    });
+    
+    const clientIds = new Set(clientArr.map(item => item.id || JSON.stringify(item)));
+    const finalArr = Array.from(mergedMap.values());
+    finalArr.sort((a, b) => {
+      const aKey = a.id || JSON.stringify(a);
+      const bKey = b.id || JSON.stringify(b);
+      const aIsClient = clientIds.has(aKey);
+      const bIsClient = clientIds.has(bKey);
+      if (aIsClient && !bIsClient) return -1;
+      if (!aIsClient && bIsClient) return 1;
+      return 0;
+    });
+    
+    return JSON.stringify(finalArr);
+  } catch (e) {
+    return clientJSON;
+  }
+}
+
 // POST /api/sync - Merges and saves the database
 app.post('/api/sync', (req, res) => {
   try {
@@ -713,7 +750,9 @@ app.post('/api/sync', (req, res) => {
     ];
 
     keys.forEach(k => {
-      if (clientData[k] !== undefined && clientData[k] !== null) {
+      if (k.startsWith('chm-')) {
+        mergedData[k] = mergeJSONArrays(clientData[k], serverData[k]);
+      } else if (clientData[k] !== undefined && clientData[k] !== null) {
         mergedData[k] = clientData[k];
       } else {
         mergedData[k] = serverData[k] || null;

@@ -743,6 +743,7 @@ export async function syncWithServer() {
   if (isSyncing) return;
   try {
     isSyncing = true;
+    getChildren();
     const keys = [
       CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
       NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
