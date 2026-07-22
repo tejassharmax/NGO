@@ -697,8 +697,10 @@ app.get('/api/sync', (req, res) => {
 app.post('/api/sync', (req, res) => {
   try {
     let serverData = {};
+    let currentDBString = '';
     if (fs.existsSync(DB_FILE)) {
-      serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
+      currentDBString = fs.readFileSync(DB_FILE, 'utf8') || '{}';
+      try { serverData = JSON.parse(currentDBString); } catch (e) {}
     }
 
     const clientData = req.body || {};
@@ -718,7 +720,10 @@ app.post('/api/sync', (req, res) => {
       }
     });
 
-    fs.writeFileSync(DB_FILE, JSON.stringify(mergedData, null, 2), 'utf8');
+    const newDBString = JSON.stringify(mergedData, null, 2);
+    if (newDBString !== currentDBString) {
+      fs.writeFileSync(DB_FILE, newDBString, 'utf8');
+    }
     return res.json(mergedData);
   } catch (err) {
     console.error('Failed to write db file:', err);

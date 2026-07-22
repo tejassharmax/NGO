@@ -752,7 +752,9 @@
         // Apply merged state from server
         Object.keys(serverData).forEach(k => {
           if (serverData[k] !== null && serverData[k] !== undefined) {
-            localStorage.setItem(k, serverData[k]);
+            if (localStorage.getItem(k) !== serverData[k]) {
+              localStorage.setItem(k, serverData[k]);
+            }
           }
         });
       }
@@ -2504,7 +2506,8 @@
     });
 
     // OCR processing backend fetch logic
-    if (page === 'ocr-processing') {
+    if (page === 'ocr-processing' && !window.__ocrStarted) {
+      window.__ocrStarted = true;
       const fileData = localStorage.getItem('ocr-upload-file');
       const fileName = localStorage.getItem('ocr-upload-filename') || 'document.png';
       const fileType = localStorage.getItem('ocr-upload-filetype') || 'image/png';

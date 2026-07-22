@@ -768,7 +768,9 @@ export async function syncWithServer() {
       // Apply merged state from server
       Object.keys(serverData).forEach(k => {
         if (serverData[k] !== null && serverData[k] !== undefined) {
-          localStorage.setItem(k, serverData[k]);
+          if (localStorage.getItem(k) !== serverData[k]) {
+            localStorage.setItem(k, serverData[k]);
+          }
         }
       });
     }

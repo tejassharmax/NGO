@@ -617,7 +617,8 @@ let page = 'dashboard';
   });
 
   // OCR processing backend fetch logic
-  if (page === 'ocr-processing') {
+  if (page === 'ocr-processing' && !window.__ocrStarted) {
+    window.__ocrStarted = true;
     const fileData = localStorage.getItem('ocr-upload-file');
     const fileName = localStorage.getItem('ocr-upload-filename') || 'document.png';
     const fileType = localStorage.getItem('ocr-upload-filetype') || 'image/png';
