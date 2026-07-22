@@ -159,14 +159,24 @@ export function getUploadedDocs() {
 export function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report') {
   const docs = getUploadedDocs();
   docs.unshift({
+    id: `DOC-${Date.now()}`,
     name: docName,
     child: childName,
+    childName: childName,
     docType: docType,
+    category: docType,
     meta: fileData ? `Image · ${Math.round(fileData.length * 0.75 / 1024)} KB` : 'No file',
     status: status,
     image: fileData,
+    fileData: fileData,
     timestamp: Date.now()
   });
+  localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+}
+
+export function deleteUploadedDoc(index) {
+  const docs = getUploadedDocs();
+  docs.splice(index, 1);
   localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
 }
 

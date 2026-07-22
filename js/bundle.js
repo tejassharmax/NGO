@@ -213,14 +213,24 @@
   function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report') {
     const docs = getUploadedDocs();
     docs.unshift({
+      id: `DOC-${Date.now()}`,
       name: docName,
       child: childName,
+      childName: childName,
       docType: docType,
+      category: docType,
       meta: fileData ? `Image · ${Math.round(fileData.length * 0.75 / 1024)} KB` : 'No file',
       status: status,
       image: fileData,
+      fileData: fileData,
       timestamp: Date.now()
     });
+    localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+  }
+
+  function deleteUploadedDoc(index) {
+    const docs = getUploadedDocs();
+    docs.splice(index, 1);
     localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
   }
 
@@ -1897,37 +1907,42 @@
 
   function documentsPage() {
     const docs = getUploadedDocs();
+    const children = getChildren();
     let contentHTML = '';
     
     if (docs.length === 0) {
       contentHTML = `<div class="empty-state" style="padding:48px 24px">
       <span class="empty-state__icon">${icon('file')}</span>
       <h3>No documents uploaded yet</h3>
-      <p>Use Smart Upload to extract details from medical documents.</p>
+      <p>Click "Upload document" to attach medical reports or use Smart OCR Upload.</p>
     </div>`;
     } else {
       contentHTML = `<div class="document-grid" id="document-grid">
       ${docs.map((doc, idx) => `
-        <article class="card document-card card--interactive" data-document-idx="${idx}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.student || '').toLowerCase()}">
-          <div class="document-card__preview" style="position:relative; width:100%; height:120px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
-            ${doc.image ? `<img src="${doc.image}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
+        <article class="card document-card card--interactive" data-document-idx="${idx}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}">
+          <div class="document-card__preview" style="position:relative; width:100%; height:140px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
+            ${doc.image || doc.fileData ? `<img src="${doc.image || doc.fileData}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
+            <button class="icon-button icon-button--small button--danger tooltip" data-tooltip="Delete Document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.9);">${icon('trash')}</button>
           </div>
           <div class="document-card__body" style="padding-top:12px;">
             <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center;">
               <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0;">${doc.name}</h2>
-              ${statusBadge(doc.status)}
+              ${statusBadge(doc.status || 'Verified')}
             </div>
-            <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between;">
-              <span>${doc.child || doc.student || '—'}</span>
-              <span>${doc.meta}</span>
+            <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; color:var(--color-text);">${doc.child || doc.childName || doc.student || '—'}</span>
+              <span>${doc.docType || doc.category || doc.meta || 'Document'}</span>
             </div>
+            ${doc.image || doc.fileData ? `<div style="margin-top:10px;"><a class="button button--sm" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="width:100%; justify-content:center;">${icon('download')} View / Download</a></div>` : ''}
           </div>
         </article>
       `).join('')}
     </div>`;
     }
 
-    return shell('documents', `${heading('Health records & documents', 'Upload, organise, and review medical reports, Aadhaar, school documents, and prescriptions.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Smart upload</a>`)}<section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-docs>${icon('filter')}Status: All</button></div></div><div class="card__body">${contentHTML}</div></section>`);
+    const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
+
+    return shell('documents', `${heading('Health records & documents', 'Upload, organise, and review medical reports, Aadhaar, school documents, and prescriptions.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Smart upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label><button class="button button--sm" type="button" data-filter-docs>${icon('filter')}Status: All</button></div></div><div class="card__body">${contentHTML}</div></section>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -2509,10 +2524,118 @@
         toast('Alert dismissed', 'The notification has been archived.');
         window.setTimeout(() => window.location.reload(), 500);
       }
+
+      // Open Direct Document Upload Modal
+      if (target.closest('[data-open-upload-modal]')) {
+        const children = getChildren();
+        const selectedFilter = document.querySelector('[data-child-document-filter]')?.value || '';
+        const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name} (${c.id})</option>`).join('');
+
+        modal({
+          title: 'Upload Document for Child',
+          body: `
+          <form id="direct-doc-form" style="display:flex; flex-direction:column; gap:14px;">
+            <label class="field">
+              <span class="field__label">Select Child *</span>
+              <select class="select" name="childName" required>
+                <option value="">Choose child</option>
+                ${childOptions}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Document Title / Name *</span>
+              <input class="input" name="docName" placeholder="e.g. Aadhaar Card, Blood Test Report" required>
+            </label>
+            <label class="field">
+              <span class="field__label">Category *</span>
+              <select class="select" name="docType" required>
+                <option value="Aadhaar Card">Aadhaar Card</option>
+                <option value="Medical Report">Medical Report / Lab Test</option>
+                <option value="Birth Certificate">Birth Certificate</option>
+                <option value="Vaccination Record">Vaccination Record</option>
+                <option value="Prescription">Prescription</option>
+                <option value="School Record">School / NGO Document</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Choose File (Image / PDF) *</span>
+              <input class="input" type="file" name="docFile" accept=".jpg,.jpeg,.png,.pdf" required id="modal-upload-input">
+            </label>
+          </form>
+        `,
+          confirmText: 'Upload Document',
+          onConfirm: () => {
+            const form = document.querySelector('#direct-doc-form');
+            if (!form || !form.reportValidity()) return false;
+            const formData = new FormData(form);
+            const childName = formData.get('childName');
+            const docName = formData.get('docName');
+            const docType = formData.get('docType');
+            const fileInput = document.querySelector('#modal-upload-input');
+            
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+              const file = fileInput.files[0];
+              const reader = new FileReader();
+              reader.onload = function(e) {
+                addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+                logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
+                toast('Document uploaded', `${docName} attached to ${childName}.`);
+                window.setTimeout(() => window.location.reload(), 400);
+              };
+              reader.readAsDataURL(file);
+            } else {
+              toast('Upload error', 'Please select a document file.');
+            }
+          }
+        });
+      }
+
+      // Delete uploaded document
+      if (target.closest('[data-delete-doc-idx]')) {
+        const idx = parseInt(target.closest('[data-delete-doc-idx]').dataset.deleteDocIdx, 10);
+        modal({
+          title: 'Delete Document?',
+          body: 'Are you sure you want to delete this uploaded document?',
+          confirmText: 'Delete',
+          confirmClass: 'button--danger',
+          onConfirm: () => {
+            deleteUploadedDoc(idx);
+            toast('Document removed', 'Document deleted from records.');
+            window.setTimeout(() => window.location.reload(), 400);
+          }
+        });
+      }
+    });
+
+    // Change listeners
+    document.addEventListener('change', (event) => {
+      if (event.target.matches('[data-child-document-filter]')) {
+        const filterVal = event.target.value.toLowerCase();
+        const searchVal = (document.querySelector('[data-document-search]')?.value || '').toLowerCase();
+        document.querySelectorAll('#document-grid article').forEach(card => {
+          const cardChild = card.dataset.childName || '';
+          const cardText = card.dataset.document || '';
+          const matchesChild = !filterVal || cardChild.includes(filterVal);
+          const matchesSearch = !searchVal || cardText.includes(searchVal);
+          card.style.display = (matchesChild && matchesSearch) ? 'block' : 'none';
+        });
+      }
     });
 
     // Inputs
     document.addEventListener('input', (event) => {
+      if (event.target.matches('[data-document-search]')) {
+        const searchVal = event.target.value.toLowerCase();
+        const filterVal = (document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
+        document.querySelectorAll('#document-grid article').forEach(card => {
+          const cardChild = card.dataset.childName || '';
+          const cardText = card.dataset.document || '';
+          const matchesChild = !filterVal || cardChild.includes(filterVal);
+          const matchesSearch = !searchVal || cardText.includes(searchVal);
+          card.style.display = (matchesChild && matchesSearch) ? 'block' : 'none';
+        });
+      }
+
       if (event.target.matches('#child-search, [data-filter-status], [data-filter-blood]')) {
         currentPage = 1;
         applyTableFilters();

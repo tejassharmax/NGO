@@ -953,37 +953,42 @@ export function expensesPage() {
 
 export function documentsPage() {
   const docs = getUploadedDocs();
+  const children = getChildren();
   let contentHTML = '';
   
   if (docs.length === 0) {
     contentHTML = `<div class="empty-state" style="padding:48px 24px">
       <span class="empty-state__icon">${icon('file')}</span>
       <h3>No documents uploaded yet</h3>
-      <p>Use Smart Upload to extract details from medical documents.</p>
+      <p>Click "Upload document" to attach medical reports or use Smart OCR Upload.</p>
     </div>`;
   } else {
     contentHTML = `<div class="document-grid" id="document-grid">
       ${docs.map((doc, idx) => `
-        <article class="card document-card card--interactive" data-document-idx="${idx}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.student || '').toLowerCase()}">
-          <div class="document-card__preview" style="position:relative; width:100%; height:120px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
-            ${doc.image ? `<img src="${doc.image}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
+        <article class="card document-card card--interactive" data-document-idx="${idx}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}">
+          <div class="document-card__preview" style="position:relative; width:100%; height:140px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
+            ${doc.image || doc.fileData ? `<img src="${doc.image || doc.fileData}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
+            <button class="icon-button icon-button--small button--danger tooltip" data-tooltip="Delete Document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; background:rgba(255,255,255,0.9);">${icon('trash')}</button>
           </div>
           <div class="document-card__body" style="padding-top:12px;">
             <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center;">
               <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0;">${doc.name}</h2>
-              ${statusBadge(doc.status)}
+              ${statusBadge(doc.status || 'Verified')}
             </div>
-            <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between;">
-              <span>${doc.child || doc.student || '—'}</span>
-              <span>${doc.meta}</span>
+            <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; color:var(--color-text);">${doc.child || doc.childName || doc.student || '—'}</span>
+              <span>${doc.docType || doc.category || doc.meta || 'Document'}</span>
             </div>
+            ${doc.image || doc.fileData ? `<div style="margin-top:10px;"><a class="button button--sm" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="width:100%; justify-content:center;">${icon('download')} View / Download</a></div>` : ''}
           </div>
         </article>
       `).join('')}
     </div>`;
   }
 
-  return shell('documents', `${heading('Health records & documents', 'Upload, organise, and review medical reports, Aadhaar, school documents, and prescriptions.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Smart upload</a>`)}<section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-docs>${icon('filter')}Status: All</button></div></div><div class="card__body">${contentHTML}</div></section>`);
+  const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
+
+  return shell('documents', `${heading('Health records & documents', 'Upload, organise, and review medical reports, Aadhaar, school documents, and prescriptions.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Smart upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label><button class="button button--sm" type="button" data-filter-docs>${icon('filter')}Status: All</button></div></div><div class="card__body">${contentHTML}</div></section>`);
 }
 
 /* ═══════════════════════════════════════════════════════

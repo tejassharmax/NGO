@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, addSponsor } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, addSponsor } from './storage.js';
 import { updateChildTable, childRows } from './table.js';
 import { searchChildren, globalSearchMarkup } from './search.js';
 import { toast } from './toast.js';
@@ -357,10 +357,118 @@ let page = 'dashboard';
       toast('Alert dismissed', 'The notification has been archived.');
       window.setTimeout(() => window.location.reload(), 500);
     }
+
+    // Open Direct Document Upload Modal
+    if (target.closest('[data-open-upload-modal]')) {
+      const children = getChildren();
+      const selectedFilter = document.querySelector('[data-child-document-filter]')?.value || '';
+      const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name} (${c.id})</option>`).join('');
+
+      modal({
+        title: 'Upload Document for Child',
+        body: `
+          <form id="direct-doc-form" style="display:flex; flex-direction:column; gap:14px;">
+            <label class="field">
+              <span class="field__label">Select Child *</span>
+              <select class="select" name="childName" required>
+                <option value="">Choose child</option>
+                ${childOptions}
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Document Title / Name *</span>
+              <input class="input" name="docName" placeholder="e.g. Aadhaar Card, Blood Test Report" required>
+            </label>
+            <label class="field">
+              <span class="field__label">Category *</span>
+              <select class="select" name="docType" required>
+                <option value="Aadhaar Card">Aadhaar Card</option>
+                <option value="Medical Report">Medical Report / Lab Test</option>
+                <option value="Birth Certificate">Birth Certificate</option>
+                <option value="Vaccination Record">Vaccination Record</option>
+                <option value="Prescription">Prescription</option>
+                <option value="School Record">School / NGO Document</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field__label">Choose File (Image / PDF) *</span>
+              <input class="input" type="file" name="docFile" accept=".jpg,.jpeg,.png,.pdf" required id="modal-upload-input">
+            </label>
+          </form>
+        `,
+        confirmText: 'Upload Document',
+        onConfirm: () => {
+          const form = document.querySelector('#direct-doc-form');
+          if (!form || !form.reportValidity()) return false;
+          const formData = new FormData(form);
+          const childName = formData.get('childName');
+          const docName = formData.get('docName');
+          const docType = formData.get('docType');
+          const fileInput = document.querySelector('#modal-upload-input');
+          
+          if (fileInput && fileInput.files && fileInput.files[0]) {
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+              logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
+              toast('Document uploaded', `${docName} attached to ${childName}.`);
+              window.setTimeout(() => window.location.reload(), 400);
+            };
+            reader.readAsDataURL(file);
+          } else {
+            toast('Upload error', 'Please select a document file.');
+          }
+        }
+      });
+    }
+
+    // Delete uploaded document
+    if (target.closest('[data-delete-doc-idx]')) {
+      const idx = parseInt(target.closest('[data-delete-doc-idx]').dataset.deleteDocIdx, 10);
+      modal({
+        title: 'Delete Document?',
+        body: 'Are you sure you want to delete this uploaded document?',
+        confirmText: 'Delete',
+        confirmClass: 'button--danger',
+        onConfirm: () => {
+          deleteUploadedDoc(idx);
+          toast('Document removed', 'Document deleted from records.');
+          window.setTimeout(() => window.location.reload(), 400);
+        }
+      });
+    }
+  });
+
+  // Change listeners
+  document.addEventListener('change', (event) => {
+    if (event.target.matches('[data-child-document-filter]')) {
+      const filterVal = event.target.value.toLowerCase();
+      const searchVal = (document.querySelector('[data-document-search]')?.value || '').toLowerCase();
+      document.querySelectorAll('#document-grid article').forEach(card => {
+        const cardChild = card.dataset.childName || '';
+        const cardText = card.dataset.document || '';
+        const matchesChild = !filterVal || cardChild.includes(filterVal);
+        const matchesSearch = !searchVal || cardText.includes(searchVal);
+        card.style.display = (matchesChild && matchesSearch) ? 'block' : 'none';
+      });
+    }
   });
 
   // Inputs
   document.addEventListener('input', (event) => {
+    if (event.target.matches('[data-document-search]')) {
+      const searchVal = event.target.value.toLowerCase();
+      const filterVal = (document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
+      document.querySelectorAll('#document-grid article').forEach(card => {
+        const cardChild = card.dataset.childName || '';
+        const cardText = card.dataset.document || '';
+        const matchesChild = !filterVal || cardChild.includes(filterVal);
+        const matchesSearch = !searchVal || cardText.includes(searchVal);
+        card.style.display = (matchesChild && matchesSearch) ? 'block' : 'none';
+      });
+    }
+
     if (event.target.matches('#child-search, [data-filter-status], [data-filter-blood]')) {
       currentPage = 1;
       applyTableFilters();
