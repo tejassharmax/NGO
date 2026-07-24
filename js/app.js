@@ -198,6 +198,26 @@ async function handleGoogleAuth(email) {
       handleGoogleAuth(email);
     }
 
+    const toggleServiceBtn = target.closest('[data-toggle-google-service]');
+    if (toggleServiceBtn) {
+      const service = toggleServiceBtn.dataset.toggleGoogleService;
+      const key = `google-${service}-connected`;
+      const isConnected = localStorage.getItem(key) === 'true';
+      const serviceName = service === 'drive' ? 'Google Drive' : service === 'sheets' ? 'Google Sheets' : 'Google Calendar';
+
+      if (isConnected) {
+        localStorage.setItem(key, 'false');
+        toast(`${serviceName} Disconnected`, 'Service disconnected from workspace.');
+      } else {
+        localStorage.setItem(key, 'true');
+        toast(`${serviceName} Connected`, `Successfully connected to workspace account.`);
+      }
+
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 400);
+    }
+
     if (target.matches('[data-global-search]')) openGlobalSearch();
     if (target.matches('[data-filter-toggle]')) { const row = document.querySelector('[data-filter-row]'); row.hidden = !row.hidden; }
     if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }

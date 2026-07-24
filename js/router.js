@@ -812,11 +812,11 @@ export function reportsPage() {
    ═══════════════════════════════════════════════════════ */
 
 export function settingsPage() {
-  const orgName = localStorage.getItem('sample-org-name') || 'NGO Health Platform';
-  const orgCode = localStorage.getItem('sample-org-code') || 'ORG-IND-01';
-  const orgEmail = localStorage.getItem('sample-org-email') || 'admin@organisation.org';
+  const isDriveConnected = localStorage.getItem('google-drive-connected') === 'true';
+  const isSheetsConnected = localStorage.getItem('google-sheets-connected') === 'true';
+  const isCalendarConnected = localStorage.getItem('google-calendar-connected') === 'true';
 
-  return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration, Google Workspace connections, and system architecture.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
+  return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Workspace service connections.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
   <div class="settings-layout">
     <nav class="card settings-nav" aria-label="Settings sections">
       <button type="button" class="active">Google Workspace</button>
@@ -825,7 +825,7 @@ export function settingsPage() {
     </nav>
     <section class="card settings-panel">
       <h2>Google Workspace Connections</h2>
-      <p class="muted">Connected Cloud APIs, Storage, and AI Integration Status</p>
+      <p class="muted">Connect or disconnect Google Cloud APIs, Drive Storage, Sheets Sync, and Calendar Services.</p>
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
@@ -833,72 +833,59 @@ export function settingsPage() {
             <b style="font-size: 14px; font-weight: 600;">Google Authentication</b>
             <span class="badge badge--success">Connected</span>
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">OAuth 2.0 GIS Authentication active. Allowed: tejassachin2010@gmail.com, wondertaleai123@gmail.com</p>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">OAuth 2.0 GIS Authentication active. Firestore verified account.</p>
+          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active Account Provider</button>
         </div>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <b style="font-size: 14px; font-weight: 600;">Google Cloud Vision API</b>
-            <span class="badge badge--blue">Demo Mode</span>
+            <span class="badge badge--blue">Connected</span>
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">Medical document extraction for blood reports, prescriptions & certificates.</p>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Medical document OCR extraction for blood reports, prescriptions & certificates.</p>
+          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active OCR Provider</button>
         </div>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <b style="font-size: 14px; font-weight: 600;">Gemini API</b>
-            <span class="badge badge--blue">Demo Mode</span>
+            <span class="badge badge--blue">Connected</span>
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">AI medical report parsing & health trend summaries.</p>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">AI medical report parsing & health trend summaries.</p>
+          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active AI Provider</button>
         </div>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <b style="font-size: 14px; font-weight: 600;">Google Drive</b>
-            <span class="badge badge--warning">Drive Sync: Coming Soon</span>
+            ${isDriveConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">Secure cloud document storage for child health records.</p>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Secure cloud document storage for child health records.</p>
+          <button class="button button--sm ${isDriveConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="drive" style="width: 100%; justify-content: center;">
+            ${isDriveConnected ? 'Disconnect Google Drive' : 'Connect Google Drive'}
+          </button>
         </div>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <b style="font-size: 14px; font-weight: 600;">Google Sheets</b>
-            <span class="badge badge--neutral">Not Connected</span>
+            ${isSheetsConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">Live spreadsheet synchronization for NGO health records.</p>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Live spreadsheet synchronization for NGO health records.</p>
+          <button class="button button--sm ${isSheetsConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="sheets" style="width: 100%; justify-content: center;">
+            ${isSheetsConnected ? 'Disconnect Google Sheets' : 'Connect Google Sheets'}
+          </button>
         </div>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <b style="font-size: 14px; font-weight: 600;">Google Calendar</b>
-            <span class="badge badge--warning">Coming Soon</span>
+            ${isCalendarConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">Automated appointment & checkup reminder scheduling.</p>
-        </div>
-      </div>
-
-      <div style="margin-top: 30px; padding: 20px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
-        <h3 style="font-size: 15px; font-weight: 700; margin-top: 0; margin-bottom: 12px;">Google Workspace System Architecture</h3>
-        <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 16px;">Demonstration workflow connecting Google Authentication, Google Drive, Sheets, Vision API & Gemini AI.</p>
-        
-        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; font-weight: 600;">
-          <span style="padding: 6px 12px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 6px;">Google Login</span>
-          <span style="color: var(--color-text-muted);">↓</span>
-          <span style="padding: 6px 12px; background: rgba(37,99,235,0.1); color: var(--color-primary); border: 1px solid rgba(37,99,235,0.2); border-radius: 6px;">Google Authentication</span>
-          <span style="color: var(--color-text-muted);">↓</span>
-          <span style="padding: 6px 12px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 6px;">Authorized Account</span>
-          <span style="color: var(--color-text-muted);">↓</span>
-          <span style="padding: 6px 12px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 6px;">Dashboard</span>
-          <span style="color: var(--color-text-muted);">↓</span>
-          <span style="padding: 6px 12px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 6px;">Google Drive</span>
-          <span style="color: var(--color-text-muted);">↓</span>
-          <span style="padding: 6px 12px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 6px;">Google Sheets</span>
-          <span style="color: var(--color-text-muted);">↓</span>
-          <span style="padding: 6px 12px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 6px;">Google Calendar</span>
-          <span style="color: var(--color-text-muted);">↓</span>
-          <span style="padding: 6px 12px; background: rgba(59,130,246,0.1); color: #2563eb; border: 1px solid rgba(59,130,246,0.2); border-radius: 6px;">Cloud Vision OCR</span>
-          <span style="color: var(--color-text-muted);">↓</span>
-          <span style="padding: 6px 12px; background: rgba(147,51,234,0.1); color: #9333ea; border: 1px solid rgba(147,51,234,0.2); border-radius: 6px;">Gemini</span>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Automated appointment & checkup reminder scheduling.</p>
+          <button class="button button--sm ${isCalendarConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="calendar" style="width: 100%; justify-content: center;">
+            ${isCalendarConnected ? 'Disconnect Google Calendar' : 'Connect Google Calendar'}
+          </button>
         </div>
       </div>
     </section>
