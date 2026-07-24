@@ -1092,9 +1092,9 @@
   function loginPage() {
     return `<main class="login-page">
     <section class="login-panel">
-      <div class="login-panel__brand" aria-label="NGO Health Management Platform">
+      <div class="login-panel__brand" aria-label="Sample Demo">
         <span class="brand-mark">${icon('heartPulse')}</span>
-        <b>Child Health Management Platform</b>
+        <b>Sample Demo</b>
       </div>
       <div class="card login-card">
         <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">Google Workspace Sign-In</h1>
