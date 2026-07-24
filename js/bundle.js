@@ -995,18 +995,18 @@
     const photoURL = session.photoURL;
     const userInitials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'AD';
 
-    const navHTML = nav.map(group => `<div class="sidebar__label">${group.section}</div>${group.items.map(item => navItem(item, page)).join('')}`).join('');
+    const navHTML = nav.map(group => group.items.map(item => navItem(item, page)).join('')).join('');
 
     return `<div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
-      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">ChildCare Platform</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
-      <nav class="sidebar__nav">${navHTML}<div class="sidebar__label">System</div><a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
+      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
+      <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
       <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML(ngoName)}</span><span class="workspace-user__role">${escapeHTML(role)}</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
     <main class="app-main" id="app-main">
       <header class="topbar">
         ${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}
-        <div class="topbar__crumbs"><span>ChildCare Health</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
+        <div class="topbar__crumbs"><span>Demo</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
         <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
         <div class="topbar__actions">
           <button class="icon-button tooltip" data-tooltip="Toggle theme" data-theme-toggle type="button" aria-label="Toggle color theme">${icon('sun')}</button>
@@ -1188,9 +1188,9 @@
   function loginPage() {
     return `<main class="login-page">
     <section class="login-panel">
-      <div class="login-panel__brand" aria-label="Child Health Management Platform">
+      <div class="login-panel__brand" aria-label="Demo">
         <span class="brand-mark">${icon('heartPulse')}</span>
-        <b>Child Health Management Platform</b>
+        <b>Demo</b>
       </div>
       <div class="card login-card">
         <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">Google Workspace Sign-In</h1>
