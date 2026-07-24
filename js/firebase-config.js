@@ -7,14 +7,15 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// Default Firebase Configuration for Child Health Management Platform
+// Live Firebase Configuration for anirudh-449ca
 const firebaseConfig = {
-  apiKey: "AIzaSyDemoKeyChildHealthManagementNgo2026",
-  authDomain: "child-health-ngo-demo.firebaseapp.com",
-  projectId: "child-health-ngo-demo",
-  storageBucket: "child-health-ngo-demo.appspot.com",
-  messagingSenderId: "987654321098",
-  appId: "1:987654321098:web:abcdef1234567890"
+  apiKey: "AIzaSyC29Gb6Nufox_ZK_lawNlKShGjAded72gk",
+  authDomain: "anirudh-449ca.firebaseapp.com",
+  projectId: "anirudh-449ca",
+  storageBucket: "anirudh-449ca.firebasestorage.app",
+  messagingSenderId: "653879382530",
+  appId: "1:653879382530:web:4ab9de818de35a4a4f0d1b",
+  measurementId: "G-WBYRPD7HBK"
 };
 
 // Initialize Firebase App
