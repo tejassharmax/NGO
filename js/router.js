@@ -2,6 +2,7 @@ import { icon, initials, pagePath, statusBadge, escapeHTML, formatDate, healthDo
 import { getChildren, getChild, getActivities, getPendingDocs, timeAgo, activityIcon, activityLabel, getUploadedDocs, getAppointments, getMedicines, getExpenses, getEmergencyContacts, getSponsors, getGrowthRecords, getMeals, getAllMeals, getHealthRecords, getAlerts, healthStatus, calculateAge, ageGroup } from './storage.js';
 import { childRows } from './table.js';
 import { registrationChart } from './chart.js';
+import { getSession } from './session.js';
 
 /* ═══════════════════════════════════════════════════════
    NAVIGATION
@@ -37,17 +38,62 @@ function navItem(item, active) {
    ═══════════════════════════════════════════════════════ */
 
 export function shell(page, content) {
-  const orgName = localStorage.getItem('sample-org-name') || 'NGO Health Platform';
-  const orgInitials = orgName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'NG';
+  const session = getSession() || {};
+  const displayName = session.displayName || 'Authorized User';
+  const email = session.email || 'tejassachin2010@gmail.com';
+  const ngoName = session.ngo || localStorage.getItem('sample-org-name') || 'Ayusha Nilayam';
+  const role = session.role || 'Admin';
+  const photoURL = session.photoURL;
+  const userInitials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'AD';
+
   const navHTML = nav.map(group => `<div class="sidebar__label">${group.section}</div>${group.items.map(item => navItem(item, page)).join('')}`).join('');
 
   return `<div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
       <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">ChildCare Platform</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
       <nav class="sidebar__nav">${navHTML}<div class="sidebar__label">System</div><a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
-      <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${orgInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${orgName}</span><span class="workspace-user__role">Authorized Admin</span></span></div></div>
+      <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML(ngoName)}</span><span class="workspace-user__role">${escapeHTML(role)}</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
-    <main class="app-main" id="app-main"><header class="topbar">${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}<div class="topbar__crumbs"><span>ChildCare Health</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div><label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label><div class="topbar__actions"><button class="icon-button tooltip" data-tooltip="Toggle theme" data-theme-toggle type="button" aria-label="Toggle color theme">${icon('sun')}</button><button class="icon-button tooltip" data-tooltip="Notifications" type="button" aria-label="Notifications" data-notifications>${icon('bell')}</button><div class="topbar-profile"><button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false"><span class="avatar">AD</span><span class="topbar-profile__name">Admin</span>${icon('chevronDown')}</button><div class="dropdown" hidden data-profile-dropdown><a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a><div class="divider"></div><button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button></div></div></div></header><section class="content page-enter">${content}</section></main></div>`;
+    <main class="app-main" id="app-main">
+      <header class="topbar">
+        ${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}
+        <div class="topbar__crumbs"><span>ChildCare Health</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
+        <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
+        <div class="topbar__actions">
+          <button class="icon-button tooltip" data-tooltip="Toggle theme" data-theme-toggle type="button" aria-label="Toggle color theme">${icon('sun')}</button>
+          <button class="icon-button tooltip" data-tooltip="Notifications" type="button" aria-label="Notifications" data-notifications>${icon('bell')}</button>
+          
+          <!-- DASHBOARD HEADER GOOGLE USER PROFILE & NGO WORKSPACE -->
+          <div class="topbar-profile" style="display:flex; align-items:center; gap:12px;">
+            <div style="display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; font-size:12px;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="width:7px; height:7px; border-radius:50%; background:var(--color-success); box-shadow:0 0 6px var(--color-success);" title="Firebase & Firestore Connected"></span>
+                <span style="font-weight:700; color:var(--color-success); font-size:11px; text-transform:uppercase; letter-spacing:0.04em;">Connected</span>
+              </div>
+              <b style="color:var(--color-text); font-size:12px; font-weight:700;">${escapeHTML(ngoName)}</b>
+              <span style="color:var(--color-text-muted); font-size:11px;">${escapeHTML(email)}</span>
+            </div>
+            <button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:20px; border:1px solid var(--color-border); background:var(--color-bg);">
+              ${photoURL ? `<img src="${escapeHTML(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
+              <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML(displayName)}</span>
+              ${icon('chevronDown')}
+            </button>
+            <div class="dropdown" hidden data-profile-dropdown>
+              <div style="padding:12px 14px; border-bottom:1px solid var(--color-border); font-size:12px;">
+                <div style="font-weight:700; color:var(--color-text);">${escapeHTML(displayName)}</div>
+                <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML(email)}</div>
+                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML(ngoName)}</span></div>
+              </div>
+              <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
+              <div class="divider"></div>
+              <button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button>
+            </div>
+          </div>
+        </div>
+      </header>
+      <section class="content page-enter">${content}</section>
+    </main>
+  </div>`;
 }
 
 const heading = (title, description, actions) => `<div class="page-heading"><div class="page-heading__copy"><h1>${title}</h1><p>${description}</p></div>${actions ? `<div class="page-heading__actions">${actions}</div>` : ''}</div>`;
@@ -193,9 +239,9 @@ export function dashboardPage() {
 export function loginPage() {
   return `<main class="login-page">
     <section class="login-panel">
-      <div class="login-panel__brand" aria-label="Sample Demo">
+      <div class="login-panel__brand" aria-label="Child Health Management Platform">
         <span class="brand-mark">${icon('heartPulse')}</span>
-        <b>Sample Demo</b>
+        <b>Child Health Management Platform</b>
       </div>
       <div class="card login-card">
         <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">Google Workspace Sign-In</h1>
@@ -206,20 +252,20 @@ export function loginPage() {
           Continue with Google
         </button>
 
-        <div style="margin-top: 24px; padding: 14px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
-          <div style="font-weight: 600; font-size: 13px; color: var(--color-text); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-            ${icon('shield')} Authorized Google Accounts
-          </div>
-          <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: var(--color-text-muted); line-height: 1.6;">
-            <li><code style="color: var(--color-primary); font-weight: 600;">tejassachin2010@gmail.com</code></li>
-            <li><code style="color: var(--color-primary); font-weight: 600;">wondertaleai123@gmail.com</code></li>
-          </ul>
-          <p style="font-size: 11px; color: var(--color-text-muted); margin-top: 10px; margin-bottom: 0; font-style: italic;">
-            Note: Only authorized Google accounts can access the dashboard.
+        <div style="margin-top: 24px; padding: 16px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
+          <p style="font-size: 12.5px; color: var(--color-text); margin: 0 0 10px 0; font-weight: 600;">
+            Only authorized Google accounts can access this application.
           </p>
+          <div style="font-weight: 600; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            ${icon('shield')} Current Demo Accounts (Firestore Verified)
+          </div>
+          <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: var(--color-text-muted); line-height: 1.8;" id="firestore-demo-accounts-list">
+            <li><code style="color: var(--color-primary); font-weight: 600;">tejassachin2010@gmail.com</code> <span style="font-size: 11px;">(Ayusha Nilayam)</span></li>
+            <li><code style="color: var(--color-primary); font-weight: 600;">wondertaleai123@gmail.com</code> <span style="font-size: 11px;">(Alex Agape)</span></li>
+          </ul>
         </div>
 
-        <p class="login-card__foot" style="margin-top: 20px; text-align: center;">Protected by Google Identity Services OAuth 2.0 & audit logs.</p>
+        <p class="login-card__foot" style="margin-top: 20px; text-align: center;">Protected by Firebase Authentication & Cloud Firestore Security Rules.</p>
       </div>
     </section>
   </main>`;
