@@ -19,6 +19,12 @@ let page = 'dashboard';
   const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
   page = document.body.dataset.page || 'dashboard';
 
+  const deprecatedPages = ['appointments', 'emergency', 'expenses', 'nutrition', 'export'];
+  if (deprecatedPages.includes(page)) {
+    window.location.href = pagePath('dashboard');
+    return;
+  }
+
   if (!isLoggedIn && page !== 'login') {
     window.location.href = pagePath('login');
   } else if (isLoggedIn && page === 'login') {
@@ -48,6 +54,32 @@ let page = 'dashboard';
   }
 })();
 
+function handleGoogleAuth(email) {
+  const allowed = ['tejassachin2010@gmail.com', 'wondertaleai123@gmail.com'];
+  if (allowed.includes(email.toLowerCase())) {
+    closeModal();
+    localStorage.setItem('sample-logged-in', 'true');
+    localStorage.setItem('google-user-email', email);
+    toast('Google Authentication Successful', `Logged in as ${email}`);
+    window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
+  } else {
+    closeModal();
+    modal({
+      title: 'Access Denied',
+      body: `<div style="text-align:center; padding:16px 8px;">
+        <div style="font-size:44px; margin-bottom:8px;">🚫</div>
+        <h3 style="color:var(--color-danger); margin:0 0 8px 0; font-size:18px; font-weight:700;">Access Denied</h3>
+        <p style="font-size:14px; color:var(--color-text); margin:0 0 12px 0; font-weight:600;">This Google account is not authorized.</p>
+        <div style="padding:10px; background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:6px; font-size:12px; font-weight:500;">
+          Tried account: <code>${email}</code>
+        </div>
+      </div>`,
+      confirmText: 'Try Authorized Account',
+      onConfirm: () => { window.location.reload(); }
+    });
+  }
+}
+
   // ─── Event Listeners ───
 
   // Document Clicks
@@ -65,15 +97,9 @@ let page = 'dashboard';
         'children': 'dashboard',
         'documents': 'dashboard',
         'reports': 'dashboard',
-        'export': 'dashboard',
         'settings': 'dashboard',
         'growth': 'dashboard',
-        'nutrition': 'dashboard',
-        'medicines': 'dashboard',
-        'appointments': 'dashboard',
-        'emergency': 'dashboard',
-        'sponsors': 'dashboard',
-        'expenses': 'dashboard'
+        'medicines': 'dashboard'
       };
       const prev = prevPageMap[page] || 'dashboard';
       window.location.href = pagePath(prev);
@@ -88,17 +114,57 @@ let page = 'dashboard';
     
     if (target.matches('[data-sign-out]')) {
       localStorage.removeItem('sample-logged-in');
-      toast('Signed out', 'You have securely signed out of your workspace.');
+      localStorage.removeItem('google-user-email');
+      toast('Signed out', 'You have securely signed out of your Google Workspace.');
       window.setTimeout(() => { window.location.href = pagePath('login'); }, 850);
     }
 
     if (target.closest('[data-google-login]')) {
-      toast('Connecting to Google...', 'Redirecting to secure single sign-on.');
-      window.setTimeout(() => {
-        localStorage.setItem('sample-logged-in', 'true');
-        toast('Google Login Successful', 'Logged in as Admin (admin@childcare.org).');
-        window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
-      }, 1200);
+      modal({
+        title: 'Google Identity Services (OAuth 2.0)',
+        body: `
+          <div style="display: flex; flex-direction: column; gap: 12px; padding: 4px 0;">
+            <p style="font-size: 13px; margin: 0 0 6px 0; color: var(--color-text-muted);">Choose a Google account to sign in to Child Health Management Platform:</p>
+            <button class="button button--ghost" type="button" data-select-google-email="tejassachin2010@gmail.com" style="width: 100%; justify-content: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px;">
+              <span style="width: 32px; height: 32px; border-radius: 50%; background: #4285F4; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;">T</span>
+              <div style="text-align: left;">
+                <b style="display: block; font-size: 13px; color: var(--color-text);">Tejas Sharma</b>
+                <span style="font-size: 11px; color: var(--color-primary); font-weight: 600;">tejassachin2010@gmail.com (Authorized)</span>
+              </div>
+            </button>
+            <button class="button button--ghost" type="button" data-select-google-email="wondertaleai123@gmail.com" style="width: 100%; justify-content: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px;">
+              <span style="width: 32px; height: 32px; border-radius: 50%; background: #34A853; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;">W</span>
+              <div style="text-align: left;">
+                <b style="display: block; font-size: 13px; color: var(--color-text);">Wondertale AI</b>
+                <span style="font-size: 11px; color: var(--color-primary); font-weight: 600;">wondertaleai123@gmail.com (Authorized)</span>
+              </div>
+            </button>
+            <div style="border-top: 1px solid var(--color-border); padding-top: 14px; margin-top: 6px;">
+              <label class="field">
+                <span class="field__label" style="font-size: 12px; font-weight: 600;">Or test with another Google Email</span>
+                <input class="input" type="email" id="custom-google-email-input" placeholder="e.g. unauthorized.user@gmail.com">
+              </label>
+              <button class="button button--primary button--sm" type="button" data-custom-google-login style="margin-top: 10px; width: 100%; justify-content: center;">Test Access</button>
+            </div>
+          </div>
+        `,
+        confirmText: null
+      });
+    }
+
+    if (target.closest('[data-select-google-email]')) {
+      const email = target.closest('[data-select-google-email]').dataset.selectGoogleEmail;
+      handleGoogleAuth(email);
+    }
+
+    if (target.closest('[data-custom-google-login]')) {
+      const input = document.querySelector('#custom-google-email-input');
+      const email = input ? input.value.trim() : '';
+      if (!email) {
+        toast('Email Required', 'Please enter a Google email address.');
+        return;
+      }
+      handleGoogleAuth(email);
     }
 
     if (target.matches('[data-global-search]')) openGlobalSearch();
