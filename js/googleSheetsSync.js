@@ -160,8 +160,8 @@ export function openGoogleSheetsTemplateModal() {
         <!-- Google Sheets Header Bar -->
         <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #0f9d58 0%, #0b8043 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
           <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="#0f9d58"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H5v-2h7v2zm7 0h-5v-2h5v2zm0-4H5v-2h14v2zm0-4H5V7h14v2z"/></svg>
+            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden; padding:4px;">
+              <img src="assets/icons/google-sheets-icon.svg" width="28" height="28" alt="Google Sheets" style="display:block; object-fit:contain;">
             </div>
             <div>
               <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
@@ -258,8 +258,8 @@ export function showSheetsSyncLoader(childName, onComplete) {
   overlay.innerHTML = `
     <div class="card" style="width:min(460px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
       <div style="display:flex; justify-content:center; margin-bottom:16px;">
-        <div id="sync-spinner-icon" style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:rgba(16,185,129,0.1); border-radius:50%; border:2px solid rgba(16,185,129,0.3);">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="animation:pulse 1.5s infinite;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <div id="sync-spinner-icon" style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:white; border-radius:50%; border:2px solid rgba(16,185,129,0.3); box-shadow:0 4px 12px rgba(0,0,0,0.1); overflow:hidden; padding:8px;">
+          <img src="assets/icons/google-sheets-icon.svg" width="36" height="36" alt="Google Sheets" style="display:block; object-fit:contain; animation:pulse 1.5s infinite;">
           <div id="sync-spinner-ring" style="position:absolute; inset:-4px; border:3px solid transparent; border-top-color:#10b981; border-radius:50%; animation:spin 1s linear infinite;"></div>
         </div>
       </div>
@@ -279,8 +279,8 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <button id="view-template-btn" class="button button--primary" type="button" style="width:100%; justify-content:center; gap:8px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H5v-2h7v2zm7 0h-5v-2h5v2zm0-4H5v-2h14v2zm0-4H5V7h14v2z"/></svg>
+        <button id="view-template-btn" class="button button--primary" type="button" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600;">
+          <img src="assets/icons/google-sheets-icon.svg" width="20" height="20" alt="Google Sheets" style="display:block;">
           View Synced Google Sheet Template
         </button>
         <button id="sync-done-btn" class="button button--ghost" type="button" style="width:100%; justify-content:center; font-weight:600;">

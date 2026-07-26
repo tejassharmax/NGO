@@ -1116,8 +1116,8 @@
         <!-- Google Sheets Header Bar -->
         <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #0f9d58 0%, #0b8043 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
           <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="#0f9d58"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H5v-2h7v2zm7 0h-5v-2h5v2zm0-4H5v-2h14v2zm0-4H5V7h14v2z"/></svg>
+            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden; padding:4px;">
+              <img src="assets/icons/google-sheets-icon.svg" width="28" height="28" alt="Google Sheets" style="display:block; object-fit:contain;">
             </div>
             <div>
               <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
@@ -1214,8 +1214,8 @@
     overlay.innerHTML = `
     <div class="card" style="width:min(460px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
       <div style="display:flex; justify-content:center; margin-bottom:16px;">
-        <div id="sync-spinner-icon" style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:rgba(16,185,129,0.1); border-radius:50%; border:2px solid rgba(16,185,129,0.3);">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="animation:pulse 1.5s infinite;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <div id="sync-spinner-icon" style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:white; border-radius:50%; border:2px solid rgba(16,185,129,0.3); box-shadow:0 4px 12px rgba(0,0,0,0.1); overflow:hidden; padding:8px;">
+          <img src="assets/icons/google-sheets-icon.svg" width="36" height="36" alt="Google Sheets" style="display:block; object-fit:contain; animation:pulse 1.5s infinite;">
           <div id="sync-spinner-ring" style="position:absolute; inset:-4px; border:3px solid transparent; border-top-color:#10b981; border-radius:50%; animation:spin 1s linear infinite;"></div>
         </div>
       </div>
@@ -1235,8 +1235,8 @@
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <button id="view-template-btn" class="button button--primary" type="button" style="width:100%; justify-content:center; gap:8px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H5v-2h7v2zm7 0h-5v-2h5v2zm0-4H5v-2h14v2zm0-4H5V7h14v2z"/></svg>
+        <button id="view-template-btn" class="button button--primary" type="button" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600;">
+          <img src="assets/icons/google-sheets-icon.svg" width="20" height="20" alt="Google Sheets" style="display:block;">
           View Synced Google Sheet Template
         </button>
         <button id="sync-done-btn" class="button button--ghost" type="button" style="width:100%; justify-content:center; font-weight:600;">
@@ -1600,7 +1600,7 @@
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
     const paginated = children.slice(0, itemsPerPage);
 
-    const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:6px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;"><span style="width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>Google Sheets Auto-Sync (Connected)</button>`;
+    const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;"><img src="assets/icons/google-sheets-icon.svg" width="16" height="16" alt="Google Sheets">Google Sheets Auto-Sync (Connected)</button>`;
 
     return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `${sheetsStatusBadge}<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon('chevronDown')}</button></th><th data-resizable data-column="age">Age</th><th class="hide-tablet" data-column="gender">Gender</th><th class="hide-tablet" data-column="blood">Blood group</th><th data-column="status">Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
@@ -2084,7 +2084,7 @@
     const malePct = total > 0 ? Math.round((males / total) * 100) : 0;
     const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
 
-    const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:6px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;"><span style="width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>Google Sheets Auto-Sync (Connected)</button>`;
+    const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;"><img src="assets/icons/google-sheets-icon.svg" width="16" height="16" alt="Google Sheets">Google Sheets Auto-Sync (Connected)</button>`;
 
     return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `${sheetsStatusBadge}<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
   <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length || 4}</div><p class="report-card__caption">verified lab test reports</p></article></div>
@@ -2186,7 +2186,10 @@
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Sheets</b>
+            <b style="font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+              <img src="assets/icons/google-sheets-icon.svg" width="18" height="18" alt="Google Sheets">
+              Google Sheets
+            </b>
             ${isSheetsConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
           <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Live spreadsheet synchronization for NGO health records.</p>
