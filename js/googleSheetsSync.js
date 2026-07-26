@@ -29,6 +29,8 @@ export const EXACT_SHEET_COLUMNS = [
   'Registration Date'
 ];
 
+export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjQzPTgcdhoEDLSVBmQLoiVPy98Dnq5iF8VfrHOt6GDRH-8hjuw6H3209dqOdNQdo5ig/exec';
+
 /**
  * Get live view link to the logged-in user's Google Sheet
  */
@@ -358,11 +360,45 @@ export async function autoSyncChildToGoogleSheets(child) {
 
   localStorage.setItem('google-sheets-connected', 'true');
 
+  const age = calculateAge(child.dob) || child.age || '—';
+  const payload = {
+    id: child.id || '',
+    name: child.name || '',
+    dob: child.dob || '',
+    age: age,
+    gender: child.gender || '',
+    blood: child.blood || '',
+    idNumber: child.idNumber || '',
+    father: child.father || child.guardian || '',
+    phone: child.phone || '',
+    height: child.height ? `${child.height} cm` : '',
+    weight: child.weight ? `${child.weight} kg` : '',
+    medicalConditions: child.medicalConditions || 'None',
+    allergies: child.allergies || 'None',
+    status: child.status || 'Active',
+    registeredDate: child.registeredDate || new Date().toISOString().slice(0, 10)
+  };
+
+  // Send live HTTP POST to connected Google Apps Script Web App
+  try {
+    fetch(GOOGLE_APPS_SCRIPT_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(() => {
+      console.log('✓ Live Google Apps Script WebApp auto-sync successful for:', child.name);
+    }).catch(err => console.warn('Google Apps Script live sync warning:', err));
+  } catch (e) {
+    console.warn('Apps Script sync exception:', e);
+  }
+
+  // Also sync to local backend backup
   try {
     fetch('/api/sync-google-sheets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ children: [child] })
+      body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL })
     }).catch(err => console.warn('Backend sync notice:', err));
   } catch (e) {
     // Ignore offline errors
@@ -370,7 +406,7 @@ export async function autoSyncChildToGoogleSheets(child) {
 
   toast(
     'Auto-Synced to Google Sheets',
-    `Record for ${child.name} synced into Google Sheets 15-column template.`
+    `Record for ${child.name} live synced to Google Sheets.`
   );
 }
 
