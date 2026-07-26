@@ -10,7 +10,7 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader } from './googleSheetsSync.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, exportGoogleSheetToXLSX } from './googleSheetsSync.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
@@ -217,6 +217,10 @@ async function handleGoogleAuth(email) {
       window.setTimeout(() => {
         window.location.reload();
       }, 400);
+    }
+
+    if (target.closest('[data-open-sheets-template]')) {
+      openGoogleSheetsTemplateModal();
     }
 
     if (target.matches('[data-global-search]')) openGlobalSearch();

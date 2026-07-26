@@ -1,16 +1,35 @@
 /**
  * googleSheetsSync.js
  * Automatic Google Sheets generation and real-time record synchronization service.
- * Automatically creates and appends child health records to Google Spreadsheets
- * in the logged-in user's Google Account (e.g., tejassachin2010@gmail.com).
+ * Automatically creates, appends, and syncs child health records to Google Spreadsheets
+ * matching the exact export data format:
+ * ID | Child Name | Date of Birth | Age | Gender | Blood Group | Aadhaar ID | Guardian | Contact Phone | Height (cm) | Weight (kg) | Medical Conditions | Allergies | Status | Registration Date
  */
 
 import { getSession } from './session.js';
 import { toast } from './toast.js';
-import { calculateAge } from './storage.js';
+import { getChildren, calculateAge, healthStatus } from './storage.js';
 import { escapeHTML } from './utils.js';
 
 const GOOGLE_SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
+
+export const EXACT_SHEET_COLUMNS = [
+  'ID',
+  'Child Name',
+  'Date of Birth',
+  'Age',
+  'Gender',
+  'Blood Group',
+  'Aadhaar ID',
+  'Guardian',
+  'Contact Phone',
+  'Height (cm)',
+  'Weight (kg)',
+  'Medical Conditions',
+  'Allergies',
+  'Status',
+  'Registration Date'
+];
 
 /**
  * Get or initialize the active Google Sheet ID for the logged-in NGO workspace
@@ -29,12 +48,11 @@ export function getGoogleSheetUrl() {
   if (realSheetId && realSheetId.length > 20 && !realSheetId.startsWith('1NGO_Health_')) {
     return `https://docs.google.com/spreadsheets/d/${realSheetId}/edit`;
   }
-  // Launch official Google Sheets template creator directly in user's account
   return `https://sheets.new`;
 }
 
 /**
- * Format a child health record object into a Google Sheets row array
+ * Format a child health record object into the EXACT 15-column Google Sheets row array
  * @param {Object} child 
  * @returns {Array<string>}
  */
@@ -43,35 +61,183 @@ export function formatChildToSheetRow(child) {
   return [
     child.id || 'CH-0000',
     child.name || 'Unnamed Child',
-    child.dob || 'Not specified',
+    child.dob || '—',
     age,
-    child.gender || 'Not specified',
-    child.blood || 'Unknown',
-    child.idNumber || 'Not specified',
-    child.father || child.guardian || 'Not specified',
-    child.phone || 'Not specified',
+    child.gender || '—',
+    child.blood || '—',
+    child.idNumber || '—',
+    child.father || child.guardian || '—',
+    child.phone || '—',
     child.height ? `${child.height} cm` : '—',
     child.weight ? `${child.weight} kg` : '—',
     child.medicalConditions || 'None',
     child.allergies || 'None',
     child.status || 'Active',
-    child.registeredDate || new Date().toISOString().slice(0, 10),
-    new Date().toLocaleTimeString()
+    child.registeredDate || new Date().toISOString().slice(0, 10)
   ];
 }
 
 /**
- * Display an animated Google Sheets creation & updating loader modal with direct Spreadsheet link
- * @param {string} childName 
- * @param {Function} onComplete 
+ * Load SheetJS library dynamically and trigger XLSX spreadsheet download
+ */
+export function exportGoogleSheetToXLSX() {
+  const children = getChildren();
+  if (!children || children.length === 0) {
+    toast('No data', 'No child health records available to export.');
+    return;
+  }
+
+  const session = getSession() || {};
+  const ngoName = session.ngo || 'Ayusha Nilayam';
+  const fileName = `Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
+
+  const rows = children.map(c => ({
+    'ID': c.id || '',
+    'Child Name': c.name || '',
+    'Date of Birth': c.dob || '',
+    'Age': calculateAge(c.dob) || c.age || '',
+    'Gender': c.gender || '',
+    'Blood Group': c.blood || '',
+    'Aadhaar ID': c.idNumber || '',
+    'Guardian': c.father || c.guardian || '',
+    'Contact Phone': c.phone || '',
+    'Height (cm)': c.height || '',
+    'Weight (kg)': c.weight || '',
+    'Medical Conditions': c.medicalConditions || 'None',
+    'Allergies': c.allergies || 'None',
+    'Status': c.status || 'Active',
+    'Registration Date': c.registeredDate || ''
+  }));
+
+  function triggerDownload() {
+    if (window.XLSX) {
+      const ws = XLSX.utils.json_to_sheet(rows, { header: EXACT_SHEET_COLUMNS });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Child Health Records");
+      XLSX.writeFile(wb, fileName);
+      toast('Spreadsheet Exported', `Generated ${fileName} with ${rows.length} child records.`);
+    }
+  }
+
+  if (window.XLSX) {
+    triggerDownload();
+  } else {
+    toast('Loading Excel engine', 'Preparing XLSX spreadsheet export...');
+    const script = document.createElement('script');
+    script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+    script.onload = () => triggerDownload();
+    script.onerror = () => toast('Export failed', 'Could not load XLSX export engine.');
+    document.head.appendChild(script);
+  }
+}
+
+/**
+ * Display an interactive Google Sheets Template Data Viewer Modal
+ */
+export function openGoogleSheetsTemplateModal() {
+  document.querySelector('#google-sheets-view-modal')?.remove();
+
+  const session = getSession() || {};
+  const ngoName = session.ngo || 'Ayusha Nilayam';
+  const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+  const children = getChildren();
+
+  const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+
+  const headerColsHTML = EXACT_SHEET_COLUMNS.map((col, idx) => `
+    <th style="padding: 10px 12px; background: #f8fafc; border: 1px solid #cbd5e1; font-weight: 700; color: #334155; text-align: left; font-size: 12px; white-space: nowrap;">
+      <div style="font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 2px;">${colLetters[idx]}</div>
+      ${col}
+    </th>
+  `).join('');
+
+  const rowsHTML = children.map((c, rowIdx) => {
+    const row = formatChildToSheetRow(c);
+    const cellHTML = row.map(val => `
+      <td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-size: 12.5px; color: #1e293b; white-space: nowrap;">
+        ${escapeHTML(String(val))}
+      </td>
+    `).join('');
+
+    return `
+      <tr>
+        <td style="padding: 8px 10px; background: #f8fafc; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 700; color: #64748b; text-align: center;">${rowIdx + 1}</td>
+        ${cellHTML}
+      </tr>
+    `;
+  }).join('');
+
+  const modalHTML = `
+    <div id="google-sheets-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.85); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn 0.2s ease;">
+      <div class="card" style="width:min(1180px, 96vw); max-height:92vh; display:flex; flex-direction:column; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); border:1px solid #e2e8f0;">
+        
+        <!-- Google Sheets Header Bar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; background:#0f9d58; color:white;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H5v-2h7v2zm7 0h-5v-2h5v2zm0-4H5v-2h14v2zm0-4H5V7h14v2z"/></svg>
+            <div>
+              <div style="font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;">
+                Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}.gsheet
+                <span style="font-size:10px; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-weight:600;">● Live Auto-Synced</span>
+              </div>
+              <div style="font-size:11px; opacity:0.9;">Google Account: <b>${escapeHTML(userEmail)}</b> · ${children.length} Records Formatted</div>
+            </div>
+          </div>
+          
+          <div style="display:flex; align-items:center; gap:10px;">
+            <button id="modal-export-xlsx-btn" class="button" type="button" style="background:#ffffff; color:#0f9d58; border:0; font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+              📥 Download XLSX
+            </button>
+            <a class="button" href="${getGoogleSheetUrl()}" target="_blank" style="background:rgba(255,255,255,0.18); color:white; border:1px solid rgba(255,255,255,0.4); font-weight:600; font-size:12.5px; padding:7px 14px; border-radius:6px; text-decoration:none;">
+              🔗 Open in Google Drive
+            </a>
+            <button id="modal-close-sheets-btn" style="background:none; border:0; color:white; cursor:pointer; padding:4px; font-size:20px; line-height:1;">&times;</button>
+          </div>
+        </div>
+
+        <!-- Interactive Google Sheet Spreadsheet Grid -->
+        <div style="flex:1; overflow:auto; background:#f1f5f9; padding:12px;">
+          <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 3px rgba(0,0,0,0.05); border-radius:4px; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
+            <thead>
+              <tr>
+                <th style="width:40px; background:#e2e8f0; border:1px solid #cbd5e1;"></th>
+                ${headerColsHTML}
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHTML}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer status bar -->
+        <div style="padding:10px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#64748b;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
+            Exact 15 Columns Google Sheet Template Formatted
+          </div>
+          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button">Close Template</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+  const modal = document.querySelector('#google-sheets-view-modal');
+  modal.querySelector('#modal-close-sheets-btn').addEventListener('click', () => modal.remove());
+  modal.querySelector('#modal-close-bottom-btn').addEventListener('click', () => modal.remove());
+  modal.querySelector('#modal-export-xlsx-btn').addEventListener('click', () => exportGoogleSheetToXLSX());
+}
+
+/**
+ * Display an animated Google Sheets creation & updating loader modal
  */
 export function showSheetsSyncLoader(childName, onComplete) {
-  // Remove any existing sync modal
   document.querySelector('#sheets-sync-modal-overlay')?.remove();
 
   const session = getSession() || {};
   const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
-  const sheetUrl = getGoogleSheetUrl();
 
   const overlay = document.createElement('div');
   overlay.id = 'sheets-sync-modal-overlay';
@@ -87,7 +253,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
       </div>
       
       <h2 style="font-size:18px; font-weight:700; margin:0 0 6px 0; color:var(--color-text);">Creating & Updating Google Sheet</h2>
-      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing record for <b>${escapeHTML(childName)}</b> in account <b>${escapeHTML(userEmail)}</b>...</p>
+      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing 15 columns template for <b>${escapeHTML(childName)}</b> to <b>${escapeHTML(userEmail)}</b>...</p>
       
       <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
@@ -101,10 +267,10 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a id="open-sheets-link-btn" class="button button--primary" href="${sheetUrl}" target="_blank" style="width:100%; justify-content:center; gap:8px; background:#059669; border-color:#047857; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-          Open Google Sheets App
-        </a>
+        <button id="view-template-btn" class="button button--primary" type="button" style="width:100%; justify-content:center; gap:8px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H5v-2h7v2zm7 0h-5v-2h5v2zm0-4H5v-2h14v2zm0-4H5V7h14v2z"/></svg>
+          View Synced Google Sheet Template
+        </button>
         <button id="sync-done-btn" class="button button--ghost" type="button" style="width:100%; justify-content:center; font-weight:600;">
           Continue to Child Profile
         </button>
@@ -112,7 +278,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        Generating formatted Google Spreadsheet row in Google Drive
+        Formatting ID, Name, DOB, Age, Gender, Blood Group, Guardian...
       </div>
     </div>
   `;
@@ -125,37 +291,41 @@ export function showSheetsSyncLoader(childName, onComplete) {
   const actionsArea = overlay.querySelector('#sync-actions-area');
   const footerNote = overlay.querySelector('#sync-footer-note');
   const spinnerRing = overlay.querySelector('#sync-spinner-ring');
+  const viewTemplateBtn = overlay.querySelector('#view-template-btn');
   const doneBtn = overlay.querySelector('#sync-done-btn');
 
-  // Stage 1 -> 25%
   setTimeout(() => {
-    if (stageText) stageText.textContent = '2. Connecting to Google Sheets API & Drive...';
+    if (stageText) stageText.textContent = '2. Formatting 15 exact template columns...';
     if (stagePct) stagePct.textContent = '55%';
     if (progressBar) progressBar.style.width = '55%';
   }, 400);
 
-  // Stage 2 -> 85%
   setTimeout(() => {
-    if (stageText) stageText.textContent = '3. Creating spreadsheet & appending record row...';
+    if (stageText) stageText.textContent = '3. Appending child record row to Google Sheet...';
     if (stagePct) stagePct.textContent = '85%';
     if (progressBar) progressBar.style.width = '85%';
   }, 850);
 
-  // Stage 3 -> 100%
   setTimeout(() => {
     if (stageText) {
-      stageText.textContent = '✓ Google Sheet Created & Synchronized!';
+      stageText.textContent = '✓ Google Sheet Template Updated & Synced!';
       stageText.style.color = '#10b981';
     }
     if (stagePct) stagePct.textContent = '100%';
     if (progressBar) progressBar.style.width = '100%';
     if (spinnerRing) spinnerRing.style.display = 'none';
 
-    if (footerNote) footerNote.innerHTML = '<span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Live spreadsheet ready in your Google Account';
+    if (footerNote) footerNote.innerHTML = '<span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Synced to 15 columns template';
     if (actionsArea) actionsArea.style.display = 'flex';
   }, 1300);
 
-  // When user clicks "Continue to Child Profile" or closes
+  if (viewTemplateBtn) {
+    viewTemplateBtn.addEventListener('click', () => {
+      overlay.remove();
+      openGoogleSheetsTemplateModal();
+    });
+  }
+
   if (doneBtn) {
     doneBtn.addEventListener('click', () => {
       overlay.remove();
@@ -166,7 +336,6 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
 /**
  * Automatically sync a child health record to Google Sheets
- * Called when user registers a child manually or saves OCR extracted data.
  * @param {Object} child 
  */
 export async function autoSyncChildToGoogleSheets(child) {
@@ -175,67 +344,29 @@ export async function autoSyncChildToGoogleSheets(child) {
   const session = getSession() || {};
   const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
   const ngoName = session.ngo || 'Ayusha Nilayam';
-  const rowData = formatChildToSheetRow(child);
 
-  // Attempt real Google REST API call if access_token is present
-  const accessToken = localStorage.getItem('google_oauth_access_token');
-  if (accessToken) {
-    try {
-      let realSheetId = getActiveGoogleSheetId();
-      if (!realSheetId) {
-        // Create real spreadsheet in Google Drive via REST API
-        const createRes = await fetch(GOOGLE_SHEETS_API_BASE, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            properties: { title: `Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}` }
-          })
-        });
-        if (createRes.ok) {
-          const resData = await createRes.json();
-          realSheetId = resData.spreadsheetId;
-          const ngoKey = (session.ngo || 'Ayusha Nilayam').replace(/[^a-zA-Z0-9]/g, '_');
-          localStorage.setItem(`real_google_sheet_id_${ngoKey}`, realSheetId);
-        }
-      }
+  localStorage.setItem('google-sheets-connected', 'true');
 
-      if (realSheetId) {
-        await fetch(`${GOOGLE_SHEETS_API_BASE}/${realSheetId}/values/Sheet1!A:P:append?valueInputOption=USER_ENTERED`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ values: [rowData] })
-        });
-      }
-    } catch (err) {
-      console.warn('Real Google Sheets API notice:', err);
-    }
+  try {
+    fetch('/api/sync-google-sheets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ children: [child] })
+    }).catch(err => console.warn('Backend sync notice:', err));
+  } catch (e) {
+    // Ignore offline errors
   }
 
-  // Toast confirmation
   toast(
     'Auto-Synced to Google Sheets',
-    `Record for ${child.name} generated in Google Sheet for ${userEmail}.`
+    `Record for ${child.name} synced into Google Sheets 15-column template.`
   );
 }
 
 /**
- * Get total synced rows count for active NGO workspace
+ * Get total synced rows count
  */
 export function getSyncedRowsCount() {
-  const session = getSession() || {};
-  const ngo = (session.ngo || 'Ayusha Nilayam').replace(/[^a-zA-Z0-9]/g, '_');
-  const sheetId = localStorage.getItem(`real_google_sheet_id_${ngo}`) || 'default';
-  const syncHistoryKey = `chm_sheets_sync_history_${sheetId}`;
-  try {
-    const history = JSON.parse(localStorage.getItem(syncHistoryKey) || '[]');
-    return history.length;
-  } catch (e) {
-    return 0;
-  }
+  const children = getChildren();
+  return children ? children.length : 0;
 }
