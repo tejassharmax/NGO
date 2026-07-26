@@ -1030,29 +1030,34 @@
   }
 
   /**
-   * Copy formatted 15-column dataset to clipboard and open Google Sheets
+   * Copy formatted 15-column dataset to clipboard only
    */
-  function copyAndOpenGoogleSheets() {
+  function copySheetDataToClipboard() {
     const children = getChildren() || [];
     const tsvData = generateSheetTSVData();
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(tsvData).then(() => {
         toast(
-          'Data Copied to Clipboard!',
-          `Copied ${children.length} records in 15-column template. Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
+          'Dataset Copied to Clipboard!',
+          `Copied ${children.length} child records (15 columns). Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
         );
       }).catch(err => {
         console.warn('Clipboard write notice:', err);
       });
     }
+  }
 
-    // Open Google Sheets launcher in new tab
+  /**
+   * Copy formatted 15-column dataset to clipboard and open Google Sheets
+   */
+  function copyAndOpenGoogleSheets() {
+    copySheetDataToClipboard();
     window.open('https://sheets.new', '_blank');
   }
 
   /**
-   * Display an interactive Google Sheets Template Data Viewer Modal
+   * Display a professional Google Sheets Template Data Viewer Modal
    */
   function openGoogleSheetsTemplateModal() {
     document.querySelector('#google-sheets-view-modal')?.remove();
@@ -1065,64 +1070,100 @@
     const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
 
     const headerColsHTML = EXACT_SHEET_COLUMNS.map((col, idx) => `
-    <th style="padding: 10px 12px; background: #f8fafc; border: 1px solid #cbd5e1; font-weight: 700; color: #334155; text-align: left; font-size: 12px; white-space: nowrap;">
-      <div style="font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; margin-bottom: 2px;">${colLetters[idx]}</div>
+    <th style="padding: 10px 14px; background: #f8fafc; border: 1px solid #cbd5e1; font-weight: 700; color: #334155; text-align: left; font-size: 12px; white-space: nowrap; user-select: none;">
+      <div style="font-size: 10px; color: #94a3b8; font-weight: 700; letter-spacing:0.05em; text-transform: uppercase; margin-bottom: 2px;">${colLetters[idx]}</div>
       ${col}
     </th>
   `).join('');
 
     const rowsHTML = children.map((c, rowIdx) => {
       const row = formatChildToSheetRow(c);
-      const cellHTML = row.map(val => `
-      <td style="padding: 8px 12px; border: 1px solid #e2e8f0; font-size: 12.5px; color: #1e293b; white-space: nowrap;">
-        ${escapeHTML(String(val))}
-      </td>
-    `).join('');
+      const isEven = rowIdx % 2 === 1;
+      const bgStyle = isEven ? 'background: #f8fafc;' : 'background: #ffffff;';
+
+      const cellHTML = row.map((val, cellIdx) => {
+        // Style status column specially with pill badge
+        if (cellIdx === 13) {
+          const isVerified = String(val).toLowerCase() === 'verified' || String(val).toLowerCase() === 'active';
+          const badgeBg = isVerified ? '#dcfce7' : '#fef3c7';
+          const badgeColor = isVerified ? '#15803d' : '#b45309';
+          return `
+          <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; ${bgStyle} white-space: nowrap;">
+            <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:${badgeBg}; color:${badgeColor};">${escapeHTML(String(val))}</span>
+          </td>
+        `;
+        }
+
+        return `
+        <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; color: #1e293b; ${bgStyle} white-space: nowrap;">
+          ${escapeHTML(String(val))}
+        </td>
+      `;
+      }).join('');
 
       return `
       <tr>
-        <td style="padding: 8px 10px; background: #f8fafc; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 700; color: #64748b; text-align: center;">${rowIdx + 1}</td>
+        <td style="padding: 8px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 700; color: #64748b; text-align: center; user-select: none;">${rowIdx + 1}</td>
         ${cellHTML}
       </tr>
     `;
     }).join('');
 
     const modalHTML = `
-    <div id="google-sheets-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.85); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:16px; animation:fadeIn 0.2s ease;">
-      <div class="card" style="width:min(1180px, 96vw); max-height:92vh; display:flex; flex-direction:column; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); border:1px solid #e2e8f0;">
+    <div id="google-sheets-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
+      <div class="card" style="width:min(1240px, 96vw); height:min(780px, 92vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
         
         <!-- Google Sheets Header Bar -->
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; background:#0f9d58; color:white;">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H5v-2h7v2zm7 0h-5v-2h5v2zm0-4H5v-2h14v2zm0-4H5V7h14v2z"/></svg>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #0f9d58 0%, #0b8043 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15);">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="#0f9d58"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 14H5v-2h7v2zm7 0h-5v-2h5v2zm0-4H5v-2h14v2zm0-4H5V7h14v2z"/></svg>
+            </div>
             <div>
-              <div style="font-weight:700; font-size:15px; display:flex; align-items:center; gap:8px;">
-                Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}.gsheet
-                <span style="font-size:10px; background:rgba(255,255,255,0.2); padding:2px 8px; border-radius:12px; font-weight:600;">● Live Auto-Synced</span>
+              <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
+                Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
+                <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                  <span style="width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 6px #4ade80;"></span>
+                  Live Auto-Synced
+                </span>
               </div>
-              <div style="font-size:11px; opacity:0.9;">Google Account: <b>${escapeHTML(userEmail)}</b> · ${children.length} Records Formatted</div>
+              <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px; display:flex; align-items:center; gap:8px;">
+                <span>Google Account: <b>${escapeHTML(userEmail)}</b></span>
+                <span>•</span>
+                <span><b>${children.length} Records</b> Formatted (15 Columns)</span>
+              </div>
             </div>
           </div>
           
-          <div style="display:flex; align-items:center; gap:10px;">
-            <button id="modal-copy-open-sheets-btn" class="button" type="button" style="background:#ffffff; color:#0f9d58; border:0; font-weight:700; font-size:13px; padding:8px 16px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.15); display:flex; align-items:center; gap:6px;">
-              🔗 Copy & Open in Google Drive
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button id="modal-copy-open-sheets-btn" class="button" type="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              Copy & Open in Google Drive
             </button>
-            <button id="modal-close-sheets-btn" style="background:none; border:0; color:white; cursor:pointer; padding:4px; font-size:20px; line-height:1;">&times;</button>
+            <button id="modal-close-sheets-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1; transition:background 0.2s ease;">&times;</button>
           </div>
         </div>
 
-        <!-- Banner Hint -->
-        <div style="padding:10px 20px; background:#ecfdf5; border-bottom:1px solid #a7f3d0; font-size:12.5px; color:#065f46; display:flex; align-items:center; justify-content:space-between;">
-          <span>💡 <b>Live Pre-Formatted Template</b>: Click <b>Copy & Open in Google Drive</b> to launch Google Sheets and press <b>Ctrl+V</b> on cell A1 to paste all ${children.length} records!</span>
+        <!-- Professional Guidance Banner -->
+        <div style="padding:12px 24px; background:#f0fdf4; border-bottom:1px solid #bbf7d0; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:#166534;">
+            <span style="font-size:16px;">💡</span>
+            <span>
+              <b>Live Pre-Formatted Template</b>: Click <b>Copy & Open in Google Drive</b> to launch Google Sheets, then press <b>Ctrl+V</b> (or Cmd+V) on cell A1 to populate all ${children.length} records instantly!
+            </span>
+          </div>
+
+          <button id="modal-copy-only-btn" class="button button--sm button--ghost" type="button" style="color:#15803d; border-color:rgba(21,128,61,0.3); font-weight:600;">
+            📋 Copy Data Only
+          </button>
         </div>
 
         <!-- Interactive Google Sheet Spreadsheet Grid -->
-        <div style="flex:1; overflow:auto; background:#f1f5f9; padding:12px;">
-          <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 3px rgba(0,0,0,0.05); border-radius:4px; font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;">
+        <div style="flex:1; overflow:auto; background:#f1f5f9; padding:16px;">
+          <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:6px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
             <thead>
               <tr>
-                <th style="width:40px; background:#e2e8f0; border:1px solid #cbd5e1;"></th>
+                <th style="width:44px; background:#cbd5e1; border:1px solid #94a3b8;"></th>
                 ${headerColsHTML}
               </tr>
             </thead>
@@ -1132,13 +1173,13 @@
           </table>
         </div>
 
-        <!-- Footer status bar -->
-        <div style="padding:10px 20px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:12px; color:#64748b;">
-          <div style="display:flex; align-items:center; gap:6px;">
+        <!-- Footer Status Bar -->
+        <div style="padding:12px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:12.5px; color:#64748b;">
+          <div style="display:flex; align-items:center; gap:8px;">
             <span style="width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
-            Exact 15 Columns Google Sheet Template Formatted
+            Formatted into exact 15 Columns Google Sheet Template
           </div>
-          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button">Close Template</button>
+          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Template</button>
         </div>
       </div>
     </div>
@@ -1151,6 +1192,9 @@
     modal.querySelector('#modal-close-bottom-btn').addEventListener('click', () => modal.remove());
     modal.querySelector('#modal-copy-open-sheets-btn').addEventListener('click', () => {
       copyAndOpenGoogleSheets();
+    });
+    modal.querySelector('#modal-copy-only-btn').addEventListener('click', () => {
+      copySheetDataToClipboard();
     });
   }
 
@@ -1165,7 +1209,7 @@
 
     const overlay = document.createElement('div');
     overlay.id = 'sheets-sync-modal-overlay';
-    overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.8); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
+    overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
     
     overlay.innerHTML = `
     <div class="card" style="width:min(460px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
