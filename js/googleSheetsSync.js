@@ -31,7 +31,6 @@ export const EXACT_SHEET_COLUMNS = [
 
 export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjQzPTgcdhoEDLSVBmQLoiVPy98Dnq5iF8VfrHOt6GDRH-8hjuw6H3209dqOdNQdo5ig/exec';
 export const LIVE_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
-export const LIVE_GOOGLE_SHEET_EMBED_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/htmlembed?gid=0&widget=true&headers=false';
 
 /**
  * Get live view link to the logged-in user's Google Sheet
@@ -191,46 +190,33 @@ export function openGoogleSheetsTemplateModal() {
           </div>
         </div>
 
-        <!-- Guidance Banner & View Switcher -->
+        <!-- Guidance Banner -->
         <div style="padding:12px 24px; background:#f0fdf4; border-bottom:1px solid #bbf7d0; display:flex; align-items:center; justify-content:space-between;">
           <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:#166534;">
-            <span style="font-size:16px;">🌐</span>
+            <span style="font-size:16px;">💡</span>
             <span>
-              <b>Live Sheet Connected</b>: View the real-time sheet below or access <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">Google Sheets File (1rQB_KAh8FR...)</a> directly!
+              <b>Live Sheet Connected</b>: Click <b>Open Live Google Sheet</b> to open <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">https://docs.google.com/spreadsheets/d/1rQB_KAh8FR...</a> directly in Google Drive!
             </span>
           </div>
 
-          <div style="display:flex; align-items:center; gap:8px;">
-            <button id="tab-live-iframe-btn" class="button button--sm" type="button" style="background:#0f9d58; color:white; font-weight:600;">
-              🌐 Live Preview
-            </button>
-            <button id="tab-data-table-btn" class="button button--sm button--ghost" type="button" style="color:#15803d; border-color:rgba(21,128,61,0.3); font-weight:600;">
-              📋 Local Data Grid
-            </button>
-          </div>
+          <button id="modal-copy-only-btn" class="button button--sm button--ghost" type="button" style="color:#15803d; border-color:rgba(21,128,61,0.3); font-weight:600;">
+            📋 Copy 15-Column Data
+          </button>
         </div>
 
-        <!-- Main View Area (Live Iframe Embed + Fallback Table) -->
-        <div style="flex:1; position:relative; overflow:hidden; background:#f8fafc;">
-          <!-- Live Embedded Google Sheet Iframe -->
-          <div id="sheets-iframe-container" style="width:100%; height:100%; display:block; border:0;">
-            <iframe src="${LIVE_GOOGLE_SHEET_EMBED_URL}" style="width:100%; height:100%; border:0; background:white;" title="Live Google Sheet Preview"></iframe>
-          </div>
-
-          <!-- Offline Local Grid View (Hidden by default) -->
-          <div id="sheets-table-container" style="width:100%; height:100%; display:none; overflow:auto; padding:16px;">
-            <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:6px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-              <thead>
-                <tr>
-                  <th style="width:44px; background:#cbd5e1; border:1px solid #94a3b8;"></th>
-                  ${headerColsHTML}
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHTML}
-              </tbody>
-            </table>
-          </div>
+        <!-- Main Native Grid View -->
+        <div style="flex:1; overflow:auto; background:#f8fafc; padding:16px;">
+          <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:6px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+            <thead>
+              <tr>
+                <th style="width:44px; background:#cbd5e1; border:1px solid #94a3b8;"></th>
+                ${headerColsHTML}
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHTML}
+            </tbody>
+          </table>
         </div>
 
         <!-- Footer Status Bar -->
@@ -239,7 +225,7 @@ export function openGoogleSheetsTemplateModal() {
             <span style="width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
             Connected File: <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0f9d58; font-weight:600; text-decoration:none;">NGO_Child_Health_Master_Records</a>
           </div>
-          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Preview</button>
+          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Template</button>
         </div>
       </div>
     </div>
@@ -250,28 +236,8 @@ export function openGoogleSheetsTemplateModal() {
   const modal = document.querySelector('#google-sheets-view-modal');
   modal.querySelector('#modal-close-sheets-btn').addEventListener('click', () => modal.remove());
   modal.querySelector('#modal-close-bottom-btn').addEventListener('click', () => modal.remove());
-
-  const tabLiveBtn = modal.querySelector('#tab-live-iframe-btn');
-  const tabDataBtn = modal.querySelector('#tab-data-table-btn');
-  const iframeBox = modal.querySelector('#sheets-iframe-container');
-  const tableBox = modal.querySelector('#sheets-table-container');
-
-  tabLiveBtn.addEventListener('click', () => {
-    iframeBox.style.display = 'block';
-    tableBox.style.display = 'none';
-    tabLiveBtn.className = 'button button--sm';
-    tabLiveBtn.style.background = '#0f9d58';
-    tabLiveBtn.style.color = 'white';
-    tabDataBtn.className = 'button button--sm button--ghost';
-  });
-
-  tabDataBtn.addEventListener('click', () => {
-    iframeBox.style.display = 'none';
-    tableBox.style.display = 'block';
-    tabDataBtn.className = 'button button--sm';
-    tabDataBtn.style.background = '#0f9d58';
-    tabDataBtn.style.color = 'white';
-    tabLiveBtn.className = 'button button--sm button--ghost';
+  modal.querySelector('#modal-copy-only-btn').addEventListener('click', () => {
+    copySheetDataToClipboard();
   });
 }
 
@@ -312,13 +278,13 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <button id="view-template-btn" class="button button--primary" type="button" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600;">
+        <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
-          View Live Google Sheet Preview
-        </button>
-        <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" class="button button--ghost" style="width:100%; justify-content:center; font-weight:600; text-decoration:none; color:#0f9d58;">
-          🔗 Open Connected Google Sheet File
+          Open Connected Live Google Sheet
         </a>
+        <button id="view-template-btn" class="button button--ghost" type="button" style="width:100%; justify-content:center; font-weight:600; color:#0f9d58;">
+          View Local Data Grid Template
+        </button>
       </div>
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px;">
