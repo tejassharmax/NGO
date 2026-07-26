@@ -59,7 +59,7 @@
   const initials = (name) => name.split(' ').map((item) => item[0]).join('').slice(0, 2).toUpperCase();
   const escapeHTML = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
   const formatDate = (date) => { try { return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date)); } catch { return date || ''; } };
-  const pagePath = (page) => {
+  const pagePath$1 = (page) => {
     const inPages = window.location.pathname.replace(/\\/g, '/').includes('/pages/');
     if (page === 'dashboard') return inPages ? '../index.html' : 'index.html';
     return inPages ? `${page}.html` : `pages/${page}.html`;
@@ -745,9 +745,9 @@
       const age = calculateAge(child.dob);
       return `<tr>
     <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
-    <td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name">${child.name}</span><span class="table-person__id">${child.id}</span></div></a></td>
+    <td><a class="table-person" href="${pagePath$1('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name">${child.name}</span><span class="table-person__id">${child.id}</span></div></a></td>
     <td data-column="age">${age || '—'}</td><td class="hide-tablet" data-column="gender">${child.gender || '—'}</td><td class="hide-tablet" data-column="blood">${child.blood || '—'}</td><td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>
-    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
+    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath$1('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
   </tr>`;
     }).join('');
   }
@@ -1253,7 +1253,7 @@
 
     overlay.querySelector('#sync-overlay-close-btn')?.addEventListener('click', () => {
       overlay.remove();
-      if (onComplete) onComplete();
+      window.location.href = pagePath('dashboard');
     });
 
     setTimeout(() => {
@@ -1370,7 +1370,7 @@
 
   function navItem(item, active) {
     const [page, label, glyph] = item;
-    return `<a class="nav-item ${page === active ? 'nav-item--active' : ''}" href="${pagePath(page)}" ${page === active ? 'aria-current="page"' : ''}>${icon(glyph)}<span class="nav-item__text">${label}</span></a>`;
+    return `<a class="nav-item ${page === active ? 'nav-item--active' : ''}" href="${pagePath$1(page)}" ${page === active ? 'aria-current="page"' : ''}>${icon(glyph)}<span class="nav-item__text">${label}</span></a>`;
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -1390,8 +1390,8 @@
 
     return `<div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
-      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
-      <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
+      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath$1('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
+      <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath$1('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
       <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML(ngoName)}</span><span class="workspace-user__role">${escapeHTML(role)}</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
     <main class="app-main" id="app-main">
@@ -1416,7 +1416,7 @@
                 <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML(email)}</div>
                 <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML(ngoName)}</span></div>
               </div>
-              <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
+              <a class="dropdown__item" href="${pagePath$1('settings')}">${icon('settings')}Account & Google Workspace</a>
               <div class="divider"></div>
               <button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button>
             </div>
@@ -1492,11 +1492,11 @@
     } else {
       attentionHTML = flaggedChildren.slice(0, 4).map(child => {
         const hs = healthStatus(child);
-        return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
+        return `<tr><td><a class="table-person" href="${pagePath$1('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
       }).join('');
     }
 
-    return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
+    return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath$1('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath$1('register-child')}">${icon('plus')}Register child</a>`)}
   <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
     ${statCard('Total Children', totalChildren.toLocaleString(), 'Active records', 'users', 'blue')}
     ${statCard('Recent Health Reports', healthReportsCount.toLocaleString(), 'Lab test panels', 'heartPulse', 'green')}
@@ -1527,11 +1527,11 @@
       </header>
       <div class="card__body">
         <div class="quick-actions">
-          <a class="quick-action" href="${pagePath('register-child')}"><span class="quick-action__icon">${icon('plus')}</span>Register child</a>
-          <a class="quick-action" href="${pagePath('ocr-upload')}"><span class="quick-action__icon">${icon('scan')}</span>Cloud Vision Upload</a>
-          <a class="quick-action" href="${pagePath('growth')}"><span class="quick-action__icon">${icon('ruler')}</span>Log growth</a>
-          <a class="quick-action" href="${pagePath('medicines')}"><span class="quick-action__icon">${icon('pill')}</span>Medicines</a>
-          <a class="quick-action" href="${pagePath('documents')}"><span class="quick-action__icon">${icon('file')}</span>Health documents</a>
+          <a class="quick-action" href="${pagePath$1('register-child')}"><span class="quick-action__icon">${icon('plus')}</span>Register child</a>
+          <a class="quick-action" href="${pagePath$1('ocr-upload')}"><span class="quick-action__icon">${icon('scan')}</span>Cloud Vision Upload</a>
+          <a class="quick-action" href="${pagePath$1('growth')}"><span class="quick-action__icon">${icon('ruler')}</span>Log growth</a>
+          <a class="quick-action" href="${pagePath$1('medicines')}"><span class="quick-action__icon">${icon('pill')}</span>Medicines</a>
+          <a class="quick-action" href="${pagePath$1('documents')}"><span class="quick-action__icon">${icon('file')}</span>Health documents</a>
         </div>
       </div>
     </section>
@@ -1543,7 +1543,7 @@
           <h2 class="card__title">Children needing attention</h2>
           <p class="card__caption">Health alerts and flagged clinical records</p>
         </div>
-        <a class="button button--sm" href="${pagePath('children')}">View all ${icon('arrowRight')}</a>
+        <a class="button button--sm" href="${pagePath$1('children')}">View all ${icon('arrowRight')}</a>
       </header>
       <div class="data-table-wrap">
         <table class="data-table">
@@ -1616,7 +1616,7 @@
 
     const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;">${icon('googleSheets')}Google Sheets Auto-Sync (Connected)</button>`;
 
-    return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `${sheetsStatusBadge}<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
+    return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `${sheetsStatusBadge}<a class="button button--primary" href="${pagePath$1('register-child')}">${icon('plus')}Register child</a>`)}
   <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon('chevronDown')}</button></th><th data-resizable data-column="age">Age</th><th class="hide-tablet" data-column="gender">Gender</th><th class="hide-tablet" data-column="blood">Blood group</th><th data-column="status">Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
   }
 
@@ -1880,7 +1880,7 @@
     const child = editId ? getChild(editId) : null;
 
     if (method !== 'manual' && !editId) {
-      return shell('register-child', `${heading('Register a child', 'Choose the quickest, most reliable way to start a new child record.')}<section class="card"><div class="card__body"><div class="method-grid"><article class="method-card card card--interactive"><span class="method-card__icon">${icon('pencil')}</span><div><h2 class="card__title">Enter details manually</h2><p>Start with a clean, guided form. Best when information is already at hand.</p></div><a class="button" href="${pagePath('register-child')}?method=manual">Start manual entry ${icon('arrowRight')}</a></article><article class="method-card card card--interactive"><span class="method-card__icon">${icon('scan')}</span><div><h2 class="card__title">Google Cloud Vision API Document Upload</h2><p>Extract information automatically from medical documents using Cloud Vision API, then verify before saving.</p></div><a class="button button--primary" href="${pagePath('ocr-upload')}">Upload document ${icon('arrowRight')}</a></article></div></div></section>`);
+      return shell('register-child', `${heading('Register a child', 'Choose the quickest, most reliable way to start a new child record.')}<section class="card"><div class="card__body"><div class="method-grid"><article class="method-card card card--interactive"><span class="method-card__icon">${icon('pencil')}</span><div><h2 class="card__title">Enter details manually</h2><p>Start with a clean, guided form. Best when information is already at hand.</p></div><a class="button" href="${pagePath$1('register-child')}?method=manual">Start manual entry ${icon('arrowRight')}</a></article><article class="method-card card card--interactive"><span class="method-card__icon">${icon('scan')}</span><div><h2 class="card__title">Google Cloud Vision API Document Upload</h2><p>Extract information automatically from medical documents using Cloud Vision API, then verify before saving.</p></div><a class="button button--primary" href="${pagePath$1('ocr-upload')}">Upload document ${icon('arrowRight')}</a></article></div></div></section>`);
     }
 
     let firstName = '', lastName = '', email = '', father = '', phone = '', blood = '';
@@ -1898,7 +1898,7 @@
     const desc = child ? 'Modify the child record. Required fields are marked with an asterisk.' : 'Create a reliable child health record. Required fields are marked with an asterisk.';
     const submitText = child ? 'Save changes' : 'Save child record';
 
-    return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
+    return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath$1('child-profile')}?id=${child.id}` : pagePath$1('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field$1('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName)}${field$1('Last name *', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field$1('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '')}${field$1('Gender *', 'gender', 'e.g. Male', 'text', '', child ? child.gender : '')}${field$1('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field$1('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements and known conditions.</p></div><div class="form-grid--two">${field$1('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML(child.allergies) : ''}</textarea></label>${field$1('Current medications', 'medications', 'e.g. Inhaler, Vitamin D', 'text', '', child ? child.medications : '')}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field$1('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field$1('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field$1('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field$1('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
@@ -1910,7 +1910,7 @@
      ═══════════════════════════════════════════════════════ */
 
   function ocrUploadPage() {
-    return shell('ocr-upload', `${heading('Google Cloud Vision API Extraction', 'Upload a medical document (Blood Reports, Prescriptions, Medical Certificates, Vaccination Records, Aadhaar). Google Cloud Vision API will extract structured fields for review.', `<a class="button button--ghost" href="${pagePath('register-child')}">Cancel</a>`)}<div class="form-layout"><section class="card"><div class="card__body"><div class="upload-zone" data-upload-zone><span class="upload-zone__icon">${icon('upload')}</span><h2 class="card__title">Drop a medical document here</h2><p>Choose a file from your device. Google Cloud Vision API will scan and extract health & child details.</p><button class="button button--primary" type="button" data-start-ocr>${icon('file')}Choose document</button><input class="sr-only" type="file" accept=".jpg,.jpeg,.png" data-upload-input><span class="upload-zone__formats">JPG or PNG · Up to 15 MB</span></div></div><div style="padding:16px; background:var(--color-bg-alt); border-top:1px solid var(--color-border);"><b style="font-size:13px; display:block; margin-bottom:8px;">Supported Document Types:</b><div style="display:flex; flex-wrap:wrap; gap:8px;"><span class="badge badge--blue">Blood Reports</span><span class="badge badge--blue">Prescriptions</span><span class="badge badge--blue">Handwritten Medical Notes</span><span class="badge badge--blue">Medical Certificates</span><span class="badge badge--blue">Vaccination Records</span></div></div></section>${steps(0, true)}</div>`);
+    return shell('ocr-upload', `${heading('Google Cloud Vision API Extraction', 'Upload a medical document (Blood Reports, Prescriptions, Medical Certificates, Vaccination Records, Aadhaar). Google Cloud Vision API will extract structured fields for review.', `<a class="button button--ghost" href="${pagePath$1('register-child')}">Cancel</a>`)}<div class="form-layout"><section class="card"><div class="card__body"><div class="upload-zone" data-upload-zone><span class="upload-zone__icon">${icon('upload')}</span><h2 class="card__title">Drop a medical document here</h2><p>Choose a file from your device. Google Cloud Vision API will scan and extract health & child details.</p><button class="button button--primary" type="button" data-start-ocr>${icon('file')}Choose document</button><input class="sr-only" type="file" accept=".jpg,.jpeg,.png" data-upload-input><span class="upload-zone__formats">JPG or PNG · Up to 15 MB</span></div></div><div style="padding:16px; background:var(--color-bg-alt); border-top:1px solid var(--color-border);"><b style="font-size:13px; display:block; margin-bottom:8px;">Supported Document Types:</b><div style="display:flex; flex-wrap:wrap; gap:8px;"><span class="badge badge--blue">Blood Reports</span><span class="badge badge--blue">Prescriptions</span><span class="badge badge--blue">Handwritten Medical Notes</span><span class="badge badge--blue">Medical Certificates</span><span class="badge badge--blue">Vaccination Records</span></div></div></section>${steps(0, true)}</div>`);
   }
 
   function ocrProcessingPage() {
@@ -1953,7 +1953,7 @@
     const phone = ocrData.phone || '';
     const idNumber = ocrData.idNumber || '';
 
-    return shell('ocr-details', `${heading('Additional details', 'Complete remaining health details before saving.', `<a class="button" href="${pagePath('ocr-review')}">Back</a><button class="button button--primary" type="submit" form="ocr-additional-form">Save child record</button>`)}<div class="form-layout"><form class="card" id="ocr-additional-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Registration & contact</h2><p>Complete any additional details for this record.</p></div><div class="form-grid--two">${field$1('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', mother)}${field$1('Mobile number *', 'phone', 'e.g. +91 98221 40393', 'tel', '', phone)}${field$1('Email address', 'email', 'guardian@example.com', 'email')}${field$1('Height (cm)', 'height', 'e.g. 140', 'number')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes"></textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin"></textarea></label><label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode"></textarea></label><label class="field form-span-all"><span class="field__label">Upload Additional Medical Records / Reports</span><input class="input" type="file" name="additionalDoc" accept=".jpg,.jpeg,.png,.pdf" data-additional-doc-input><span style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">Upload blood test reports, immunization records, or medical certificates.</span></label></div></section><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Final verification</h2><p>You're about to create the child record.</p></div><label class="checkbox"><input type="checkbox" required><span>I confirm the information is accurate and complete.</span></label></section><input type="hidden" name="firstName" value="${firstName}"><input type="hidden" name="lastName" value="${lastName}"><input type="hidden" name="father" value="${father}"><input type="hidden" name="gender" value="${gender}"><input type="hidden" name="blood" value="${blood}"><input type="hidden" name="idNumber" value="${idNumber}"><input type="hidden" name="dob" value="${ocrData.dob || ''}"></form>${steps(3, true)}</div>`);
+    return shell('ocr-details', `${heading('Additional details', 'Complete remaining health details before saving.', `<a class="button" href="${pagePath$1('ocr-review')}">Back</a><button class="button button--primary" type="submit" form="ocr-additional-form">Save child record</button>`)}<div class="form-layout"><form class="card" id="ocr-additional-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Registration & contact</h2><p>Complete any additional details for this record.</p></div><div class="form-grid--two">${field$1('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', mother)}${field$1('Mobile number *', 'phone', 'e.g. +91 98221 40393', 'tel', '', phone)}${field$1('Email address', 'email', 'guardian@example.com', 'email')}${field$1('Height (cm)', 'height', 'e.g. 140', 'number')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes"></textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin"></textarea></label><label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode"></textarea></label><label class="field form-span-all"><span class="field__label">Upload Additional Medical Records / Reports</span><input class="input" type="file" name="additionalDoc" accept=".jpg,.jpeg,.png,.pdf" data-additional-doc-input><span style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">Upload blood test reports, immunization records, or medical certificates.</span></label></div></section><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Final verification</h2><p>You're about to create the child record.</p></div><label class="checkbox"><input type="checkbox" required><span>I confirm the information is accurate and complete.</span></label></section><input type="hidden" name="firstName" value="${firstName}"><input type="hidden" name="lastName" value="${lastName}"><input type="hidden" name="father" value="${father}"><input type="hidden" name="gender" value="${gender}"><input type="hidden" name="blood" value="${blood}"><input type="hidden" name="idNumber" value="${idNumber}"><input type="hidden" name="dob" value="${ocrData.dob || ''}"></form>${steps(3, true)}</div>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -2078,7 +2078,7 @@
 
     const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
 
-    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<span class="badge badge--warning" style="padding:6px 12px; font-size:12px; font-weight:600; align-self:center;">Drive Sync: Coming Soon</span><button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
+    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<span class="badge badge--warning" style="padding:6px 12px; font-size:12px; font-weight:600; align-self:center;">Drive Sync: Coming Soon</span><button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath$1('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -2264,7 +2264,7 @@
     return results.map((child) => {
       const age = calculateAge(child.dob) || child.age || '—';
       return `
-      <a class="global-search__result" href="${pagePath('child-profile')}?id=${child.id}" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; text-decoration:none; color:var(--color-text); border-bottom:1px solid var(--color-border);">
+      <a class="global-search__result" href="${pagePath$1('child-profile')}?id=${child.id}" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; text-decoration:none; color:var(--color-text); border-bottom:1px solid var(--color-border);">
         <div style="display:flex; align-items:center; gap:12px;">
           <span class="table-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--color-primary-light); color:var(--color-primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">${initials(child.name)}</span>
           <div>
@@ -37197,14 +37197,14 @@
 
     const deprecatedPages = ['appointments', 'emergency', 'expenses', 'nutrition', 'export'];
     if (deprecatedPages.includes(page)) {
-      window.location.href = pagePath('dashboard');
+      window.location.href = pagePath$1('dashboard');
       return;
     }
 
     if (!isLoggedIn && page !== 'login') {
-      window.location.href = pagePath('login');
+      window.location.href = pagePath$1('login');
     } else if (isLoggedIn && page === 'login') {
-      window.location.href = pagePath('dashboard');
+      window.location.href = pagePath$1('dashboard');
     } else {
       // Await database sync from server if logged in
       if (page !== 'login') {
@@ -37242,7 +37242,7 @@
         role: userDoc.role
       });
       toast('Authentication Successful', `Logged in as ${email} (${userDoc.ngo})`);
-      window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
+      window.setTimeout(() => { window.location.href = pagePath$1('dashboard'); }, 850);
     } else {
       closeModal();
       modal({
@@ -37283,7 +37283,7 @@
           'medicines': 'dashboard'
         };
         const prev = prevPageMap[page] || 'dashboard';
-        window.location.href = pagePath(prev);
+        window.location.href = pagePath$1(prev);
       }
 
       if (target.matches('[data-collapse-sidebar]')) document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
@@ -37296,7 +37296,7 @@
       if (target.matches('[data-sign-out]')) {
         logoutUser().then(() => {
           toast('Signed out', 'Terminated Firebase Session and cleared workspace state.');
-          window.setTimeout(() => { window.location.href = pagePath('login'); }, 600);
+          window.setTimeout(() => { window.location.href = pagePath$1('login'); }, 600);
         });
       }
 
@@ -37305,7 +37305,7 @@
         loginWithGoogle().then((res) => {
           if (res.success) {
             toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
-            window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
+            window.setTimeout(() => { window.location.href = pagePath$1('dashboard'); }, 850);
           } else if (res.errorCode === 'ACCESS_DENIED') {
             modal({
               title: 'Access Denied',
@@ -37441,7 +37441,7 @@
 
       if (target.matches('[data-edit]')) {
         const id = target.dataset.edit;
-        window.location.href = `${pagePath('register-child')}?method=manual&edit=${id}`;
+        window.location.href = `${pagePath$1('register-child')}?method=manual&edit=${id}`;
       }
 
       if (target.matches('#btn-prev')) {
@@ -37462,7 +37462,7 @@
       const childCard = target.closest('[data-child-id]');
       if (childCard && !target.matches('button, a')) {
         const childId = childCard.dataset.childId;
-        window.location.href = `${pagePath('child-profile')}?id=${childId}`;
+        window.location.href = `${pagePath$1('child-profile')}?id=${childId}`;
       }
 
       const docCardClick = target.closest('[data-document-idx]');
@@ -37579,7 +37579,7 @@
             }
           });
           localStorage.setItem('ocr-parsed-data', JSON.stringify(ocrData));
-          window.location.href = pagePath('ocr-details');
+          window.location.href = pagePath$1('ocr-details');
         } else {
           toast('Review required', 'Confirm that you have checked the extracted details before continuing.');
         }
@@ -37835,10 +37835,7 @@
       if (!form.reportValidity()) return;
       const child = saveChild(form);
 
-      showSheetsSyncLoader(child.name, () => {
-        toast('Child saved & synced', `${child.name}'s record generated in Google Sheets.`);
-        window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
-      });
+      showSheetsSyncLoader(child.name);
     });
 
     // OCR additional form
@@ -37902,10 +37899,7 @@
         }
       }
 
-      showSheetsSyncLoader(child.name, () => {
-        toast('Verified child saved', `${child.name}'s record generated in Google Sheets.`);
-        window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
-      });
+      showSheetsSyncLoader(child.name);
     });
 
     // Growth form (using delegated submit handler for dynamic form cards)
@@ -38053,7 +38047,7 @@
       if (adminIdInput === 'admin-ngo') {
         localStorage.setItem('sample-logged-in', 'true');
         toast('Login Successful', 'Welcome to the Child Health Management workspace.');
-        window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
+        window.setTimeout(() => { window.location.href = pagePath$1('dashboard'); }, 850);
       } else {
         toast('Access Denied', 'Incorrect Admin User ID. Please check the demo credentials.');
       }
@@ -38131,7 +38125,7 @@
                 const elapsed = Date.now() - startTime;
                 const remaining = Math.max(0, 1000 - elapsed);
                 window.setTimeout(() => {
-                  window.location.href = pagePath('ocr-review');
+                  window.location.href = pagePath$1('ocr-review');
                 }, remaining);
               } else {
                 throw new Error(result.error || 'Extraction failed');
@@ -38147,7 +38141,7 @@
                 body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
                 confirmText: 'Try Again',
                 onConfirm: () => {
-                  window.location.href = pagePath('ocr-upload');
+                  window.location.href = pagePath$1('ocr-upload');
                 }
               });
 
@@ -38158,7 +38152,7 @@
             });
         });
     } else {
-      window.setTimeout(() => { window.location.href = pagePath('ocr-review'); }, 1850);
+      window.setTimeout(() => { window.location.href = pagePath$1('ocr-review'); }, 1850);
     }
   }
 
@@ -38305,14 +38299,14 @@
           localStorage.setItem('ocr-upload-filename', file.name);
           localStorage.setItem('ocr-upload-filetype', file.type);
         }
-        window.setTimeout(() => { window.location.href = pagePath('ocr-processing'); }, 500);
+        window.setTimeout(() => { window.location.href = pagePath$1('ocr-processing'); }, 500);
       };
       img.onerror = function () {
         console.warn('Image loading failed, saving original:', file.name);
         localStorage.setItem('ocr-upload-file', e.target.result);
         localStorage.setItem('ocr-upload-filename', file.name);
         localStorage.setItem('ocr-upload-filetype', file.type);
-        window.setTimeout(() => { window.location.href = pagePath('ocr-processing'); }, 500);
+        window.setTimeout(() => { window.location.href = pagePath$1('ocr-processing'); }, 500);
       };
       img.src = e.target.result;
     };

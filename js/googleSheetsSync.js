@@ -304,7 +304,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
   overlay.querySelector('#sync-overlay-close-btn')?.addEventListener('click', () => {
     overlay.remove();
-    if (onComplete) onComplete();
+    window.location.href = pagePath('dashboard');
   });
 
   setTimeout(() => {
