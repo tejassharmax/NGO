@@ -10,7 +10,14 @@ const express = require('express');
 const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
+const vision = require('@google-cloud/vision');
+const { google } = require('googleapis');
 require('dotenv').config();
+
+// Initialize the Google Cloud Vision client
+const visionClient = new vision.ImageAnnotatorClient({
+  keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+});
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -110,7 +117,7 @@ async function preprocessImage(buffer, mode = 'standard') {
  * This handles a wide variety of image qualities — from studio scans to
  * dark phone photos of crumpled documents.
  */
-async function performOCR(buffer) {
+async function performTesseractOCR(buffer) {
   const passes = [
     { mode: 'standard',   label: 'standard enhancement' },
     { mode: 'brightened', label: 'low-light brightening' },
@@ -171,6 +178,35 @@ async function performOCR(buffer) {
   }
 
   return { text: bestText, confidence: bestConfidence, fields: bestFields };
+}
+
+/**
+ * Runs Google Cloud Vision API to perform document text detection.
+ * If it fails, falls back to Tesseract OCR.
+ */
+async function performOCR(buffer) {
+  try {
+    console.log('  → Attempting Google Cloud Vision OCR...');
+    const [result] = await visionClient.documentTextDetection(buffer);
+    const fullTextAnnotation = result.fullTextAnnotation;
+    const text = fullTextAnnotation ? fullTextAnnotation.text : '';
+    
+    let confidence = 95; // Default high confidence for Vision API
+    if (fullTextAnnotation && fullTextAnnotation.pages && fullTextAnnotation.pages[0]) {
+      confidence = (fullTextAnnotation.pages[0].confidence || 0.95) * 100;
+    }
+
+    const parsed = parseOCRText(text, true); // silent mode for evaluation
+    const fields = countExtractedFields(parsed);
+
+    console.log(`    ✓ Google Cloud Vision success: confidence ${confidence.toFixed(1)}%  |  fields extracted: ${fields}`);
+    
+    return { text, confidence, fields };
+  } catch (err) {
+    console.warn(`  ⚠ Google Cloud Vision OCR failed: ${err.message}`);
+    console.log('  → Falling back to local Tesseract OCR...');
+    return performTesseractOCR(buffer);
+  }
 }
 
 function countExtractedFields(parsed) {
@@ -730,6 +766,155 @@ function mergeJSONArrays(clientJSON, serverJSON) {
   }
 }
 
+/* ═══════════════════════════════════════════════════════
+   AUTOMATIC GOOGLE SHEETS SYNC SERVICE
+   ═══════════════════════════════════════════════════════ */
+
+const SHEETS_CONFIG_FILE = path.join(DB_DIR, 'sheets_config.json');
+
+function getSheetsConfig() {
+  try {
+    if (fs.existsSync(SHEETS_CONFIG_FILE)) {
+      return JSON.parse(fs.readFileSync(SHEETS_CONFIG_FILE, 'utf8'));
+    }
+  } catch (e) {}
+  return {
+    sheetId: process.env.GOOGLE_SHEET_ID || '',
+    autoSync: true,
+    lastSynced: null,
+    status: 'Ready'
+  };
+}
+
+function saveSheetsConfig(config) {
+  try {
+    fs.writeFileSync(SHEETS_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+  } catch (e) {
+    console.error('Failed to save sheets config:', e);
+  }
+}
+
+// Format child objects into tabular array for Google Sheets
+function formatChildrenForSheet(children) {
+  const headers = [
+    'Child ID', 'Full Name', 'Gender', 'Date of Birth', 'Blood Group',
+    'Father Name', 'Mother Name', 'Phone Number', 'Address', 'ID / Aadhaar Number',
+    'Height (cm)', 'Weight (kg)', 'Medical Conditions', 'Allergies',
+    'Emergency Contact', 'Emergency Phone', 'Registered Date', 'Status'
+  ];
+
+  const rows = children.map(c => [
+    c.id || '',
+    c.name || '',
+    c.gender || '',
+    c.dob || '',
+    c.blood || '',
+    c.father || '',
+    c.mother || '',
+    c.phone || '',
+    c.address || '',
+    c.idNumber || '',
+    c.height || '',
+    c.weight || '',
+    c.medicalConditions || '',
+    c.allergies || '',
+    c.emergencyContact || '',
+    c.emergencyPhone || '',
+    c.registeredDate || '',
+    c.status || 'Active'
+  ]);
+
+  return [headers, ...rows];
+}
+
+// Automatically save a synchronized CSV export file locally for sheets sync backup
+function updateLocalCSVExport(children) {
+  try {
+    const tableData = formatChildrenForSheet(children);
+    const csvContent = tableData.map(row => 
+      row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+    
+    const csvPath = path.join(DB_DIR, 'google_sheets_live_sync.csv');
+    fs.writeFileSync(csvPath, csvContent, 'utf8');
+    console.log(`✓ Synchronized local Google Sheets CSV backup (${children.length} records)`);
+  } catch (err) {
+    console.warn('Failed to save local CSV export:', err.message);
+  }
+}
+
+async function syncChildrenToGoogleSheets(children) {
+  if (!Array.isArray(children)) return { success: false, message: 'Invalid children data' };
+  
+  // Always keep local CSV live export updated immediately
+  updateLocalCSVExport(children);
+
+  const config = getSheetsConfig();
+  const tableData = formatChildrenForSheet(children);
+
+  try {
+    const auth = new google.auth.GoogleAuth({
+      keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'],
+    });
+
+    const sheets = google.sheets({ version: 'v4', auth });
+    let sheetId = config.sheetId || process.env.GOOGLE_SHEET_ID;
+
+    // Create a Google Spreadsheet automatically if none exists
+    if (!sheetId) {
+      console.log('  → Creating new Google Spreadsheet for NGO Child Health Records...');
+      const createRes = await sheets.spreadsheets.create({
+        requestBody: {
+          properties: { title: 'NGO Child Health Management — Master Records' },
+        },
+      });
+      sheetId = createRes.data.spreadsheetId;
+      config.sheetId = sheetId;
+      saveSheetsConfig(config);
+      console.log(`  ✓ Created Google Spreadsheet: https://docs.google.com/spreadsheets/d/${sheetId}`);
+    }
+
+    // Clear and write updated rows
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: sheetId,
+      range: 'Sheet1!A1:Z5000',
+    });
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: 'Sheet1!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: tableData },
+    });
+
+    config.lastSynced = new Date().toISOString();
+    config.status = 'Connected';
+    config.count = children.length;
+    saveSheetsConfig(config);
+
+    console.log(`✓ Google Sheets Auto-Sync success: ${children.length} records synced to Google Sheet (${sheetId})`);
+    return {
+      success: true,
+      sheetId,
+      url: `https://docs.google.com/spreadsheets/d/${sheetId}`,
+      count: children.length,
+      lastSynced: config.lastSynced
+    };
+  } catch (err) {
+    console.warn(`  ⚠ Google Sheets API Sync notice: ${err.message}`);
+    config.status = 'Ready (Local Backup Active)';
+    config.lastError = err.message;
+    saveSheetsConfig(config);
+    return {
+      success: false,
+      error: err.message,
+      count: children.length,
+      localCsvSynced: true
+    };
+  }
+}
+
 // POST /api/sync - Merges and saves the database
 app.post('/api/sync', (req, res) => {
   try {
@@ -763,10 +948,50 @@ app.post('/api/sync', (req, res) => {
     if (newDBString !== currentDBString) {
       fs.writeFileSync(DB_FILE, newDBString, 'utf8');
     }
+
+    // Immediately sync local CSV backup and trigger Google Sheets sync
+    if (mergedData['chm-children']) {
+      try {
+        const children = JSON.parse(mergedData['chm-children']);
+        if (Array.isArray(children)) {
+          updateLocalCSVExport(children);
+          syncChildrenToGoogleSheets(children).catch(err => {
+            console.warn('Background Google Sheets auto-sync notice:', err.message);
+          });
+        }
+      } catch (e) {}
+    }
+
     return res.json(mergedData);
   } catch (err) {
     console.error('Failed to write db file:', err);
     return res.status(500).json({ error: 'Failed to sync database' });
+  }
+});
+
+// GET /api/sheets/config - Get Google Sheets config and sync status
+app.get('/api/sheets/config', (req, res) => {
+  const config = getSheetsConfig();
+  res.json({
+    ...config,
+    url: config.sheetId ? `https://docs.google.com/spreadsheets/d/${config.sheetId}` : null
+  });
+});
+
+// POST /api/sheets/sync - Manual trigger endpoint for Google Sheets sync
+app.post('/api/sheets/sync', async (req, res) => {
+  try {
+    let children = req.body.children;
+    if (!children && fs.existsSync(DB_FILE)) {
+      const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
+      if (db['chm-children']) children = JSON.parse(db['chm-children']);
+    }
+    if (!children) return res.status(400).json({ error: 'No child records found to sync' });
+
+    const result = await syncChildrenToGoogleSheets(children);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

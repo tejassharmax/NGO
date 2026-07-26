@@ -1,4 +1,5 @@
 import { updateChild, getChild } from './storage.js';
+import { autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
 
 export function collectChild(form) {
   const values = Object.fromEntries(new FormData(form));
@@ -49,5 +50,9 @@ export function collectChild(form) {
 }
 
 export function saveChild(form) {
-  return updateChild(collectChild(form));
+  const child = collectChild(form);
+  const updated = updateChild(child);
+  // Automatically generate / append row to Google Sheets in user's account
+  autoSyncChildToGoogleSheets(child);
+  return updated;
 }

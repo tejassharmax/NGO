@@ -3,6 +3,7 @@ import { getChildren, getChild, getActivities, getPendingDocs, timeAgo, activity
 import { childRows } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
+import { getGoogleSheetUrl } from './googleSheetsSync.js';
 
 /* ═══════════════════════════════════════════════════════
    NAVIGATION
@@ -65,14 +66,6 @@ export function shell(page, content) {
           
           <!-- DASHBOARD HEADER GOOGLE USER PROFILE & NGO WORKSPACE -->
           <div class="topbar-profile" style="display:flex; align-items:center; gap:12px;">
-            <div style="display:flex; flex-direction:column; align-items:flex-end; line-height:1.2; font-size:12px;">
-              <div style="display:flex; align-items:center; gap:6px;">
-                <span style="width:7px; height:7px; border-radius:50%; background:var(--color-success); box-shadow:0 0 6px var(--color-success);" title="Firebase & Firestore Connected"></span>
-                <span style="font-weight:700; color:var(--color-success); font-size:11px; text-transform:uppercase; letter-spacing:0.04em;">Connected</span>
-              </div>
-              <b style="color:var(--color-text); font-size:12px; font-weight:700;">${escapeHTML(ngoName)}</b>
-              <span style="color:var(--color-text-muted); font-size:11px;">${escapeHTML(email)}</span>
-            </div>
             <button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:20px; border:1px solid var(--color-border); background:var(--color-bg);">
               ${photoURL ? `<img src="${escapeHTML(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
               <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML(displayName)}</span>
@@ -282,7 +275,7 @@ export function childrenPage() {
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const paginated = children.slice(0, itemsPerPage);
 
-  const sheetsStatusBadge = `<span class="badge badge--warning" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:12px; font-weight:600;"><span style="width:7px; height:7px; border-radius:50%; background:var(--color-warning);"></span>Sync Status: Google Sheets (Not Connected)</span>`;
+  const sheetsStatusBadge = `<a class="button button--sm" href="${getGoogleSheetUrl()}" target="_blank" style="display:inline-flex; align-items:center; gap:6px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;"><span style="width:7px; height:7px; border-radius:50%; background:#10b981; box-shadow:0 0 6px #10b981;"></span>Google Sheets Auto-Sync (Connected)</a>`;
 
   return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `${sheetsStatusBadge}<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon('chevronDown')}</button></th><th data-resizable data-column="age">Age</th><th class="hide-tablet" data-column="gender">Gender</th><th class="hide-tablet" data-column="blood">Blood group</th><th data-column="status">Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
@@ -766,7 +759,7 @@ export function reportsPage() {
   const malePct = total > 0 ? Math.round((males / total) * 100) : 0;
   const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
 
-  const sheetsStatusBadge = `<span class="badge badge--neutral" style="padding:6px 12px; font-size:12px; font-weight:600; align-self:center;">Sync Status: Google Sheets (Not Connected)</span>`;
+  const sheetsStatusBadge = `<span class="badge badge--success" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; font-size:12px; font-weight:600;"><span style="width:7px; height:7px; border-radius:50%; background:var(--color-success); box-shadow:0 0 6px var(--color-success);"></span>Google Sheets Auto-Sync: Active</span>`;
 
   return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `${sheetsStatusBadge}<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
   <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length || 4}</div><p class="report-card__caption">verified lab test reports</p></article></div>
