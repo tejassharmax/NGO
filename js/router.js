@@ -530,7 +530,7 @@ export function childProfilePage() {
    ═══════════════════════════════════════════════════════ */
 
 function steps(active, upload = false) {
-  const items = upload ? ['Upload', 'Processing', 'Review & verify', 'Additional details', 'Save record'] : ['Choose method', 'Child details', 'Health & guardian', 'Review & save'];
+  const items = upload ? ['Upload', 'Processing', 'Review & verify', 'Additional details', 'Google Sheets Auto-Sync'] : ['Choose method', 'Child details', 'Health & guardian', 'Google Sheets Auto-Sync'];
   return `<aside class="card form-aside"><div class="stepper">${items.map((item, index) => `<div class="stepper__item ${index < active ? 'stepper__item--complete' : ''} ${index === active ? 'stepper__item--active' : ''}"><span class="stepper__dot">${index < active ? icon('check') : index + 1}</span><span class="stepper__label">${item}</span></div>`).join('')}</div></aside>`;
 }
 
