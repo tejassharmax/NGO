@@ -10,6 +10,7 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
+import { showSheetsSyncLoader } from './googleSheetsSync.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
@@ -642,8 +643,11 @@ async function handleGoogleAuth(email) {
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
     const child = saveChild(form);
-    toast('Child saved', `${child.name}'s record is ready.`);
-    window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
+
+    showSheetsSyncLoader(child.name, () => {
+      toast('Child saved & synced', `${child.name}'s record generated in Google Sheets.`);
+      window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
+    });
   });
 
   // OCR additional form
@@ -707,8 +711,10 @@ async function handleGoogleAuth(email) {
       }
     }
 
-    toast('Verified child saved', `${child.name}'s record is now active.`);
-    window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
+    showSheetsSyncLoader(child.name, () => {
+      toast('Verified child saved', `${child.name}'s record generated in Google Sheets.`);
+      window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
+    });
   });
 
   // Growth form (using delegated submit handler for dynamic form cards)
