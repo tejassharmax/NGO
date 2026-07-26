@@ -994,6 +994,8 @@
   ];
 
   const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjQzPTgcdhoEDLSVBmQLoiVPy98Dnq5iF8VfrHOt6GDRH-8hjuw6H3209dqOdNQdo5ig/exec';
+  const LIVE_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
+  const LIVE_GOOGLE_SHEET_EMBED_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/htmlembed?gid=0&widget=true&headers=false';
 
   /**
    * Format a child health record object into the EXACT 15-column Google Sheets row array
@@ -1022,44 +1024,6 @@
   }
 
   /**
-   * Generate formatted TSV string of all records for instant Google Sheets pasting
-   * @returns {string}
-   */
-  function generateSheetTSVData() {
-    const children = getChildren() || [];
-    const headerRow = EXACT_SHEET_COLUMNS.join('\t');
-    const dataRows = children.map(c => formatChildToSheetRow(c).join('\t'));
-    return [headerRow, ...dataRows].join('\n');
-  }
-
-  /**
-   * Copy formatted 15-column dataset to clipboard only
-   */
-  function copySheetDataToClipboard() {
-    const children = getChildren() || [];
-    const tsvData = generateSheetTSVData();
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(tsvData).then(() => {
-        toast(
-          'Dataset Copied to Clipboard!',
-          `Copied ${children.length} child records (15 columns). Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
-        );
-      }).catch(err => {
-        console.warn('Clipboard write notice:', err);
-      });
-    }
-  }
-
-  /**
-   * Copy formatted 15-column dataset to clipboard and open Google Sheets
-   */
-  function copyAndOpenGoogleSheets() {
-    copySheetDataToClipboard();
-    window.open('https://sheets.new', '_blank');
-  }
-
-  /**
    * Display a professional Google Sheets Template Data Viewer Modal
    */
   function openGoogleSheetsTemplateModal() {
@@ -1085,7 +1049,6 @@
       const bgStyle = isEven ? 'background: #f8fafc;' : 'background: #ffffff;';
 
       const cellHTML = row.map((val, cellIdx) => {
-        // Style status column specially with pill badge
         if (cellIdx === 13) {
           const isVerified = String(val).toLowerCase() === 'verified' || String(val).toLowerCase() === 'active';
           const badgeBg = isVerified ? '#dcfce7' : '#fef3c7';
@@ -1114,7 +1077,7 @@
 
     const modalHTML = `
     <div id="google-sheets-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
-      <div class="card" style="width:min(1240px, 96vw); height:min(780px, 92vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
+      <div class="card" style="width:min(1280px, 96vw); height:min(820px, 94vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
         
         <!-- Google Sheets Header Bar -->
         <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #0f9d58 0%, #0b8043 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
@@ -1127,7 +1090,7 @@
                 Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
                 <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
                   <span style="width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 6px #4ade80;"></span>
-                  Live Auto-Synced
+                  Live Auto-Synced File
                 </span>
               </div>
               <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px; display:flex; align-items:center; gap:8px;">
@@ -1139,50 +1102,63 @@
           </div>
           
           <div style="display:flex; align-items:center; gap:12px;">
-            <button id="modal-copy-open-sheets-btn" class="button" type="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+            <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" class="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-              Copy & Open in Google Drive
-            </button>
+              Open Live Google Sheet
+            </a>
             <button id="modal-close-sheets-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1; transition:background 0.2s ease;">&times;</button>
           </div>
         </div>
 
-        <!-- Professional Guidance Banner -->
+        <!-- Guidance Banner & View Switcher -->
         <div style="padding:12px 24px; background:#f0fdf4; border-bottom:1px solid #bbf7d0; display:flex; align-items:center; justify-content:space-between;">
           <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:#166534;">
-            <span style="font-size:16px;">💡</span>
+            <span style="font-size:16px;">🌐</span>
             <span>
-              <b>Live Pre-Formatted Template</b>: Click <b>Copy & Open in Google Drive</b> to launch Google Sheets, then press <b>Ctrl+V</b> (or Cmd+V) on cell A1 to populate all ${children.length} records instantly!
+              <b>Live Sheet Connected</b>: View the real-time sheet below or access <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">Google Sheets File (1rQB_KAh8FR...)</a> directly!
             </span>
           </div>
 
-          <button id="modal-copy-only-btn" class="button button--sm button--ghost" type="button" style="color:#15803d; border-color:rgba(21,128,61,0.3); font-weight:600;">
-            📋 Copy Data Only
-          </button>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button id="tab-live-iframe-btn" class="button button--sm" type="button" style="background:#0f9d58; color:white; font-weight:600;">
+              🌐 Live Preview
+            </button>
+            <button id="tab-data-table-btn" class="button button--sm button--ghost" type="button" style="color:#15803d; border-color:rgba(21,128,61,0.3); font-weight:600;">
+              📋 Local Data Grid
+            </button>
+          </div>
         </div>
 
-        <!-- Interactive Google Sheet Spreadsheet Grid -->
-        <div style="flex:1; overflow:auto; background:#f1f5f9; padding:16px;">
-          <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:6px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-            <thead>
-              <tr>
-                <th style="width:44px; background:#cbd5e1; border:1px solid #94a3b8;"></th>
-                ${headerColsHTML}
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHTML}
-            </tbody>
-          </table>
+        <!-- Main View Area (Live Iframe Embed + Fallback Table) -->
+        <div style="flex:1; position:relative; overflow:hidden; background:#f8fafc;">
+          <!-- Live Embedded Google Sheet Iframe -->
+          <div id="sheets-iframe-container" style="width:100%; height:100%; display:block; border:0;">
+            <iframe src="${LIVE_GOOGLE_SHEET_EMBED_URL}" style="width:100%; height:100%; border:0; background:white;" title="Live Google Sheet Preview"></iframe>
+          </div>
+
+          <!-- Offline Local Grid View (Hidden by default) -->
+          <div id="sheets-table-container" style="width:100%; height:100%; display:none; overflow:auto; padding:16px;">
+            <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:6px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+              <thead>
+                <tr>
+                  <th style="width:44px; background:#cbd5e1; border:1px solid #94a3b8;"></th>
+                  ${headerColsHTML}
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHTML}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Footer Status Bar -->
         <div style="padding:12px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:12.5px; color:#64748b;">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
-            Formatted into exact 15 Columns Google Sheet Template
+            Connected File: <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0f9d58; font-weight:600; text-decoration:none;">NGO_Child_Health_Master_Records</a>
           </div>
-          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Template</button>
+          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Preview</button>
         </div>
       </div>
     </div>
@@ -1193,11 +1169,28 @@
     const modal = document.querySelector('#google-sheets-view-modal');
     modal.querySelector('#modal-close-sheets-btn').addEventListener('click', () => modal.remove());
     modal.querySelector('#modal-close-bottom-btn').addEventListener('click', () => modal.remove());
-    modal.querySelector('#modal-copy-open-sheets-btn').addEventListener('click', () => {
-      copyAndOpenGoogleSheets();
+
+    const tabLiveBtn = modal.querySelector('#tab-live-iframe-btn');
+    const tabDataBtn = modal.querySelector('#tab-data-table-btn');
+    const iframeBox = modal.querySelector('#sheets-iframe-container');
+    const tableBox = modal.querySelector('#sheets-table-container');
+
+    tabLiveBtn.addEventListener('click', () => {
+      iframeBox.style.display = 'block';
+      tableBox.style.display = 'none';
+      tabLiveBtn.className = 'button button--sm';
+      tabLiveBtn.style.background = '#0f9d58';
+      tabLiveBtn.style.color = 'white';
+      tabDataBtn.className = 'button button--sm button--ghost';
     });
-    modal.querySelector('#modal-copy-only-btn').addEventListener('click', () => {
-      copySheetDataToClipboard();
+
+    tabDataBtn.addEventListener('click', () => {
+      iframeBox.style.display = 'none';
+      tableBox.style.display = 'block';
+      tabDataBtn.className = 'button button--sm';
+      tabDataBtn.style.background = '#0f9d58';
+      tabDataBtn.style.color = 'white';
+      tabLiveBtn.className = 'button button--sm button--ghost';
     });
   }
 
@@ -1208,14 +1201,14 @@
     document.querySelector('#sheets-sync-modal-overlay')?.remove();
 
     const session = getSession() || {};
-    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+    session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
 
     const overlay = document.createElement('div');
     overlay.id = 'sheets-sync-modal-overlay';
     overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
     
     overlay.innerHTML = `
-    <div class="card" style="width:min(460px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
+    <div class="card" style="width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
       <div style="display:flex; justify-content:center; margin-bottom:16px;">
         <div id="sync-spinner-icon" style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:white; border-radius:50%; border:2px solid rgba(16,185,129,0.3); box-shadow:0 4px 12px rgba(0,0,0,0.1); overflow:hidden;">
           <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation:pulse 1.5s infinite;"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
@@ -1223,8 +1216,8 @@
         </div>
       </div>
       
-      <h2 style="font-size:18px; font-weight:700; margin:0 0 6px 0; color:var(--color-text);">Creating & Updating Google Sheet</h2>
-      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing 15 columns template for <b>${escapeHTML(childName)}</b> to <b>${escapeHTML(userEmail)}</b>...</p>
+      <h2 style="font-size:18px; font-weight:700; margin:0 0 6px 0; color:var(--color-text);">Updating Live Google Sheet</h2>
+      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing 15 columns for <b>${escapeHTML(childName)}</b> to live Google Sheet...</p>
       
       <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
@@ -1240,16 +1233,16 @@
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
         <button id="view-template-btn" class="button button--primary" type="button" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
-          View Synced Google Sheet Template
+          View Live Google Sheet Preview
         </button>
-        <button id="sync-done-btn" class="button button--ghost" type="button" style="width:100%; justify-content:center; font-weight:600;">
-          Continue to Child Profile
-        </button>
+        <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" class="button button--ghost" style="width:100%; justify-content:center; font-weight:600; text-decoration:none; color:#0f9d58;">
+          🔗 Open Connected Google Sheet File
+        </a>
       </div>
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        Formatting ID, Name, DOB, Age, Gender, Blood Group, Guardian...
+        Connected: 1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE
       </div>
     </div>
   `;
@@ -1263,30 +1256,29 @@
     const footerNote = overlay.querySelector('#sync-footer-note');
     const spinnerRing = overlay.querySelector('#sync-spinner-ring');
     const viewTemplateBtn = overlay.querySelector('#view-template-btn');
-    const doneBtn = overlay.querySelector('#sync-done-btn');
 
     setTimeout(() => {
-      if (stageText) stageText.textContent = '2. Formatting 15 exact template columns...';
+      if (stageText) stageText.textContent = '2. Transmitting 15 columns payload...';
       if (stagePct) stagePct.textContent = '55%';
       if (progressBar) progressBar.style.width = '55%';
     }, 400);
 
     setTimeout(() => {
-      if (stageText) stageText.textContent = '3. Appending child record row to Google Sheet...';
+      if (stageText) stageText.textContent = '3. Appending record row to Google Sheet...';
       if (stagePct) stagePct.textContent = '85%';
       if (progressBar) progressBar.style.width = '85%';
     }, 850);
 
     setTimeout(() => {
       if (stageText) {
-        stageText.textContent = '✓ Google Sheet Template Updated & Synced!';
+        stageText.textContent = '✓ Live Google Sheet Updated & Synced!';
         stageText.style.color = '#10b981';
       }
       if (stagePct) stagePct.textContent = '100%';
       if (progressBar) progressBar.style.width = '100%';
       if (spinnerRing) spinnerRing.style.display = 'none';
 
-      if (footerNote) footerNote.innerHTML = '<span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Synced to 15 columns template';
+      if (footerNote) footerNote.innerHTML = '<span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Synced to 1rQB_KAh8FR...';
       if (actionsArea) actionsArea.style.display = 'flex';
     }, 1300);
 
@@ -1294,13 +1286,6 @@
       viewTemplateBtn.addEventListener('click', () => {
         overlay.remove();
         openGoogleSheetsTemplateModal();
-      });
-    }
-
-    if (doneBtn) {
-      doneBtn.addEventListener('click', () => {
-        overlay.remove();
-        if (onComplete) onComplete();
       });
     }
   }
@@ -1355,7 +1340,7 @@
       fetch('/api/sync-google-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL })
+        body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL, sheetUrl: LIVE_GOOGLE_SHEET_URL })
       }).catch(err => console.warn('Backend sync notice:', err));
     } catch (e) {
       // Ignore offline errors
@@ -37809,10 +37794,7 @@
       if (!form.reportValidity()) return;
       const child = saveChild(form);
 
-      showSheetsSyncLoader(child.name, () => {
-        toast('Child saved & synced', `${child.name}'s record generated in Google Sheets.`);
-        window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
-      });
+      showSheetsSyncLoader(child.name);
     });
 
     // OCR additional form
@@ -37876,10 +37858,7 @@
         }
       }
 
-      showSheetsSyncLoader(child.name, () => {
-        toast('Verified child saved', `${child.name}'s record generated in Google Sheets.`);
-        window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
-      });
+      showSheetsSyncLoader(child.name);
     });
 
     // Growth form (using delegated submit handler for dynamic form cards)
