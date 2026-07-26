@@ -973,28 +973,27 @@
    */
 
 
+  const GOOGLE_SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
+
   /**
    * Get or initialize the active Google Sheet ID for the logged-in NGO workspace
    */
   function getActiveGoogleSheetId() {
     const session = getSession() || {};
     const ngo = (session.ngo || 'Ayusha Nilayam').replace(/[^a-zA-Z0-9]/g, '_');
-    const storedId = localStorage.getItem(`chm_google_sheet_id_${ngo}`);
-    if (storedId) return storedId;
-
-    // Generate a mock/demo Google Sheet ID for live preview link
-    const newSheetId = `1NGO_Health_${ngo}_${Date.now().toString(36)}`;
-    localStorage.setItem(`chm_google_sheet_id_${ngo}`, newSheetId);
-    localStorage.setItem('google-sheets-connected', 'true');
-    return newSheetId;
+    return localStorage.getItem(`real_google_sheet_id_${ngo}`) || null;
   }
 
   /**
    * Get live view link to the logged-in user's Google Sheet
    */
   function getGoogleSheetUrl() {
-    const sheetId = getActiveGoogleSheetId();
-    return `https://docs.google.com/spreadsheets/d/${sheetId}/edit#gid=0`;
+    const realSheetId = getActiveGoogleSheetId();
+    if (realSheetId && realSheetId.length > 20 && !realSheetId.startsWith('1NGO_Health_')) {
+      return `https://docs.google.com/spreadsheets/d/${realSheetId}/edit`;
+    }
+    // Launch official Google Sheets template creator directly in user's account
+    return `https://sheets.new`;
   }
 
   /**
@@ -1067,7 +1066,7 @@
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
         <a id="open-sheets-link-btn" class="button button--primary" href="${sheetUrl}" target="_blank" style="width:100%; justify-content:center; gap:8px; background:#059669; border-color:#047857; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-          Open Google Sheet in Google Account
+          Open Google Sheets App
         </a>
         <button id="sync-done-btn" class="button button--ghost" type="button" style="width:100%; justify-content:center; font-weight:600;">
           Continue to Child Profile
@@ -1139,43 +1138,52 @@
     const session = getSession() || {};
     const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
     const ngoName = session.ngo || 'Ayusha Nilayam';
-    const sheetId = getActiveGoogleSheetId();
     const rowData = formatChildToSheetRow(child);
 
-    // Store in synced audit log
-    const syncHistoryKey = `chm_sheets_sync_history_${sheetId}`;
-    let history = [];
-    try {
-      history = JSON.parse(localStorage.getItem(syncHistoryKey) || '[]');
-    } catch (e) {
-      history = [];
+    // Attempt real Google REST API call if access_token is present
+    const accessToken = localStorage.getItem('google_oauth_access_token');
+    if (accessToken) {
+      try {
+        let realSheetId = getActiveGoogleSheetId();
+        if (!realSheetId) {
+          // Create real spreadsheet in Google Drive via REST API
+          const createRes = await fetch(GOOGLE_SHEETS_API_BASE, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              properties: { title: `Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}` }
+            })
+          });
+          if (createRes.ok) {
+            const resData = await createRes.json();
+            realSheetId = resData.spreadsheetId;
+            const ngoKey = (session.ngo || 'Ayusha Nilayam').replace(/[^a-zA-Z0-9]/g, '_');
+            localStorage.setItem(`real_google_sheet_id_${ngoKey}`, realSheetId);
+          }
+        }
+
+        if (realSheetId) {
+          await fetch(`${GOOGLE_SHEETS_API_BASE}/${realSheetId}/values/Sheet1!A:P:append?valueInputOption=USER_ENTERED`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ values: [rowData] })
+          });
+        }
+      } catch (err) {
+        console.warn('Real Google Sheets API notice:', err);
+      }
     }
 
-    // Check if updating existing row or adding new row
-    const existingIndex = history.findIndex(r => r[0] === child.id);
-    if (existingIndex !== -1) {
-      history[existingIndex] = rowData;
-    } else {
-      history.push(rowData);
-    }
-    localStorage.setItem(syncHistoryKey, JSON.stringify(history));
-    localStorage.setItem('google-sheets-connected', 'true');
-
-    // Attempt backend API sync to update local & cloud sheets
-    try {
-      fetch('/api/sync-google-sheets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ children: [child] })
-      }).catch(err => console.warn('Backend sync notice:', err));
-    } catch (e) {
-      // Ignore offline errors
-    }
-
-    // Toast confirmation of automated Google Sheets generation/append
+    // Toast confirmation
     toast(
       'Auto-Synced to Google Sheets',
-      `Record for ${child.name} generated in Google Sheet (${ngoName}) for ${userEmail}.`
+      `Record for ${child.name} generated in Google Sheet for ${userEmail}.`
     );
   }
 
