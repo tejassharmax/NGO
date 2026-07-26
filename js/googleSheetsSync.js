@@ -255,7 +255,9 @@ export function showSheetsSyncLoader(childName, onComplete) {
   overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
   
   overlay.innerHTML = `
-    <div class="card" style="width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
+    <div class="card" style="position:relative; width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
+      <button id="sync-overlay-close-btn" style="position:absolute; top:14px; right:16px; background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:22px; line-height:1; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; transition:background 0.2s ease;" aria-label="Close">&times;</button>
+
       <div style="display:flex; justify-content:center; margin-bottom:16px;">
         <div id="sync-spinner-icon" style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:white; border-radius:50%; border:2px solid rgba(16,185,129,0.3); box-shadow:0 4px 12px rgba(0,0,0,0.1); overflow:hidden;">
           <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation:pulse 1.5s infinite;"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
@@ -264,7 +266,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
       </div>
       
       <h2 style="font-size:18px; font-weight:700; margin:0 0 6px 0; color:var(--color-text);">Updating Live Google Sheet</h2>
-      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing 15 columns for <b>${escapeHTML(childName)}</b> to live Google Sheet...</p>
+      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing for <b>${escapeHTML(childName)}</b> to live Google Sheet...</p>
       
       <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
@@ -282,14 +284,11 @@ export function showSheetsSyncLoader(childName, onComplete) {
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
           Open Connected Live Google Sheet
         </a>
-        <button id="view-template-btn" class="button button--ghost" type="button" style="width:100%; justify-content:center; font-weight:600; color:#0f9d58;">
-          View Local Data Grid Template
-        </button>
       </div>
 
-      <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px;">
+      <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        Connected: 1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE
+        Connected: 1rQB_KAh8FR...
       </div>
     </div>
   `;
@@ -302,10 +301,14 @@ export function showSheetsSyncLoader(childName, onComplete) {
   const actionsArea = overlay.querySelector('#sync-actions-area');
   const footerNote = overlay.querySelector('#sync-footer-note');
   const spinnerRing = overlay.querySelector('#sync-spinner-ring');
-  const viewTemplateBtn = overlay.querySelector('#view-template-btn');
+
+  overlay.querySelector('#sync-overlay-close-btn')?.addEventListener('click', () => {
+    overlay.remove();
+    if (onComplete) onComplete();
+  });
 
   setTimeout(() => {
-    if (stageText) stageText.textContent = '2. Transmitting 15 columns payload...';
+    if (stageText) stageText.textContent = '2. Transmitting record payload...';
     if (stagePct) stagePct.textContent = '55%';
     if (progressBar) progressBar.style.width = '55%';
   }, 400);
@@ -318,7 +321,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
   setTimeout(() => {
     if (stageText) {
-      stageText.textContent = '✓ Live Google Sheet Updated & Synced!';
+      stageText.textContent = 'Live Google Sheet Updated & Synced!';
       stageText.style.color = '#10b981';
     }
     if (stagePct) stagePct.textContent = '100%';
@@ -328,13 +331,6 @@ export function showSheetsSyncLoader(childName, onComplete) {
     if (footerNote) footerNote.innerHTML = '<span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Synced to 1rQB_KAh8FR...';
     if (actionsArea) actionsArea.style.display = 'flex';
   }, 1300);
-
-  if (viewTemplateBtn) {
-    viewTemplateBtn.addEventListener('click', () => {
-      overlay.remove();
-      openGoogleSheetsTemplateModal();
-    });
-  }
 }
 
 /**
