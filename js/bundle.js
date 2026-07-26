@@ -2260,12 +2260,46 @@
     return getChildren().filter((child) => !term || Object.values(child).some((value) => String(value).toLowerCase().includes(term)));
   }
 
+  function renderSearchResultsList(query = '') {
+    const results = searchChildren(query).slice(0, 7);
+    if (!results.length) {
+      return `<div class="empty-state" style="padding: 24px 16px;"><span class="empty-state__icon">${icon('search')}</span><h3>No matching records</h3><p style="font-size:12px; color:var(--color-text-muted);">Try searching by child name, guardian, phone number, ID, or blood group.</p></div>`;
+    }
+    return results.map((child) => {
+      const age = calculateAge(child.dob) || child.age || '—';
+      return `
+      <a class="global-search__result" href="${pagePath('child-profile')}?id=${child.id}" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; text-decoration:none; color:var(--color-text); border-bottom:1px solid var(--color-border);">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="table-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--color-primary-light); color:var(--color-primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">${initials(child.name)}</span>
+          <div>
+            <b style="font-size:14px; display:block;">${child.name}</b>
+            <small style="font-size:11.5px; color:var(--color-text-muted);">${child.id} • ${age} • ${child.gender || '—'} • ${child.blood || '—'} • ${child.father || child.guardian || 'Guardian'}</small>
+          </div>
+        </div>
+        <span class="global-search__go" style="color:var(--color-primary); font-size:16px;">${icon('arrowRight')}</span>
+      </a>
+    `;
+    }).join('');
+  }
+
   function globalSearchMarkup(query = '') {
-    const results = searchChildren(query).slice(0, 5);
-    return `<div class="modal-backdrop" role="presentation"><section class="modal global-search" role="dialog" aria-modal="true" aria-labelledby="search-title"><header class="global-search__input"><span>${icon('search')}</span><input id="global-search-input" class="input" value="${query}" placeholder="Search children, guardians, health records…" aria-label="Search all child records" autofocus><kbd>Esc</kbd></header><div class="global-search__results"><p class="global-search__hint" id="search-title">Search across all child records</p>${results.length ? results.map((child) => {
-    const age = calculateAge(child.dob);
-    return `<a class="global-search__result" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span><b>${child.name}</b><small>${child.id} · ${age || '—'} · ${child.blood || '—'}</small></span><span class="global-search__go">${icon('arrowRight')}</span></a>`;
-  }).join('') : '<div class="empty-state"><span class="empty-state__icon">'+icon('search')+'</span><h3>No matching records</h3><p>Try a name, guardian, phone number, ID, or blood group.</p></div>'}</div></section></div>`;
+    return `
+    <div class="modal-backdrop" role="presentation" style="position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,0.75); backdrop-filter:blur(6px); display:flex; align-items:flex-start; justify-content:center; padding-top:80px;">
+      <section class="modal global-search card" role="dialog" aria-modal="true" aria-labelledby="search-title" style="width:min(640px, 94vw); border-radius:12px; overflow:hidden; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.25);">
+        <header class="global-search__input" style="display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid var(--color-border); background:var(--color-bg);">
+          <span style="color:var(--color-text-muted); font-size:18px;">${icon('search')}</span>
+          <input id="global-search-input" class="input" value="${query}" placeholder="Search children, guardians, health records…" aria-label="Search all child records" autofocus style="flex:1; border:0; background:transparent; font-size:16px; color:var(--color-text); outline:none;">
+          <kbd style="padding:2px 8px; font-size:11px; background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:4px; color:var(--color-text-muted);">Esc</kbd>
+        </header>
+        <div class="global-search__results" id="global-search-results-wrap" style="max-height:60vh; overflow:auto;">
+          <p class="global-search__hint" id="search-title" style="padding:10px 16px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-muted); margin:0; border-bottom:1px solid var(--color-border);">Search results</p>
+          <div id="global-search-results-container">
+            ${renderSearchResultsList(query)}
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
   }
 
   function closeModal() { document.querySelector('#modal-root').replaceChildren(); }
@@ -37719,8 +37753,23 @@
       }
     });
 
+    // Global Keyboard Shortcuts (⌘ K / Ctrl K for Search)
+    document.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        openGlobalSearch('');
+      }
+      if (event.key === 'Escape') {
+        closeModal();
+      }
+    });
+
     // Inputs
     document.addEventListener('input', (event) => {
+      if (event.target.matches('[data-global-search]')) {
+        openGlobalSearch(event.target.value);
+      }
+
       if (event.target.matches('[data-document-search]')) {
         const searchVal = event.target.value.toLowerCase();
         const filterVal = (document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
@@ -38143,14 +38192,29 @@
   function openGlobalSearch(query = '') {
     const root = document.querySelector('#modal-root');
     if (!root) return;
-    root.innerHTML = globalSearchMarkup(query);
-    const input = root.querySelector('#global-search-input');
-    if (input) {
-      input.focus();
-      input.select();
-      input.addEventListener('input', () => openGlobalSearch(input.value));
+
+    const existingInput = root.querySelector('#global-search-input');
+    const resultsContainer = root.querySelector('#global-search-results-container');
+
+    if (existingInput && resultsContainer) {
+      resultsContainer.innerHTML = renderSearchResultsList(query);
+    } else {
+      root.innerHTML = globalSearchMarkup(query);
+      const input = root.querySelector('#global-search-input');
+      if (input) {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        input.addEventListener('input', () => {
+          const container = root.querySelector('#global-search-results-container');
+          if (container) {
+            container.innerHTML = renderSearchResultsList(input.value);
+          }
+        });
+      }
+      root.querySelector('.modal-backdrop')?.addEventListener('click', (event) => {
+        if (event.target === event.currentTarget) closeModal();
+      });
     }
-    root.querySelector('.modal-backdrop')?.addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
   }
 
   function filteredChildren() {

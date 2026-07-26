@@ -1,7 +1,7 @@
 import { renderPage } from './router.js';
 import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, addSponsor } from './storage.js';
 import { updateChildTable, childRows } from './table.js';
-import { searchChildren, globalSearchMarkup } from './search.js';
+import { searchChildren, globalSearchMarkup, renderSearchResultsList } from './search.js';
 import { toast } from './toast.js';
 import { modal, closeModal } from './modal.js';
 import { saveChild } from './form.js';
@@ -577,8 +577,23 @@ async function handleGoogleAuth(email) {
     }
   });
 
+  // Global Keyboard Shortcuts (⌘ K / Ctrl K for Search)
+  document.addEventListener('keydown', (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      openGlobalSearch('');
+    }
+    if (event.key === 'Escape') {
+      closeModal();
+    }
+  });
+
   // Inputs
   document.addEventListener('input', (event) => {
+    if (event.target.matches('[data-global-search]')) {
+      openGlobalSearch(event.target.value);
+    }
+
     if (event.target.matches('[data-document-search]')) {
       const searchVal = event.target.value.toLowerCase();
       const filterVal = (document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
@@ -1007,14 +1022,29 @@ setTheme(localStorage.getItem('sample-theme') === 'dark');
 function openGlobalSearch(query = '') {
   const root = document.querySelector('#modal-root');
   if (!root) return;
-  root.innerHTML = globalSearchMarkup(query);
-  const input = root.querySelector('#global-search-input');
-  if (input) {
-    input.focus();
-    input.select();
-    input.addEventListener('input', () => openGlobalSearch(input.value));
+
+  const existingInput = root.querySelector('#global-search-input');
+  const resultsContainer = root.querySelector('#global-search-results-container');
+
+  if (existingInput && resultsContainer) {
+    resultsContainer.innerHTML = renderSearchResultsList(query);
+  } else {
+    root.innerHTML = globalSearchMarkup(query);
+    const input = root.querySelector('#global-search-input');
+    if (input) {
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      input.addEventListener('input', () => {
+        const container = root.querySelector('#global-search-results-container');
+        if (container) {
+          container.innerHTML = renderSearchResultsList(input.value);
+        }
+      });
+    }
+    root.querySelector('.modal-backdrop')?.addEventListener('click', (event) => {
+      if (event.target === event.currentTarget) closeModal();
+    });
   }
-  root.querySelector('.modal-backdrop')?.addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
 }
 
 function filteredChildren() {
