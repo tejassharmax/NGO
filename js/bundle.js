@@ -968,7 +968,7 @@
   /**
    * googleSheetsSync.js
    * Automatic Google Sheets generation and real-time record synchronization service.
-   * Automatically creates, appends, and syncs child health records to Google Spreadsheets
+   * Automatically formats and syncs child health records to Google Spreadsheets
    * matching the exact export data format:
    * ID | Child Name | Date of Birth | Age | Gender | Blood Group | Aadhaar ID | Guardian | Contact Phone | Height (cm) | Weight (kg) | Medical Conditions | Allergies | Status | Registration Date
    */
@@ -991,26 +991,6 @@
     'Status',
     'Registration Date'
   ];
-
-  /**
-   * Get or initialize the active Google Sheet ID for the logged-in NGO workspace
-   */
-  function getActiveGoogleSheetId() {
-    const session = getSession() || {};
-    const ngo = (session.ngo || 'Ayusha Nilayam').replace(/[^a-zA-Z0-9]/g, '_');
-    return localStorage.getItem(`real_google_sheet_id_${ngo}`) || null;
-  }
-
-  /**
-   * Get live view link to the logged-in user's Google Sheet
-   */
-  function getGoogleSheetUrl() {
-    const realSheetId = getActiveGoogleSheetId();
-    if (realSheetId && realSheetId.length > 20 && !realSheetId.startsWith('1NGO_Health_')) {
-      return `https://docs.google.com/spreadsheets/d/${realSheetId}/edit`;
-    }
-    return `https://sheets.new`;
-  }
 
   /**
    * Format a child health record object into the EXACT 15-column Google Sheets row array
@@ -1039,57 +1019,36 @@
   }
 
   /**
-   * Load SheetJS library dynamically and trigger XLSX spreadsheet download
+   * Generate formatted TSV string of all records for instant Google Sheets pasting
+   * @returns {string}
    */
-  function exportGoogleSheetToXLSX() {
-    const children = getChildren();
-    if (!children || children.length === 0) {
-      toast('No data', 'No child health records available to export.');
-      return;
+  function generateSheetTSVData() {
+    const children = getChildren() || [];
+    const headerRow = EXACT_SHEET_COLUMNS.join('\t');
+    const dataRows = children.map(c => formatChildToSheetRow(c).join('\t'));
+    return [headerRow, ...dataRows].join('\n');
+  }
+
+  /**
+   * Copy formatted 15-column dataset to clipboard and open Google Sheets
+   */
+  function copyAndOpenGoogleSheets() {
+    const children = getChildren() || [];
+    const tsvData = generateSheetTSVData();
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(tsvData).then(() => {
+        toast(
+          'Data Copied to Clipboard!',
+          `Copied ${children.length} records in 15-column template. Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
+        );
+      }).catch(err => {
+        console.warn('Clipboard write notice:', err);
+      });
     }
 
-    const session = getSession() || {};
-    const ngoName = session.ngo || 'Ayusha Nilayam';
-    const fileName = `Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`;
-
-    const rows = children.map(c => ({
-      'ID': c.id || '',
-      'Child Name': c.name || '',
-      'Date of Birth': c.dob || '',
-      'Age': calculateAge(c.dob) || c.age || '',
-      'Gender': c.gender || '',
-      'Blood Group': c.blood || '',
-      'Aadhaar ID': c.idNumber || '',
-      'Guardian': c.father || c.guardian || '',
-      'Contact Phone': c.phone || '',
-      'Height (cm)': c.height || '',
-      'Weight (kg)': c.weight || '',
-      'Medical Conditions': c.medicalConditions || 'None',
-      'Allergies': c.allergies || 'None',
-      'Status': c.status || 'Active',
-      'Registration Date': c.registeredDate || ''
-    }));
-
-    function triggerDownload() {
-      if (window.XLSX) {
-        const ws = XLSX.utils.json_to_sheet(rows, { header: EXACT_SHEET_COLUMNS });
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Child Health Records");
-        XLSX.writeFile(wb, fileName);
-        toast('Spreadsheet Exported', `Generated ${fileName} with ${rows.length} child records.`);
-      }
-    }
-
-    if (window.XLSX) {
-      triggerDownload();
-    } else {
-      toast('Loading Excel engine', 'Preparing XLSX spreadsheet export...');
-      const script = document.createElement('script');
-      script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-      script.onload = () => triggerDownload();
-      script.onerror = () => toast('Export failed', 'Could not load XLSX export engine.');
-      document.head.appendChild(script);
-    }
+    // Open Google Sheets launcher in new tab
+    window.open('https://sheets.new', '_blank');
   }
 
   /**
@@ -1101,7 +1060,7 @@
     const session = getSession() || {};
     const ngoName = session.ngo || 'Ayusha Nilayam';
     const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
-    const children = getChildren();
+    const children = getChildren() || [];
 
     const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
 
@@ -1146,14 +1105,16 @@
           </div>
           
           <div style="display:flex; align-items:center; gap:10px;">
-            <button id="modal-export-xlsx-btn" class="button" type="button" style="background:#ffffff; color:#0f9d58; border:0; font-weight:700; font-size:12.5px; padding:7px 14px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
-              📥 Download XLSX
+            <button id="modal-copy-open-sheets-btn" class="button" type="button" style="background:#ffffff; color:#0f9d58; border:0; font-weight:700; font-size:13px; padding:8px 16px; border-radius:6px; box-shadow:0 2px 4px rgba(0,0,0,0.15); display:flex; align-items:center; gap:6px;">
+              🔗 Copy & Open in Google Drive
             </button>
-            <a class="button" href="${getGoogleSheetUrl()}" target="_blank" style="background:rgba(255,255,255,0.18); color:white; border:1px solid rgba(255,255,255,0.4); font-weight:600; font-size:12.5px; padding:7px 14px; border-radius:6px; text-decoration:none;">
-              🔗 Open in Google Drive
-            </a>
             <button id="modal-close-sheets-btn" style="background:none; border:0; color:white; cursor:pointer; padding:4px; font-size:20px; line-height:1;">&times;</button>
           </div>
+        </div>
+
+        <!-- Banner Hint -->
+        <div style="padding:10px 20px; background:#ecfdf5; border-bottom:1px solid #a7f3d0; font-size:12.5px; color:#065f46; display:flex; align-items:center; justify-content:space-between;">
+          <span>💡 <b>Live Pre-Formatted Template</b>: Click <b>Copy & Open in Google Drive</b> to launch Google Sheets and press <b>Ctrl+V</b> on cell A1 to paste all ${children.length} records!</span>
         </div>
 
         <!-- Interactive Google Sheet Spreadsheet Grid -->
@@ -1188,7 +1149,9 @@
     const modal = document.querySelector('#google-sheets-view-modal');
     modal.querySelector('#modal-close-sheets-btn').addEventListener('click', () => modal.remove());
     modal.querySelector('#modal-close-bottom-btn').addEventListener('click', () => modal.remove());
-    modal.querySelector('#modal-export-xlsx-btn').addEventListener('click', () => exportGoogleSheetToXLSX());
+    modal.querySelector('#modal-copy-open-sheets-btn').addEventListener('click', () => {
+      copyAndOpenGoogleSheets();
+    });
   }
 
   /**
@@ -1304,7 +1267,6 @@
 
     const session = getSession() || {};
     session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
-    session.ngo || 'Ayusha Nilayam';
 
     localStorage.setItem('google-sheets-connected', 'true');
 

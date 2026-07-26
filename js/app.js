@@ -10,7 +10,7 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, exportGoogleSheetToXLSX } from './googleSheetsSync.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets } from './googleSheetsSync.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
