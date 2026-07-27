@@ -240,7 +240,7 @@ export function loginPage() {
         <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 20px;">Authenticate using your authorized Google Account to access the child health platform.</p>
 
         <button class="button button--primary tooltip" data-tooltip="Sign in with authorized Google Account" data-google-login type="button" style="width:100%; min-height:46px; display:flex; align-items:center; justify-content:center; gap:12px; font-weight:600; font-size:14px; background: #ffffff; color: #3c4043; border: 1px solid #dadce0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
-          <img src="google-logo.png" alt="Google Logo" style="width:22px; height:22px; object-fit:contain;" />
+          <img src="/google-logo.png" alt="Google Logo" style="width:22px; height:22px; object-fit:contain;" />
           Continue with Google
         </button>
 
