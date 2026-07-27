@@ -996,6 +996,17 @@
   const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjQzPTgcdhoEDLSVBmQLoiVPy98Dnq5iF8VfrHOt6GDRH-8hjuw6H3209dqOdNQdo5ig/exec';
   const LIVE_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
 
+  function formatUnitValue(val, unit) {
+    if (val === null || val === undefined || val === '') return '—';
+    const num = String(val).replace(/[^0-9.]/g, '').trim();
+    return num ? `${num} ${unit}` : '—';
+  }
+
+  function extractRawNumber(val) {
+    if (val === null || val === undefined || val === '') return '';
+    return String(val).replace(/[^0-9.]/g, '').trim();
+  }
+
   /**
    * Format a child health record object into the EXACT 15-column Google Sheets row array
    * @param {Object} child 
@@ -1013,8 +1024,8 @@
       child.idNumber || '—',
       child.father || child.guardian || '—',
       child.phone || '—',
-      child.height ? `${child.height} cm` : '—',
-      child.weight ? `${child.weight} kg` : '—',
+      formatUnitValue(child.height, 'cm'),
+      formatUnitValue(child.weight, 'kg'),
       child.medicalConditions || 'None',
       child.allergies || 'None',
       child.status || 'Active',
@@ -1305,8 +1316,8 @@
       idNumber: child.idNumber || '',
       father: child.father || child.guardian || '',
       phone: child.phone || '',
-      height: child.height ? `${child.height} cm` : '',
-      weight: child.weight ? `${child.weight} kg` : '',
+      height: extractRawNumber(child.height),
+      weight: extractRawNumber(child.weight),
       medicalConditions: child.medicalConditions || 'None',
       allergies: child.allergies || 'None',
       status: child.status || 'Active',
@@ -2346,8 +2357,8 @@
       dob,
       idNumber,
       // Health baseline fields
-      height: values.height || '',
-      weight: values.weight || '',
+      height: values.height ? String(values.height).replace(/[^0-9.]/g, '').trim() : '',
+      weight: values.weight ? String(values.weight).replace(/[^0-9.]/g, '').trim() : '',
       medicalConditions: values.medicalConditions || '',
       allergies: values.allergies || '',
       medications: values.medications || '',

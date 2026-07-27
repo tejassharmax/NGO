@@ -38,8 +38,8 @@ export function collectChild(form) {
     dob,
     idNumber,
     // Health baseline fields
-    height: values.height || '',
-    weight: values.weight || '',
+    height: values.height ? String(values.height).replace(/[^0-9.]/g, '').trim() : '',
+    weight: values.weight ? String(values.weight).replace(/[^0-9.]/g, '').trim() : '',
     medicalConditions: values.medicalConditions || '',
     allergies: values.allergies || '',
     medications: values.medications || '',

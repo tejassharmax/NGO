@@ -39,6 +39,17 @@ export function getGoogleSheetUrl() {
   return LIVE_GOOGLE_SHEET_URL;
 }
 
+export function formatUnitValue(val, unit) {
+  if (val === null || val === undefined || val === '') return '—';
+  const num = String(val).replace(/[^0-9.]/g, '').trim();
+  return num ? `${num} ${unit}` : '—';
+}
+
+export function extractRawNumber(val) {
+  if (val === null || val === undefined || val === '') return '';
+  return String(val).replace(/[^0-9.]/g, '').trim();
+}
+
 /**
  * Format a child health record object into the EXACT 15-column Google Sheets row array
  * @param {Object} child 
@@ -56,8 +67,8 @@ export function formatChildToSheetRow(child) {
     child.idNumber || '—',
     child.father || child.guardian || '—',
     child.phone || '—',
-    child.height ? `${child.height} cm` : '—',
-    child.weight ? `${child.weight} kg` : '—',
+    formatUnitValue(child.height, 'cm'),
+    formatUnitValue(child.weight, 'kg'),
     child.medicalConditions || 'None',
     child.allergies || 'None',
     child.status || 'Active',
@@ -356,8 +367,8 @@ export async function autoSyncChildToGoogleSheets(child) {
     idNumber: child.idNumber || '',
     father: child.father || child.guardian || '',
     phone: child.phone || '',
-    height: child.height ? `${child.height} cm` : '',
-    weight: child.weight ? `${child.weight} kg` : '',
+    height: extractRawNumber(child.height),
+    weight: extractRawNumber(child.weight),
     medicalConditions: child.medicalConditions || 'None',
     allergies: child.allergies || 'None',
     status: child.status || 'Active',
