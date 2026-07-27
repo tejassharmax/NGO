@@ -233,15 +233,14 @@ export function loginPage() {
   return `<main class="login-page">
     <section class="login-panel">
       <div class="login-panel__brand" aria-label="Demo">
-        <span class="brand-mark">${icon('heartPulse')}</span>
-        <b>Demo</b>
+        <b>demo</b>
       </div>
       <div class="card login-card">
         <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">Google Workspace Sign-In</h1>
         <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 20px;">Authenticate using your authorized Google Account to access the child health platform.</p>
 
         <button class="button button--primary tooltip" data-tooltip="Sign in with authorized Google Account" data-google-login type="button" style="width:100%; min-height:46px; display:flex; align-items:center; justify-content:center; gap:12px; font-weight:600; font-size:14px; background: #ffffff; color: #3c4043; border: 1px solid #dadce0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
-          <svg width="20" height="20" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.63-.06-1.25-.16-1.84H9v3.49h4.84a4.14 4.14 0 0 1-1.8 2.71v2.26h2.91c1.7-1.56 2.69-3.86 2.69-6.62Z" fill="#4285F4"/><path d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.91-2.26c-.8.54-1.85.86-3.05.86-2.34 0-4.32-1.58-5.03-3.7H.95v2.33A9 9 0 0 0 9 18Z" fill="#34A853"/><path d="M3.97 10.76a5.4 5.4 0 0 1 0-3.52V4.91H.95a9 9 0 0 0 0 8.18l3.02-2.33Z" fill="#FBBC05"/><path d="M9 3.58c1.32 0 2.5.45 3.44 1.35L15 2.4A9 9 0 0 0 .95 4.91l3.02 2.33C4.68 5.16 6.66 3.58 9 3.58Z" fill="#EA4335"/></svg>
+          <img src="google-logo.png" alt="Google Logo" style="width:22px; height:22px; object-fit:contain;" />
           Continue with Google
         </button>
 
