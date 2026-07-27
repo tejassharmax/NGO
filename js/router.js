@@ -245,9 +245,6 @@ export function loginPage() {
         </button>
 
         <div style="margin-top: 24px; padding: 16px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
-          <p style="font-size: 12.5px; color: var(--color-text); margin: 0 0 10px 0; font-weight: 600;">
-            Only authorized Google accounts can access this application.
-          </p>
           <div style="font-weight: 600; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
             ${icon('shield')} Current Demo Accounts (Firestore Verified)
           </div>
