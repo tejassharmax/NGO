@@ -281,3 +281,134 @@ body.theme-dark .login-page {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+/* ─── Login Page Enhancements ─── */
+.login-bg-orbs {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.login-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.45;
+}
+
+.login-orb--1 {
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, #bfdbfe, #3b82f6);
+  top: -120px;
+  right: -80px;
+  animation: orbFloat 8s ease-in-out infinite;
+}
+
+.login-orb--2 {
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, #d1fae5, #10b981);
+  bottom: -80px;
+  left: -60px;
+  animation: orbFloat 10s ease-in-out infinite reverse;
+}
+
+.login-orb--3 {
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, #ede9fe, #8b5cf6);
+  top: 40%;
+  left: 30%;
+  animation: orbFloat 12s ease-in-out infinite 2s;
+}
+
+@keyframes orbFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-24px) scale(1.04); }
+}
+
+body.theme-dark .login-orb--1 { opacity: 0.18; }
+body.theme-dark .login-orb--2 { opacity: 0.14; }
+body.theme-dark .login-orb--3 { opacity: 0.12; }
+
+.login-panel {
+  position: relative;
+  z-index: 1;
+}
+
+.login-panel__brand .brand-mark svg {
+  width: 22px;
+  height: 22px;
+  stroke: #fff;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.login-card__hero {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.login-card__hero-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 1px solid #bfdbfe;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12);
+}
+
+.login-card__hero-icon svg {
+  width: 30px;
+  height: 30px;
+  stroke: var(--color-primary);
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+body.theme-dark .login-card__hero-icon {
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e40af22 100%);
+  border-color: #1d4ed844;
+}
+
+.login-features {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.login-feature {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 5px 12px;
+}
+
+.login-feature svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--color-primary);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
