@@ -110,7 +110,7 @@ function formatDateForInput(dateStr) {
     const [_, d, m, y] = matchDMY;
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
-  try { const d = new Date(dateStr); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch (e) {}
+  try { const d = new Date(dateStr); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch (e) { }
   return '';
 }
 
@@ -231,20 +231,35 @@ export function dashboardPage() {
 
 export function loginPage() {
   return `<main class="login-page">
+    <div class="login-bg-orbs" aria-hidden="true">
+      <span class="login-orb login-orb--1"></span>
+      <span class="login-orb login-orb--2"></span>
+      <span class="login-orb login-orb--3"></span>
+    </div>
     <section class="login-panel">
-      <div class="login-panel__brand" aria-label="Demo">
-        <b>demo</b>
+      <div class="login-panel__brand" aria-label="Child Health Management">
+        <span class="brand-mark">${icon('heartPulse')}</span>
+        ChildCare
       </div>
       <div class="card login-card">
-        <h1 style="font-size: 20px; font-weight: 700; margin-bottom: 6px;">Google Workspace Sign-In</h1>
-        <p style="font-size: 13px; color: var(--color-text-muted); margin-bottom: 20px;">Authenticate using your authorized Google Account to access the child health platform.</p>
+        <div class="login-card__hero" aria-hidden="true">
+          <div class="login-card__hero-icon">${icon('stethoscope')}</div>
+        </div>
+        <h1>Welcome back</h1>
+        <p>Sign in to access the Child Health Management Platform</p>
 
         <button class="button button--primary tooltip" data-tooltip="Sign in with authorized Google Account" data-google-login type="button" style="width:100%; min-height:46px; display:flex; align-items:center; justify-content:center; gap:12px; font-weight:600; font-size:14px; background: #ffffff; color: #3c4043; border: 1px solid #dadce0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
           <img src="/google-logo.png" alt="Google Logo" style="width:22px; height:22px; object-fit:contain;" />
           Continue with Google
         </button>
 
-        <div style="margin-top: 24px; padding: 16px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
+        <div class="login-features" aria-hidden="true">
+          <div class="login-feature">${icon('shield')}<span>Secure Access</span></div>
+          <div class="login-feature">${icon('activity')}<span>Health Tracking</span></div>
+          <div class="login-feature">${icon('heart')}<span>Child Care</span></div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 16px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
           <div style="font-weight: 600; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
             ${icon('shield')} Current Demo Accounts (Firestore Verified)
           </div>
@@ -700,7 +715,7 @@ export function documentsPage() {
   const docs = getUploadedDocs();
   const children = getChildren();
   let contentHTML = '';
-  
+
   if (docs.length === 0) {
     contentHTML = `<div class="empty-state" style="padding:48px 24px">
       <span class="empty-state__icon">${icon('file')}</span>
