@@ -255,16 +255,19 @@ export function renderDayView(year, month, day) {
     if (matchingAppts.length > 0) {
       slotContent = matchingAppts.map(a => `
         <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
-          <div class="gcal-event-time-badge">${a.time || slot.label}</div>
-          <div class="gcal-event-body">
-            <b class="gcal-event-name">${escapeHTML(a.childName)}</b>
-            <span class="gcal-event-detail">${escapeHTML(a.type)}${a.doctor ? ` · ${escapeHTML(a.doctor)}` : ''}</span>
+          <div class="gcal-event-card-main">
+            <div class="gcal-event-title-row">
+              <span class="gcal-event-name">${escapeHTML(a.childName)}</span>
+              <span class="gcal-event-dot">·</span>
+              <span class="gcal-event-detail-text">${escapeHTML(a.type)}${a.doctor ? ` (${escapeHTML(a.doctor)})` : ''}</span>
+            </div>
+            <div class="gcal-event-time-row">${a.time || slot.label}</div>
           </div>
           <span class="gcal-status-pill gcal-status-pill--${a.status === 'Completed' ? 'done' : 'upcoming'}">${a.status || 'Upcoming'}</span>
         </div>
       `).join('');
     } else {
-      slotContent = `<div class="gcal-slot-hint">+ Click to add appointment at ${slot.label}</div>`;
+      slotContent = `<div class="gcal-slot-hint">+ Add appointment at ${slot.label}</div>`;
     }
 
     return `
