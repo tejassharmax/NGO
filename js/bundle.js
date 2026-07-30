@@ -2863,20 +2863,83 @@
 
     // All appointments list sorted by date
     const allApptsHTML = appointments.length === 0
-      ? `<div class="empty-state" style="padding:30px 12px"><span class="empty-state__icon">${icon('calendar')}</span><h3 style="font-size:13px">No appointments yet</h3><p>Book your first appointment using the form above.</p></div>`
-      : appointments.slice(0, 10).map(a => {
-        const typeClass = a.type?.toLowerCase().includes('doctor') ? 'blue' : a.type?.toLowerCase().includes('follow') ? 'green' : a.type?.toLowerCase().includes('dental') ? 'amber' : 'violet';
-        return `
-        <div class="cal-appt-item cal-appt-item--${typeClass}">
-          <div class="cal-appt-time">${a.time || '—'}</div>
-          <div class="cal-appt-details">
-            <div class="cal-appt-name">${a.childName || 'Unknown'}</div>
-            <div class="cal-appt-meta">${a.type || 'Appointment'}${a.doctor ? ` · ${a.doctor}` : ''} · ${a.date || '—'}</div>
-            ${a.notes ? `<div class="cal-appt-notes">${a.notes}</div>` : ''}
-          </div>
-          <span class="cal-appt-badge cal-appt-badge--${a.status === 'Completed' ? 'done' : 'upcoming'}">${a.status || 'Upcoming'}</span>
-        </div>`;
-      }).join('');
+      ? `<div class="empty-state" style="padding:40px 16px; text-align:center;">
+        <span class="empty-state__icon" style="font-size:40px; display:block; margin-bottom:8px;">📅</span>
+        <h3 style="font-size:15px; font-weight:700; margin:0 0 4px 0;">No appointments recorded</h3>
+        <p style="font-size:13px; color:var(--color-text-muted); margin:0;">Register an appointment using the calendar above.</p>
+       </div>`
+      : `
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Child</th>
+              <th>Appointment Type</th>
+              <th>Doctor / Clinic</th>
+              <th>Date & Time</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${appointments.map(a => {
+              const currentStatus = computeAppointmentStatus(a);
+              const isCompleted = currentStatus === 'Completed';
+              const typeClass = a.type?.toLowerCase().includes('doctor') ? 'blue' : a.type?.toLowerCase().includes('follow') ? 'green' : a.type?.toLowerCase().includes('dental') ? 'amber' : 'violet';
+              const formattedTime = formatSingleDisplayTime(a.time || '10:00 AM');
+              const dateObj = new Date(a.date + 'T00:00:00');
+              const formattedDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : (a.date || '—');
+
+              return `
+                <tr class="gcal-appt-row">
+                  <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div class="avatar avatar--sm" style="background:#e8f0fe; color:#1a73e8; font-weight:700; font-size:12px; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;">${initials(a.childName || 'C')}</div>
+                      <div>
+                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML$1(a.childName || 'Child')}</strong>
+                        <span style="font-size:11px; color:var(--color-text-muted);">${a.childId ? `ID: ${a.childId}` : ''}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="gcal-event-chip gcal-event-chip--${typeClass}" style="display:inline-flex; width:auto; padding:3px 10px; font-size:12px; font-weight:600; cursor:pointer;" data-event-id="${a.id}">
+                      ${escapeHTML$1(a.type || 'General')}
+                    </span>
+                  </td>
+                  <td>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text);">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#70757a" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                      <span>${escapeHTML$1(a.doctor || 'General Clinic')}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="font-size:13px; font-weight:600; color:var(--color-text);">${formattedDate}</div>
+                    <div style="font-size:11.5px; color:var(--color-text-muted);">${formattedTime}</div>
+                  </td>
+                  <td>
+                    <span class="gcal-status-pill gcal-status-pill--${isCompleted ? 'done' : 'upcoming'}" style="display:inline-block; border-radius:12px; padding:3px 10px; font-size:10px; font-weight:700;">
+                      ${currentStatus}
+                    </span>
+                  </td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex; align-items:center; gap:6px;">
+                      <button class="button button--secondary button--sm" type="button" data-event-id="${a.id}" title="View Details" style="padding:6px 10px; font-size:12px; font-weight:600; gap:4px;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        View
+                      </button>
+                      <button class="button button--secondary button--sm" type="button" data-sync-event-id="${a.id}" title="Sync Google Calendar" style="padding:6px 10px; font-size:12px; color:#1a73e8;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                      </button>
+                      <button class="button button--danger-outline button--sm" type="button" data-delete-event-id="${a.id}" title="Delete Appointment" style="padding:6px 8px; color:#d93025;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
 
     return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath$1('children')}">${icon('users')}View Children</a>`)}
   <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
@@ -2894,7 +2957,7 @@
         </div>
         <span class="badge badge--blue">${appointments.length} total</span>
       </header>
-      <div class="card__body" style="padding-top: 10px;">
+      <div class="card__body" style="padding: 0;">
         ${allApptsHTML}
       </div>
     </section>
