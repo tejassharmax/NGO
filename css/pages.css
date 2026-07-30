@@ -635,39 +635,61 @@ body.theme-dark .login-card__hero-icon {
 .gcal-event-chip {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 6px;
-  border-radius: 4px;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 3px;
   font-size: 11px;
-  font-weight: 600;
-  line-height: 1.2;
+  font-weight: 500;
+  line-height: 20px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  transition: transform 0.1s ease;
+  cursor: pointer;
+  transition: filter 0.12s ease;
 }
 .gcal-event-chip:hover {
-  transform: scale(1.02);
+  filter: brightness(0.92);
 }
-.gcal-event-chip--blue { background: #dbeafe; color: #1e40af; border-left: 3px solid #2563eb; }
-.gcal-event-chip--green { background: #dcfce7; color: #166534; border-left: 3px solid #059669; }
-.gcal-event-chip--amber { background: #fef3c7; color: #92400e; border-left: 3px solid #d97706; }
-.gcal-event-chip--violet { background: #f3e8ff; color: #6b21a8; border-left: 3px solid #7c3aed; }
+
+/* Google Calendar-style solid color backgrounds */
+.gcal-event-chip--blue {
+  background: #039be5;
+  color: #ffffff;
+}
+.gcal-event-chip--green {
+  background: #0b8043;
+  color: #ffffff;
+}
+.gcal-event-chip--amber {
+  background: #f4511e;
+  color: #ffffff;
+}
+.gcal-event-chip--violet {
+  background: #8e24aa;
+  color: #ffffff;
+}
 
 .gcal-chip-time {
-  font-weight: 700;
-  font-size: 10px;
-  opacity: 0.85;
+  font-weight: 500;
+  font-size: 11px;
+  opacity: 0.92;
 }
 .gcal-chip-title {
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
 }
 .gcal-more-chip {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  padding: 2px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #3c4043;
+  padding: 1px 6px;
+  line-height: 20px;
+  cursor: pointer;
+}
+.gcal-more-chip:hover {
+  background: #f0f0f0;
+  border-radius: 3px;
 }
 
 /* Legend Bar */
@@ -694,10 +716,10 @@ body.theme-dark .login-card__hero-icon {
   border-radius: 50%;
   display: inline-block;
 }
-.gcal-dot--blue { background: #2563eb; }
-.gcal-dot--green { background: #059669; }
-.gcal-dot--amber { background: #d97706; }
-.gcal-dot--violet { background: #7c3aed; }
+.gcal-dot--blue { background: #039be5; }
+.gcal-dot--green { background: #0b8043; }
+.gcal-dot--amber { background: #f4511e; }
+.gcal-dot--violet { background: #8e24aa; }
 
 /* Day View Timeline Grid */
 .gcal-day-view {
