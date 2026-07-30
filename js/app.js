@@ -130,7 +130,7 @@ async function handleGoogleAuth(email) {
     }
 
     if (target.closest('[data-google-login]')) {
-      // Trigger Firebase Authentication Google Sign-In with Cloud Firestore Verification
+      toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
       loginWithGoogle().then((res) => {
         if (res.success) {
           toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
@@ -150,54 +150,9 @@ async function handleGoogleAuth(email) {
             onConfirm: () => { window.location.reload(); }
           });
         } else {
-          // Alternative interactive chooser modal for demo environment testing
-          modal({
-            title: 'Firebase Google Sign-In',
-            body: `
-              <div style="display: flex; flex-direction: column; gap: 12px; padding: 4px 0;">
-                <p style="font-size: 13px; margin: 0 0 6px 0; color: var(--color-text-muted);">Select or test a Google account to verify Cloud Firestore authorization:</p>
-                <button class="button button--ghost" type="button" data-select-google-email="tejassachin2010@gmail.com" style="width: 100%; justify-content: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px;">
-                  <span style="width: 32px; height: 32px; border-radius: 50%; background: #4285F4; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;">T</span>
-                  <div style="text-align: left;">
-                    <b style="display: block; font-size: 13px; color: var(--color-text);">Tejas Sharma</b>
-                    <span style="font-size: 11px; color: var(--color-primary); font-weight: 600;">tejassachin2010@gmail.com (Ayusha Nilayam)</span>
-                  </div>
-                </button>
-                <button class="button button--ghost" type="button" data-select-google-email="wondertaleai123@gmail.com" style="width: 100%; justify-content: flex-start; gap: 12px; padding: 12px; border: 1px solid var(--color-border); border-radius: 8px;">
-                  <span style="width: 32px; height: 32px; border-radius: 50%; background: #34A853; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px;">W</span>
-                  <div style="text-align: left;">
-                    <b style="display: block; font-size: 13px; color: var(--color-text);">Wondertale AI</b>
-                    <span style="font-size: 11px; color: var(--color-primary); font-weight: 600;">wondertaleai123@gmail.com (Alex Agape)</span>
-                  </div>
-                </button>
-                <div style="border-top: 1px solid var(--color-border); padding-top: 14px; margin-top: 6px;">
-                  <label class="field">
-                    <span class="field__label" style="font-size: 12px; font-weight: 600;">Or test with another Google Email</span>
-                    <input class="input" type="email" id="custom-google-email-input" placeholder="e.g. unauthorized.user@gmail.com">
-                  </label>
-                  <button class="button button--primary button--sm" type="button" data-custom-google-login style="margin-top: 10px; width: 100%; justify-content: center;">Test Access</button>
-                </div>
-              </div>
-            `,
-            confirmText: null
-          });
+          toast('Authentication Info', res.message || 'Google Sign-In popup closed.');
         }
       });
-    }
-
-    if (target.closest('[data-select-google-email]')) {
-      const email = target.closest('[data-select-google-email]').dataset.selectGoogleEmail;
-      handleGoogleAuth(email);
-    }
-
-    if (target.closest('[data-custom-google-login]')) {
-      const input = document.querySelector('#custom-google-email-input');
-      const email = input ? input.value.trim() : '';
-      if (!email) {
-        toast('Email Required', 'Please enter a Google email address.');
-        return;
-      }
-      handleGoogleAuth(email);
     }
 
     const toggleServiceBtn = target.closest('[data-toggle-google-service]');
