@@ -55,30 +55,59 @@ export function buildGoogleCalendarUrl(appointment) {
   return `${base}&text=${title}&dates=${dates}&details=${details}&sf=true&output=xml`;
 }
 
+export function parseHoursAndMinutes(timeStr) {
+  if (!timeStr) return { hours: 10, minutes: 0 };
+  const str = String(timeStr).trim();
+
+  // Try 12-hour format e.g. "11:30 AM", "11:30AM", "11:30 PM", "9:00 AM"
+  const match12 = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = parseInt(match12[2], 10);
+    const ampm = match12[3] ? match12[3].toUpperCase() : null;
+    if (ampm === 'PM' && hours !== 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    return { hours: isNaN(hours) ? 10 : hours, minutes: isNaN(minutes) ? 0 : minutes };
+  }
+
+  const parts = str.split(':');
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  return {
+    hours: isNaN(hours) ? 10 : hours,
+    minutes: isNaN(minutes) ? 0 : minutes
+  };
+}
+
+export function formatSingleDisplayTime(timeStr) {
+  const { hours, minutes } = parseHoursAndMinutes(timeStr);
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h12 = hours % 12 || 12;
+  const minStr = String(minutes).padStart(2, '0');
+  return `${h12}:${minStr} ${ampm}`;
+}
+
+export function formatDisplayTimeRange(timeStr) {
+  const { hours, minutes } = parseHoursAndMinutes(timeStr);
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  const h12 = hours % 12 || 12;
+  const minStr = String(minutes).padStart(2, '0');
+  const startFormatted = `${h12}:${minStr}`;
+
+  const endHours = (hours + 1) % 24;
+  const endAmpm = endHours >= 12 ? 'pm' : 'am';
+  const endH12 = endHours % 12 || 12;
+  const endFormatted = `${endH12}:${minStr}${endAmpm}`;
+
+  return `${startFormatted} – ${endFormatted}`;
+}
+
 function parseTime(timeStr) {
   if (!timeStr) return null;
-  let hours, minutes = 0;
-
-  const match24 = timeStr.match(/^(\d{1,2}):(\d{2})$/);
-  if (match24) {
-    hours = parseInt(match24[1]);
-    minutes = parseInt(match24[2]);
-  }
-
-  const match12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-  if (match12) {
-    hours = parseInt(match12[1]);
-    minutes = parseInt(match12[2]);
-    if (match12[3].toUpperCase() === 'PM' && hours !== 12) hours += 12;
-    if (match12[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
-  }
-
-  if (hours === undefined || isNaN(hours)) return null;
-
+  const { hours, minutes } = parseHoursAndMinutes(timeStr);
   const sh = String(hours).padStart(2, '0');
   const sm = String(minutes).padStart(2, '0');
   const eh = String((hours + 1) % 24).padStart(2, '0');
-
   return { start: `${sh}${sm}00`, end: `${eh}${sm}00` };
 }
 
@@ -306,13 +335,7 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
   const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   // Format display time
-  let displayTime = preselectedTime;
-  if (preselectedTime) {
-    const [h, min] = preselectedTime.split(':').map(Number);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    displayTime = `${h12}:${String(min).padStart(2, '0')} ${ampm}`;
-  }
+  const displayTime = formatSingleDisplayTime(preselectedTime);
 
   return `
     <form class="gcal-popup-form" id="cal-booking-form">
@@ -428,19 +451,7 @@ export function renderEventDetailsModalMarkup(eventId) {
 
   const dateObj = new Date(appt.date + 'T00:00:00');
   const dayStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-
-  let timeStr = appt.time || '10:00 AM';
-  let endTimeStr = '11:00 AM';
-  if (appt.time) {
-    const [h, min] = appt.time.split(':').map(Number);
-    const ampm = h >= 12 ? 'am' : 'am';
-    const h12 = h % 12 || 12;
-    timeStr = `${h12}:${String(min).padStart(2, '0')}`;
-    const nextH = (h + 1) % 24;
-    const nextAmpm = nextH >= 12 ? 'pm' : 'am';
-    const nextH12 = nextH % 12 || 12;
-    endTimeStr = `${nextH12}:${String(min).padStart(2, '0')}${nextAmpm}`;
-  }
+  const timeRangeFormatted = formatDisplayTimeRange(appt.time || '10:00 AM');
 
   const hexColors = {
     blue: '#039be5',
@@ -481,7 +492,7 @@ export function renderEventDetailsModalMarkup(eventId) {
             <span class="gcal-popover-color-dot" style="background-color: ${colorHex};"></span>
             <div class="gcal-popover-title-group">
               <h2 class="gcal-popover-title">${escapeHTML(appt.childName)} — ${escapeHTML(appt.type)}</h2>
-              <div class="gcal-popover-time">${dayStr} · ${timeStr} – ${endTimeStr}</div>
+              <div class="gcal-popover-time">${dayStr} · ${timeRangeFormatted}</div>
             </div>
           </div>
 
