@@ -569,7 +569,7 @@ export function calendarCard(viewMode = 'month', initialYear, initialMonth, init
         <div class="gcal-header-right">
           <button class="gcal-btn gcal-btn--create" type="button" data-open-booking-modal data-slot-date="${dateVal}" data-slot-time="10:00">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            Book Appointment
+            Register Appointment
           </button>
 
           <button class="gcal-btn gcal-btn--secondary" type="button" data-calendar-today>Today</button>
