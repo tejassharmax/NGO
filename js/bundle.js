@@ -37784,7 +37784,7 @@
 
     // Document Clicks
     document.addEventListener('click', (event) => {
-      const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back]');
+      const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], .modal-backdrop');
       if (!target) return;
 
       if (target.matches('[data-topbar-back]')) {
