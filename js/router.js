@@ -154,25 +154,7 @@ export function dashboardPage() {
   <div style="margin-top: 20px;">
     ${calendarCard()}
   </div>
-  <div class="dashboard-grid dashboard-grid--primary" style="margin-top: 20px;">
-    <section class="card">
-      <header class="card__header">
-        <div>
-          <h2 class="card__title">Quick actions</h2>
-          <p class="card__caption">Common health management tasks</p>
-        </div>
-      </header>
-      <div class="card__body">
-        <div class="quick-actions">
-          <a class="quick-action" href="${pagePath('register-child')}"><span class="quick-action__icon">${icon('plus')}</span>Register child</a>
-          <a class="quick-action" href="${pagePath('ocr-upload')}"><span class="quick-action__icon">${icon('scan')}</span>Cloud Vision Upload</a>
-          <a class="quick-action" href="${pagePath('growth')}"><span class="quick-action__icon">${icon('ruler')}</span>Log growth</a>
-          <a class="quick-action" href="${pagePath('medicines')}"><span class="quick-action__icon">${icon('pill')}</span>Medicines</a>
-          <a class="quick-action" href="${pagePath('documents')}"><span class="quick-action__icon">${icon('file')}</span>Health documents</a>
-        </div>
-      </div>
-    </section>
-  </div>
+
   <div style="margin-top: 24px;">
     <section class="card">
       <header class="card__header">
