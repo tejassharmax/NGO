@@ -281,19 +281,21 @@ async function handleGoogleAuth(email) {
         return;
       }
 
-      // Time Slot Row Click in Day View -> Open Booking Popup Modal
-      const slotRow = target.closest('[data-open-booking-modal]');
-      if (slotRow) {
-        const slotDate = slotRow.dataset.slotDate;
-        const slotTime = slotRow.dataset.slotTime;
-        const modalContainer = document.querySelector('#cal-modal-container') || document.body;
+      // Time Slot Row Click or "+ Book Appointment" Click -> Open Floating Popup Modal
+      const slotBtn = target.closest('[data-open-booking-modal]');
+      if (slotBtn) {
+        const slotDate = slotBtn.dataset.slotDate || new Date().toISOString().slice(0, 10);
+        const slotTime = slotBtn.dataset.slotTime || '10:00';
+        const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
         modalContainer.innerHTML = renderBookingModalMarkup(slotDate, slotTime);
         return;
       }
     }
 
-    // Modal Close Button or Overlay Click
-    if (target.closest('[data-close-cal-modal]') || (target.dataset && target.dataset.closeCalModalBg !== undefined)) {
+    // Modal Close Button or Overlay Backdrop Click
+    if (target.closest('[data-close-cal-modal]') || target.classList.contains('modal-backdrop') || (target.dataset && target.dataset.closeCalModalBg !== undefined)) {
+      const modalRoot = document.querySelector('#modal-root');
+      if (modalRoot) modalRoot.replaceChildren();
       const calModal = document.querySelector('#cal-booking-modal');
       if (calModal) calModal.remove();
     }
@@ -889,6 +891,12 @@ async function handleGoogleAuth(email) {
       doctor: values.doctor || '',
       notes: values.notes || ''
     });
+
+    const modalRoot = document.querySelector('#modal-root');
+    if (modalRoot) modalRoot.replaceChildren();
+    const calModal = document.querySelector('#cal-booking-modal');
+    if (calModal) calModal.remove();
+
     window.setTimeout(() => window.location.reload(), 1000);
   };
 
