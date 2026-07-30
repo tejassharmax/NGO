@@ -254,46 +254,61 @@ export function renderCalendarGrid(year, month, selectedDay = null) {
     </div>`;
 }
 
+export function computeAppointmentStatus(appt) {
+  if (!appt) return 'Upcoming';
+  if (appt.status && appt.status !== 'Upcoming' && appt.status !== 'Pending') {
+    return appt.status;
+  }
+  const todayStr = new Date().toISOString().slice(0, 10);
+  if (appt.date < todayStr) {
+    return 'Completed';
+  }
+  if (appt.date === todayStr) {
+    const { hours } = parseHoursAndMinutes(appt.time || '10:00');
+    const currentHour = new Date().getHours();
+    if (hours < currentHour) {
+      return 'Completed';
+    }
+  }
+  return 'Upcoming';
+}
+
 /* ═══════════════════════════════════════════════════════
    DAY VIEW HOURLY GRID (Google Calendar Style)
    ═══════════════════════════════════════════════════════ */
 
 export function renderDayView(year, month, day) {
   const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-  const dateObj = new Date(year, month, day);
-  const dayName = DAY_NAMES[dateObj.getDay()];
-  const dateFormatted = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const appointments = getAppointments().filter(a => a.date === dateStr);
 
   const slotRows = HOURLY_SLOTS.map(slot => {
-    const slotHour = parseInt(slot.value.split(':')[0]);
+    const slotHour = parseInt(slot.value.split(':')[0], 10);
     const matchingAppts = appointments.filter(a => {
       if (!a.time) return slot.value === '10:00';
-      const match24 = a.time.match(/^(\d{1,2}):/);
-      if (match24) {
-        let h = parseInt(match24[1]);
-        if (a.time.toLowerCase().includes('pm') && h !== 12) h += 12;
-        if (a.time.toLowerCase().includes('am') && h === 12) h = 0;
-        return h === slotHour;
-      }
-      return false;
+      const { hours } = parseHoursAndMinutes(a.time);
+      return hours === slotHour;
     });
 
     let slotContent = '';
     if (matchingAppts.length > 0) {
-      slotContent = matchingAppts.map(a => `
-        <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
-          <div class="gcal-event-time-badge">${a.time || slot.label}</div>
-          <div class="gcal-event-body">
-            <b class="gcal-event-name">${escapeHTML(a.childName)}</b>
-            <span class="gcal-event-detail">${escapeHTML(a.type)}${a.doctor ? ` · ${escapeHTML(a.doctor)}` : ''}</span>
-          </div>
-          <span class="gcal-status-pill gcal-status-pill--${a.status === 'Completed' ? 'done' : 'upcoming'}">${a.status || 'Upcoming'}</span>
-        </div>
-      `).join('');
+      slotContent = matchingAppts.map(a => {
+        const currentStatus = computeAppointmentStatus(a);
+        return `
+          <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
+            <div class="gcal-event-card-main">
+              <div class="gcal-event-title-row">
+                <span class="gcal-event-name">${escapeHTML(a.childName)}</span>
+                <span class="gcal-event-dot">·</span>
+                <span class="gcal-event-detail-text">${escapeHTML(a.type)}${a.doctor ? ` (${escapeHTML(a.doctor)})` : ''}</span>
+              </div>
+              <div class="gcal-event-time-row">${formatSingleDisplayTime(a.time || slot.label)}</div>
+            </div>
+            <span class="gcal-status-pill gcal-status-pill--${currentStatus === 'Completed' ? 'done' : 'upcoming'}">${currentStatus}</span>
+          </div>`;
+      }).join('');
     } else {
-      slotContent = `<div class="gcal-slot-hint">+ Click to add appointment at ${slot.label}</div>`;
+      slotContent = `<div class="gcal-slot-hint">+ Add appointment at ${slot.label}</div>`;
     }
 
     return `
@@ -305,16 +320,6 @@ export function renderDayView(year, month, day) {
 
   return `
     <div class="gcal-day-view">
-      <div class="gcal-day-header">
-        <div class="gcal-day-title">
-          <h3>${dayName}, ${dateFormatted}</h3>
-          <p>${appointments.length} appointment(s) scheduled for this day</p>
-        </div>
-        <button class="button button--primary button--sm" type="button" data-open-booking-modal data-slot-date="${dateStr}" data-slot-time="10:00">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-          Add Appointment
-        </button>
-      </div>
       <div class="gcal-timeline-grid">
         ${slotRows}
       </div>
@@ -449,6 +454,7 @@ export function renderEventDetailsModalMarkup(eventId) {
   const appt = appointments.find(a => String(a.id) === String(eventId));
   if (!appt) return '';
 
+  const currentStatus = computeAppointmentStatus(appt);
   const dateObj = new Date(appt.date + 'T00:00:00');
   const dayStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   const timeRangeFormatted = formatDisplayTimeRange(appt.time || '10:00 AM');
@@ -491,7 +497,10 @@ export function renderEventDetailsModalMarkup(eventId) {
           <div class="gcal-popover-row gcal-popover-title-row">
             <span class="gcal-popover-color-dot" style="background-color: ${colorHex};"></span>
             <div class="gcal-popover-title-group">
-              <h2 class="gcal-popover-title">${escapeHTML(appt.childName)} — ${escapeHTML(appt.type)}</h2>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                <h2 class="gcal-popover-title">${escapeHTML(appt.childName)} — ${escapeHTML(appt.type)}</h2>
+                <span class="gcal-status-pill gcal-status-pill--${currentStatus === 'Completed' ? 'done' : 'upcoming'}">${currentStatus}</span>
+              </div>
               <div class="gcal-popover-time">${dayStr} · ${timeRangeFormatted}</div>
             </div>
           </div>
