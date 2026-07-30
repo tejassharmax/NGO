@@ -220,7 +220,17 @@ async function handleGoogleAuth(email) {
       }, 400);
     }
 
-    // ─── Calendar Controls (View Toggle, Today, Prev/Next, Day Click, Time Slot Modal) ───
+    // ─── Open Booking Popup Modal (from any button or time slot row) ───
+    const slotBtn = target.closest('[data-open-booking-modal]');
+    if (slotBtn) {
+      const slotDate = slotBtn.dataset.slotDate || new Date().toISOString().slice(0, 10);
+      const slotTime = slotBtn.dataset.slotTime || '10:00';
+      const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
+      modalContainer.innerHTML = renderBookingModalMarkup(slotDate, slotTime);
+      return;
+    }
+
+    // ─── Calendar Controls (View Toggle, Today, Prev/Next, Day Click) ───
     const calRoot = target.closest('[data-calendar-root]');
     if (calRoot) {
       let viewMode = calRoot.dataset.calViewMode || 'month';
@@ -273,21 +283,11 @@ async function handleGoogleAuth(email) {
         return;
       }
 
-      // Day Click in Month View -> Switch to Day View
+      // Day Click in Month View -> Switch to Day View for that date
       const dayCell = target.closest('[data-calendar-day]');
       if (dayCell) {
         const dayNum = parseInt(dayCell.dataset.calendarDay);
         updateCalendarView(calRoot, 'day', y, m, dayNum);
-        return;
-      }
-
-      // Time Slot Row Click or "+ Book Appointment" Click -> Open Floating Popup Modal
-      const slotBtn = target.closest('[data-open-booking-modal]');
-      if (slotBtn) {
-        const slotDate = slotBtn.dataset.slotDate || new Date().toISOString().slice(0, 10);
-        const slotTime = slotBtn.dataset.slotTime || '10:00';
-        const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
-        modalContainer.innerHTML = renderBookingModalMarkup(slotDate, slotTime);
         return;
       }
     }
