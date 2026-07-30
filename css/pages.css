@@ -556,48 +556,48 @@ body.theme-dark .login-card__hero-icon {
 .gcal-month-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  background: var(--color-border);
+  background: #dadce0;
   gap: 1px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid #dadce0;
 }
 
 .gcal-header-cell {
-  background: var(--color-bg-alt);
+  background: #f8f9fa;
   padding: 10px 4px;
   text-align: center;
   font-size: 11px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  letter-spacing: 0.6px;
+  font-weight: 500;
+  color: #70757a;
+  letter-spacing: 0.5px;
 }
 
 /* Day Box Cells */
 .gcal-day-cell {
-  background: var(--color-bg);
+  background: #ffffff;
   min-height: 105px;
   padding: 8px 8px;
   display: flex;
   flex-direction: column;
   cursor: pointer;
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.12s ease;
   position: relative;
   outline: none;
 }
 .gcal-day-cell:hover:not(.gcal-day-cell--outside) {
-  background: #f8fafc;
-  z-index: 2;
-  box-shadow: inset 0 0 0 2px var(--color-primary);
+  background: #f0f4f9;
 }
 .gcal-day-cell--outside {
-  background: var(--color-bg-alt);
-  opacity: 0.45;
+  background: #f8f9fa;
   cursor: default;
 }
+.gcal-day-cell--outside .gcal-day-num {
+  color: #b0b5ba;
+}
 .gcal-day-cell--today {
-  background: rgba(37, 99, 235, 0.02);
+  background: #ffffff;
 }
 .gcal-day-cell--selected {
-  box-shadow: inset 0 0 0 2px var(--color-primary);
+  background: #e8f0fe;
 }
 
 .gcal-day-top {
