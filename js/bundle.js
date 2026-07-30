@@ -57,7 +57,7 @@
 
   const icon = (name) => icons[name] || '';
   const initials = (name) => name.split(' ').map((item) => item[0]).join('').slice(0, 2).toUpperCase();
-  const escapeHTML = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
+  const escapeHTML$1 = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
   const formatDate = (date) => { try { return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date)); } catch { return date || ''; } };
   const pagePath$1 = (page) => {
     const inPages = window.location.pathname.replace(/\\/g, '/').includes('/pages/');
@@ -1095,14 +1095,14 @@
           const badgeColor = isVerified ? '#15803d' : '#b45309';
           return `
           <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; ${bgStyle} white-space: nowrap;">
-            <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:${badgeBg}; color:${badgeColor};">${escapeHTML(String(val))}</span>
+            <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:${badgeBg}; color:${badgeColor};">${escapeHTML$1(String(val))}</span>
           </td>
         `;
         }
 
         return `
         <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; color: #1e293b; ${bgStyle} white-space: nowrap;">
-          ${escapeHTML(String(val))}
+          ${escapeHTML$1(String(val))}
         </td>
       `;
       }).join('');
@@ -1134,7 +1134,7 @@
                 </span>
               </div>
               <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px; display:flex; align-items:center; gap:8px;">
-                <span>Google Account: <b>${escapeHTML(userEmail)}</b></span>
+                <span>Google Account: <b>${escapeHTML$1(userEmail)}</b></span>
                 <span>•</span>
                 <span><b>${children.length} Records</b> Formatted (15 Columns)</span>
               </div>
@@ -1226,7 +1226,7 @@
       </div>
       
       <h2 style="font-size:18px; font-weight:700; margin:0 0 6px 0; color:var(--color-text);">Updating Live Google Sheet</h2>
-      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing for <b>${escapeHTML(childName)}</b> to live Google Sheet...</p>
+      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing for <b>${escapeHTML$1(childName)}</b> to live Google Sheet...</p>
       
       <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
@@ -1357,15 +1357,15 @@
 
   /**
    * googleCalendar.js
-   * Google Calendar integration for appointment booking & interactive view switcher.
-   * Supports Month View, Day View (hourly timeline grid), Interactive Time Slot Pop-up Modal,
-   * and seamless Google Calendar event synchronization.
+   * Google Calendar-grade interactive appointment management.
+   * Features full-width Month View with event chips, Day View timeline grid,
+   * view toggling, and interactive modal popup with Google Calendar sync.
    */
 
 
   const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
   const HOURLY_SLOTS = [
     { label: '08:00 AM', value: '08:00' },
@@ -1384,12 +1384,10 @@
   ];
 
   /**
-   * Build a Google Calendar event creation URL.
-   * Opens Google Calendar in a new tab with pre-filled details.
+   * Build Google Calendar TEMPLATE URL for instant synchronization
    */
   function buildGoogleCalendarUrl(appointment) {
     const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-
     const title = encodeURIComponent(`${appointment.childName} — ${appointment.type}`);
     const details = encodeURIComponent(
       `Doctor: ${appointment.doctor || 'N/A'}\nChild: ${appointment.childName}\nType: ${appointment.type}\nNotes: ${appointment.notes || 'No notes'}\n\nCreated from Child Health Management App`
@@ -1408,13 +1406,9 @@
     }
 
     const dates = `${dateStr}T${startTime}/${dateStr}T${endTime}`;
-
     return `${base}&text=${title}&dates=${dates}&details=${details}&sf=true&output=xml`;
   }
 
-  /**
-   * Parse a time string (HH:MM in 24h or 12h) into start/end strings
-   */
   function parseTime(timeStr) {
     if (!timeStr) return null;
     let hours, minutes = 0;
@@ -1439,15 +1433,9 @@
     const sm = String(minutes).padStart(2, '0');
     const eh = String((hours + 1) % 24).padStart(2, '0');
 
-    return {
-      start: `${sh}${sm}00`,
-      end: `${eh}${sm}00`
-    };
+    return { start: `${sh}${sm}00`, end: `${eh}${sm}00` };
   }
 
-  /**
-   * Create an appointment: save locally + open Google Calendar
-   */
   function bookAppointment(data) {
     const appt = addAppointment({
       childId: data.childId,
@@ -1463,7 +1451,7 @@
     const calUrl = buildGoogleCalendarUrl(appt);
     window.open(calUrl, '_blank');
 
-    toast('Appointment Booked', `${data.childName} — ${data.type} on ${data.date}. Google Calendar opened.`);
+    toast('Appointment Scheduled', `${data.childName} — ${data.type} on ${data.date}. Google Calendar synced.`);
     return appt;
   }
 
@@ -1473,7 +1461,7 @@
 
   function firstDayOfWeek(year, month) {
     const d = new Date(year, month, 1).getDay();
-    return d === 0 ? 6 : d - 1;
+    return d === 0 ? 6 : d - 1; // Convert to Monday start
   }
 
   function typeColor(type) {
@@ -1486,8 +1474,13 @@
     return 'blue';
   }
 
+  function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+
   /* ═══════════════════════════════════════════════════════
-     MONTH VIEW GRID
+     FULL-WIDTH GOOGLE CALENDAR MONTH GRID WITH EVENT CHIPS
      ═══════════════════════════════════════════════════════ */
 
   function renderCalendarGrid(year, month, selectedDay = null) {
@@ -1496,6 +1489,9 @@
     const todayDate = today.getDate();
     const totalDays = daysInMonth(year, month);
     const startDay = firstDayOfWeek(year, month);
+
+    // Previous month trailing days
+    const prevMonthTotalDays = daysInMonth(year, month - 1);
 
     const appointments = getAppointments();
     const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
@@ -1508,43 +1504,77 @@
       }
     });
 
-    let headerHTML = DAY_LABELS.map(d => `<div class="cal-header-cell">${d}</div>`).join('');
+    // Header row for weekdays
+    let headerHTML = DAY_LABELS.map(d => `<div class="gcal-header-cell">${d}</div>`).join('');
+
     let cellsHTML = '';
-    for (let i = 0; i < startDay; i++) {
-      cellsHTML += `<div class="cal-day cal-day--empty"></div>`;
+
+    // Render trailing days from previous month
+    for (let i = startDay - 1; i >= 0; i--) {
+      const prevDayNum = prevMonthTotalDays - i;
+      cellsHTML += `
+      <div class="gcal-day-cell gcal-day-cell--outside">
+        <span class="gcal-day-num">${prevDayNum}</span>
+      </div>`;
     }
 
+    // Render current month days
     for (let day = 1; day <= totalDays; day++) {
       const isToday = isCurrentMonth && day === todayDate;
       const isSelected = selectedDay === day;
-      const hasAppts = apptsByDay[day] && apptsByDay[day].length > 0;
-      const apptCount = hasAppts ? apptsByDay[day].length : 0;
+      const dayAppts = apptsByDay[day] || [];
 
-      let dotsHTML = '';
-      if (hasAppts) {
-        const types = [...new Set(apptsByDay[day].map(a => a.type))];
-        dotsHTML = types.slice(0, 3).map(t => `<span class="cal-dot cal-dot--${typeColor(t)}"></span>`).join('');
+      // Build event chips inside the calendar day cell
+      let chipsHTML = '';
+      if (dayAppts.length > 0) {
+        const visible = dayAppts.slice(0, 2);
+        chipsHTML = visible.map(a => `
+        <div class="gcal-event-chip gcal-event-chip--${typeColor(a.type)}" title="${escapeHTML(a.childName)} - ${escapeHTML(a.type)}">
+          <span class="gcal-chip-time">${a.time || '10:00'}</span>
+          <span class="gcal-chip-title">${escapeHTML(a.childName)}</span>
+        </div>
+      `).join('');
+
+        if (dayAppts.length > 2) {
+          chipsHTML += `<div class="gcal-more-chip">+${dayAppts.length - 2} more</div>`;
+        }
       }
 
       cellsHTML += `
-      <button class="cal-day ${isToday ? 'cal-day--today' : ''} ${isSelected ? 'cal-day--selected' : ''} ${hasAppts ? 'cal-day--has-events' : ''}"
-        type="button" data-calendar-day="${day}" title="${hasAppts ? apptCount + ' appointment(s)' : 'Click to view Day schedule'}">
-        <span class="cal-day__num">${day}</span>
-        ${dotsHTML ? `<div class="cal-dots">${dotsHTML}</div>` : ''}
-      </button>`;
+      <div class="gcal-day-cell ${isToday ? 'gcal-day-cell--today' : ''} ${isSelected ? 'gcal-day-cell--selected' : ''}"
+        data-calendar-day="${day}" role="button" tabindex="0" title="Click to open Day schedule for ${day} ${MONTH_NAMES[month]}">
+        <div class="gcal-day-top">
+          <span class="gcal-day-num ${isToday ? 'gcal-day-num--today' : ''}">${day}</span>
+        </div>
+        <div class="gcal-day-chips">
+          ${chipsHTML}
+        </div>
+      </div>`;
+    }
+
+    // Render leading days for next month to complete grid row (total 35 or 42 cells)
+    const renderedCount = startDay + totalDays;
+    const totalGridCells = renderedCount > 35 ? 42 : 35;
+    const nextMonthDays = totalGridCells - renderedCount;
+
+    for (let day = 1; day <= nextMonthDays; day++) {
+      cellsHTML += `
+      <div class="gcal-day-cell gcal-day-cell--outside">
+        <span class="gcal-day-num">${day}</span>
+      </div>`;
     }
 
     return `
-    <div class="cal-widget">
-      <div class="cal-grid">
+    <div class="gcal-month-wrap">
+      <div class="gcal-month-grid">
         ${headerHTML}
         ${cellsHTML}
       </div>
-      <div class="cal-legend">
-        <span class="cal-legend-item"><span class="cal-dot cal-dot--blue"></span>Doctor</span>
-        <span class="cal-legend-item"><span class="cal-dot cal-dot--green"></span>Follow-up</span>
-        <span class="cal-legend-item"><span class="cal-dot cal-dot--amber"></span>Dental</span>
-        <span class="cal-legend-item"><span class="cal-dot cal-dot--violet"></span>Deworming</span>
+      <div class="gcal-legend-bar">
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--blue"></span> Doctor Visit</span>
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--green"></span> Follow-up / Vaccine</span>
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--amber"></span> Dental / Eye</span>
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--violet"></span> Deworming</span>
       </div>
     </div>`;
   }
@@ -1562,10 +1592,9 @@
     const appointments = getAppointments().filter(a => a.date === dateStr);
 
     const slotRows = HOURLY_SLOTS.map(slot => {
-      // Find appointments matching this slot hour
       const slotHour = parseInt(slot.value.split(':')[0]);
       const matchingAppts = appointments.filter(a => {
-        if (!a.time) return slot.value === '10:00'; // Default unassigned to 10 AM
+        if (!a.time) return slot.value === '10:00';
         const match24 = a.time.match(/^(\d{1,2}):/);
         if (match24) {
           let h = parseInt(match24[1]);
@@ -1579,39 +1608,39 @@
       let slotContent = '';
       if (matchingAppts.length > 0) {
         slotContent = matchingAppts.map(a => `
-        <div class="cal-event-card cal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
-          <div class="cal-event-time">${a.time || slot.label}</div>
-          <div class="cal-event-info">
-            <b class="cal-event-title">${a.childName}</b>
-            <span class="cal-event-sub">${a.type}${a.doctor ? ` — ${a.doctor}` : ''}</span>
+        <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
+          <div class="gcal-event-time-badge">${a.time || slot.label}</div>
+          <div class="gcal-event-body">
+            <b class="gcal-event-name">${escapeHTML(a.childName)}</b>
+            <span class="gcal-event-detail">${escapeHTML(a.type)}${a.doctor ? ` · ${escapeHTML(a.doctor)}` : ''}</span>
           </div>
-          <span class="cal-event-status cal-event-status--${a.status === 'Completed' ? 'done' : 'upcoming'}">${a.status || 'Upcoming'}</span>
+          <span class="gcal-status-pill gcal-status-pill--${a.status === 'Completed' ? 'done' : 'upcoming'}">${a.status || 'Upcoming'}</span>
         </div>
       `).join('');
       } else {
-        slotContent = `<div class="cal-slot-placeholder">+ Click to add appointment at ${slot.label}</div>`;
+        slotContent = `<div class="gcal-slot-hint">+ Click to add appointment at ${slot.label}</div>`;
       }
 
       return `
-      <div class="cal-timeline-row" data-open-booking-modal data-slot-date="${dateStr}" data-slot-time="${slot.value}">
-        <div class="cal-time-col">
-          <span>${slot.label}</span>
-        </div>
-        <div class="cal-slot-col">
-          ${slotContent}
-        </div>
+      <div class="gcal-timeline-row" data-open-booking-modal data-slot-date="${dateStr}" data-slot-time="${slot.value}">
+        <div class="gcal-time-col">${slot.label}</div>
+        <div class="gcal-slot-col">${slotContent}</div>
       </div>`;
     }).join('');
 
     return `
-    <div class="cal-day-view">
-      <div class="cal-day-view__header">
-        <div class="cal-day-view__title">
+    <div class="gcal-day-view">
+      <div class="gcal-day-header">
+        <div class="gcal-day-title">
           <h3>${dayName}, ${dateFormatted}</h3>
           <p>${appointments.length} appointment(s) scheduled for this day</p>
         </div>
+        <button class="button button--primary button--sm" type="button" data-open-booking-modal data-slot-date="${dateStr}" data-slot-time="10:00">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Add Appointment
+        </button>
       </div>
-      <div class="cal-timeline-grid">
+      <div class="gcal-timeline-grid">
         ${slotRows}
       </div>
     </div>`;
@@ -1623,24 +1652,22 @@
 
   function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
     const children = getChildren();
-    const childOptions = children.map(c => `<option value="${c.id}">${c.name} (${c.id})</option>`).join('');
+    const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
     const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
 
     return `
-    <form class="cal-booking-form" id="cal-booking-form">
-      <h3 class="cal-booking-title">Book Appointment</h3>
-
-      <label class="cal-field">
-        <span class="cal-field__label">Select Child</span>
-        <select class="cal-select" name="childId" required>
+    <form class="gcal-form" id="cal-booking-form">
+      <div class="gcal-form-group">
+        <label class="gcal-label">Select Child</label>
+        <select class="gcal-input" name="childId" required>
           <option value="">Choose a child…</option>
           ${childOptions}
         </select>
-      </label>
+      </div>
 
-      <label class="cal-field">
-        <span class="cal-field__label">Appointment Type</span>
-        <select class="cal-select" name="type" required>
+      <div class="gcal-form-group">
+        <label class="gcal-label">Appointment Type</label>
+        <select class="gcal-input" name="type" required>
           <option value="">Select type…</option>
           <option value="Doctor visit">Doctor Visit</option>
           <option value="Follow-up">Follow-up</option>
@@ -1650,39 +1677,36 @@
           <option value="Eye checkup">Eye Checkup</option>
           <option value="General checkup">General Checkup</option>
         </select>
-      </label>
-
-      <label class="cal-field">
-        <span class="cal-field__label">Doctor / Clinic</span>
-        <input class="cal-input" name="doctor" type="text" placeholder="e.g. Dr. Amit Kumar" />
-      </label>
-
-      <div class="cal-field-row">
-        <label class="cal-field">
-          <span class="cal-field__label">Date</span>
-          <input class="cal-input" name="date" type="date" value="${dateVal}" required />
-        </label>
-        <label class="cal-field">
-          <span class="cal-field__label">Time</span>
-          <input class="cal-input" name="time" type="time" value="${preselectedTime}" />
-        </label>
       </div>
 
-      <label class="cal-field">
-        <span class="cal-field__label">Notes</span>
-        <textarea class="cal-textarea" name="notes" rows="2" placeholder="Additional details…"></textarea>
-      </label>
+      <div class="gcal-form-group">
+        <label class="gcal-label">Doctor / Clinic Name</label>
+        <input class="gcal-input" name="doctor" type="text" placeholder="e.g. Dr. Amit Kumar (Pediatrician)" />
+      </div>
 
-      <button class="cal-book-btn" type="submit">
+      <div class="gcal-form-row">
+        <div class="gcal-form-group">
+          <label class="gcal-label">Date</label>
+          <input class="gcal-input" name="date" type="date" value="${dateVal}" required />
+        </div>
+        <div class="gcal-form-group">
+          <label class="gcal-label">Time</label>
+          <input class="gcal-input" name="time" type="time" value="${preselectedTime}" />
+        </div>
+      </div>
+
+      <div class="gcal-form-group">
+        <label class="gcal-label">Notes & Instructions</label>
+        <textarea class="gcal-textarea" name="notes" rows="2" placeholder="Blood test follow-up, dosage notes…"></textarea>
+      </div>
+
+      <button class="gcal-submit-btn" type="submit">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
         Book on Google Calendar
       </button>
     </form>`;
   }
 
-  /**
-   * Render Google Calendar-style Popup Modal
-   */
   function renderBookingModalMarkup(dateStr, timeStr) {
     const formHTML = renderBookingForm(dateStr, timeStr);
 
@@ -1690,9 +1714,9 @@
     <div class="cal-modal-overlay" id="cal-booking-modal" data-close-cal-modal-bg>
       <div class="cal-modal-card">
         <div class="cal-modal-header">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-            <h3 style="margin:0; font-size:16px; font-weight:700;">Google Calendar Booking</h3>
+          <div class="gcal-modal-title">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            <span>Book Child Appointment</span>
           </div>
           <button type="button" class="cal-modal-close" data-close-cal-modal>&times;</button>
         </div>
@@ -1719,57 +1743,47 @@
     const dayName = DAY_NAMES[dateObj.getDay()];
 
     const titleText = isMonthView ? `${monthName} ${year}` : `${dayName}, ${day} ${monthName} ${year}`;
+    const dateVal = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
     return `
     <section class="card cal-card" data-calendar-root data-cal-view-mode="${viewMode}" data-cal-year="${year}" data-cal-month="${month}" data-cal-day="${day}">
-      <header class="card__header cal-header-bar">
-        <div class="cal-header-left">
-          <h2 class="card__title cal-header-title">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary)"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-            <span data-calendar-title>${titleText}</span>
-          </h2>
+      <header class="card__header gcal-header">
+        <div class="gcal-header-left">
+          <div class="gcal-brand-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+          </div>
+          <h2 class="gcal-title" data-calendar-title>${titleText}</h2>
         </div>
 
-        <div class="cal-header-controls">
-          <button class="button button--sm button--ghost" type="button" data-calendar-today>Today</button>
+        <div class="gcal-header-right">
+          <button class="gcal-btn gcal-btn--create" type="button" data-open-booking-modal data-slot-date="${dateVal}" data-slot-time="10:00">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Book Appointment
+          </button>
+
+          <button class="gcal-btn gcal-btn--secondary" type="button" data-calendar-today>Today</button>
           
-          <div class="cal-nav-btn-group">
-            <button class="cal-nav-btn" type="button" data-calendar-prev title="Previous">&lsaquo;</button>
-            <button class="cal-nav-btn" type="button" data-calendar-next title="Next">&rsaquo;</button>
+          <div class="gcal-nav-group">
+            <button class="gcal-nav-btn" type="button" data-calendar-prev title="Previous">&lsaquo;</button>
+            <button class="gcal-nav-btn" type="button" data-calendar-next title="Next">&rsaquo;</button>
           </div>
 
-          <div class="cal-view-toggle">
-            <button class="cal-view-btn ${isMonthView ? 'active' : ''}" type="button" data-cal-view="month">Month</button>
-            <button class="cal-view-btn ${!isMonthView ? 'active' : ''}" type="button" data-cal-view="day">Day</button>
+          <div class="gcal-toggle-group">
+            <button class="gcal-toggle-btn ${isMonthView ? 'active' : ''}" type="button" data-cal-view="month">Month</button>
+            <button class="gcal-toggle-btn ${!isMonthView ? 'active' : ''}" type="button" data-cal-view="day">Day</button>
           </div>
         </div>
       </header>
 
-      <div class="card__body cal-card__body">
-        <div class="cal-content-container" data-calendar-container>
-          ${isMonthView ? renderMonthViewLayout(year, month, day) : renderDayView(year, month, day)}
+      <div class="card__body gcal-body">
+        <div class="gcal-container" data-calendar-container>
+          ${isMonthView ? renderCalendarGrid(year, month, day) : renderDayView(year, month, day)}
         </div>
       </div>
     </section>
     <div id="cal-modal-container"></div>`;
   }
 
-  function renderMonthViewLayout(year, month, day) {
-    const dateVal = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return `
-    <div class="cal-layout">
-      <div class="cal-layout__left">
-        ${renderCalendarGrid(year, month, day)}
-      </div>
-      <div class="cal-layout__right">
-        ${renderBookingForm(dateVal)}
-      </div>
-    </div>`;
-  }
-
-  /**
-   * Re-render the calendar view inside root
-   */
   function updateCalendarView(root, viewMode, year, month, day) {
     if (!root) return;
 
@@ -1778,19 +1792,16 @@
     const dateObj = new Date(year, month, day);
     const dayName = DAY_NAMES[dateObj.getDay()];
 
-    // Update root attributes
     root.dataset.calViewMode = viewMode;
     root.dataset.calYear = year;
     root.dataset.calMonth = month;
     root.dataset.calDay = day;
 
-    // Update title
     const titleEl = root.querySelector('[data-calendar-title]');
     if (titleEl) {
       titleEl.textContent = isMonthView ? `${monthName} ${year}` : `${dayName}, ${day} ${monthName} ${year}`;
     }
 
-    // Update active view buttons
     root.querySelectorAll('[data-cal-view]').forEach(btn => {
       if (btn.dataset.calView === viewMode) {
         btn.classList.add('active');
@@ -1799,10 +1810,9 @@
       }
     });
 
-    // Update body content
     const container = root.querySelector('[data-calendar-container]');
     if (container) {
-      container.innerHTML = isMonthView ? renderMonthViewLayout(year, month, day) : renderDayView(year, month, day);
+      container.innerHTML = isMonthView ? renderCalendarGrid(year, month, day) : renderDayView(year, month, day);
     }
   }
 
@@ -1855,7 +1865,7 @@
     <aside class="sidebar" aria-label="Primary navigation">
       <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath$1('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
       <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath$1('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
-      <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML(ngoName)}</span><span class="workspace-user__role">${escapeHTML(role)}</span></span></div></div>
+      <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML$1(ngoName)}</span><span class="workspace-user__role">${escapeHTML$1(role)}</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
     <main class="app-main" id="app-main">
       <header class="topbar">
@@ -1869,15 +1879,15 @@
           <!-- DASHBOARD HEADER GOOGLE USER PROFILE & NGO WORKSPACE -->
           <div class="topbar-profile" style="display:flex; align-items:center; gap:12px;">
             <button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:20px; border:1px solid var(--color-border); background:var(--color-bg);">
-              ${photoURL ? `<img src="${escapeHTML(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
-              <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML(displayName)}</span>
+              ${photoURL ? `<img src="${escapeHTML$1(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
+              <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML$1(displayName)}</span>
               ${icon('chevronDown')}
             </button>
             <div class="dropdown" hidden data-profile-dropdown>
               <div style="padding:12px 14px; border-bottom:1px solid var(--color-border); font-size:12px;">
-                <div style="font-weight:700; color:var(--color-text);">${escapeHTML(displayName)}</div>
-                <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML(email)}</div>
-                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML(ngoName)}</span></div>
+                <div style="font-weight:700; color:var(--color-text);">${escapeHTML$1(displayName)}</div>
+                <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML$1(email)}</div>
+                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML$1(ngoName)}</span></div>
               </div>
               <a class="dropdown__item" href="${pagePath$1('settings')}">${icon('settings')}Account & Google Workspace</a>
               <div class="divider"></div>
@@ -1902,7 +1912,7 @@
 
   const statCard = (label, value, trend, glyph, color) => `<article class="card stat-card card--interactive"><div class="stat-card__top"><span class="stat-card__label">${label}</span><span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span></div><div class="stat-card__number">${value}</div><div class="stat-card__footer"><span class="trend--up">${icon('arrowUp')} ${trend}</span></div></article>`;
 
-  const field$1 = (label, name, placeholder, type = 'text', hint = '', value = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML(value)}">${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
+  const field$1 = (label, name, placeholder, type = 'text', hint = '', value = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML$1(value)}">${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
 
   function formatDateForInput(dateStr) {
     if (!dateStr) return '';
@@ -2348,9 +2358,9 @@
 
     return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath$1('child-profile')}?id=${child.id}` : pagePath$1('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field$1('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName)}${field$1('Last name *', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field$1('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '')}${field$1('Gender *', 'gender', 'e.g. Male', 'text', '', child ? child.gender : '')}${field$1('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field$1('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements and known conditions.</p></div><div class="form-grid--two">${field$1('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML(child.allergies) : ''}</textarea></label>${field$1('Current medications', 'medications', 'e.g. Inhaler, Vitamin D', 'text', '', child ? child.medications : '')}</div></section>
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements and known conditions.</p></div><div class="form-grid--two">${field$1('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML$1(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML$1(child.allergies) : ''}</textarea></label>${field$1('Current medications', 'medications', 'e.g. Inhaler, Vitamin D', 'text', '', child ? child.medications : '')}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field$1('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field$1('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field$1('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field$1('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML$1(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML$1(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
   }
 
   /* ═══════════════════════════════════════════════════════
