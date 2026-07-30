@@ -293,7 +293,7 @@ export function renderDayView(year, month, day) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   BOOKING FORM & MODAL
+   BOOKING FORM & MODAL — Google Calendar Style Popup
    ═══════════════════════════════════════════════════════ */
 
 export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
@@ -301,55 +301,109 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
   const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
   const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
 
+  // Format display date
+  const dateObj = new Date(dateVal + 'T00:00:00');
+  const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  // Format display time
+  let displayTime = preselectedTime;
+  if (preselectedTime) {
+    const [h, min] = preselectedTime.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    displayTime = `${h12}:${String(min).padStart(2, '0')} ${ampm}`;
+  }
+
   return `
-    <form class="gcal-form" id="cal-booking-form">
-      <div class="gcal-form-group">
-        <label class="gcal-label">Select Child</label>
-        <select class="gcal-input" name="childId" required>
-          <option value="">Choose a child…</option>
-          ${childOptions}
-        </select>
+    <form class="gcal-popup-form" id="cal-booking-form">
+      <!-- Title row (Google Calendar style borderless input) -->
+      <div class="gcal-popup-title-row">
+        <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add title" autocomplete="off" />
       </div>
 
-      <div class="gcal-form-group">
-        <label class="gcal-label">Appointment Type</label>
-        <select class="gcal-input" name="type" required>
-          <option value="">Select type…</option>
-          <option value="Doctor visit">Doctor Visit</option>
-          <option value="Follow-up">Follow-up</option>
-          <option value="Dental checkup">Dental Checkup</option>
-          <option value="Deworming">Deworming</option>
-          <option value="Vaccination">Vaccination</option>
-          <option value="Eye checkup">Eye Checkup</option>
-          <option value="General checkup">General Checkup</option>
-        </select>
+      <!-- Tab bar -->
+      <div class="gcal-popup-tabs">
+        <button type="button" class="gcal-popup-tab gcal-popup-tab--active">Appointment</button>
+        <button type="button" class="gcal-popup-tab">Reminder</button>
       </div>
 
-      <div class="gcal-form-group">
-        <label class="gcal-label">Doctor / Clinic Name</label>
-        <input class="gcal-input" name="doctor" type="text" placeholder="e.g. Dr. Amit Kumar (Pediatrician)" />
-      </div>
-
-      <div class="gcal-form-row">
-        <div class="gcal-form-group">
-          <label class="gcal-label">Date</label>
-          <input class="gcal-input" name="date" type="date" value="${dateVal}" required />
+      <!-- Icon rows -->
+      <div class="gcal-popup-rows">
+        <!-- Date & Time -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <div class="gcal-popup-datetime">
+              <input class="gcal-popup-date-input" name="date" type="date" value="${dateVal}" required />
+              <input class="gcal-popup-time-input" name="time" type="time" value="${preselectedTime}" />
+            </div>
+            <div class="gcal-popup-date-display">${displayDate} · ${displayTime}</div>
+          </div>
         </div>
-        <div class="gcal-form-group">
-          <label class="gcal-label">Time</label>
-          <input class="gcal-input" name="time" type="time" value="${preselectedTime}" />
+
+        <!-- Child selector -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <select class="gcal-popup-select" name="childId" required>
+              <option value="">Select child</option>
+              ${childOptions}
+            </select>
+          </div>
+        </div>
+
+        <!-- Appointment type -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <select class="gcal-popup-select" name="type" required>
+              <option value="">Appointment type</option>
+              <option value="Doctor visit">Doctor Visit</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Dental checkup">Dental Checkup</option>
+              <option value="Deworming">Deworming</option>
+              <option value="Vaccination">Vaccination</option>
+              <option value="Eye checkup">Eye Checkup</option>
+              <option value="General checkup">General Checkup</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <textarea class="gcal-popup-notes" name="notes" rows="2" placeholder="Add description or notes"></textarea>
+          </div>
+        </div>
+
+        <!-- Google Calendar badge -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <span class="gcal-popup-cal-label">
+              <span class="gcal-popup-cal-dot"></span>
+              Child Health Calendar
+            </span>
+          </div>
         </div>
       </div>
 
-      <div class="gcal-form-group">
-        <label class="gcal-label">Notes & Instructions</label>
-        <textarea class="gcal-textarea" name="notes" rows="2" placeholder="Blood test follow-up, dosage notes…"></textarea>
+      <!-- Footer buttons -->
+      <div class="gcal-popup-footer">
+        <button class="gcal-popup-more-btn" type="button" data-close-cal-modal>More options</button>
+        <button class="gcal-popup-save-btn" type="submit">Save</button>
       </div>
-
-      <button class="gcal-submit-btn" type="submit">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-        Book on Google Calendar
-      </button>
     </form>`;
 }
 
@@ -357,19 +411,13 @@ export function renderBookingModalMarkup(dateStr, timeStr) {
   const formHTML = renderBookingForm(dateStr, timeStr);
 
   return `
-    <div class="modal-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation" style="position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); padding: 16px;">
-      <section class="modal" role="dialog" aria-modal="true" style="width: min(100%, 460px); background: var(--color-bg, #ffffff); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35); border: 1px solid var(--color-border); animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);">
-        <header class="modal__header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-alt);">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-            <h2 class="modal__title" style="font-size: 16px; font-weight: 700; margin: 0; color: var(--color-text);">Book Child Appointment</h2>
-          </div>
-          <button class="icon-button icon-button--small" type="button" aria-label="Close dialog" data-close-cal-modal style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text-muted); line-height: 1;">&times;</button>
-        </header>
-        <div class="modal__body" style="padding: 20px;">
-          ${formHTML}
-        </div>
-      </section>
+    <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
+      <div class="gcal-popup-card" role="dialog" aria-modal="true">
+        <button class="gcal-popup-close" type="button" aria-label="Close" data-close-cal-modal>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        ${formHTML}
+      </div>
     </div>`;
 }
 

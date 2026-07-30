@@ -832,95 +832,280 @@ body.theme-dark .login-card__hero-icon {
 .gcal-status-pill--upcoming { background: rgba(37, 99, 235, 0.15); color: #2563eb; }
 .gcal-status-pill--done { background: rgba(5, 150, 105, 0.15); color: #059669; }
 
-/* Booking Modal & Form */
-.gcal-modal-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--color-text);
-}
-.gcal-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.gcal-form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.gcal-form-row {
+/* ═══════════════════════════════════════════════════════
+   Google Calendar Style Popup — Booking Modal
+   ═══════════════════════════════════════════════════════ */
+
+/* Backdrop */
+.gcal-popup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.32);
+  padding: 16px;
+  animation: gcalBackdropFadeIn 0.18s ease forwards;
 }
-.gcal-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-}
-.gcal-input,
-.gcal-textarea {
-  font-family: inherit;
-  font-size: 13px;
-  padding: 10px 12px;
+
+/* Floating Card */
+.gcal-popup-card {
+  position: relative;
+  width: min(100%, 448px);
+  background: #ffffff;
   border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
-  color: var(--color-text);
-  outline: none;
-  width: 100%;
-  box-sizing: border-box;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 24px 38px 3px rgba(0,0,0,0.14), 0 9px 46px 8px rgba(0,0,0,0.12), 0 11px 15px -7px rgba(0,0,0,0.2);
+  overflow: hidden;
+  animation: gcalPopupSlideIn 0.22s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-.gcal-input:focus,
-.gcal-textarea:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-}
-.gcal-submit-btn {
+
+/* Close X button (top-right) */
+.gcal-popup-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 18px;
-  border-radius: 10px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   border: none;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  color: #ffffff;
-  font-family: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
+  background: transparent;
+  color: #5f6368;
   cursor: pointer;
-  margin-top: 6px;
-  transition: all 0.15s ease;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+  transition: background 0.15s;
 }
-.gcal-submit-btn:hover {
-  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4);
-  transform: translateY(-1px);
+.gcal-popup-close:hover {
+  background: rgba(0, 0, 0, 0.06);
 }
 
-/* Smooth Animations for Modal & Day View Transition */
-.modal-backdrop {
-  animation: gcalBackdropFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-.modal-backdrop section.modal {
-  animation: gcalModalPopUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* Form container */
+.gcal-popup-form {
+  display: flex;
+  flex-direction: column;
 }
 
-.gcal-day-view {
-  animation: gcalViewSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+/* Title input (borderless, Google style) */
+.gcal-popup-title-row {
+  padding: 20px 20px 0 54px;
+}
+.gcal-popup-title-input {
+  width: 100%;
+  border: none;
+  border-bottom: 2px solid #e0e0e0;
+  outline: none;
+  font-family: 'Google Sans', 'Roboto', 'Manrope', sans-serif;
+  font-size: 22px;
+  font-weight: 400;
+  color: #202124;
+  padding: 8px 0;
+  background: transparent;
+  transition: border-color 0.2s;
+}
+.gcal-popup-title-input::placeholder {
+  color: #80868b;
+}
+.gcal-popup-title-input:focus {
+  border-bottom-color: #1a73e8;
 }
 
+/* Tab bar */
+.gcal-popup-tabs {
+  display: flex;
+  gap: 0;
+  padding: 12px 20px 0 54px;
+  border-bottom: 1px solid #e0e0e0;
+}
+.gcal-popup-tab {
+  padding: 8px 16px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #5f6368;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
+}
+.gcal-popup-tab:hover {
+  color: #202124;
+  background: rgba(0, 0, 0, 0.04);
+}
+.gcal-popup-tab--active {
+  color: #1a73e8;
+  border-bottom-color: #1a73e8;
+}
+
+/* Icon rows */
+.gcal-popup-rows {
+  padding: 16px 20px 8px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gcal-popup-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 8px 0;
+  min-height: 36px;
+}
+.gcal-popup-icon {
+  flex-shrink: 0;
+  width: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  color: #5f6368;
+}
+.gcal-popup-row-content {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Date & time inputs row */
+.gcal-popup-datetime {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.gcal-popup-date-input,
+.gcal-popup-time-input {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: #fff;
+  color: #202124;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.gcal-popup-date-input { flex: 1.4; }
+.gcal-popup-time-input { flex: 0.8; }
+.gcal-popup-date-input:focus,
+.gcal-popup-time-input:focus {
+  border-color: #1a73e8;
+}
+.gcal-popup-date-display {
+  font-size: 12px;
+  color: #1a73e8;
+  font-weight: 500;
+  letter-spacing: 0.1px;
+}
+
+/* Select inputs */
+.gcal-popup-select {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: #fff;
+  color: #202124;
+  outline: none;
+  cursor: pointer;
+  appearance: auto;
+  transition: border-color 0.15s;
+}
+.gcal-popup-select:focus {
+  border-color: #1a73e8;
+}
+
+/* Notes textarea */
+.gcal-popup-notes {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid #dadce0;
+  border-radius: 4px;
+  background: #fff;
+  color: #202124;
+  outline: none;
+  resize: vertical;
+  min-height: 44px;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.gcal-popup-notes:focus {
+  border-color: #1a73e8;
+}
+
+/* Calendar label */
+.gcal-popup-cal-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #3c4043;
+}
+.gcal-popup-cal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #1a73e8;
+  flex-shrink: 0;
+}
+
+/* Footer */
+.gcal-popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid #e0e0e0;
+}
+.gcal-popup-more-btn {
+  padding: 8px 20px;
+  border-radius: 4px;
+  border: 1px solid #dadce0;
+  background: #fff;
+  color: #1a73e8;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.gcal-popup-more-btn:hover {
+  background: #f1f3f4;
+}
+.gcal-popup-save-btn {
+  padding: 8px 24px;
+  border-radius: 4px;
+  border: none;
+  background: #1a73e8;
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, box-shadow 0.15s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.gcal-popup-save-btn:hover {
+  background: #1765cc;
+  box-shadow: 0 2px 6px rgba(26,115,232,0.35);
+}
+
+/* Animations */
 @keyframes gcalBackdropFadeIn {
-  from { opacity: 0; backdrop-filter: blur(0px); }
-  to { opacity: 1; backdrop-filter: blur(6px); }
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gcalPopupSlideIn {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 @keyframes gcalModalPopUp {
@@ -928,9 +1113,12 @@ body.theme-dark .login-card__hero-icon {
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
+.gcal-day-view {
+  animation: gcalViewSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 @keyframes gcalViewSlide {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 
