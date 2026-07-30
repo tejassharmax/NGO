@@ -749,43 +749,44 @@ body.theme-dark .login-card__hero-icon {
 .gcal-timeline-grid {
   display: flex;
   flex-direction: column;
-  border: 1px solid #dadce0;
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--color-bg);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
 }
 
 .gcal-timeline-row {
   display: flex;
-  min-height: 56px;
-  border-bottom: 1px solid #e0e0e0;
+  min-height: 60px;
+  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: background 0.15s ease;
 }
 .gcal-timeline-row:last-child {
   border-bottom: none;
 }
 .gcal-timeline-row:hover {
-  background: #f1f3f4;
+  background: rgba(37, 99, 235, 0.04);
 }
 
 .gcal-time-col {
-  width: 86px;
+  width: 100px;
   flex-shrink: 0;
-  padding: 12px 14px;
-  background: #ffffff;
-  border-right: 1px solid #e0e0e0;
-  font-size: 11px;
-  font-weight: 500;
-  color: #70757a;
+  padding: 14px 16px;
+  background: var(--color-bg-alt);
+  border-right: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
   display: flex;
   align-items: flex-start;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.2px;
 }
 
 .gcal-slot-col {
   flex: 1;
-  padding: 6px 12px;
+  padding: 8px 16px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -794,86 +795,64 @@ body.theme-dark .login-card__hero-icon {
 
 .gcal-slot-hint {
   font-size: 12px;
-  color: #1a73e8;
+  color: var(--color-text-muted);
   opacity: 0;
-  transition: opacity 0.12s ease;
+  transition: opacity 0.15s ease;
   font-weight: 500;
 }
 .gcal-timeline-row:hover .gcal-slot-hint {
-  opacity: 1;
+  opacity: 0.75;
+  color: var(--color-primary);
 }
 
-/* Event Cards in Day View Slot (Google Calendar style) */
+/* Event Cards in Day View Slot */
 .gcal-event-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 14px;
-  border-radius: 6px;
-  margin: 2px 0;
-  color: #ffffff;
-  transition: filter 0.12s ease, box-shadow 0.12s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  gap: 16px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 4px solid;
+  margin: 3px 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
-.gcal-event-card:hover {
-  filter: brightness(0.93);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+.gcal-event-card--blue { border-left-color: #2563eb; background: #eff6ff; }
+.gcal-event-card--green { border-left-color: #059669; background: #ecfdf5; }
+.gcal-event-card--amber { border-left-color: #d97706; background: #fffbeb; }
+.gcal-event-card--violet { border-left-color: #7c3aed; background: #f5f3ff; }
+
+.gcal-event-time-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+  min-width: 70px;
 }
-
-.gcal-event-card--blue { background: #039be5; }
-.gcal-event-card--green { background: #0b8043; }
-.gcal-event-card--amber { background: #f4511e; }
-.gcal-event-card--violet { background: #8e24aa; }
-
-.gcal-event-card-main {
+.gcal-event-body {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
   min-width: 0;
 }
-.gcal-event-title-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  line-height: 1.2;
-}
 .gcal-event-name {
-  font-weight: 600;
-  color: #ffffff;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text);
 }
-.gcal-event-dot {
-  opacity: 0.7;
+.gcal-event-detail {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
 }
-.gcal-event-detail-text {
-  font-weight: 400;
-  opacity: 0.9;
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gcal-event-time-row {
-  font-size: 11px;
-  font-weight: 400;
-  opacity: 0.85;
-}
-
 .gcal-status-pill {
   font-size: 10px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 4px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
 }
-.gcal-status-pill--done {
-  background: rgba(255, 255, 255, 0.35);
-}
+.gcal-status-pill--upcoming { background: rgba(37, 99, 235, 0.15); color: #2563eb; }
+.gcal-status-pill--done { background: rgba(5, 150, 105, 0.15); color: #059669; }
 
 /* ═══════════════════════════════════════════════════════
    Google Calendar Style Popup — Booking Modal
@@ -1159,9 +1138,147 @@ body.theme-dark .login-card__hero-icon {
 .gcal-day-view {
   animation: gcalViewSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+/* ═══════════════════════════════════════════════════════
+   Google Calendar Event Details Popover Modal
+   ═══════════════════════════════════════════════════════ */
 
-@keyframes gcalViewSlide {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
+.gcal-event-popover-card {
+  position: relative;
+  width: min(100%, 460px);
+  background: var(--color-bg, #ffffff);
+  border-radius: 16px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.22), 0 8px 16px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+  animation: gcalPopupSlideIn 0.22s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  border: 1px solid var(--color-border, #dadce0);
 }
+
+.gcal-popover-banner {
+  height: 130px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.gcal-popover-actions {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+}
+
+.gcal-popover-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(6px);
+  color: #3c4043;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  transition: all 0.15s ease;
+}
+.gcal-popover-btn:hover {
+  background: #ffffff;
+  color: #1a73e8;
+  transform: scale(1.08);
+}
+
+.gcal-popover-body {
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gcal-popover-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.gcal-popover-title-row {
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.gcal-popover-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+
+.gcal-popover-title-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gcal-popover-title {
+  font-family: 'Google Sans', 'Roboto', sans-serif;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--color-text, #202124);
+  margin: 0;
+  line-height: 1.3;
+}
+
+.gcal-popover-time {
+  font-size: 13.5px;
+  color: var(--color-text-muted, #5f6368);
+  font-weight: 400;
+}
+
+.gcal-popover-icon {
+  width: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  color: var(--color-text-muted, #5f6368);
+}
+
+.gcal-popover-desc {
+  flex: 1;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--color-text, #3c4043);
+}
+.gcal-popover-desc p {
+  margin: 0 0 4px 0;
+}
+.gcal-popover-desc p:last-child {
+  margin-bottom: 0;
+}
+
+.gcal-popover-app-tag {
+  font-size: 12px;
+  color: #70757a;
+  margin-top: 8px !important;
+}
+
+.gcal-popover-meta {
+  font-size: 13.5px;
+  color: var(--color-text, #3c4043);
+  font-weight: 400;
+}
+
+.gcal-popover-footer {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border, #e0e0e0);
+}
+
 

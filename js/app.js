@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, addSponsor } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, addSponsor } from './storage.js';
 import { updateChildTable, childRows } from './table.js';
 import { searchChildren, globalSearchMarkup, renderSearchResultsList } from './search.js';
 import { toast } from './toast.js';
@@ -11,7 +11,7 @@ import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets } from './googleSheetsSync.js';
-import { bookAppointment, updateCalendarView, renderBookingModalMarkup } from './googleCalendar.js';
+import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl } from './googleCalendar.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
@@ -94,7 +94,7 @@ async function handleGoogleAuth(email) {
 
   // Document Clicks
   document.addEventListener('click', (event) => {
-    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], .modal-backdrop, .gcal-popup-backdrop');
+    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
     if (!target) return;
 
     if (target.matches('[data-topbar-back]')) {
@@ -173,6 +173,48 @@ async function handleGoogleAuth(email) {
       window.setTimeout(() => {
         window.location.reload();
       }, 400);
+    }
+
+    // ─── Open Event Details Popover Card ───
+    const deleteBtn = target.closest('[data-delete-event-id]');
+    if (deleteBtn) {
+      const id = deleteBtn.getAttribute('data-delete-event-id');
+      deleteAppointment(id);
+      toast('Appointment Deleted', 'Appointment has been removed from schedule.');
+      const calModal = document.querySelector('#cal-booking-modal');
+      if (calModal) calModal.remove();
+      window.setTimeout(() => window.location.reload(), 400);
+      return;
+    }
+
+    const editBtn = target.closest('[data-edit-event-id]');
+    if (editBtn) {
+      const id = editBtn.getAttribute('data-edit-event-id');
+      const appt = getAppointments().find(a => String(a.id) === String(id));
+      if (appt) {
+        const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
+        modalContainer.innerHTML = renderBookingModalMarkup(appt.date, appt.time || '10:00');
+      }
+      return;
+    }
+
+    const syncBtn = target.closest('[data-sync-event-id]');
+    if (syncBtn) {
+      const id = syncBtn.getAttribute('data-sync-event-id');
+      const appt = getAppointments().find(a => String(a.id) === String(id));
+      if (appt) {
+        window.open(buildGoogleCalendarUrl(appt), '_blank');
+        toast('Google Calendar Sync', 'Opening event in Google Calendar...');
+      }
+      return;
+    }
+
+    const eventCard = target.closest('[data-event-id]');
+    if (eventCard) {
+      const eventId = eventCard.getAttribute('data-event-id');
+      const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
+      modalContainer.innerHTML = renderEventDetailsModalMarkup(eventId);
+      return;
     }
 
     // ─── Open Booking Popup Modal (from any button or time slot row) ───
