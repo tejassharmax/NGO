@@ -357,19 +357,19 @@ export function renderBookingModalMarkup(dateStr, timeStr) {
   const formHTML = renderBookingForm(dateStr, timeStr);
 
   return `
-    <div class="cal-modal-overlay" id="cal-booking-modal" data-close-cal-modal-bg>
-      <div class="cal-modal-card">
-        <div class="cal-modal-header">
-          <div class="gcal-modal-title">
+    <div class="modal-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation" style="position: fixed; inset: 0; z-index: 99999; display: grid; place-items: center; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); padding: 16px;">
+      <section class="modal" role="dialog" aria-modal="true" style="width: min(100%, 460px); background: var(--color-bg, #ffffff); border-radius: 16px; overflow: hidden; box-shadow: 0 25px 60px rgba(0, 0, 0, 0.35); border: 1px solid var(--color-border); animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);">
+        <header class="modal__header" style="display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-alt);">
+          <div style="display: flex; align-items: center; gap: 10px;">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-            <span>Book Child Appointment</span>
+            <h2 class="modal__title" style="font-size: 16px; font-weight: 700; margin: 0; color: var(--color-text);">Book Child Appointment</h2>
           </div>
-          <button type="button" class="cal-modal-close" data-close-cal-modal>&times;</button>
-        </div>
-        <div class="cal-modal-body">
+          <button class="icon-button icon-button--small" type="button" aria-label="Close dialog" data-close-cal-modal style="background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text-muted); line-height: 1;">&times;</button>
+        </header>
+        <div class="modal__body" style="padding: 20px;">
           ${formHTML}
         </div>
-      </div>
+      </section>
     </div>`;
 }
 
