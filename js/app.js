@@ -11,7 +11,7 @@ import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets } from './googleSheetsSync.js';
-import { bookAppointment, updateCalendarView, renderDayAppointments } from './googleCalendar.js';
+import { bookAppointment, updateCalendarView, renderBookingModalMarkup } from './googleCalendar.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
@@ -220,41 +220,82 @@ async function handleGoogleAuth(email) {
       }, 400);
     }
 
-    // ─── Calendar: Month Navigation ───
+    // ─── Calendar Controls (View Toggle, Today, Prev/Next, Day Click, Time Slot Modal) ───
     const calRoot = target.closest('[data-calendar-root]');
-    if (target.closest('[data-calendar-prev]') && calRoot) {
+    if (calRoot) {
+      let viewMode = calRoot.dataset.calViewMode || 'month';
       let y = parseInt(calRoot.dataset.calYear);
       let m = parseInt(calRoot.dataset.calMonth);
-      m--;
-      if (m < 0) { m = 11; y--; }
-      updateCalendarView(calRoot, y, m, null);
-      // Clear day appointments
-      const dayContainer = calRoot.querySelector('[data-day-appointments]');
-      if (dayContainer) dayContainer.innerHTML = '<div class="cal-day-list__empty">Select a day to see appointments</div>';
-    }
-    if (target.closest('[data-calendar-next]') && calRoot) {
-      let y = parseInt(calRoot.dataset.calYear);
-      let m = parseInt(calRoot.dataset.calMonth);
-      m++;
-      if (m > 11) { m = 0; y++; }
-      updateCalendarView(calRoot, y, m, null);
-      const dayContainer = calRoot.querySelector('[data-day-appointments]');
-      if (dayContainer) dayContainer.innerHTML = '<div class="cal-day-list__empty">Select a day to see appointments</div>';
-    }
+      let d = parseInt(calRoot.dataset.calDay);
 
-    // ─── Calendar: Day Selection ───
-    const dayBtn = target.closest('[data-calendar-day]');
-    if (dayBtn && calRoot) {
-      const day = parseInt(dayBtn.dataset.calendarDay);
-      const y = parseInt(calRoot.dataset.calYear);
-      const m = parseInt(calRoot.dataset.calMonth);
-      updateCalendarView(calRoot, y, m, day);
-
-      // Also update the date field in the booking form
-      const dateInput = calRoot.querySelector('input[name="date"]');
-      if (dateInput) {
-        dateInput.value = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      // View Toggle Buttons (Month / Day)
+      const viewBtn = target.closest('[data-cal-view]');
+      if (viewBtn) {
+        viewMode = viewBtn.dataset.calView;
+        updateCalendarView(calRoot, viewMode, y, m, d);
+        return;
       }
+
+      // Today Button
+      if (target.closest('[data-calendar-today]')) {
+        const now = new Date();
+        updateCalendarView(calRoot, viewMode, now.getFullYear(), now.getMonth(), now.getDate());
+        return;
+      }
+
+      // Prev Button
+      if (target.closest('[data-calendar-prev]')) {
+        if (viewMode === 'month') {
+          m--;
+          if (m < 0) { m = 11; y--; }
+        } else {
+          const curDate = new Date(y, m, d - 1);
+          y = curDate.getFullYear();
+          m = curDate.getMonth();
+          d = curDate.getDate();
+        }
+        updateCalendarView(calRoot, viewMode, y, m, d);
+        return;
+      }
+
+      // Next Button
+      if (target.closest('[data-calendar-next]')) {
+        if (viewMode === 'month') {
+          m++;
+          if (m > 11) { m = 0; y++; }
+        } else {
+          const curDate = new Date(y, m, d + 1);
+          y = curDate.getFullYear();
+          m = curDate.getMonth();
+          d = curDate.getDate();
+        }
+        updateCalendarView(calRoot, viewMode, y, m, d);
+        return;
+      }
+
+      // Day Click in Month View -> Switch to Day View
+      const dayCell = target.closest('[data-calendar-day]');
+      if (dayCell) {
+        const dayNum = parseInt(dayCell.dataset.calendarDay);
+        updateCalendarView(calRoot, 'day', y, m, dayNum);
+        return;
+      }
+
+      // Time Slot Row Click in Day View -> Open Booking Popup Modal
+      const slotRow = target.closest('[data-open-booking-modal]');
+      if (slotRow) {
+        const slotDate = slotRow.dataset.slotDate;
+        const slotTime = slotRow.dataset.slotTime;
+        const modalContainer = document.querySelector('#cal-modal-container') || document.body;
+        modalContainer.innerHTML = renderBookingModalMarkup(slotDate, slotTime);
+        return;
+      }
+    }
+
+    // Modal Close Button or Overlay Click
+    if (target.closest('[data-close-cal-modal]') || (target.dataset && target.dataset.closeCalModalBg !== undefined)) {
+      const calModal = document.querySelector('#cal-booking-modal');
+      if (calModal) calModal.remove();
     }
 
     if (target.closest('[data-open-sheets-template]')) {

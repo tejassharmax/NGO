@@ -4,7 +4,7 @@ import { childRows } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
 import { getGoogleSheetUrl } from './googleSheetsSync.js';
-import { calendarCard, renderCalendarGrid, renderDayAppointments, renderBookingForm } from './googleCalendar.js';
+import { calendarCard, renderCalendarGrid, renderDayView, renderBookingForm } from './googleCalendar.js';
 
 /* ═══════════════════════════════════════════════════════
    NAVIGATION

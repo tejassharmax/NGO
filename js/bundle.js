@@ -1357,14 +1357,31 @@
 
   /**
    * googleCalendar.js
-   * Google Calendar integration for appointment booking.
-   * Uses Google Calendar URL scheme to create events (no API key required).
-   * Manages local appointment state and syncs with the calendar grid UI.
+   * Google Calendar integration for appointment booking & interactive view switcher.
+   * Supports Month View, Day View (hourly timeline grid), Interactive Time Slot Pop-up Modal,
+   * and seamless Google Calendar event synchronization.
    */
 
 
   const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  const HOURLY_SLOTS = [
+    { label: '08:00 AM', value: '08:00' },
+    { label: '09:00 AM', value: '09:00' },
+    { label: '10:00 AM', value: '10:00' },
+    { label: '11:00 AM', value: '11:00' },
+    { label: '12:00 PM', value: '12:00' },
+    { label: '01:00 PM', value: '13:00' },
+    { label: '02:00 PM', value: '14:00' },
+    { label: '03:00 PM', value: '15:00' },
+    { label: '04:00 PM', value: '16:00' },
+    { label: '05:00 PM', value: '17:00' },
+    { label: '06:00 PM', value: '18:00' },
+    { label: '07:00 PM', value: '19:00' },
+    { label: '08:00 PM', value: '20:00' }
+  ];
 
   /**
    * Build a Google Calendar event creation URL.
@@ -1378,10 +1395,9 @@
       `Doctor: ${appointment.doctor || 'N/A'}\nChild: ${appointment.childName}\nType: ${appointment.type}\nNotes: ${appointment.notes || 'No notes'}\n\nCreated from Child Health Management App`
     );
 
-    // Format dates for Google Calendar: YYYYMMDDTHHmmss
     const dateStr = appointment.date.replace(/-/g, '');
-    let startTime = '100000'; // default 10:00 AM
-    let endTime = '110000';   // default 11:00 AM (1 hour)
+    let startTime = '100000';
+    let endTime = '110000';
 
     if (appointment.time) {
       const parsed = parseTime(appointment.time);
@@ -1401,16 +1417,14 @@
    */
   function parseTime(timeStr) {
     if (!timeStr) return null;
-    let hours, minutes;
+    let hours, minutes = 0;
 
-    // Handle HH:MM format (24h)
     const match24 = timeStr.match(/^(\d{1,2}):(\d{2})$/);
     if (match24) {
       hours = parseInt(match24[1]);
       minutes = parseInt(match24[2]);
     }
 
-    // Handle 12h format like "10:00 AM"
     const match12 = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
     if (match12) {
       hours = parseInt(match12[1]);
@@ -1419,11 +1433,11 @@
       if (match12[3].toUpperCase() === 'AM' && hours === 12) hours = 0;
     }
 
-    if (hours === undefined) return null;
+    if (hours === undefined || isNaN(hours)) return null;
 
     const sh = String(hours).padStart(2, '0');
     const sm = String(minutes).padStart(2, '0');
-    const eh = String(hours + 1).padStart(2, '0');
+    const eh = String((hours + 1) % 24).padStart(2, '0');
 
     return {
       start: `${sh}${sm}00`,
@@ -1435,19 +1449,17 @@
    * Create an appointment: save locally + open Google Calendar
    */
   function bookAppointment(data) {
-    // Save to local storage
     const appt = addAppointment({
       childId: data.childId,
       childName: data.childName,
       type: data.type,
       date: data.date,
-      time: data.time || '',
+      time: data.time || '10:00',
       doctor: data.doctor || '',
       notes: data.notes || '',
       status: 'Upcoming'
     });
 
-    // Open Google Calendar in new tab
     const calUrl = buildGoogleCalendarUrl(appt);
     window.open(calUrl, '_blank');
 
@@ -1455,28 +1467,29 @@
     return appt;
   }
 
-  /* ═══════════════════════════════════════════════════════
-     CALENDAR GRID RENDERING
-     ═══════════════════════════════════════════════════════ */
-
-  /**
-   * Get the number of days in a month
-   */
   function daysInMonth(year, month) {
     return new Date(year, month + 1, 0).getDate();
   }
 
-  /**
-   * Get the day of week (0=Mon, 6=Sun) for the first day of a month
-   */
   function firstDayOfWeek(year, month) {
     const d = new Date(year, month, 1).getDay();
-    return d === 0 ? 6 : d - 1; // Convert Sun=0 to Mon-based
+    return d === 0 ? 6 : d - 1;
   }
 
-  /**
-   * Build the calendar grid HTML for a given year/month
-   */
+  function typeColor(type) {
+    if (!type) return 'blue';
+    const t = type.toLowerCase();
+    if (t.includes('doctor') || t.includes('general')) return 'blue';
+    if (t.includes('follow') || t.includes('vaccin')) return 'green';
+    if (t.includes('dental') || t.includes('eye')) return 'amber';
+    if (t.includes('deworm')) return 'violet';
+    return 'blue';
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     MONTH VIEW GRID
+     ═══════════════════════════════════════════════════════ */
+
   function renderCalendarGrid(year, month, selectedDay = null) {
     const today = new Date();
     const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
@@ -1484,7 +1497,6 @@
     const totalDays = daysInMonth(year, month);
     const startDay = firstDayOfWeek(year, month);
 
-    // Get appointments for this month
     const appointments = getAppointments();
     const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
     const apptsByDay = {};
@@ -1496,12 +1508,8 @@
       }
     });
 
-    // Day headers
     let headerHTML = DAY_LABELS.map(d => `<div class="cal-header-cell">${d}</div>`).join('');
-
-    // Day cells
     let cellsHTML = '';
-    // Empty cells before start
     for (let i = 0; i < startDay; i++) {
       cellsHTML += `<div class="cal-day cal-day--empty"></div>`;
     }
@@ -1512,7 +1520,6 @@
       const hasAppts = apptsByDay[day] && apptsByDay[day].length > 0;
       const apptCount = hasAppts ? apptsByDay[day].length : 0;
 
-      // Determine dot colors based on appointment types
       let dotsHTML = '';
       if (hasAppts) {
         const types = [...new Set(apptsByDay[day].map(a => a.type))];
@@ -1521,7 +1528,7 @@
 
       cellsHTML += `
       <button class="cal-day ${isToday ? 'cal-day--today' : ''} ${isSelected ? 'cal-day--selected' : ''} ${hasAppts ? 'cal-day--has-events' : ''}"
-        type="button" data-calendar-day="${day}" title="${hasAppts ? apptCount + ' appointment(s)' : 'No appointments'}">
+        type="button" data-calendar-day="${day}" title="${hasAppts ? apptCount + ' appointment(s)' : 'Click to view Day schedule'}">
         <span class="cal-day__num">${day}</span>
         ${dotsHTML ? `<div class="cal-dots">${dotsHTML}</div>` : ''}
       </button>`;
@@ -1529,11 +1536,6 @@
 
     return `
     <div class="cal-widget">
-      <div class="cal-nav">
-        <button class="cal-nav-btn" type="button" data-calendar-prev title="Previous month">&lsaquo;</button>
-        <span class="cal-nav-title">${MONTH_NAMES[month]} ${year}</span>
-        <button class="cal-nav-btn" type="button" data-calendar-next title="Next month">&rsaquo;</button>
-      </div>
       <div class="cal-grid">
         ${headerHTML}
         ${cellsHTML}
@@ -1547,45 +1549,79 @@
     </div>`;
   }
 
-  /**
-   * Render the list of appointments for a selected day
-   */
-  function renderDayAppointments(year, month, day) {
+  /* ═══════════════════════════════════════════════════════
+     DAY VIEW HOURLY GRID (Google Calendar Style)
+     ═══════════════════════════════════════════════════════ */
+
+  function renderDayView(year, month, day) {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dateObj = new Date(year, month, day);
+    const dayName = DAY_NAMES[dateObj.getDay()];
+    const dateFormatted = dateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+
     const appointments = getAppointments().filter(a => a.date === dateStr);
-    const dateLabel = new Date(year, month, day).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-    if (appointments.length === 0) {
+    const slotRows = HOURLY_SLOTS.map(slot => {
+      // Find appointments matching this slot hour
+      const slotHour = parseInt(slot.value.split(':')[0]);
+      const matchingAppts = appointments.filter(a => {
+        if (!a.time) return slot.value === '10:00'; // Default unassigned to 10 AM
+        const match24 = a.time.match(/^(\d{1,2}):/);
+        if (match24) {
+          let h = parseInt(match24[1]);
+          if (a.time.toLowerCase().includes('pm') && h !== 12) h += 12;
+          if (a.time.toLowerCase().includes('am') && h === 12) h = 0;
+          return h === slotHour;
+        }
+        return false;
+      });
+
+      let slotContent = '';
+      if (matchingAppts.length > 0) {
+        slotContent = matchingAppts.map(a => `
+        <div class="cal-event-card cal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
+          <div class="cal-event-time">${a.time || slot.label}</div>
+          <div class="cal-event-info">
+            <b class="cal-event-title">${a.childName}</b>
+            <span class="cal-event-sub">${a.type}${a.doctor ? ` — ${a.doctor}` : ''}</span>
+          </div>
+          <span class="cal-event-status cal-event-status--${a.status === 'Completed' ? 'done' : 'upcoming'}">${a.status || 'Upcoming'}</span>
+        </div>
+      `).join('');
+      } else {
+        slotContent = `<div class="cal-slot-placeholder">+ Click to add appointment at ${slot.label}</div>`;
+      }
+
       return `
-      <div class="cal-day-list">
-        <div class="cal-day-list__header">${dateLabel}</div>
-        <div class="cal-day-list__empty">No appointments scheduled for this day</div>
+      <div class="cal-timeline-row" data-open-booking-modal data-slot-date="${dateStr}" data-slot-time="${slot.value}">
+        <div class="cal-time-col">
+          <span>${slot.label}</span>
+        </div>
+        <div class="cal-slot-col">
+          ${slotContent}
+        </div>
       </div>`;
-    }
-
-    const items = appointments.map(a => `
-    <div class="cal-appt-item cal-appt-item--${typeColor(a.type)}">
-      <div class="cal-appt-time">${a.time || '—'}</div>
-      <div class="cal-appt-details">
-        <div class="cal-appt-name">${a.childName}</div>
-        <div class="cal-appt-meta">${a.type}${a.doctor ? ` · ${a.doctor}` : ''}</div>
-        ${a.notes ? `<div class="cal-appt-notes">${a.notes}</div>` : ''}
-      </div>
-      <span class="cal-appt-badge cal-appt-badge--${a.status === 'Completed' ? 'done' : 'upcoming'}">${a.status || 'Upcoming'}</span>
-    </div>
-  `).join('');
+    }).join('');
 
     return `
-    <div class="cal-day-list">
-      <div class="cal-day-list__header">${dateLabel}</div>
-      ${items}
+    <div class="cal-day-view">
+      <div class="cal-day-view__header">
+        <div class="cal-day-view__title">
+          <h3>${dayName}, ${dateFormatted}</h3>
+          <p>${appointments.length} appointment(s) scheduled for this day</p>
+        </div>
+      </div>
+      <div class="cal-timeline-grid">
+        ${slotRows}
+      </div>
     </div>`;
   }
 
-  /**
-   * Render the booking form (child selector + details)
-   */
-  function renderBookingForm(preselectedDate) {
+  /* ═══════════════════════════════════════════════════════
+     BOOKING FORM & MODAL
+     ═══════════════════════════════════════════════════════ */
+
+  function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
     const children = getChildren();
     const childOptions = children.map(c => `<option value="${c.id}">${c.name} (${c.id})</option>`).join('');
     const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
@@ -1628,7 +1664,7 @@
         </label>
         <label class="cal-field">
           <span class="cal-field__label">Time</span>
-          <input class="cal-input" name="time" type="time" value="10:00" />
+          <input class="cal-input" name="time" type="time" value="${preselectedTime}" />
         </label>
       </div>
 
@@ -1637,7 +1673,7 @@
         <textarea class="cal-textarea" name="notes" rows="2" placeholder="Additional details…"></textarea>
       </label>
 
-      <button class="cal-book-btn" type="submit" data-book-appointment>
+      <button class="cal-book-btn" type="submit">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
         Book on Google Calendar
       </button>
@@ -1645,74 +1681,129 @@
   }
 
   /**
-   * Map appointment type to a color class
+   * Render Google Calendar-style Popup Modal
    */
-  function typeColor(type) {
-    if (!type) return 'blue';
-    const t = type.toLowerCase();
-    if (t.includes('doctor') || t.includes('general')) return 'blue';
-    if (t.includes('follow')) return 'green';
-    if (t.includes('dental')) return 'amber';
-    if (t.includes('deworm')) return 'violet';
-    if (t.includes('vaccin')) return 'green';
-    if (t.includes('eye')) return 'amber';
-    return 'blue';
+  function renderBookingModalMarkup(dateStr, timeStr) {
+    const formHTML = renderBookingForm(dateStr, timeStr);
+
+    return `
+    <div class="cal-modal-overlay" id="cal-booking-modal" data-close-cal-modal-bg>
+      <div class="cal-modal-card">
+        <div class="cal-modal-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+            <h3 style="margin:0; font-size:16px; font-weight:700;">Google Calendar Booking</h3>
+          </div>
+          <button type="button" class="cal-modal-close" data-close-cal-modal>&times;</button>
+        </div>
+        <div class="cal-modal-body">
+          ${formHTML}
+        </div>
+      </div>
+    </div>`;
   }
 
   /* ═══════════════════════════════════════════════════════
-     FULL CALENDAR SECTION FOR DASHBOARD
+     FULL CALENDAR CONTAINER & VIEW CONTROLLER
      ═══════════════════════════════════════════════════════ */
 
-  /**
-   * Render the complete calendar card for the dashboard.
-   * This replaces the "Active health alerts" section.
-   */
-  function calendarCard() {
+  function calendarCard(viewMode = 'month', initialYear, initialMonth, initialDay) {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
-    const today = now.getDate();
+    const day = now.getDate();
+
+    const isMonthView = viewMode === 'month';
+    const monthName = MONTH_NAMES[month];
+    const dateObj = new Date(year, month, day);
+    const dayName = DAY_NAMES[dateObj.getDay()];
+
+    const titleText = isMonthView ? `${monthName} ${year}` : `${dayName}, ${day} ${monthName} ${year}`;
 
     return `
-    <section class="card cal-card" data-calendar-root data-cal-year="${year}" data-cal-month="${month}" data-cal-day="${today}">
-      <header class="card__header">
-        <div>
-          <h2 class="card__title" style="display:flex; align-items:center; gap:8px;">
+    <section class="card cal-card" data-calendar-root data-cal-view-mode="${viewMode}" data-cal-year="${year}" data-cal-month="${month}" data-cal-day="${day}">
+      <header class="card__header cal-header-bar">
+        <div class="cal-header-left">
+          <h2 class="card__title cal-header-title">
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--color-primary)"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-            Appointment Calendar
+            <span data-calendar-title>${titleText}</span>
           </h2>
-          <p class="card__caption">Select a child and book health appointments — synced to Google Calendar</p>
+        </div>
+
+        <div class="cal-header-controls">
+          <button class="button button--sm button--ghost" type="button" data-calendar-today>Today</button>
+          
+          <div class="cal-nav-btn-group">
+            <button class="cal-nav-btn" type="button" data-calendar-prev title="Previous">&lsaquo;</button>
+            <button class="cal-nav-btn" type="button" data-calendar-next title="Next">&rsaquo;</button>
+          </div>
+
+          <div class="cal-view-toggle">
+            <button class="cal-view-btn ${isMonthView ? 'active' : ''}" type="button" data-cal-view="month">Month</button>
+            <button class="cal-view-btn ${!isMonthView ? 'active' : ''}" type="button" data-cal-view="day">Day</button>
+          </div>
         </div>
       </header>
+
       <div class="card__body cal-card__body">
-        <div class="cal-layout">
-          <div class="cal-layout__left" data-calendar-container>
-            ${renderCalendarGrid(year, month, today)}
-          </div>
-          <div class="cal-layout__right" data-booking-container>
-            ${renderBookingForm(now.toISOString().slice(0, 10))}
-          </div>
-        </div>
-        <div class="cal-day-appointments" data-day-appointments>
-          ${renderDayAppointments(year, month, today)}
+        <div class="cal-content-container" data-calendar-container>
+          ${isMonthView ? renderMonthViewLayout(year, month, day) : renderDayView(year, month, day)}
         </div>
       </div>
-    </section>`;
+    </section>
+    <div id="cal-modal-container"></div>`;
+  }
+
+  function renderMonthViewLayout(year, month, day) {
+    const dateVal = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return `
+    <div class="cal-layout">
+      <div class="cal-layout__left">
+        ${renderCalendarGrid(year, month, day)}
+      </div>
+      <div class="cal-layout__right">
+        ${renderBookingForm(dateVal)}
+      </div>
+    </div>`;
   }
 
   /**
-   * Re-render the calendar grid inside the existing container (for month nav / day selection)
+   * Re-render the calendar view inside root
    */
-  function updateCalendarView(root, year, month, selectedDay) {
-    const calContainer = root.querySelector('[data-calendar-container]');
-    const dayContainer = root.querySelector('[data-day-appointments]');
-    if (calContainer) calContainer.innerHTML = renderCalendarGrid(year, month, selectedDay);
-    if (dayContainer && selectedDay) dayContainer.innerHTML = renderDayAppointments(year, month, selectedDay);
+  function updateCalendarView(root, viewMode, year, month, day) {
+    if (!root) return;
 
-    // Update data attributes
+    const isMonthView = viewMode === 'month';
+    const monthName = MONTH_NAMES[month];
+    const dateObj = new Date(year, month, day);
+    const dayName = DAY_NAMES[dateObj.getDay()];
+
+    // Update root attributes
+    root.dataset.calViewMode = viewMode;
     root.dataset.calYear = year;
     root.dataset.calMonth = month;
-    if (selectedDay) root.dataset.calDay = selectedDay;
+    root.dataset.calDay = day;
+
+    // Update title
+    const titleEl = root.querySelector('[data-calendar-title]');
+    if (titleEl) {
+      titleEl.textContent = isMonthView ? `${monthName} ${year}` : `${dayName}, ${day} ${monthName} ${year}`;
+    }
+
+    // Update active view buttons
+    root.querySelectorAll('[data-cal-view]').forEach(btn => {
+      if (btn.dataset.calView === viewMode) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    // Update body content
+    const container = root.querySelector('[data-calendar-container]');
+    if (container) {
+      container.innerHTML = isMonthView ? renderMonthViewLayout(year, month, day) : renderDayView(year, month, day);
+    }
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -37802,41 +37893,82 @@
         }, 400);
       }
 
-      // ─── Calendar: Month Navigation ───
+      // ─── Calendar Controls (View Toggle, Today, Prev/Next, Day Click, Time Slot Modal) ───
       const calRoot = target.closest('[data-calendar-root]');
-      if (target.closest('[data-calendar-prev]') && calRoot) {
+      if (calRoot) {
+        let viewMode = calRoot.dataset.calViewMode || 'month';
         let y = parseInt(calRoot.dataset.calYear);
         let m = parseInt(calRoot.dataset.calMonth);
-        m--;
-        if (m < 0) { m = 11; y--; }
-        updateCalendarView(calRoot, y, m, null);
-        // Clear day appointments
-        const dayContainer = calRoot.querySelector('[data-day-appointments]');
-        if (dayContainer) dayContainer.innerHTML = '<div class="cal-day-list__empty">Select a day to see appointments</div>';
-      }
-      if (target.closest('[data-calendar-next]') && calRoot) {
-        let y = parseInt(calRoot.dataset.calYear);
-        let m = parseInt(calRoot.dataset.calMonth);
-        m++;
-        if (m > 11) { m = 0; y++; }
-        updateCalendarView(calRoot, y, m, null);
-        const dayContainer = calRoot.querySelector('[data-day-appointments]');
-        if (dayContainer) dayContainer.innerHTML = '<div class="cal-day-list__empty">Select a day to see appointments</div>';
-      }
+        let d = parseInt(calRoot.dataset.calDay);
 
-      // ─── Calendar: Day Selection ───
-      const dayBtn = target.closest('[data-calendar-day]');
-      if (dayBtn && calRoot) {
-        const day = parseInt(dayBtn.dataset.calendarDay);
-        const y = parseInt(calRoot.dataset.calYear);
-        const m = parseInt(calRoot.dataset.calMonth);
-        updateCalendarView(calRoot, y, m, day);
-
-        // Also update the date field in the booking form
-        const dateInput = calRoot.querySelector('input[name="date"]');
-        if (dateInput) {
-          dateInput.value = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        // View Toggle Buttons (Month / Day)
+        const viewBtn = target.closest('[data-cal-view]');
+        if (viewBtn) {
+          viewMode = viewBtn.dataset.calView;
+          updateCalendarView(calRoot, viewMode, y, m, d);
+          return;
         }
+
+        // Today Button
+        if (target.closest('[data-calendar-today]')) {
+          const now = new Date();
+          updateCalendarView(calRoot, viewMode, now.getFullYear(), now.getMonth(), now.getDate());
+          return;
+        }
+
+        // Prev Button
+        if (target.closest('[data-calendar-prev]')) {
+          if (viewMode === 'month') {
+            m--;
+            if (m < 0) { m = 11; y--; }
+          } else {
+            const curDate = new Date(y, m, d - 1);
+            y = curDate.getFullYear();
+            m = curDate.getMonth();
+            d = curDate.getDate();
+          }
+          updateCalendarView(calRoot, viewMode, y, m, d);
+          return;
+        }
+
+        // Next Button
+        if (target.closest('[data-calendar-next]')) {
+          if (viewMode === 'month') {
+            m++;
+            if (m > 11) { m = 0; y++; }
+          } else {
+            const curDate = new Date(y, m, d + 1);
+            y = curDate.getFullYear();
+            m = curDate.getMonth();
+            d = curDate.getDate();
+          }
+          updateCalendarView(calRoot, viewMode, y, m, d);
+          return;
+        }
+
+        // Day Click in Month View -> Switch to Day View
+        const dayCell = target.closest('[data-calendar-day]');
+        if (dayCell) {
+          const dayNum = parseInt(dayCell.dataset.calendarDay);
+          updateCalendarView(calRoot, 'day', y, m, dayNum);
+          return;
+        }
+
+        // Time Slot Row Click in Day View -> Open Booking Popup Modal
+        const slotRow = target.closest('[data-open-booking-modal]');
+        if (slotRow) {
+          const slotDate = slotRow.dataset.slotDate;
+          const slotTime = slotRow.dataset.slotTime;
+          const modalContainer = document.querySelector('#cal-modal-container') || document.body;
+          modalContainer.innerHTML = renderBookingModalMarkup(slotDate, slotTime);
+          return;
+        }
+      }
+
+      // Modal Close Button or Overlay Click
+      if (target.closest('[data-close-cal-modal]') || (target.dataset && target.dataset.closeCalModalBg !== undefined)) {
+        const calModal = document.querySelector('#cal-booking-modal');
+        if (calModal) calModal.remove();
       }
 
       if (target.closest('[data-open-sheets-template]')) {
