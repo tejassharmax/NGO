@@ -94,7 +94,7 @@ async function handleGoogleAuth(email) {
 
   // Document Clicks
   document.addEventListener('click', (event) => {
-    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], .modal-backdrop');
+    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], .modal-backdrop, .gcal-popup-backdrop');
     if (!target) return;
 
     if (target.matches('[data-topbar-back]')) {
@@ -250,7 +250,7 @@ async function handleGoogleAuth(email) {
     }
 
     // Modal Close Button or Overlay Backdrop Click
-    if (target.closest('[data-close-cal-modal]') || target.classList.contains('modal-backdrop') || (target.dataset && target.dataset.closeCalModalBg !== undefined)) {
+    if (target.closest('[data-close-cal-modal]') || target.classList.contains('modal-backdrop') || target.classList.contains('gcal-popup-backdrop') || (target.dataset && target.dataset.closeCalModalBg !== undefined)) {
       const modalRoot = document.querySelector('#modal-root');
       if (modalRoot) modalRoot.replaceChildren();
       const calModal = document.querySelector('#cal-booking-modal');
