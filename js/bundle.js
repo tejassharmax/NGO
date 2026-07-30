@@ -1787,15 +1787,16 @@
   function updateCalendarView(root, viewMode, year, month, day) {
     if (!root) return;
 
-    const isMonthView = viewMode === 'month';
+    const mode = viewMode || 'month';
+    const isMonthView = mode === 'month';
     const monthName = MONTH_NAMES[month];
     const dateObj = new Date(year, month, day);
     const dayName = DAY_NAMES[dateObj.getDay()];
 
-    root.dataset.calViewMode = viewMode;
-    root.dataset.calYear = year;
-    root.dataset.calMonth = month;
-    root.dataset.calDay = day;
+    root.setAttribute('data-cal-view-mode', mode);
+    root.setAttribute('data-cal-year', String(year));
+    root.setAttribute('data-cal-month', String(month));
+    root.setAttribute('data-cal-day', String(day));
 
     const titleEl = root.querySelector('[data-calendar-title]');
     if (titleEl) {
@@ -1803,7 +1804,7 @@
     }
 
     root.querySelectorAll('[data-cal-view]').forEach(btn => {
-      if (btn.dataset.calView === viewMode) {
+      if (btn.getAttribute('data-cal-view') === mode) {
         btn.classList.add('active');
       } else {
         btn.classList.remove('active');
@@ -37906,8 +37907,8 @@
       // ─── Open Booking Popup Modal (from any button or time slot row) ───
       const slotBtn = target.closest('[data-open-booking-modal]');
       if (slotBtn) {
-        const slotDate = slotBtn.dataset.slotDate || new Date().toISOString().slice(0, 10);
-        const slotTime = slotBtn.dataset.slotTime || '10:00';
+        const slotDate = slotBtn.getAttribute('data-slot-date') || new Date().toISOString().slice(0, 10);
+        const slotTime = slotBtn.getAttribute('data-slot-time') || '10:00';
         const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
         modalContainer.innerHTML = renderBookingModalMarkup(slotDate, slotTime);
         return;
@@ -37916,16 +37917,16 @@
       // ─── Calendar Controls (View Toggle, Today, Prev/Next, Day Click) ───
       const calRoot = target.closest('[data-calendar-root]');
       if (calRoot) {
-        let viewMode = calRoot.dataset.calViewMode || 'month';
-        let y = parseInt(calRoot.dataset.calYear);
-        let m = parseInt(calRoot.dataset.calMonth);
-        let d = parseInt(calRoot.dataset.calDay);
+        let viewMode = calRoot.getAttribute('data-cal-view-mode') || 'month';
+        let y = parseInt(calRoot.getAttribute('data-cal-year') || new Date().getFullYear());
+        let m = parseInt(calRoot.getAttribute('data-cal-month') || new Date().getMonth());
+        let d = parseInt(calRoot.getAttribute('data-cal-day') || new Date().getDate());
 
         // View Toggle Buttons (Month / Day)
         const viewBtn = target.closest('[data-cal-view]');
         if (viewBtn) {
-          viewMode = viewBtn.dataset.calView;
-          updateCalendarView(calRoot, viewMode, y, m, d);
+          const newMode = viewBtn.getAttribute('data-cal-view');
+          updateCalendarView(calRoot, newMode, y, m, d);
           return;
         }
 
@@ -37966,11 +37967,13 @@
           return;
         }
 
-        // Day Click in Month View -> Switch to Day View for that date
+        // Day Click in Month View -> MUST SWITCH TO DAY VIEW FOR THAT DATE!
         const dayCell = target.closest('[data-calendar-day]');
         if (dayCell) {
-          const dayNum = parseInt(dayCell.dataset.calendarDay);
-          updateCalendarView(calRoot, 'day', y, m, dayNum);
+          const dayNum = parseInt(dayCell.getAttribute('data-calendar-day'));
+          if (!isNaN(dayNum)) {
+            updateCalendarView(calRoot, 'day', y, m, dayNum);
+          }
           return;
         }
       }

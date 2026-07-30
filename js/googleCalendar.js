@@ -433,15 +433,16 @@ export function calendarCard(viewMode = 'month', initialYear, initialMonth, init
 export function updateCalendarView(root, viewMode, year, month, day) {
   if (!root) return;
 
-  const isMonthView = viewMode === 'month';
+  const mode = viewMode || 'month';
+  const isMonthView = mode === 'month';
   const monthName = MONTH_NAMES[month];
   const dateObj = new Date(year, month, day);
   const dayName = DAY_NAMES[dateObj.getDay()];
 
-  root.dataset.calViewMode = viewMode;
-  root.dataset.calYear = year;
-  root.dataset.calMonth = month;
-  root.dataset.calDay = day;
+  root.setAttribute('data-cal-view-mode', mode);
+  root.setAttribute('data-cal-year', String(year));
+  root.setAttribute('data-cal-month', String(month));
+  root.setAttribute('data-cal-day', String(day));
 
   const titleEl = root.querySelector('[data-calendar-title]');
   if (titleEl) {
@@ -449,7 +450,7 @@ export function updateCalendarView(root, viewMode, year, month, day) {
   }
 
   root.querySelectorAll('[data-cal-view]').forEach(btn => {
-    if (btn.dataset.calView === viewMode) {
+    if (btn.getAttribute('data-cal-view') === mode) {
       btn.classList.add('active');
     } else {
       btn.classList.remove('active');
