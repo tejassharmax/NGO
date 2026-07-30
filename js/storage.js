@@ -271,6 +271,13 @@ export function updateAppointment(appt) {
   return appt;
 }
 
+export function deleteAppointment(id) {
+  const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+  const filtered = all.filter(a => String(a.id) !== String(id));
+  localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(filtered));
+  return true;
+}
+
 /* ─── Emergency Contacts ─── */
 
 export function getEmergencyContacts() {
