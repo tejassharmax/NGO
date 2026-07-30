@@ -4,6 +4,7 @@ import { childRows } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
 import { getGoogleSheetUrl } from './googleSheetsSync.js';
+import { calendarCard, renderCalendarGrid, renderDayAppointments, renderBookingForm } from './googleCalendar.js';
 
 /* ═══════════════════════════════════════════════════════
    NAVIGATION
@@ -11,13 +12,14 @@ import { getGoogleSheetUrl } from './googleSheetsSync.js';
 
 const nav = [
   { section: 'Overview', items: [['dashboard', 'Dashboard', 'grid']] },
-  { section: 'Children & Health', items: [['children', 'Children', 'users'], ['growth', 'Growth', 'ruler'], ['medicines', 'Medicines', 'pill'], ['documents', 'Documents', 'file']] },
+  { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['medicines', 'Medicines', 'pill'], ['documents', 'Documents', 'file']] },
   { section: 'Analytics', items: [['reports', 'Reports', 'chart']] }
 ];
 
 const pageTitles = {
   dashboard: 'Dashboard',
   children: 'Children',
+  appointments: 'Appointments',
   'child-profile': 'Child Health Profile',
   'register-child': 'Register child',
   'ocr-upload': 'Google Cloud Vision API Extraction',
@@ -129,23 +131,6 @@ export function dashboardPage() {
   // Flagged children for alerts
   const flaggedChildren = children.filter(c => healthStatus(c).level !== 'good');
 
-  // Active Health Alerts
-  const alertsList = getAlerts().filter(a => !a.dismissed).slice(0, 5);
-  let alertsHTML = '';
-  if (alertsList.length === 0) {
-    alertsHTML = `<div class="empty-state" style="padding:24px 12px"><span class="empty-state__icon">${icon('check')}</span><h3 style="font-size:13px">All health status clear</h3><p>No active critical warnings or health flags.</p></div>`;
-  } else {
-    alertsHTML = alertsList.map(a => `
-      <div class="list-row" style="border-left: 3px solid ${a.type === 'critical' ? 'var(--color-danger)' : a.type === 'warning' ? 'var(--color-warning)' : 'var(--color-primary)'}; padding-left: 10px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-        <span class="list-row__copy" style="margin-left: 4px;">
-          <b style="color: ${a.type === 'critical' ? 'var(--color-danger)' : a.type === 'warning' ? 'var(--color-warning)' : 'inherit'}; font-size: 13px;">${a.message}</b>
-          <span style="font-size: 11px;">${a.childName}</span>
-        </span>
-        <button class="icon-button icon-button--small tooltip" data-tooltip="Dismiss" type="button" data-dismiss-alert="${a.id}" aria-label="Dismiss alert" style="margin-left: auto;">${icon('x')}</button>
-      </div>
-    `).join('');
-  }
-
   // Children Needing Attention
   let attentionHTML = '';
   if (flaggedChildren.length === 0) {
@@ -166,19 +151,10 @@ export function dashboardPage() {
     ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'Google Drive Storage', 'file', 'blue')}
     ${statCard('Last Checkup', 'Today', '10:30 AM verified', 'clock', 'green')}
   </div>
-  <div class="dashboard-grid dashboard-grid--primary">
-    <section class="card">
-      <header class="card__header">
-        <div>
-          <h2 class="card__title">Active health alerts</h2>
-          <p class="card__caption">Critical warnings and health updates needing caregiver attention</p>
-        </div>
-        <span class="badge badge--danger">${alertsList.length > 0 ? alertsList.length + ' active' : 'None'}</span>
-      </header>
-      <div class="card__body" style="padding-top: 10px;">
-        ${alertsHTML}
-      </div>
-    </section>
+  <div style="margin-top: 20px;">
+    ${calendarCard()}
+  </div>
+  <div class="dashboard-grid dashboard-grid--primary" style="margin-top: 20px;">
     <section class="card">
       <header class="card__header">
         <div>
@@ -900,6 +876,59 @@ export function settingsPage() {
 }
 
 /* ═══════════════════════════════════════════════════════
+   APPOINTMENTS — Full Page Calendar View
+   ═══════════════════════════════════════════════════════ */
+
+export function appointmentsPage() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const today = now.getDate();
+  const appointments = getAppointments();
+  const upcomingCount = appointments.filter(a => a.status === 'Upcoming').length;
+  const completedCount = appointments.filter(a => a.status === 'Completed').length;
+
+  // All appointments list sorted by date
+  const allApptsHTML = appointments.length === 0
+    ? `<div class="empty-state" style="padding:30px 12px"><span class="empty-state__icon">${icon('calendar')}</span><h3 style="font-size:13px">No appointments yet</h3><p>Book your first appointment using the form above.</p></div>`
+    : appointments.slice(0, 10).map(a => {
+      const typeClass = a.type?.toLowerCase().includes('doctor') ? 'blue' : a.type?.toLowerCase().includes('follow') ? 'green' : a.type?.toLowerCase().includes('dental') ? 'amber' : 'violet';
+      return `
+        <div class="cal-appt-item cal-appt-item--${typeClass}">
+          <div class="cal-appt-time">${a.time || '—'}</div>
+          <div class="cal-appt-details">
+            <div class="cal-appt-name">${a.childName || 'Unknown'}</div>
+            <div class="cal-appt-meta">${a.type || 'Appointment'}${a.doctor ? ` · ${a.doctor}` : ''} · ${a.date || '—'}</div>
+            ${a.notes ? `<div class="cal-appt-notes">${a.notes}</div>` : ''}
+          </div>
+          <span class="cal-appt-badge cal-appt-badge--${a.status === 'Completed' ? 'done' : 'upcoming'}">${a.status || 'Upcoming'}</span>
+        </div>`;
+    }).join('');
+
+  return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}View Children</a>`)}
+  <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+    ${statCard('Total Appointments', appointments.length.toLocaleString(), 'All records', 'calendar', 'blue')}
+    ${statCard('Upcoming', upcomingCount.toLocaleString(), 'Scheduled visits', 'clock', 'amber')}
+    ${statCard('Completed', completedCount.toLocaleString(), 'Past appointments', 'check', 'green')}
+  </div>
+  ${calendarCard()}
+  <div style="margin-top: 20px;">
+    <section class="card">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">All Appointments</h2>
+          <p class="card__caption">Complete appointment history across all children</p>
+        </div>
+        <span class="badge badge--blue">${appointments.length} total</span>
+      </header>
+      <div class="card__body" style="padding-top: 10px;">
+        ${allApptsHTML}
+      </div>
+    </section>
+  </div>`);
+}
+
+/* ═══════════════════════════════════════════════════════
    PAGE ROUTER
    ═══════════════════════════════════════════════════════ */
 
@@ -908,6 +937,7 @@ export function renderPage(page) {
     login: loginPage,
     dashboard: dashboardPage,
     children: childrenPage,
+    appointments: appointmentsPage,
     'child-profile': childProfilePage,
     'register-child': registerChildPage,
     'ocr-upload': ocrUploadPage,

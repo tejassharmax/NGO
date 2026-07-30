@@ -11,6 +11,7 @@ import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets } from './googleSheetsSync.js';
+import { bookAppointment, updateCalendarView, renderDayAppointments } from './googleCalendar.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
@@ -23,7 +24,7 @@ let page = 'dashboard';
   const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
   page = document.body.dataset.page || 'dashboard';
 
-  const deprecatedPages = ['appointments', 'emergency', 'expenses', 'nutrition', 'export'];
+  const deprecatedPages = ['emergency', 'expenses', 'nutrition', 'export'];
   if (deprecatedPages.includes(page)) {
     window.location.href = pagePath('dashboard');
     return;
@@ -217,6 +218,43 @@ async function handleGoogleAuth(email) {
       window.setTimeout(() => {
         window.location.reload();
       }, 400);
+    }
+
+    // ─── Calendar: Month Navigation ───
+    const calRoot = target.closest('[data-calendar-root]');
+    if (target.closest('[data-calendar-prev]') && calRoot) {
+      let y = parseInt(calRoot.dataset.calYear);
+      let m = parseInt(calRoot.dataset.calMonth);
+      m--;
+      if (m < 0) { m = 11; y--; }
+      updateCalendarView(calRoot, y, m, null);
+      // Clear day appointments
+      const dayContainer = calRoot.querySelector('[data-day-appointments]');
+      if (dayContainer) dayContainer.innerHTML = '<div class="cal-day-list__empty">Select a day to see appointments</div>';
+    }
+    if (target.closest('[data-calendar-next]') && calRoot) {
+      let y = parseInt(calRoot.dataset.calYear);
+      let m = parseInt(calRoot.dataset.calMonth);
+      m++;
+      if (m > 11) { m = 0; y++; }
+      updateCalendarView(calRoot, y, m, null);
+      const dayContainer = calRoot.querySelector('[data-day-appointments]');
+      if (dayContainer) dayContainer.innerHTML = '<div class="cal-day-list__empty">Select a day to see appointments</div>';
+    }
+
+    // ─── Calendar: Day Selection ───
+    const dayBtn = target.closest('[data-calendar-day]');
+    if (dayBtn && calRoot) {
+      const day = parseInt(dayBtn.dataset.calendarDay);
+      const y = parseInt(calRoot.dataset.calYear);
+      const m = parseInt(calRoot.dataset.calMonth);
+      updateCalendarView(calRoot, y, m, day);
+
+      // Also update the date field in the booking form
+      const dateInput = calRoot.querySelector('input[name="date"]');
+      if (dateInput) {
+        dateInput.value = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
     }
 
     if (target.closest('[data-open-sheets-template]')) {
@@ -796,25 +834,33 @@ async function handleGoogleAuth(email) {
     window.setTimeout(() => window.location.reload(), 500);
   });
 
-  // Appointment form
-  document.querySelector('#appointment-form')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
+  // Appointment form (legacy & calendar widget)
+  const handleBookingSubmit = (form) => {
     if (!form.reportValidity()) return;
     const values = Object.fromEntries(new FormData(form));
     const child = getChild(values.childId);
-    addAppointment({
+    bookAppointment({
       childId: values.childId,
       childName: child ? child.name : 'Unknown',
       type: values.type,
       date: values.date,
       time: values.time || '',
       doctor: values.doctor || '',
-      notes: values.notes || '',
-      status: 'Upcoming'
+      notes: values.notes || ''
     });
-    toast('Appointment scheduled', 'Reminder has been set.');
-    window.setTimeout(() => window.location.reload(), 500);
+    window.setTimeout(() => window.location.reload(), 1000);
+  };
+
+  document.querySelector('#appointment-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    handleBookingSubmit(event.currentTarget);
+  });
+
+  document.addEventListener('submit', (event) => {
+    if (event.target && (event.target.id === 'cal-booking-form' || event.target.classList.contains('cal-booking-form'))) {
+      event.preventDefault();
+      handleBookingSubmit(event.target);
+    }
   });
 
   // Emergency contact form
