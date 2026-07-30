@@ -1,0 +1,56 @@
+remove appointments, emergency, expenses, nutrition, remove export.
+
+google looker studio
+last checkup
+
+log checkup
+blood pressure
+height 
+pulse rate
+Weight
+
+mainly google cloud app
+gemini apis, cloud vision api
+google sheets, docs bucket 
+
+Ayusha Nilayam
+Alex Agape
+Never Alone Home
+
+Required Features
+Build Google Cloud App
+
+Google Authentication
+
+Children
+Growth - BP,Pulse, Height Weight
+Medicine
+Report
+Google Vision OCR for 
+Notebook Handwritten Observations and Medicines
+Blood Tests
+
+Last Checkup ---- Next Checkup
+
+Add Next Appointment/ Checkup
+ - Contact Name
+Contact Number
+Date / Time
+
+next checkup - google calendar
+
+graph LR
+  A[User Fills Child Form / OCR] --> B[Click Save Child Record]
+  B --> C[Google Sheets API v4]
+  C --> D{Sheet Exists in Google Account?}
+  D -- No --> E[Create New Google Sheet: 'Child_Health_Records_Ayusha_Nilayam']
+  D -- Yes --> F[Append New Child Record Row]
+  E --> F
+  F --> G[Live Sync Badge: Connected]
+
+dental remarks
+hygiene index
+
+last checkup reports
+on firebase child id, calendar id and institution id
+if child id is blank u have to create a new child id and update this sheet
