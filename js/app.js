@@ -11,7 +11,7 @@ import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets } from './googleSheetsSync.js';
-import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl } from './googleCalendar.js';
+import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, formatSingleDisplayTime } from './googleCalendar.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
@@ -936,13 +936,8 @@ async function handleGoogleAuth(email) {
     if (displayEl && dateInput && dateInput.value) {
       const dateObj = new Date(dateInput.value + 'T00:00:00');
       const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-      let displayTime = timeInput ? timeInput.value : '';
-      if (displayTime) {
-        const [h, min] = displayTime.split(':').map(Number);
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        const h12 = h % 12 || 12;
-        displayTime = `${h12}:${String(min).padStart(2, '0')} ${ampm}`;
-      }
+      const rawTime = timeInput ? timeInput.value : '';
+      const displayTime = rawTime ? formatSingleDisplayTime(rawTime) : '';
       displayEl.textContent = `${displayDate}${displayTime ? ` · ${displayTime}` : ''}`;
     }
   });
