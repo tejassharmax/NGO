@@ -37969,12 +37969,27 @@
         }
       }
 
+      // Tab switching inside Google Calendar popup modal
+      const popupTab = target.closest('.gcal-popup-tab');
+      if (popupTab) {
+        const parent = popupTab.closest('.gcal-popup-tabs');
+        if (parent) {
+          parent.querySelectorAll('.gcal-popup-tab').forEach(t => t.classList.remove('gcal-popup-tab--active'));
+          popupTab.classList.add('gcal-popup-tab--active');
+        }
+        return;
+      }
+
       // Modal Close Button or Overlay Backdrop Click
-      if (target.closest('[data-close-cal-modal]') || target.classList.contains('modal-backdrop') || target.classList.contains('gcal-popup-backdrop') || (target.dataset && target.dataset.closeCalModalBg !== undefined)) {
+      const isExplicitClose = target.closest('[data-close-cal-modal]');
+      const isDirectBackdrop = event.target && event.target.classList && (event.target.classList.contains('modal-backdrop') || event.target.classList.contains('gcal-popup-backdrop') || event.target.dataset.closeCalModalBg !== undefined);
+
+      if (isExplicitClose || isDirectBackdrop) {
         const modalRoot = document.querySelector('#modal-root');
         if (modalRoot) modalRoot.replaceChildren();
         const calModal = document.querySelector('#cal-booking-modal');
         if (calModal) calModal.remove();
+        return;
       }
 
       if (target.closest('[data-open-sheets-template]')) {
@@ -38580,6 +38595,27 @@
       if (event.target && (event.target.id === 'cal-booking-form' || event.target.classList.contains('cal-booking-form'))) {
         event.preventDefault();
         handleBookingSubmit(event.target);
+      }
+    });
+
+    // Live date & time text update in booking popup
+    document.addEventListener('input', (event) => {
+      const form = event.target.closest('#cal-booking-form');
+      if (!form) return;
+      const dateInput = form.querySelector('[name="date"]');
+      const timeInput = form.querySelector('[name="time"]');
+      const displayEl = form.querySelector('.gcal-popup-date-display');
+      if (displayEl && dateInput && dateInput.value) {
+        const dateObj = new Date(dateInput.value + 'T00:00:00');
+        const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+        let displayTime = timeInput ? timeInput.value : '';
+        if (displayTime) {
+          const [h, min] = displayTime.split(':').map(Number);
+          const ampm = h >= 12 ? 'PM' : 'AM';
+          const h12 = h % 12 || 12;
+          displayTime = `${h12}:${String(min).padStart(2, '0')} ${ampm}`;
+        }
+        displayEl.textContent = `${displayDate}${displayTime ? ` · ${displayTime}` : ''}`;
       }
     });
 
