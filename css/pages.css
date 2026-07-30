@@ -749,44 +749,43 @@ body.theme-dark .login-card__hero-icon {
 .gcal-timeline-grid {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
   overflow: hidden;
-  background: var(--color-bg);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  background: #ffffff;
 }
 
 .gcal-timeline-row {
   display: flex;
-  min-height: 60px;
-  border-bottom: 1px solid var(--color-border);
+  min-height: 56px;
+  border-bottom: 1px solid #e0e0e0;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.12s ease;
 }
 .gcal-timeline-row:last-child {
   border-bottom: none;
 }
 .gcal-timeline-row:hover {
-  background: rgba(37, 99, 235, 0.04);
+  background: #f1f3f4;
 }
 
 .gcal-time-col {
-  width: 100px;
+  width: 86px;
   flex-shrink: 0;
-  padding: 14px 16px;
-  background: var(--color-bg-alt);
-  border-right: 1px solid var(--color-border);
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-text-muted);
+  padding: 12px 14px;
+  background: #ffffff;
+  border-right: 1px solid #e0e0e0;
+  font-size: 11px;
+  font-weight: 500;
+  color: #70757a;
   display: flex;
   align-items: flex-start;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.1px;
 }
 
 .gcal-slot-col {
   flex: 1;
-  padding: 8px 16px;
+  padding: 6px 12px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -795,64 +794,86 @@ body.theme-dark .login-card__hero-icon {
 
 .gcal-slot-hint {
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: #1a73e8;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.12s ease;
   font-weight: 500;
 }
 .gcal-timeline-row:hover .gcal-slot-hint {
-  opacity: 0.75;
-  color: var(--color-primary);
+  opacity: 1;
 }
 
-/* Event Cards in Day View Slot */
+/* Event Cards in Day View Slot (Google Calendar style) */
 .gcal-event-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  border-left: 4px solid;
-  margin: 3px 0;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  gap: 12px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  margin: 2px 0;
+  color: #ffffff;
+  transition: filter 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
-.gcal-event-card--blue { border-left-color: #2563eb; background: #eff6ff; }
-.gcal-event-card--green { border-left-color: #059669; background: #ecfdf5; }
-.gcal-event-card--amber { border-left-color: #d97706; background: #fffbeb; }
-.gcal-event-card--violet { border-left-color: #7c3aed; background: #f5f3ff; }
+.gcal-event-card:hover {
+  filter: brightness(0.93);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
 
-.gcal-event-time-badge {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-text);
-  min-width: 70px;
-}
-.gcal-event-body {
-  flex: 1;
+.gcal-event-card--blue { background: #039be5; }
+.gcal-event-card--green { background: #0b8043; }
+.gcal-event-card--amber { background: #f4511e; }
+.gcal-event-card--violet { background: #8e24aa; }
+
+.gcal-event-card-main {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
+.gcal-event-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  line-height: 1.2;
+}
 .gcal-event-name {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--color-text);
+  font-weight: 600;
+  color: #ffffff;
 }
-.gcal-event-detail {
-  font-size: 11.5px;
-  color: var(--color-text-muted);
-  margin-top: 2px;
+.gcal-event-dot {
+  opacity: 0.7;
 }
+.gcal-event-detail-text {
+  font-weight: 400;
+  opacity: 0.9;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gcal-event-time-row {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
 .gcal-status-pill {
   font-size: 10px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 20px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
   text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
 }
-.gcal-status-pill--upcoming { background: rgba(37, 99, 235, 0.15); color: #2563eb; }
-.gcal-status-pill--done { background: rgba(5, 150, 105, 0.15); color: #059669; }
+.gcal-status-pill--done {
+  background: rgba(255, 255, 255, 0.35);
+}
 
 /* ═══════════════════════════════════════════════════════
    Google Calendar Style Popup — Booking Modal
