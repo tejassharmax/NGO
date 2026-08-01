@@ -10,7 +10,7 @@ import { toast } from './toast.js';
 import { getChildren, getHealthRecords, healthStatus, calculateAge } from './storage.js';
 import { escapeHTML } from './utils.js';
 
-export const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/d/1Im2valDOE5oDLCKKVlagVxqA28_ddEnliRk50CuEYN4/edit';
+export const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/u/0/';
 export const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzRCHXXREdsubNksomt6wkZHspuJzREL8jZdjrThAzPfLwny5QXaAKTy2HAn7LtTIFHQ/exec';
 
 /**
@@ -18,6 +18,16 @@ export const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/A
  */
 export function getGoogleDocUrl() {
   return localStorage.getItem('custom-google-doc-url') || DEFAULT_GOOGLE_DOC_URL;
+}
+
+/**
+ * Set custom Google Doc URL
+ */
+export function setGoogleDocUrl(url) {
+  if (url && url.trim()) {
+    localStorage.setItem('custom-google-doc-url', url.trim());
+    toast('Google Doc Link Saved!', 'Custom Google Doc link updated successfully.');
+  }
 }
 
 /**
@@ -167,6 +177,10 @@ export function openGoogleDocsTemplateModal() {
           </div>
           
           <div style="display:flex; align-items:center; gap:12px;">
+            <button id="modal-edit-doc-url-btn" class="button" style="background:rgba(255,255,255,0.18); color:white; border:1px solid rgba(255,255,255,0.3); font-weight:600; font-size:12.5px; padding:9px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Set Doc URL
+            </button>
             <button id="modal-sync-doc-btn" class="button" style="background:#ffffff; color:#1a73e8; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
               Open Live Google Doc
@@ -242,5 +256,13 @@ export function openGoogleDocsTemplateModal() {
 
   document.querySelector('#modal-sync-doc-btn')?.addEventListener('click', () => {
     syncAndOpenGoogleDoc();
+  });
+
+  document.querySelector('#modal-edit-doc-url-btn')?.addEventListener('click', () => {
+    const current = getGoogleDocUrl();
+    const input = prompt('Paste your Google Doc URL (e.g. https://docs.google.com/document/d/.../edit):', current);
+    if (input && input.trim()) {
+      setGoogleDocUrl(input);
+    }
   });
 }
