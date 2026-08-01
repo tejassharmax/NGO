@@ -10,7 +10,7 @@ import { toast } from './toast.js';
 import { getChildren, getHealthRecords, healthStatus, calculateAge } from './storage.js';
 import { escapeHTML } from './utils.js';
 
-export const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/u/0/';
+export const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/d/1J8abUEGvLaI7ayRZnxf0hkC4D3KBL4YLwxN2PHzRh1w/edit';
 export const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzRCHXXREdsubNksomt6wkZHspuJzREL8jZdjrThAzPfLwny5QXaAKTy2HAn7LtTIFHQ/exec';
 
 /**
