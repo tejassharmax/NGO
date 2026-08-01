@@ -11,7 +11,7 @@ import { getChildren, getHealthRecords, healthStatus, calculateAge } from './sto
 import { escapeHTML } from './utils.js';
 
 export const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/create';
-export const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjQzPTgcdhoEDLSVBmQLoiVPy98Dnq5iF8VfrHOt6GDRH-8hjuw6H3209dqOdNQdo5ig/exec';
+export const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwBCTD-EDPNPpVSGUqtcoZSqndM5ZDq_UcY5yCVGUCEBZNhj0M4EUB7XHiodmBon3iuA/exec';
 
 /**
  * Get live view link to the Google Doc report
