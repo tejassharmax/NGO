@@ -10,14 +10,14 @@ import { toast } from './toast.js';
 import { getChildren, getHealthRecords, healthStatus, calculateAge } from './storage.js';
 import { escapeHTML } from './utils.js';
 
-export const LIVE_GOOGLE_DOC_URL = 'https://docs.google.com/document/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit';
+export const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/create';
 export const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjQzPTgcdhoEDLSVBmQLoiVPy98Dnq5iF8VfrHOt6GDRH-8hjuw6H3209dqOdNQdo5ig/exec';
 
 /**
  * Get live view link to the Google Doc report
  */
 export function getGoogleDocUrl() {
-  return LIVE_GOOGLE_DOC_URL;
+  return localStorage.getItem('custom-google-doc-url') || DEFAULT_GOOGLE_DOC_URL;
 }
 
 /**
@@ -101,7 +101,7 @@ export function copyReportTextToClipboard() {
  */
 export function syncAndOpenGoogleDoc() {
   copyReportTextToClipboard();
-  toast('Opening Google Docs...', 'Creating a new Google Document for your account...');
+  toast('Opening Google Docs...', 'Opening live executive report document...');
   
   // Trigger background sync to Apps Script / Webhook bridge
   fetch(GOOGLE_DOCS_APPS_SCRIPT_URL, {
@@ -118,7 +118,7 @@ export function syncAndOpenGoogleDoc() {
   });
 
   window.setTimeout(() => {
-    window.open(LIVE_GOOGLE_DOC_URL, '_blank');
+    window.open(getGoogleDocUrl(), '_blank');
   }, 400);
 }
 
