@@ -3057,7 +3057,7 @@
    */
 
 
-  const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/d/1J8abUEGvLaI7ayRZnxf0hkC4D3KBL4YLwxN2PHzRh1w/edit';
+  const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/u/0/';
   const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzRCHXXREdsubNksomt6wkZHspuJzREL8jZdjrThAzPfLwny5QXaAKTy2HAn7LtTIFHQ/exec';
 
   /**
