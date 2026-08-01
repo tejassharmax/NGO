@@ -11,6 +11,7 @@ import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets } from './googleSheetsSync.js';
+import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc } from './googleDocsSync.js';
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, formatSingleDisplayTime } from './googleCalendar.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
@@ -316,6 +317,14 @@ async function handleGoogleAuth(email) {
 
     if (target.closest('[data-open-sheets-template]')) {
       openGoogleSheetsTemplateModal();
+    }
+
+    if (target.closest('[data-open-docs-template]')) {
+      openGoogleDocsTemplateModal();
+    }
+
+    if (target.closest('[data-sync-google-doc]')) {
+      syncAndOpenGoogleDoc();
     }
 
     if (target.matches('[data-global-search]')) openGlobalSearch();

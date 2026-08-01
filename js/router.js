@@ -729,8 +729,9 @@ export function reportsPage() {
   const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
 
   const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;">${icon('googleSheets')}Google Sheets Auto-Sync (Connected)</button>`;
+  const docsStatusBadge = `<button class="button button--sm" type="button" data-open-docs-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(26,115,232,0.1); color:#1a73e8; border:1px solid rgba(26,115,232,0.25); font-weight:600;">${icon('googleDocs')}Google Docs Live Auto-Sync (Active)</button>`;
 
-  return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `${sheetsStatusBadge}<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
+  return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `${sheetsStatusBadge}${docsStatusBadge}<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
   <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length || 4}</div><p class="report-card__caption">verified lab test reports</p></article></div>
   
   <section class="card section-gap" style="margin-top: 24px;">
