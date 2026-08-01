@@ -80,30 +80,9 @@ export function generateExecutiveDocContent() {
 }
 
 /**
- * Copy formatted report text to clipboard
+ * Automatically sync executive report to Google Docs in background whenever records change
  */
-export function copyReportTextToClipboard() {
-  const content = generateExecutiveDocContent();
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(content).then(() => {
-      toast(
-        'Executive Report Copied!',
-        'Formatted health summary copied. Press Ctrl+V (or Cmd+V) in Google Docs to paste!'
-      );
-    }).catch(err => {
-      console.warn('Clipboard write notice:', err);
-    });
-  }
-}
-
-/**
- * Trigger live API sync to Google Docs and open document
- */
-export function syncAndOpenGoogleDoc() {
-  copyReportTextToClipboard();
-  toast('Opening Google Docs...', 'Opening live executive report document...');
-  
-  // Trigger background sync to Apps Script / Webhook bridge
+export function autoSyncToGoogleDocs() {
   fetch(GOOGLE_DOCS_APPS_SCRIPT_URL, {
     method: 'POST',
     mode: 'no-cors',
@@ -114,12 +93,22 @@ export function syncAndOpenGoogleDoc() {
       content: generateExecutiveDocContent()
     })
   }).catch(err => {
-    console.warn('Doc background sync notice:', err);
+    console.warn('Google Docs background auto-sync notice:', err);
   });
+}
+
+/**
+ * Trigger live API sync to Google Docs and open document
+ */
+export function syncAndOpenGoogleDoc() {
+  toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
+  
+  autoSyncToGoogleDocs();
 
   window.setTimeout(() => {
+    toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
     window.open(getGoogleDocUrl(), '_blank');
-  }, 400);
+  }, 500);
 }
 
 /**
