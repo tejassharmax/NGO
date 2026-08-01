@@ -80,12 +80,30 @@ export function generateExecutiveDocContent() {
 }
 
 /**
+ * Copy formatted report text to clipboard
+ */
+export function copyReportTextToClipboard() {
+  const content = generateExecutiveDocContent();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(content).then(() => {
+      toast(
+        'Executive Report Copied!',
+        'Formatted health summary copied. Press Ctrl+V (or Cmd+V) in Google Docs to paste!'
+      );
+    }).catch(err => {
+      console.warn('Clipboard write notice:', err);
+    });
+  }
+}
+
+/**
  * Trigger live API sync to Google Docs and open document
  */
 export function syncAndOpenGoogleDoc() {
-  toast('Syncing to Google Docs...', 'Updating live executive report in Google Docs...');
+  copyReportTextToClipboard();
+  toast('Opening Google Docs...', 'Creating a new Google Document for your account...');
   
-  // Trigger fetch to Apps Script / Webhook bridge
+  // Trigger background sync to Apps Script / Webhook bridge
   fetch(GOOGLE_DOCS_APPS_SCRIPT_URL, {
     method: 'POST',
     mode: 'no-cors',
@@ -100,9 +118,8 @@ export function syncAndOpenGoogleDoc() {
   });
 
   window.setTimeout(() => {
-    toast('Google Doc Updated!', 'Opening live executive report document...');
     window.open(LIVE_GOOGLE_DOC_URL, '_blank');
-  }, 600);
+  }, 400);
 }
 
 /**
