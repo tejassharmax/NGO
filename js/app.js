@@ -12,7 +12,7 @@ import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets } from './googleSheetsSync.js';
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc } from './googleDocsSync.js';
-import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, formatSingleDisplayTime } from './googleCalendar.js';
+import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
@@ -91,55 +91,55 @@ async function handleGoogleAuth(email) {
   }
 }
 
-  // ─── Event Listeners ───
+// ─── Event Listeners ───
 
-  // Document Clicks
-  document.addEventListener('click', (event) => {
-    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
-    if (!target) return;
+// Document Clicks
+document.addEventListener('click', (event) => {
+  const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
+  if (!target) return;
 
-    if (target.matches('[data-topbar-back]')) {
-      const prevPageMap = {
-        'child-profile': 'children',
-        'register-child': 'children',
-        'ocr-review': 'ocr-upload',
-        'ocr-details': 'ocr-review',
-        'ocr-processing': 'ocr-upload',
-        'children': 'dashboard',
-        'documents': 'dashboard',
-        'reports': 'dashboard',
-        'settings': 'dashboard',
-        'growth': 'dashboard',
-        'medicines': 'dashboard'
-      };
-      const prev = prevPageMap[page] || 'dashboard';
-      window.location.href = pagePath(prev);
-    }
+  if (target.matches('[data-topbar-back]')) {
+    const prevPageMap = {
+      'child-profile': 'children',
+      'register-child': 'children',
+      'ocr-review': 'ocr-upload',
+      'ocr-details': 'ocr-review',
+      'ocr-processing': 'ocr-upload',
+      'children': 'dashboard',
+      'documents': 'dashboard',
+      'reports': 'dashboard',
+      'settings': 'dashboard',
+      'growth': 'dashboard',
+      'medicines': 'dashboard'
+    };
+    const prev = prevPageMap[page] || 'dashboard';
+    window.location.href = pagePath(prev);
+  }
 
-    if (target.matches('[data-collapse-sidebar]')) document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
-    if (target.matches('[data-open-sidebar]')) { document.querySelector('.app-shell').classList.add('sidebar-open'); document.querySelector('.mobile-backdrop').hidden = false; }
-    if (target.matches('[data-close-sidebar]')) { document.querySelector('.app-shell').classList.remove('sidebar-open'); target.hidden = true; }
-    if (target.matches('[data-theme-toggle]')) setTheme(!document.body.classList.contains('theme-dark'));
-    if (target.matches('[data-notifications]')) { const dropdown = document.querySelector('[data-notif-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-profile-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
-    if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-notif-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
-    
-    if (target.matches('[data-sign-out]')) {
-      logoutUser().then(() => {
-        toast('Signed out', 'Terminated Firebase Session and cleared workspace state.');
-        window.setTimeout(() => { window.location.href = pagePath('login'); }, 600);
-      });
-    }
+  if (target.matches('[data-collapse-sidebar]')) document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
+  if (target.matches('[data-open-sidebar]')) { document.querySelector('.app-shell').classList.add('sidebar-open'); document.querySelector('.mobile-backdrop').hidden = false; }
+  if (target.matches('[data-close-sidebar]')) { document.querySelector('.app-shell').classList.remove('sidebar-open'); target.hidden = true; }
+  if (target.matches('[data-theme-toggle]')) setTheme(!document.body.classList.contains('theme-dark'));
+  if (target.matches('[data-notifications]')) { const dropdown = document.querySelector('[data-notif-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-profile-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
+  if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-notif-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
 
-    if (target.closest('[data-google-login]')) {
-      toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
-      loginWithGoogle().then((res) => {
-        if (res.success) {
-          toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
-          window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
-        } else if (res.errorCode === 'ACCESS_DENIED') {
-          modal({
-            title: 'Access Denied',
-            body: `<div style="text-align:center; padding:16px 8px;">
+  if (target.matches('[data-sign-out]')) {
+    logoutUser().then(() => {
+      toast('Signed out', 'Terminated Firebase Session and cleared workspace state.');
+      window.setTimeout(() => { window.location.href = pagePath('login'); }, 600);
+    });
+  }
+
+  if (target.closest('[data-google-login]')) {
+    toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
+    loginWithGoogle().then((res) => {
+      if (res.success) {
+        toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
+        window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
+      } else if (res.errorCode === 'ACCESS_DENIED') {
+        modal({
+          title: 'Access Denied',
+          body: `<div style="text-align:center; padding:16px 8px;">
               <div style="font-size:44px; margin-bottom:8px;">🚫</div>
               <h3 style="color:var(--color-danger); margin:0 0 8px 0; font-size:18px; font-weight:700;">Access Denied</h3>
               <p style="font-size:14px; color:var(--color-text); margin:0 0 12px 0; font-weight:600;">This Google account is not authorized.</p>
@@ -147,360 +147,329 @@ async function handleGoogleAuth(email) {
                 Tried account: <code>${res.email || 'Unauthorized Account'}</code>
               </div>
             </div>`,
-            confirmText: 'Try Authorized Account',
-            onConfirm: () => { window.location.reload(); }
-          });
-        } else {
-          toast('Authentication Info', res.message || 'Google Sign-In popup closed.');
-        }
-      });
-    }
-
-    const toggleServiceBtn = target.closest('[data-toggle-google-service]');
-    if (toggleServiceBtn) {
-      const service = toggleServiceBtn.dataset.toggleGoogleService;
-      const key = `google-${service}-connected`;
-      const isConnected = localStorage.getItem(key) === 'true';
-      const serviceName = service === 'drive' ? 'Google Drive' : service === 'sheets' ? 'Google Sheets' : 'Google Calendar';
-
-      if (isConnected) {
-        localStorage.setItem(key, 'false');
-        toast(`${serviceName} Disconnected`, 'Service disconnected from workspace.');
+          confirmText: 'Try Authorized Account',
+          onConfirm: () => { window.location.reload(); }
+        });
       } else {
-        localStorage.setItem(key, 'true');
-        toast(`${serviceName} Connected`, `Successfully connected to workspace account.`);
+        toast('Authentication Info', res.message || 'Google Sign-In popup closed.');
       }
+    });
+  }
 
-      window.setTimeout(() => {
-        window.location.reload();
-      }, 400);
+  const toggleServiceBtn = target.closest('[data-toggle-google-service]');
+  if (toggleServiceBtn) {
+    const service = toggleServiceBtn.dataset.toggleGoogleService;
+    const key = `google-${service}-connected`;
+    const isConnected = localStorage.getItem(key) === 'true';
+    const serviceName = service === 'drive' ? 'Google Drive' : service === 'sheets' ? 'Google Sheets' : 'Google Calendar';
+
+    if (isConnected) {
+      localStorage.setItem(key, 'false');
+      toast(`${serviceName} Disconnected`, 'Service disconnected from workspace.');
+    } else {
+      localStorage.setItem(key, 'true');
+      toast(`${serviceName} Connected`, `Successfully connected to workspace account.`);
     }
 
-    // ─── Open Event Details Popover Card ───
-    const deleteBtn = target.closest('[data-delete-event-id]');
-    if (deleteBtn) {
-      const id = deleteBtn.getAttribute('data-delete-event-id');
-      deleteAppointment(id);
-      toast('Appointment Deleted', 'Appointment has been removed from schedule.');
-      const calModal = document.querySelector('#cal-booking-modal');
-      if (calModal) calModal.remove();
-      window.setTimeout(() => window.location.reload(), 400);
-      return;
-    }
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 400);
+  }
 
-    const editBtn = target.closest('[data-edit-event-id]');
-    if (editBtn) {
-      const id = editBtn.getAttribute('data-edit-event-id');
-      const appt = getAppointments().find(a => String(a.id) === String(id));
-      if (appt) {
-        const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
-        modalContainer.innerHTML = renderBookingModalMarkup(appt.date, appt.time || '10:00');
-      }
-      return;
-    }
+  // ─── Open Event Details Popover Card ───
+  const deleteBtn = target.closest('[data-delete-event-id]');
+  if (deleteBtn) {
+    const id = deleteBtn.getAttribute('data-delete-event-id');
+    deleteAppointment(id);
+    toast('Appointment Deleted', 'Appointment has been removed from schedule.');
+    const calModal = document.querySelector('#cal-booking-modal');
+    if (calModal) calModal.remove();
+    window.setTimeout(() => window.location.reload(), 400);
+    return;
+  }
 
-    const syncBtn = target.closest('[data-sync-event-id]');
-    if (syncBtn) {
-      const id = syncBtn.getAttribute('data-sync-event-id');
-      const appt = getAppointments().find(a => String(a.id) === String(id));
-      if (appt) {
-        window.open(buildGoogleCalendarUrl(appt), '_blank');
-        toast('Google Calendar Sync', 'Opening event in Google Calendar...');
-      }
-      return;
-    }
-
-    const eventCard = target.closest('[data-event-id]');
-    if (eventCard) {
-      const eventId = eventCard.getAttribute('data-event-id');
+  const editBtn = target.closest('[data-edit-event-id]');
+  if (editBtn) {
+    const id = editBtn.getAttribute('data-edit-event-id');
+    const appt = getAppointments().find(a => String(a.id) === String(id));
+    if (appt) {
       const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
-      modalContainer.innerHTML = renderEventDetailsModalMarkup(eventId);
+      modalContainer.innerHTML = renderBookingModalMarkup(appt.date, appt.time || '10:00');
+    }
+    return;
+  }
+
+  const syncBtn = target.closest('[data-sync-event-id]');
+  if (syncBtn) {
+    const id = syncBtn.getAttribute('data-sync-event-id');
+    const appt = getAppointments().find(a => String(a.id) === String(id));
+    if (appt) {
+      window.open(buildGoogleCalendarUrl(appt), '_blank');
+      toast('Google Calendar Sync', 'Opening event in Google Calendar...');
+    }
+    return;
+  }
+
+  const eventCard = target.closest('[data-event-id]');
+  if (eventCard) {
+    const eventId = eventCard.getAttribute('data-event-id');
+    const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
+    modalContainer.innerHTML = renderEventDetailsModalMarkup(eventId);
+    return;
+  }
+
+  // ─── Open Booking Popup Modal (from any button or time slot row) ───
+  const slotBtn = target.closest('[data-open-booking-modal]');
+  if (slotBtn) {
+    const slotDate = slotBtn.getAttribute('data-slot-date') || new Date().toISOString().slice(0, 10);
+    const slotTime = slotBtn.getAttribute('data-slot-time') || '10:00';
+    const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
+    modalContainer.innerHTML = renderBookingModalMarkup(slotDate, slotTime);
+    return;
+  }
+
+  // ─── Calendar Controls (View Toggle, Today, Prev/Next, Day Click) ───
+  const calRoot = target.closest('[data-calendar-root]');
+  if (calRoot) {
+    let viewMode = calRoot.getAttribute('data-cal-view-mode') || 'month';
+    let y = parseInt(calRoot.getAttribute('data-cal-year') || new Date().getFullYear());
+    let m = parseInt(calRoot.getAttribute('data-cal-month') || new Date().getMonth());
+    let d = parseInt(calRoot.getAttribute('data-cal-day') || new Date().getDate());
+
+    // View Toggle Buttons (Month / Day)
+    const viewBtn = target.closest('[data-cal-view]');
+    if (viewBtn) {
+      const newMode = viewBtn.getAttribute('data-cal-view');
+      updateCalendarView(calRoot, newMode, y, m, d);
       return;
     }
 
-    // ─── Open Booking Popup Modal (from any button or time slot row) ───
-    const slotBtn = target.closest('[data-open-booking-modal]');
-    if (slotBtn) {
-      const slotDate = slotBtn.getAttribute('data-slot-date') || new Date().toISOString().slice(0, 10);
-      const slotTime = slotBtn.getAttribute('data-slot-time') || '10:00';
-      const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
-      modalContainer.innerHTML = renderBookingModalMarkup(slotDate, slotTime);
+    // Today Button
+    if (target.closest('[data-calendar-today]')) {
+      const now = new Date();
+      updateCalendarView(calRoot, viewMode, now.getFullYear(), now.getMonth(), now.getDate());
       return;
     }
 
-    // ─── Calendar Controls (View Toggle, Today, Prev/Next, Day Click) ───
-    const calRoot = target.closest('[data-calendar-root]');
-    if (calRoot) {
-      let viewMode = calRoot.getAttribute('data-cal-view-mode') || 'month';
-      let y = parseInt(calRoot.getAttribute('data-cal-year') || new Date().getFullYear());
-      let m = parseInt(calRoot.getAttribute('data-cal-month') || new Date().getMonth());
-      let d = parseInt(calRoot.getAttribute('data-cal-day') || new Date().getDate());
-
-      // View Toggle Buttons (Month / Day)
-      const viewBtn = target.closest('[data-cal-view]');
-      if (viewBtn) {
-        const newMode = viewBtn.getAttribute('data-cal-view');
-        updateCalendarView(calRoot, newMode, y, m, d);
-        return;
+    // Prev Button
+    if (target.closest('[data-calendar-prev]')) {
+      if (viewMode === 'month') {
+        m--;
+        if (m < 0) { m = 11; y--; }
+      } else {
+        const curDate = new Date(y, m, d - 1);
+        y = curDate.getFullYear();
+        m = curDate.getMonth();
+        d = curDate.getDate();
       }
-
-      // Today Button
-      if (target.closest('[data-calendar-today]')) {
-        const now = new Date();
-        updateCalendarView(calRoot, viewMode, now.getFullYear(), now.getMonth(), now.getDate());
-        return;
-      }
-
-      // Prev Button
-      if (target.closest('[data-calendar-prev]')) {
-        if (viewMode === 'month') {
-          m--;
-          if (m < 0) { m = 11; y--; }
-        } else {
-          const curDate = new Date(y, m, d - 1);
-          y = curDate.getFullYear();
-          m = curDate.getMonth();
-          d = curDate.getDate();
-        }
-        updateCalendarView(calRoot, viewMode, y, m, d);
-        return;
-      }
-
-      // Next Button
-      if (target.closest('[data-calendar-next]')) {
-        if (viewMode === 'month') {
-          m++;
-          if (m > 11) { m = 0; y++; }
-        } else {
-          const curDate = new Date(y, m, d + 1);
-          y = curDate.getFullYear();
-          m = curDate.getMonth();
-          d = curDate.getDate();
-        }
-        updateCalendarView(calRoot, viewMode, y, m, d);
-        return;
-      }
-
-      // Day Click in Month View -> MUST SWITCH TO DAY VIEW FOR THAT DATE!
-      const dayCell = target.closest('[data-calendar-day]');
-      if (dayCell) {
-        const dayNum = parseInt(dayCell.getAttribute('data-calendar-day'));
-        if (!isNaN(dayNum)) {
-          updateCalendarView(calRoot, 'day', y, m, dayNum);
-        }
-        return;
-      }
-    }
-
-    // Tab switching inside Google Calendar popup modal
-    const popupTab = target.closest('.gcal-popup-tab');
-    if (popupTab) {
-      const parent = popupTab.closest('.gcal-popup-tabs');
-      if (parent) {
-        parent.querySelectorAll('.gcal-popup-tab').forEach(t => t.classList.remove('gcal-popup-tab--active'));
-        popupTab.classList.add('gcal-popup-tab--active');
-
-        const form = popupTab.closest('form');
-        if (form) {
-          const isReminder = popupTab.textContent.trim().toLowerCase() === 'reminder';
-          const modeInput = form.querySelector('[name="mode"]');
-          if (modeInput) modeInput.value = isReminder ? 'Reminder' : 'Appointment';
-
-          const titleInput = form.querySelector('.gcal-popup-title-input');
-          if (titleInput) {
-            titleInput.placeholder = isReminder ? 'Add reminder title (e.g. Give Vitamin D3)' : 'Add title';
-          }
-
-          const typeSelect = form.querySelector('select[name="type"]');
-          if (typeSelect) {
-            if (isReminder) {
-              typeSelect.innerHTML = `
-                <option value="">Reminder type</option>
-                <option value="Medication Dose">Medication Dose</option>
-                <option value="Follow-up Reminder">Follow-up Reminder</option>
-                <option value="Vaccination Due">Vaccination Due</option>
-                <option value="Diet & Nutrition">Diet & Nutrition</option>
-                <option value="Hygiene Check">Hygiene Check</option>
-                <option value="General Reminder">General Reminder</option>
-              `;
-            } else {
-              typeSelect.innerHTML = `
-                <option value="">Appointment type</option>
-                <option value="Doctor visit">Doctor Visit</option>
-                <option value="Follow-up">Follow-up</option>
-                <option value="Dental checkup">Dental Checkup</option>
-                <option value="Deworming">Deworming</option>
-                <option value="Vaccination">Vaccination</option>
-                <option value="Eye checkup">Eye Checkup</option>
-                <option value="General checkup">General Checkup</option>
-              `;
-            }
-          }
-
-          const saveBtn = form.querySelector('.gcal-popup-save-btn');
-          if (saveBtn) {
-            saveBtn.textContent = isReminder ? 'Save Reminder' : 'Save';
-          }
-        }
-      }
+      updateCalendarView(calRoot, viewMode, y, m, d);
       return;
     }
 
-    // Modal Close Button or Overlay Backdrop Click
-    const isExplicitClose = target.closest('[data-close-cal-modal]');
-    const isDirectBackdrop = event.target && event.target.classList && (event.target.classList.contains('modal-backdrop') || event.target.classList.contains('gcal-popup-backdrop') || event.target.dataset.closeCalModalBg !== undefined);
-
-    if (isExplicitClose || isDirectBackdrop) {
-      const modalRoot = document.querySelector('#modal-root');
-      if (modalRoot) modalRoot.replaceChildren();
-      const calModal = document.querySelector('#cal-booking-modal');
-      if (calModal) calModal.remove();
+    // Next Button
+    if (target.closest('[data-calendar-next]')) {
+      if (viewMode === 'month') {
+        m++;
+        if (m > 11) { m = 0; y++; }
+      } else {
+        const curDate = new Date(y, m, d + 1);
+        y = curDate.getFullYear();
+        m = curDate.getMonth();
+        d = curDate.getDate();
+      }
+      updateCalendarView(calRoot, viewMode, y, m, d);
       return;
     }
 
-    if (target.closest('[data-open-sheets-template]')) {
-      openGoogleSheetsTemplateModal();
+    // Day Click in Month View -> MUST SWITCH TO DAY VIEW FOR THAT DATE!
+    const dayCell = target.closest('[data-calendar-day]');
+    if (dayCell) {
+      const dayNum = parseInt(dayCell.getAttribute('data-calendar-day'));
+      if (!isNaN(dayNum)) {
+        updateCalendarView(calRoot, 'day', y, m, dayNum);
+      }
+      return;
     }
+  }
 
-    if (target.closest('[data-open-docs-template]')) {
-      openGoogleDocsTemplateModal();
+  // Tab switching inside Google Calendar popup modal
+  const popupTab = target.closest('.gcal-popup-tab');
+  if (popupTab) {
+    const parent = popupTab.closest('.gcal-popup-tabs');
+    if (parent) {
+      parent.querySelectorAll('.gcal-popup-tab').forEach(t => t.classList.remove('gcal-popup-tab--active'));
+      popupTab.classList.add('gcal-popup-tab--active');
     }
+    return;
+  }
 
-    if (target.closest('[data-sync-google-doc]')) {
-      syncAndOpenGoogleDoc();
+  // Modal Close Button or Overlay Backdrop Click
+  const isExplicitClose = target.closest('[data-close-cal-modal]');
+  const isDirectBackdrop = event.target && event.target.classList && (event.target.classList.contains('modal-backdrop') || event.target.classList.contains('gcal-popup-backdrop') || event.target.dataset.closeCalModalBg !== undefined);
+
+  if (isExplicitClose || isDirectBackdrop) {
+    const modalRoot = document.querySelector('#modal-root');
+    if (modalRoot) modalRoot.replaceChildren();
+    const calModal = document.querySelector('#cal-booking-modal');
+    if (calModal) calModal.remove();
+    return;
+  }
+
+  if (target.closest('[data-open-sheets-template]')) {
+    openGoogleSheetsTemplateModal();
+  }
+
+  if (target.closest('[data-open-docs-template]')) {
+    openGoogleDocsTemplateModal();
+  }
+
+  if (target.closest('[data-sync-google-doc]')) {
+    syncAndOpenGoogleDoc();
+  }
+
+  const tasksBtn = target.closest('[data-sync-tasks-id]');
+  if (tasksBtn) {
+    const eventId = tasksBtn.getAttribute('data-sync-tasks-id');
+    const appointments = getAppointments();
+    const appt = appointments.find(a => String(a.id) === String(eventId));
+    if (appt) {
+      const tasksUrl = buildGoogleTasksUrl(appt);
+      window.open(tasksUrl, '_blank');
+      toast('Google Tasks Syncing', `Pushing reminder for ${appt.childName} to Google Tasks & connected devices.`);
     }
+  }
 
-    if (target.matches('[data-global-search]')) openGlobalSearch();
-    if (target.matches('[data-filter-toggle]')) { const row = document.querySelector('[data-filter-row]'); row.hidden = !row.hidden; }
-    if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }
-    if (target.matches('[data-clear-filters]')) { document.querySelectorAll('[data-filter-status], [data-filter-blood]').forEach((input) => { input.value = ''; }); applyTableFilters(); }
-    if (target.matches('[data-column-visibility-toggle]')) {
-      const columns = [
-        { id: 'age', label: 'Age' },
-        { id: 'gender', label: 'Gender' },
-        { id: 'blood', label: 'Blood group' },
-        { id: 'status', label: 'Status' }
-      ];
-      const states = JSON.parse(localStorage.getItem('chm-col-visibility') || '{"age":true,"gender":true,"blood":true,"status":true}');
-      const formHTML = columns.map(col => `
+  if (target.matches('[data-global-search]')) openGlobalSearch();
+  if (target.matches('[data-filter-toggle]')) { const row = document.querySelector('[data-filter-row]'); row.hidden = !row.hidden; }
+  if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }
+  if (target.matches('[data-clear-filters]')) { document.querySelectorAll('[data-filter-status], [data-filter-blood]').forEach((input) => { input.value = ''; }); applyTableFilters(); }
+  if (target.matches('[data-column-visibility-toggle]')) {
+    const columns = [
+      { id: 'age', label: 'Age' },
+      { id: 'gender', label: 'Gender' },
+      { id: 'blood', label: 'Blood group' },
+      { id: 'status', label: 'Status' }
+    ];
+    const states = JSON.parse(localStorage.getItem('chm-col-visibility') || '{"age":true,"gender":true,"blood":true,"status":true}');
+    const formHTML = columns.map(col => `
         <label class="checkbox" style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
           <input type="checkbox" data-col-id="${col.id}" ${states[col.id] ? 'checked' : ''}>
           <span>${col.label}</span>
         </label>
       `).join('');
-      modal({
-        title: 'Configure columns',
-        body: `<div style="display:flex; flex-direction:column; gap:4px; padding: 10px 0;">
+    modal({
+      title: 'Configure columns',
+      body: `<div style="display:flex; flex-direction:column; gap:4px; padding: 10px 0;">
           <p style="margin-bottom:12px; font-size:12px; color:var(--color-text-muted);">Toggle columns to customize your data table view.</p>
           ${formHTML}
         </div>`,
-        confirmText: 'Apply changes',
-        onConfirm: () => {
-          const newStates = {};
-          columns.forEach(col => {
-            const checked = document.querySelector(`input[data-col-id="${col.id}"]`)?.checked;
-            newStates[col.id] = checked;
-          });
-          localStorage.setItem('chm-col-visibility', JSON.stringify(newStates));
-          applyColumnVisibility();
-          toast('View updated', 'Your custom columns have been applied.');
-        }
+      confirmText: 'Apply changes',
+      onConfirm: () => {
+        const newStates = {};
+        columns.forEach(col => {
+          const checked = document.querySelector(`input[data-col-id="${col.id}"]`)?.checked;
+          newStates[col.id] = checked;
+        });
+        localStorage.setItem('chm-col-visibility', JSON.stringify(newStates));
+        applyColumnVisibility();
+        toast('View updated', 'Your custom columns have been applied.');
+      }
+    });
+  }
+
+  if (target.matches('[data-delete]')) {
+    const id = target.dataset.delete;
+    const child = getChildren().find((item) => item.id === id);
+    modal({ title: `Remove ${child?.name || 'child'}?`, body: 'This removes the child record from this workspace. This action cannot be undone.', confirmText: 'Remove child', confirmClass: 'button--danger', onConfirm: () => { deleteChild(id); applyTableFilters(); toast('Child removed', 'The record has been removed from this workspace.'); } });
+  }
+
+  if (target.matches('[data-edit]')) {
+    const id = target.dataset.edit;
+    window.location.href = `${pagePath('register-child')}?method=manual&edit=${id}`;
+  }
+
+  if (target.matches('#btn-prev')) {
+    if (currentPage > 1) {
+      currentPage--;
+      applyTableFilters();
+    }
+  }
+  if (target.matches('#btn-next')) {
+    const children = filteredChildren();
+    const totalPages = Math.ceil(children.length / itemsPerPage) || 1;
+    if (currentPage < totalPages) {
+      currentPage++;
+      applyTableFilters();
+    }
+  }
+
+  const childCard = target.closest('[data-child-id]');
+  if (childCard && !target.matches('button, a')) {
+    const childId = childCard.dataset.childId;
+    window.location.href = `${pagePath('child-profile')}?id=${childId}`;
+  }
+
+  const docCardClick = target.closest('[data-document-idx]');
+  if (docCardClick && !target.matches('button, a')) {
+    const idx = docCardClick.dataset.documentIdx;
+    const docs = getUploadedDocs();
+    const doc = docs[idx];
+    if (doc) {
+      modal({
+        title: `${doc.name} - ${doc.child || doc.student || '—'}`,
+        body: doc.image
+          ? `<div style="text-align:center; max-height: 70vh; overflow: auto;"><img src="${doc.image}" style="max-width:100%; max-height: 55vh; object-fit:contain; border-radius:6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>`
+          : `<div class="empty-state" style="padding: 24px;"><span class="empty-state__icon">${icon('file')}</span><p>No preview image available for this document.</p></div>`,
+        confirmText: 'Close',
+        onConfirm: () => { }
       });
     }
-    
-    if (target.matches('[data-delete]')) {
-      const id = target.dataset.delete;
-      const child = getChildren().find((item) => item.id === id);
-      modal({ title: `Remove ${child?.name || 'child'}?`, body: 'This removes the child record from this workspace. This action cannot be undone.', confirmText: 'Remove child', confirmClass: 'button--danger', onConfirm: () => { deleteChild(id); applyTableFilters(); toast('Child removed', 'The record has been removed from this workspace.'); } });
-    }
+  }
 
-    if (target.matches('[data-edit]')) {
-      const id = target.dataset.edit;
-      window.location.href = `${pagePath('register-child')}?method=manual&edit=${id}`;
-    }
+  if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
+    exportChildrenToExcel();
+  }
 
-    if (target.matches('#btn-prev')) {
-      if (currentPage > 1) {
-        currentPage--;
-        applyTableFilters();
-      }
-    }
-    if (target.matches('#btn-next')) {
-      const children = filteredChildren();
-      const totalPages = Math.ceil(children.length / itemsPerPage) || 1;
-      if (currentPage < totalPages) {
-        currentPage++;
-        applyTableFilters();
-      }
-    }
+  if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
+  if (target.matches('[data-report-print], [data-profile-print]')) window.print();
+  if (target.matches('[data-apply-report]')) toast('Report updated', 'Your report now reflects the selected filters.');
 
-    const childCard = target.closest('[data-child-id]');
-    if (childCard && !target.matches('button, a')) {
-      const childId = childCard.dataset.childId;
-      window.location.href = `${pagePath('child-profile')}?id=${childId}`;
-    }
+  if (target.matches('[data-save-settings]')) {
+    const orgNameInput = document.querySelector('input[name="schoolName"]')?.value.trim() || 'An Organisation';
+    const orgCodeInput = document.querySelector('input[name="schoolCode"]')?.value.trim() || 'ORG-IND-01';
+    const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
+    const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
 
-    const docCardClick = target.closest('[data-document-idx]');
-    if (docCardClick && !target.matches('button, a')) {
-      const idx = docCardClick.dataset.documentIdx;
-      const docs = getUploadedDocs();
-      const doc = docs[idx];
-      if (doc) {
-        modal({
-          title: `${doc.name} - ${doc.child || doc.student || '—'}`,
-          body: doc.image 
-            ? `<div style="text-align:center; max-height: 70vh; overflow: auto;"><img src="${doc.image}" style="max-width:100%; max-height: 55vh; object-fit:contain; border-radius:6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>`
-            : `<div class="empty-state" style="padding: 24px;"><span class="empty-state__icon">${icon('file')}</span><p>No preview image available for this document.</p></div>`,
-          confirmText: 'Close',
-          onConfirm: () => {}
-        });
-      }
-    }
+    localStorage.setItem('sample-org-name', orgNameInput);
+    localStorage.setItem('sample-org-code', orgCodeInput);
+    localStorage.setItem('sample-org-email', orgEmailInput);
+    localStorage.setItem('sample-org-timezone', orgTimezoneInput);
 
-    if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
-      exportChildrenToExcel();
-    }
+    toast('Settings saved', 'Your workspace preferences are up to date.');
+    window.setTimeout(() => { window.location.reload(); }, 600);
+  }
 
-    if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
-    if (target.matches('[data-report-print], [data-profile-print]')) window.print();
-    if (target.matches('[data-apply-report]')) toast('Report updated', 'Your report now reflects the selected filters.');
-    
-    if (target.matches('[data-save-settings]')) {
-      const orgNameInput = document.querySelector('input[name="schoolName"]')?.value.trim() || 'An Organisation';
-      const orgCodeInput = document.querySelector('input[name="schoolCode"]')?.value.trim() || 'ORG-IND-01';
-      const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
-      const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
+  if (target.matches('[data-2fa]')) toast('Security configuration', 'Two-factor authentication configuration would open here.');
+  if (target.matches('[data-upload-document]')) toast('Choose a document', 'Use Smart Upload for guided document extraction.');
 
-      localStorage.setItem('sample-org-name', orgNameInput);
-      localStorage.setItem('sample-org-code', orgCodeInput);
-      localStorage.setItem('sample-org-email', orgEmailInput);
-      localStorage.setItem('sample-org-timezone', orgTimezoneInput);
+  if (target.matches('[data-filter-docs]')) {
+    const statuses = ['All', 'Pending', 'Verified'];
+    const currIdx = statuses.indexOf(activeDocFilter);
+    activeDocFilter = statuses[(currIdx + 1) % statuses.length];
+    target.innerHTML = `${icon('filter')}Status: ${activeDocFilter}`;
+    applyDocumentFilters();
+  }
 
-      toast('Settings saved', 'Your workspace preferences are up to date.');
-      window.setTimeout(() => { window.location.reload(); }, 600);
-    }
-
-    if (target.matches('[data-2fa]')) toast('Security configuration', 'Two-factor authentication configuration would open here.');
-    if (target.matches('[data-upload-document]')) toast('Choose a document', 'Use Smart Upload for guided document extraction.');
-    
-    if (target.matches('[data-filter-docs]')) {
-      const statuses = ['All', 'Pending', 'Verified'];
-      const currIdx = statuses.indexOf(activeDocFilter);
-      activeDocFilter = statuses[(currIdx + 1) % statuses.length];
-      target.innerHTML = `${icon('filter')}Status: ${activeDocFilter}`;
-      applyDocumentFilters();
-    }
-
-    if (target.closest('[data-add-measurement]')) {
-      const firstSelect = document.querySelector('.growth-form-instance select[name="childId"]');
-      const childOptionsHTML = firstSelect ? firstSelect.innerHTML : '<option value="">Select child</option>';
-      const container = document.querySelector('#growth-forms-container');
-      if (container) {
-        const formCount = container.querySelectorAll('.growth-form-instance').length;
-        const newForm = document.createElement('form');
-        newForm.className = 'card growth-form-instance page-enter';
-        newForm.style.marginTop = '24px';
-        newForm.innerHTML = `
+  if (target.closest('[data-add-measurement]')) {
+    const firstSelect = document.querySelector('.growth-form-instance select[name="childId"]');
+    const childOptionsHTML = firstSelect ? firstSelect.innerHTML : '<option value="">Select child</option>';
+    const container = document.querySelector('#growth-forms-container');
+    if (container) {
+      const formCount = container.querySelectorAll('.growth-form-instance').length;
+      const newForm = document.createElement('form');
+      newForm.className = 'card growth-form-instance page-enter';
+      newForm.style.marginTop = '24px';
+      newForm.innerHTML = `
           <section class="form-section">
             <div class="form-section__heading" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
               <div>
@@ -522,120 +491,120 @@ async function handleGoogleAuth(email) {
             </div>
           </section>
         `;
-        container.appendChild(newForm);
-        newForm.scrollIntoView({ behavior: 'smooth' });
-        const select = newForm.querySelector('select[name="childId"]');
-        if (select) select.focus();
-        toast('Form added', 'Another measurement form has been added at the bottom.');
-      }
+      container.appendChild(newForm);
+      newForm.scrollIntoView({ behavior: 'smooth' });
+      const select = newForm.querySelector('select[name="childId"]');
+      if (select) select.focus();
+      toast('Form added', 'Another measurement form has been added at the bottom.');
     }
+  }
 
-    if (target.closest('.remove-form-btn')) {
-      const btn = target.closest('.remove-form-btn');
-      const form = btn.closest('.growth-form-instance');
-      if (form) {
-        form.remove();
-        toast('Form removed', 'Measurement form was removed.');
-      }
+  if (target.closest('.remove-form-btn')) {
+    const btn = target.closest('.remove-form-btn');
+    const form = btn.closest('.growth-form-instance');
+    if (form) {
+      form.remove();
+      toast('Form removed', 'Measurement form was removed.');
     }
+  }
 
-    if (target.matches('[data-activity]')) toast('Activity feed', 'Your activity history is up to date.');
-    if (target.matches('[data-start-ocr]')) document.querySelector('[data-upload-input]')?.click();
-    if (target.matches('[data-upload-zone]')) document.querySelector('[data-upload-input]')?.click();
-    if (target.matches('[data-ocr-back]')) window.history.back();
+  if (target.matches('[data-activity]')) toast('Activity feed', 'Your activity history is up to date.');
+  if (target.matches('[data-start-ocr]')) document.querySelector('[data-upload-input]')?.click();
+  if (target.matches('[data-upload-zone]')) document.querySelector('[data-upload-input]')?.click();
+  if (target.matches('[data-ocr-back]')) window.history.back();
 
-    if (target.matches('[data-ocr-continue]')) {
-      if (document.querySelector('[data-ocr-confirm]')?.checked) {
-        const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-        const formFields = document.querySelectorAll('form.card input, form.card select');
-        formFields.forEach(field => {
-          if (field.name) {
-            ocrData[field.name] = field.value;
-          }
-        });
-        localStorage.setItem('ocr-parsed-data', JSON.stringify(ocrData));
-        window.location.href = pagePath('ocr-details');
-      } else {
-        toast('Review required', 'Confirm that you have checked the extracted details before continuing.');
-      }
-    }
-
-    if (target.matches('[data-ocr-rotate], [data-ocr-rotate] *')) {
-      const img = document.querySelector('.document-preview-img');
-      if (img) {
-        let rotation = parseInt(img.dataset.rotation || '0', 10);
-        rotation = (rotation + 90) % 360;
-        img.dataset.rotation = String(rotation);
-        img.style.transform = `rotate(${rotation}deg)`;
-      } else {
-        toast('Preview not active', 'No document image is currently loaded to rotate.');
-      }
-    }
-
-    if (target.matches('[data-ocr-fullscreen], [data-ocr-fullscreen] *')) {
-      const wrapper = document.querySelector('.document-preview-img-wrap') || document.querySelector('.document-sheet');
-      if (wrapper) {
-        if (document.fullscreenElement) {
-          document.exitFullscreen();
-        } else {
-          wrapper.requestFullscreen?.() || wrapper.webkitRequestFullscreen?.() || wrapper.msRequestFullscreen?.();
+  if (target.matches('[data-ocr-continue]')) {
+    if (document.querySelector('[data-ocr-confirm]')?.checked) {
+      const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
+      const formFields = document.querySelectorAll('form.card input, form.card select');
+      formFields.forEach(field => {
+        if (field.name) {
+          ocrData[field.name] = field.value;
         }
+      });
+      localStorage.setItem('ocr-parsed-data', JSON.stringify(ocrData));
+      window.location.href = pagePath('ocr-details');
+    } else {
+      toast('Review required', 'Confirm that you have checked the extracted details before continuing.');
+    }
+  }
+
+  if (target.matches('[data-ocr-rotate], [data-ocr-rotate] *')) {
+    const img = document.querySelector('.document-preview-img');
+    if (img) {
+      let rotation = parseInt(img.dataset.rotation || '0', 10);
+      rotation = (rotation + 90) % 360;
+      img.dataset.rotation = String(rotation);
+      img.style.transform = `rotate(${rotation}deg)`;
+    } else {
+      toast('Preview not active', 'No document image is currently loaded to rotate.');
+    }
+  }
+
+  if (target.matches('[data-ocr-fullscreen], [data-ocr-fullscreen] *')) {
+    const wrapper = document.querySelector('.document-preview-img-wrap') || document.querySelector('.document-sheet');
+    if (wrapper) {
+      if (document.fullscreenElement) {
+        document.exitFullscreen();
       } else {
-        toast('Preview not active', 'No document preview is loaded to maximize.');
+        wrapper.requestFullscreen?.() || wrapper.webkitRequestFullscreen?.() || wrapper.msRequestFullscreen?.();
       }
+    } else {
+      toast('Preview not active', 'No document preview is loaded to maximize.');
     }
+  }
 
-    if (target.matches('.accordion__trigger')) target.closest('.accordion__item').classList.toggle('is-open');
-    if (target.closest('.tab')) {
-      const tabBtn = target.closest('.tab');
-      const tabsGroup = tabBtn.closest('.tabs');
-      if (tabsGroup) {
-        const allTabs = Array.from(tabsGroup.querySelectorAll('.tab'));
-        const index = allTabs.indexOf(tabBtn);
-        allTabs.forEach((t) => {
-          t.classList.toggle('tab--active', t === tabBtn);
-          t.setAttribute('aria-selected', String(t === tabBtn));
+  if (target.matches('.accordion__trigger')) target.closest('.accordion__item').classList.toggle('is-open');
+  if (target.closest('.tab')) {
+    const tabBtn = target.closest('.tab');
+    const tabsGroup = tabBtn.closest('.tabs');
+    if (tabsGroup) {
+      const allTabs = Array.from(tabsGroup.querySelectorAll('.tab'));
+      const index = allTabs.indexOf(tabBtn);
+      allTabs.forEach((t) => {
+        t.classList.toggle('tab--active', t === tabBtn);
+        t.setAttribute('aria-selected', String(t === tabBtn));
+      });
+
+      const profileContainer = document.querySelector('.profile-tab-content-container');
+      if (profileContainer) {
+        const panels = Array.from(profileContainer.querySelectorAll('[data-tab-panel]'));
+        const panelNames = ['overview', 'guardian', 'health', 'growth', 'documents', 'timeline', 'notes'];
+        const selectedPanelName = tabBtn.dataset.profileTab || panelNames[index] || 'overview';
+        panels.forEach((p) => {
+          p.style.display = (p.dataset.tabPanel === selectedPanelName) ? 'block' : 'none';
         });
-
-        const profileContainer = document.querySelector('.profile-tab-content-container');
-        if (profileContainer) {
-          const panels = Array.from(profileContainer.querySelectorAll('[data-tab-panel]'));
-          const panelNames = ['overview', 'guardian', 'health', 'growth', 'documents', 'timeline', 'notes'];
-          const selectedPanelName = tabBtn.dataset.profileTab || panelNames[index] || 'overview';
-          panels.forEach((p) => {
-            p.style.display = (p.dataset.tabPanel === selectedPanelName) ? 'block' : 'none';
-          });
-        }
       }
     }
-    if (target.closest('.settings-nav button')) {
-      target.closest('.settings-nav').querySelectorAll('button').forEach((button) => button.classList.toggle('active', button === target));
-      toast(`${target.textContent.trim()} settings`, 'This section is ready for configuration.');
-    }
+  }
+  if (target.closest('.settings-nav button')) {
+    target.closest('.settings-nav').querySelectorAll('button').forEach((button) => button.classList.toggle('active', button === target));
+    toast(`${target.textContent.trim()} settings`, 'This section is ready for configuration.');
+  }
 
-    // Delete emergency contact
-    if (target.matches('[data-delete-contact]')) {
-      const contactId = target.dataset.deleteContact;
-      modal({ title: 'Remove contact?', body: 'This will permanently remove this emergency contact.', confirmText: 'Remove', confirmClass: 'button--danger', onConfirm: () => { deleteEmergencyContact(contactId); toast('Contact removed', 'Emergency contact has been deleted.'); window.setTimeout(() => window.location.reload(), 500); } });
-    }
+  // Delete emergency contact
+  if (target.matches('[data-delete-contact]')) {
+    const contactId = target.dataset.deleteContact;
+    modal({ title: 'Remove contact?', body: 'This will permanently remove this emergency contact.', confirmText: 'Remove', confirmClass: 'button--danger', onConfirm: () => { deleteEmergencyContact(contactId); toast('Contact removed', 'Emergency contact has been deleted.'); window.setTimeout(() => window.location.reload(), 500); } });
+  }
 
-    // Dismiss health alert
-    if (target.closest('[data-dismiss-alert]')) {
-      const alertId = target.closest('[data-dismiss-alert]').dataset.dismissAlert;
-      dismissAlert(alertId);
-      toast('Alert dismissed', 'The notification has been archived.');
-      window.setTimeout(() => window.location.reload(), 500);
-    }
+  // Dismiss health alert
+  if (target.closest('[data-dismiss-alert]')) {
+    const alertId = target.closest('[data-dismiss-alert]').dataset.dismissAlert;
+    dismissAlert(alertId);
+    toast('Alert dismissed', 'The notification has been archived.');
+    window.setTimeout(() => window.location.reload(), 500);
+  }
 
-    // Open Direct Document Upload Modal
-    if (target.closest('[data-open-upload-modal]')) {
-      const children = getChildren();
-      const selectedFilter = document.querySelector('[data-child-document-filter]')?.value || '';
-      const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name} (${c.id})</option>`).join('');
+  // Open Direct Document Upload Modal
+  if (target.closest('[data-open-upload-modal]')) {
+    const children = getChildren();
+    const selectedFilter = document.querySelector('[data-child-document-filter]')?.value || '';
+    const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name} (${c.id})</option>`).join('');
 
-      modal({
-        title: 'Upload Document for Child',
-        body: `
+    modal({
+      title: 'Upload Document for Child',
+      body: `
           <form id="direct-doc-form" style="display:flex; flex-direction:column; gap:14px;">
             <label class="field">
               <span class="field__label">Select Child *</span>
@@ -665,143 +634,143 @@ async function handleGoogleAuth(email) {
             </label>
           </form>
         `,
-        confirmText: 'Upload Document',
-        onConfirm: () => {
-          const form = document.querySelector('#direct-doc-form');
-          if (!form || !form.reportValidity()) return false;
-          const formData = new FormData(form);
-          const childName = formData.get('childName');
-          const docName = formData.get('docName');
-          const docType = formData.get('docType');
-          const fileInput = document.querySelector('#modal-upload-input');
-          
-          if (fileInput && fileInput.files && fileInput.files[0]) {
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-            reader.onload = function(e) {
-              addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
-              logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
-              toast('Document uploaded', `${docName} attached to ${childName}.`);
-              window.setTimeout(() => window.location.reload(), 400);
-            };
-            reader.readAsDataURL(file);
-          } else {
-            toast('Upload error', 'Please select a document file.');
-          }
+      confirmText: 'Upload Document',
+      onConfirm: () => {
+        const form = document.querySelector('#direct-doc-form');
+        if (!form || !form.reportValidity()) return false;
+        const formData = new FormData(form);
+        const childName = formData.get('childName');
+        const docName = formData.get('docName');
+        const docType = formData.get('docType');
+        const fileInput = document.querySelector('#modal-upload-input');
+
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+          const file = fileInput.files[0];
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+            logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
+            toast('Document uploaded', `${docName} attached to ${childName}.`);
+            window.setTimeout(() => window.location.reload(), 400);
+          };
+          reader.readAsDataURL(file);
+        } else {
+          toast('Upload error', 'Please select a document file.');
         }
-      });
-    }
-
-    // Delete uploaded document
-    if (target.closest('[data-delete-doc-idx]')) {
-      const idx = parseInt(target.closest('[data-delete-doc-idx]').dataset.deleteDocIdx, 10);
-      modal({
-        title: 'Delete Document?',
-        body: 'Are you sure you want to delete this uploaded document?',
-        confirmText: 'Delete',
-        confirmClass: 'button--danger',
-        onConfirm: () => {
-          deleteUploadedDoc(idx);
-          toast('Document removed', 'Document deleted from records.');
-          window.setTimeout(() => window.location.reload(), 400);
-        }
-      });
-    }
-  });
-
-  // Change listeners
-  document.addEventListener('change', (event) => {
-    if (event.target.matches('[data-child-document-filter]')) {
-      const filterVal = event.target.value.toLowerCase();
-      const searchVal = (document.querySelector('[data-document-search]')?.value || '').toLowerCase();
-      document.querySelectorAll('#document-grid article').forEach(card => {
-        const cardChild = card.dataset.childName || '';
-        const cardText = card.dataset.document || '';
-        const matchesChild = !filterVal || cardChild.includes(filterVal);
-        const matchesSearch = !searchVal || cardText.includes(searchVal);
-        card.style.display = (matchesChild && matchesSearch) ? 'block' : 'none';
-      });
-    }
-  });
-
-  // Global Keyboard Shortcuts (⌘ K / Ctrl K for Search)
-  document.addEventListener('keydown', (event) => {
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
-      event.preventDefault();
-      openGlobalSearch('');
-    }
-    if (event.key === 'Escape') {
-      closeModal();
-    }
-  });
-
-  // Inputs
-  document.addEventListener('input', (event) => {
-    if (event.target.matches('[data-global-search]')) {
-      openGlobalSearch(event.target.value);
-    }
-
-    if (event.target.matches('[data-document-search]')) {
-      const searchVal = event.target.value.toLowerCase();
-      const filterVal = (document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
-      document.querySelectorAll('#document-grid article').forEach(card => {
-        const cardChild = card.dataset.childName || '';
-        const cardText = card.dataset.document || '';
-        const matchesChild = !filterVal || cardChild.includes(filterVal);
-        const matchesSearch = !searchVal || cardText.includes(searchVal);
-        card.style.display = (matchesChild && matchesSearch) ? 'block' : 'none';
-      });
-    }
-
-    if (event.target.matches('#child-search, [data-filter-status], [data-filter-blood]')) {
-      currentPage = 1;
-      applyTableFilters();
-    }
-    if (event.target.matches('[data-document-search]')) applyDocumentFilters();
-  });
-
-  // Changes
-  document.addEventListener('change', (event) => {
-    if (event.target.matches('[data-filter-status], [data-filter-blood]')) {
-      currentPage = 1;
-      applyTableFilters();
-    }
-    if (event.target.matches('#select-all')) document.querySelectorAll('[data-select-row]').forEach((input) => { input.checked = event.target.checked; });
-    if (event.target.matches('[data-upload-input]') && event.target.files?.length) {
-      processUploadedFile(event.target.files[0]);
-    }
-  });
-
-  // Drag & Drop
-  document.addEventListener('dragover', (event) => {
-    const zone = event.target.closest('[data-upload-zone]');
-    if (zone) {
-      event.preventDefault();
-      zone.classList.add('is-dragging');
-    }
-  });
-
-  document.addEventListener('dragleave', (event) => {
-    const zone = event.target.closest('[data-upload-zone]');
-    if (zone && !zone.contains(event.relatedTarget)) {
-      zone.classList.remove('is-dragging');
-    }
-  });
-
-  document.addEventListener('drop', (event) => {
-    const zone = event.target.closest('[data-upload-zone]');
-    if (zone) {
-      event.preventDefault();
-      zone.classList.remove('is-dragging');
-      if (event.dataTransfer.files?.length) {
-        processUploadedFile(event.dataTransfer.files[0]);
       }
-    }
-  });
+    });
+  }
 
-  // ─── Form Submissions ───
-  function initFormListeners() {
-    console.log("initFormListeners called for page:", page);
+  // Delete uploaded document
+  if (target.closest('[data-delete-doc-idx]')) {
+    const idx = parseInt(target.closest('[data-delete-doc-idx]').dataset.deleteDocIdx, 10);
+    modal({
+      title: 'Delete Document?',
+      body: 'Are you sure you want to delete this uploaded document?',
+      confirmText: 'Delete',
+      confirmClass: 'button--danger',
+      onConfirm: () => {
+        deleteUploadedDoc(idx);
+        toast('Document removed', 'Document deleted from records.');
+        window.setTimeout(() => window.location.reload(), 400);
+      }
+    });
+  }
+});
+
+// Change listeners
+document.addEventListener('change', (event) => {
+  if (event.target.matches('[data-child-document-filter]')) {
+    const filterVal = event.target.value.toLowerCase();
+    const searchVal = (document.querySelector('[data-document-search]')?.value || '').toLowerCase();
+    document.querySelectorAll('#document-grid article').forEach(card => {
+      const cardChild = card.dataset.childName || '';
+      const cardText = card.dataset.document || '';
+      const matchesChild = !filterVal || cardChild.includes(filterVal);
+      const matchesSearch = !searchVal || cardText.includes(searchVal);
+      card.style.display = (matchesChild && matchesSearch) ? 'block' : 'none';
+    });
+  }
+});
+
+// Global Keyboard Shortcuts (⌘ K / Ctrl K for Search)
+document.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+    event.preventDefault();
+    openGlobalSearch('');
+  }
+  if (event.key === 'Escape') {
+    closeModal();
+  }
+});
+
+// Inputs
+document.addEventListener('input', (event) => {
+  if (event.target.matches('[data-global-search]')) {
+    openGlobalSearch(event.target.value);
+  }
+
+  if (event.target.matches('[data-document-search]')) {
+    const searchVal = event.target.value.toLowerCase();
+    const filterVal = (document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
+    document.querySelectorAll('#document-grid article').forEach(card => {
+      const cardChild = card.dataset.childName || '';
+      const cardText = card.dataset.document || '';
+      const matchesChild = !filterVal || cardChild.includes(filterVal);
+      const matchesSearch = !searchVal || cardText.includes(searchVal);
+      card.style.display = (matchesChild && matchesSearch) ? 'block' : 'none';
+    });
+  }
+
+  if (event.target.matches('#child-search, [data-filter-status], [data-filter-blood]')) {
+    currentPage = 1;
+    applyTableFilters();
+  }
+  if (event.target.matches('[data-document-search]')) applyDocumentFilters();
+});
+
+// Changes
+document.addEventListener('change', (event) => {
+  if (event.target.matches('[data-filter-status], [data-filter-blood]')) {
+    currentPage = 1;
+    applyTableFilters();
+  }
+  if (event.target.matches('#select-all')) document.querySelectorAll('[data-select-row]').forEach((input) => { input.checked = event.target.checked; });
+  if (event.target.matches('[data-upload-input]') && event.target.files?.length) {
+    processUploadedFile(event.target.files[0]);
+  }
+});
+
+// Drag & Drop
+document.addEventListener('dragover', (event) => {
+  const zone = event.target.closest('[data-upload-zone]');
+  if (zone) {
+    event.preventDefault();
+    zone.classList.add('is-dragging');
+  }
+});
+
+document.addEventListener('dragleave', (event) => {
+  const zone = event.target.closest('[data-upload-zone]');
+  if (zone && !zone.contains(event.relatedTarget)) {
+    zone.classList.remove('is-dragging');
+  }
+});
+
+document.addEventListener('drop', (event) => {
+  const zone = event.target.closest('[data-upload-zone]');
+  if (zone) {
+    event.preventDefault();
+    zone.classList.remove('is-dragging');
+    if (event.dataTransfer.files?.length) {
+      processUploadedFile(event.dataTransfer.files[0]);
+    }
+  }
+});
+
+// ─── Form Submissions ───
+function initFormListeners() {
+  console.log("initFormListeners called for page:", page);
 
   // Child registration form
   document.querySelector('#child-form')?.addEventListener('submit', (event) => {
@@ -824,7 +793,7 @@ async function handleGoogleAuth(email) {
     const child = saveChild(form);
     logActivity('doc_processed', child.name, 'OCR-verified child saved');
     addPendingDoc('Health record', child.name);
-    
+
     const fileData = localStorage.getItem('ocr-upload-file');
     const fileName = localStorage.getItem('ocr-upload-filename') || 'Medical Document';
     let docLabel = 'Medical Report';
@@ -841,7 +810,7 @@ async function handleGoogleAuth(email) {
     if (addInput && addInput.files && addInput.files[0]) {
       const addFile = addInput.files[0];
       const addReader = new FileReader();
-      addReader.onload = function(e) {
+      addReader.onload = function (e) {
         addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record');
       };
       addReader.readAsDataURL(addFile);
@@ -861,7 +830,7 @@ async function handleGoogleAuth(email) {
         platelets: ocrData.platelets || '',
         pcv: ocrData.pcv || ''
       });
-      
+
       const alerts = [];
       if (ocrData.hemoglobin && parseFloat(ocrData.hemoglobin) < 11.0) {
         alerts.push('Low Hemoglobin (Anemia risk)');
@@ -869,7 +838,7 @@ async function handleGoogleAuth(email) {
       if (ocrData.rbc && parseFloat(ocrData.rbc) > 4.8) {
         alerts.push('High RBC Count');
       }
-      
+
       if (alerts.length > 0) {
         logActivity('health_alert', child.name, `Abnormal blood values: ${alerts.join(', ')}`);
       } else {
@@ -951,7 +920,6 @@ async function handleGoogleAuth(email) {
     bookAppointment({
       childId: values.childId,
       childName: child ? child.name : 'Unknown',
-      mode: values.mode || 'Appointment',
       type: values.type,
       date: values.date,
       time: values.time || '',
@@ -1179,12 +1147,12 @@ async function handleGoogleAuth(email) {
   });
 }
 
-  document.addEventListener('keydown', (event) => {
-    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openGlobalSearch(); }
-    if (event.key === 'Escape') closeModal();
-  });
+document.addEventListener('keydown', (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openGlobalSearch(); }
+  if (event.key === 'Escape') closeModal();
+});
 
-  // OCR processing backend fetch logic
+// OCR processing backend fetch logic
 function initOCRProcessing() {
   if (page !== 'ocr-processing' || window.__ocrStarted) return;
   window.__ocrStarted = true;
@@ -1197,7 +1165,7 @@ function initOCRProcessing() {
     const progressPctText = document.querySelector('.ocr-progress-pct');
     const progressStatusText = document.querySelector('.ocr-progress-status');
     let currentProgress = 0;
-    
+
     const statusSteps = [
       { min: 0, text: 'Preprocessing image & normalizing contrast...' },
       { min: 20, text: 'Scanning text with Tesseract multi-pass OCR...' },
@@ -1212,7 +1180,7 @@ function initOCRProcessing() {
         if (currentProgress > 92) currentProgress = 92;
         if (progressBar) progressBar.style.width = `${currentProgress}%`;
         if (progressPctText) progressPctText.textContent = `${currentProgress}%`;
-        
+
         const step = statusSteps.filter(s => currentProgress >= s.min).pop();
         if (step && progressStatusText) {
           progressStatusText.textContent = step.text;
@@ -1246,7 +1214,7 @@ function initOCRProcessing() {
               localStorage.setItem('ocr-parsed-data', JSON.stringify(result.data));
               const name = [result.data.firstName, result.data.lastName].filter(Boolean).join(' ') || 'Unknown';
               logActivity('doc_processed', name, 'Document extracted via OCR');
-              
+
               const elapsed = Date.now() - startTime;
               const remaining = Math.max(0, 1000 - elapsed);
               window.setTimeout(() => {
@@ -1260,7 +1228,7 @@ function initOCRProcessing() {
             window.clearInterval(progressTimer);
             console.error('Live OCR failed:', err);
             localStorage.removeItem('ocr-parsed-data');
-            
+
             modal({
               title: 'Extraction Failed',
               body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
@@ -1347,7 +1315,7 @@ function filteredChildren() {
 
 function applyTableFilters() {
   const children = filteredChildren().sort((a, b) => String(a[activeSort.field] || '').localeCompare(String(b[activeSort.field] || '')) * (activeSort.direction === 'asc' ? 1 : -1));
-  
+
   const totalItems = children.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   if (currentPage > totalPages) currentPage = totalPages;
@@ -1388,9 +1356,9 @@ function applyDocumentFilters() {
     const matchesSearch = text.includes(searchVal);
     const badge = card.querySelector('.badge');
     const statusBadgeText = badge ? badge.textContent.trim() : '';
-    const matchesStatus = (activeDocFilter === 'All') || 
-                          (activeDocFilter === 'Pending' && statusBadgeText.includes('Pending')) ||
-                          (activeDocFilter === 'Verified' && (statusBadgeText.includes('Verified') || statusBadgeText.includes('Active')));
+    const matchesStatus = (activeDocFilter === 'All') ||
+      (activeDocFilter === 'Pending' && statusBadgeText.includes('Pending')) ||
+      (activeDocFilter === 'Verified' && (statusBadgeText.includes('Verified') || statusBadgeText.includes('Active')));
     card.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
   });
 }
@@ -1412,7 +1380,7 @@ function processUploadedFile(file) {
       canvas.height = img.naturalHeight;
       const ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0);
-      
+
       try {
         const pngDataUrl = canvas.toDataURL('image/png');
         localStorage.setItem('ocr-upload-file', pngDataUrl);
@@ -1484,7 +1452,7 @@ function exportChildrenToExcel() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Children Health Records");
     XLSX.writeFile(wb, "ChildCare_Health_Records.xlsx");
-    
+
     logActivity('export_created', 'Excel file', 'Exported all children health data to Excel');
     toast('Export complete', 'Your children health records Excel file has been downloaded.');
   });

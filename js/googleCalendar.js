@@ -55,6 +55,36 @@ export function buildGoogleCalendarUrl(appointment) {
   return `${base}&text=${title}&dates=${dates}&details=${details}&sf=true&output=xml`;
 }
 
+/**
+ * Build Google Tasks & Reminders URL for device notification sync
+ */
+export function buildGoogleTasksUrl(reminder) {
+  const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+  const title = encodeURIComponent(`🔔 REMINDER: ${reminder.childName} — ${reminder.type || reminder.title || 'Health Task'}`);
+  const details = encodeURIComponent(
+    `📱 GOOGLE TASKS & DEVICE REMINDER\n` +
+    `Child: ${reminder.childName}\n` +
+    `Task Type: ${reminder.type || 'Reminder'}\n` +
+    `Notes: ${reminder.doctor || reminder.notes || 'Healthcare Task'}\n\n` +
+    `⚠️ Sync Notice: Notification alert will ring on all connected devices signed into your Google Account (Android, iOS, PC, Mac).`
+  );
+
+  const dateStr = (reminder.date || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
+  let startTime = '100000';
+  let endTime = '103000';
+
+  if (reminder.time) {
+    const parsed = parseTime(reminder.time);
+    if (parsed) {
+      startTime = parsed.start;
+      endTime = parsed.end;
+    }
+  }
+
+  const dates = `${dateStr}T${startTime}/${dateStr}T${endTime}`;
+  return `${base}&text=${title}&dates=${dates}&details=${details}&remind=true&sf=true&output=xml`;
+}
+
 export function parseHoursAndMinutes(timeStr) {
   if (!timeStr) return { hours: 10, minutes: 0 };
   const str = String(timeStr).trim();
@@ -112,25 +142,21 @@ function parseTime(timeStr) {
 }
 
 export function bookAppointment(data) {
-  const isReminder = data.mode === 'Reminder' || (data.type && data.type.toLowerCase().includes('reminder'));
-  const eventType = data.type || (isReminder ? 'General Reminder' : 'Doctor visit');
   const appt = addAppointment({
     childId: data.childId,
     childName: data.childName,
-    type: eventType,
+    type: data.type,
     date: data.date,
     time: data.time || '10:00',
-    doctor: data.doctor || (isReminder ? 'Reminder Note' : 'Checkup'),
+    doctor: data.doctor || '',
     notes: data.notes || '',
-    mode: isReminder ? 'Reminder' : 'Appointment',
     status: 'Upcoming'
   });
 
   const calUrl = buildGoogleCalendarUrl(appt);
   window.open(calUrl, '_blank');
 
-  const titleText = isReminder ? '🔔 Reminder Created & Synced' : '📅 Appointment Scheduled';
-  toast(titleText, `${data.childName} — ${eventType} on ${data.date}. Google Calendar synced.`);
+  toast('Appointment Scheduled', `${data.childName} — ${data.type} on ${data.date}. Google Calendar synced.`);
   return appt;
 }
 
@@ -146,7 +172,6 @@ function firstDayOfWeek(year, month) {
 function typeColor(type) {
   if (!type) return 'blue';
   const t = type.toLowerCase();
-  if (t.includes('reminder') || t.includes('dose') || t.includes('hygiene') || t.includes('diet')) return 'violet';
   if (t.includes('doctor') || t.includes('general')) return 'blue';
   if (t.includes('follow') || t.includes('vaccin')) return 'green';
   if (t.includes('dental') || t.includes('eye')) return 'amber';
@@ -349,7 +374,6 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
 
   return `
     <form class="gcal-popup-form" id="cal-booking-form">
-      <input type="hidden" name="mode" value="Appointment" />
       <!-- Title row (Google Calendar style borderless input) -->
       <div class="gcal-popup-title-row">
         <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add title" autocomplete="off" />
@@ -419,7 +443,7 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
           </div>
         </div>
 
-        <!-- Google Calendar badge -->
+        <!-- Google Calendar badge & Device Notification Notice -->
         <div class="gcal-popup-row">
           <div class="gcal-popup-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
@@ -429,6 +453,9 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
               <span class="gcal-popup-cal-dot"></span>
               Child Health Calendar
             </span>
+            <div class="gcal-device-sync-badge" id="gcal-device-sync-badge" style="display:none; margin-top:8px; font-size:11.5px; color:#1e40af; background:#eff6ff; padding:8px 12px; border-radius:8px; font-weight:600; border:1px solid #bfdbfe; line-height:1.4;">
+              📱 <b>Device Sync Alert</b>: Reminders ring on all connected devices (Android, iPhone, Mac, Windows) signed into your Google Account.
+            </div>
           </div>
         </div>
       </div>
@@ -542,10 +569,14 @@ export function renderEventDetailsModalMarkup(eventId) {
           </div>
 
           <!-- Sync Action Footer -->
-          <div class="gcal-popover-footer">
+          <div class="gcal-popover-footer" style="display:flex; flex-direction:column; gap:8px;">
             <button class="gcal-popup-save-btn" type="button" data-sync-event-id="${appt.id}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
               Open in Google Calendar
+            </button>
+            <button class="gcal-popup-save-btn" type="button" data-sync-tasks-id="${appt.id}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: #1a73e8; color: white;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+              Add to Google Tasks / Reminders 🔔
             </button>
           </div>
         </div>
