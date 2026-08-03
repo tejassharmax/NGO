@@ -800,6 +800,7 @@ function formatChildrenForSheet(children) {
     'Child ID', 'Full Name', 'Gender', 'Date of Birth', 'Blood Group',
     'Father Name', 'Mother Name', 'Phone Number', 'Address', 'ID / Aadhaar Number',
     'Height (cm)', 'Weight (kg)', 'Medical Conditions', 'Allergies',
+    'Current Medications', 'Dental Remarks', 'Oral Hygiene Index',
     'Emergency Contact', 'Emergency Phone', 'Registered Date', 'Status'
   ];
 
@@ -818,6 +819,9 @@ function formatChildrenForSheet(children) {
     c.weight || '',
     c.medicalConditions || '',
     c.allergies || '',
+    c.medications || 'None',
+    c.dentalRemarks || 'None',
+    c.hygieneIndex || 'Not Assessed',
     c.emergencyContact || '',
     c.emergencyPhone || '',
     c.registeredDate || '',
