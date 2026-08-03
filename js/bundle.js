@@ -1426,36 +1426,6 @@
     return `${base}&text=${title}&dates=${dates}&details=${details}&sf=true&output=xml`;
   }
 
-  /**
-   * Build Google Tasks & Reminders URL for device notification sync
-   */
-  function buildGoogleTasksUrl(reminder) {
-    const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-    const title = encodeURIComponent(`🔔 REMINDER: ${reminder.childName} — ${reminder.type || reminder.title || 'Health Task'}`);
-    const details = encodeURIComponent(
-      `📱 GOOGLE TASKS & DEVICE REMINDER\n` +
-      `Child: ${reminder.childName}\n` +
-      `Task Type: ${reminder.type || 'Reminder'}\n` +
-      `Notes: ${reminder.doctor || reminder.notes || 'Healthcare Task'}\n\n` +
-      `⚠️ Sync Notice: Notification alert will ring on all connected devices signed into your Google Account (Android, iOS, PC, Mac).`
-    );
-
-    const dateStr = (reminder.date || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
-    let startTime = '100000';
-    let endTime = '103000';
-
-    if (reminder.time) {
-      const parsed = parseTime(reminder.time);
-      if (parsed) {
-        startTime = parsed.start;
-        endTime = parsed.end;
-      }
-    }
-
-    const dates = `${dateStr}T${startTime}/${dateStr}T${endTime}`;
-    return `${base}&text=${title}&dates=${dates}&details=${details}&remind=true&sf=true&output=xml`;
-  }
-
   function parseHoursAndMinutes(timeStr) {
     if (!timeStr) return { hours: 10, minutes: 0 };
     const str = String(timeStr).trim();
@@ -1749,12 +1719,6 @@
         <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add title" autocomplete="off" />
       </div>
 
-      <!-- Tab bar -->
-      <div class="gcal-popup-tabs">
-        <button type="button" class="gcal-popup-tab gcal-popup-tab--active">Appointment</button>
-        <button type="button" class="gcal-popup-tab">Reminder</button>
-      </div>
-
       <!-- Icon rows -->
       <div class="gcal-popup-rows">
         <!-- Date & Time -->
@@ -1813,7 +1777,7 @@
           </div>
         </div>
 
-        <!-- Google Calendar badge & Device Notification Notice -->
+        <!-- Google Calendar badge -->
         <div class="gcal-popup-row">
           <div class="gcal-popup-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
@@ -1823,9 +1787,6 @@
               <span class="gcal-popup-cal-dot"></span>
               Child Health Calendar
             </span>
-            <div class="gcal-device-sync-badge" id="gcal-device-sync-badge" style="display:none; margin-top:8px; font-size:11.5px; color:#1e40af; background:#eff6ff; padding:8px 12px; border-radius:8px; font-weight:600; border:1px solid #bfdbfe; line-height:1.4;">
-              📱 <b>Device Sync Alert</b>: Reminders ring on all connected devices (Android, iPhone, Mac, Windows) signed into your Google Account.
-            </div>
           </div>
         </div>
       </div>
@@ -1876,20 +1837,17 @@
         <!-- Banner Header -->
         <div class="gcal-popover-banner" style="background-image: url('assets/gcal_event_banner.png');">
           <div class="gcal-popover-actions">
-            <button class="gcal-popover-btn" type="button" data-edit-event-id="${appt.id}" title="Edit event">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <button class="gcal-popover-btn" type="button" data-edit-event-id="${appt.id}" title="Edit appointment">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
-            <button class="gcal-popover-btn" type="button" data-delete-event-id="${appt.id}" title="Delete event">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <button class="gcal-popover-btn" type="button" data-delete-event-id="${appt.id}" title="Delete appointment">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
-            <button class="gcal-popover-btn" type="button" data-sync-event-id="${appt.id}" title="Sync to Google Calendar">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            </button>
-            <button class="gcal-popover-btn" type="button" data-sync-event-id="${appt.id}" title="More options">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+            <button class="gcal-popover-btn" type="button" data-sync-event-id="${appt.id}" title="Open in Google Calendar">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
             </button>
             <button class="gcal-popover-btn" type="button" data-close-cal-modal title="Close">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
         </div>
@@ -1898,13 +1856,16 @@
         <div class="gcal-popover-body">
           <!-- Title row -->
           <div class="gcal-popover-row gcal-popover-title-row">
-            <span class="gcal-popover-color-dot" style="background-color: ${colorHex};"></span>
-            <div class="gcal-popover-title-group">
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
-                <h2 class="gcal-popover-title">${escapeHTML(appt.childName)} — ${escapeHTML(appt.type)}</h2>
+            <span class="gcal-popover-color-dot" style="background-color: ${colorHex}; margin-top: 4px;"></span>
+            <div class="gcal-popover-title-group" style="width: 100%;">
+              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                <div>
+                  <h2 class="gcal-popover-title" style="font-size: 19px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1.3; letter-spacing: -0.01em;">${escapeHTML(appt.childName)}</h2>
+                  <div style="font-size: 13.5px; font-weight: 600; color: #475569; margin-top: 3px;">${escapeHTML(appt.type)}</div>
+                </div>
                 <span class="gcal-status-pill gcal-status-pill--${currentStatus === 'Completed' ? 'done' : 'upcoming'}">${currentStatus}</span>
               </div>
-              <div class="gcal-popover-time">${dayStr} · ${timeRangeFormatted}</div>
+              <div class="gcal-popover-time" style="margin-top: 6px; font-size: 13px; color: #64748b; font-weight: 500;">${dayStr} · ${timeRangeFormatted}</div>
             </div>
           </div>
 
@@ -1939,14 +1900,10 @@
           </div>
 
           <!-- Sync Action Footer -->
-          <div class="gcal-popover-footer" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="gcal-popover-footer">
             <button class="gcal-popup-save-btn" type="button" data-sync-event-id="${appt.id}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
               Open in Google Calendar
-            </button>
-            <button class="gcal-popup-save-btn" type="button" data-sync-tasks-id="${appt.id}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; background: #1a73e8; color: white;">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
-              Add to Google Tasks / Reminders 🔔
             </button>
           </div>
         </div>
@@ -38542,64 +38499,7 @@
       }
     }
 
-    // Tab switching inside Google Calendar popup modal
-    const popupTab = target.closest('.gcal-popup-tab');
-    if (popupTab) {
-      const parent = popupTab.closest('.gcal-popup-tabs');
-      if (parent) {
-        parent.querySelectorAll('.gcal-popup-tab').forEach(t => t.classList.remove('gcal-popup-tab--active'));
-        popupTab.classList.add('gcal-popup-tab--active');
 
-        const form = popupTab.closest('form');
-        if (form) {
-          const isReminder = popupTab.textContent.trim().toLowerCase() === 'reminder';
-          const modeInput = form.querySelector('[name="mode"]');
-          if (modeInput) modeInput.value = isReminder ? 'Reminder' : 'Appointment';
-
-          const titleInput = form.querySelector('.gcal-popup-title-input');
-          if (titleInput) {
-            titleInput.placeholder = isReminder ? 'Add reminder title (e.g. Give Vitamin D3)' : 'Add title';
-          }
-
-          const typeSelect = form.querySelector('select[name="type"]');
-          if (typeSelect) {
-            if (isReminder) {
-              typeSelect.innerHTML = `
-              <option value="">Reminder type</option>
-              <option value="Medication Dose">Medication Dose</option>
-              <option value="Follow-up Reminder">Follow-up Reminder</option>
-              <option value="Vaccination Due">Vaccination Due</option>
-              <option value="Diet & Nutrition">Diet & Nutrition</option>
-              <option value="Hygiene Check">Hygiene Check</option>
-              <option value="General Reminder">General Reminder</option>
-            `;
-            } else {
-              typeSelect.innerHTML = `
-              <option value="">Appointment type</option>
-              <option value="Doctor visit">Doctor Visit</option>
-              <option value="Follow-up">Follow-up</option>
-              <option value="Dental checkup">Dental Checkup</option>
-              <option value="Deworming">Deworming</option>
-              <option value="Vaccination">Vaccination</option>
-              <option value="Eye checkup">Eye Checkup</option>
-              <option value="General checkup">General Checkup</option>
-            `;
-            }
-          }
-
-          const deviceBadge = form.querySelector('#gcal-device-sync-badge');
-          if (deviceBadge) {
-            deviceBadge.style.display = isReminder ? 'block' : 'none';
-          }
-
-          const saveBtn = form.querySelector('.gcal-popup-save-btn');
-          if (saveBtn) {
-            saveBtn.textContent = isReminder ? 'Save Reminder & Sync Devices 🔔' : 'Save';
-          }
-        }
-      }
-      return;
-    }
 
     // Modal Close Button or Overlay Backdrop Click
     const isExplicitClose = target.closest('[data-close-cal-modal]');
@@ -38625,17 +38525,7 @@
       syncAndOpenGoogleDoc();
     }
 
-    const tasksBtn = target.closest('[data-sync-tasks-id]');
-    if (tasksBtn) {
-      const eventId = tasksBtn.getAttribute('data-sync-tasks-id');
-      const appointments = getAppointments();
-      const appt = appointments.find(a => String(a.id) === String(eventId));
-      if (appt) {
-        const tasksUrl = buildGoogleTasksUrl(appt);
-        window.open(tasksUrl, '_blank');
-        toast('Google Tasks Syncing', `Pushing reminder for ${appt.childName} to Google Tasks & connected devices.`);
-      }
-    }
+
 
     if (target.matches('[data-global-search]')) openGlobalSearch();
     if (target.matches('[data-filter-toggle]')) { const row = document.querySelector('[data-filter-row]'); row.hidden = !row.hidden; }
