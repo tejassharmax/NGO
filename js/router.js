@@ -397,7 +397,9 @@ export function childProfilePage() {
                 <div class="detail-row"><span>BMI</span><b>${latestGrowth && latestGrowth.bmi ? latestGrowth.bmi : '—'}</b></div>
                 <div class="detail-row"><span>Medical conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
                 <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
-                <div class="detail-row"><span>Active medications</span><b>${meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : 'None'}</b></div>
+                <div class="detail-row"><span>Current medications</span><b>${child.medications || (meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : 'None')}</b></div>
+                <div class="detail-row"><span>Dental remarks</span><b>${child.dentalRemarks || 'No remarks recorded'}</b></div>
+                <div class="detail-row"><span>Hygiene Index</span><b>${child.hygieneIndex || 'Not Assessed'}</b></div>
               </div>
             </div>
           </section>
@@ -501,9 +503,50 @@ export function registerChildPage() {
   const desc = child ? 'Modify the child record. Required fields are marked with an asterisk.' : 'Create a reliable child health record. Required fields are marked with an asterisk.';
   const submitText = child ? 'Save changes' : 'Save child record';
 
+  const knownMedsPresets = [
+    'None',
+    'Paracetamol / Crocin',
+    'Amoxicillin Syrup',
+    'Inhaler / Asthma Medication',
+    'Vitamin D3 Drops / Syrup',
+    'Multivitamin Syrup',
+    'Iron Syrup / Supplement',
+    'Albendazole / Deworming',
+    'Cetirizine Syrup',
+    'ORAL Rehydration Salts (ORS)'
+  ];
+  const curMed = child ? child.medications : '';
+  const isCustomMed = curMed && !knownMedsPresets.includes(curMed);
+
   return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName)}${field('Last name *', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '')}${field('Gender *', 'gender', 'e.g. Male', 'text', '', child ? child.gender : '')}${field('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements and known conditions.</p></div><div class="form-grid--two">${field('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML(child.allergies) : ''}</textarea></label>${field('Current medications', 'medications', 'e.g. Inhaler, Vitamin D', 'text', '', child ? child.medications : '')}</div></section>
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML(child.allergies) : ''}</textarea></label>
+  <div class="form-span-all" style="display:flex; flex-direction:column; gap:10px;">
+    <label class="field">
+      <span class="field__label">Current medications</span>
+      <select class="input" name="medications_preset" data-meds-select>
+        <option value="">Select medication...</option>
+        <option value="None" ${curMed === 'None' ? 'selected' : ''}>None</option>
+        <option value="Paracetamol / Crocin" ${curMed === 'Paracetamol / Crocin' ? 'selected' : ''}>Paracetamol / Crocin</option>
+        <option value="Amoxicillin Syrup" ${curMed === 'Amoxicillin Syrup' ? 'selected' : ''}>Amoxicillin Syrup</option>
+        <option value="Inhaler / Asthma Medication" ${curMed === 'Inhaler / Asthma Medication' ? 'selected' : ''}>Inhaler / Asthma Medication</option>
+        <option value="Vitamin D3 Drops / Syrup" ${curMed === 'Vitamin D3 Drops / Syrup' ? 'selected' : ''}>Vitamin D3 Drops / Syrup</option>
+        <option value="Multivitamin Syrup" ${curMed === 'Multivitamin Syrup' ? 'selected' : ''}>Multivitamin Syrup</option>
+        <option value="Iron Syrup / Supplement" ${curMed === 'Iron Syrup / Supplement' ? 'selected' : ''}>Iron Syrup / Supplement</option>
+        <option value="Albendazole / Deworming" ${curMed === 'Albendazole / Deworming' ? 'selected' : ''}>Albendazole / Deworming</option>
+        <option value="Cetirizine Syrup" ${curMed === 'Cetirizine Syrup' ? 'selected' : ''}>Cetirizine Syrup</option>
+        <option value="ORAL Rehydration Salts (ORS)" ${curMed === 'ORAL Rehydration Salts (ORS)' ? 'selected' : ''}>ORAL Rehydration Salts (ORS)</option>
+        <option value="Other" ${isCustomMed ? 'selected' : ''}>Other</option>
+      </select>
+    </label>
+    <label class="field" id="custom-med-field" style="${isCustomMed ? 'display:block;' : 'display:none;'}">
+      <span class="field__label">Specify other medication</span>
+      <input class="input" type="text" name="medications_custom" placeholder="Type custom medication name..." value="${isCustomMed ? escapeHTML(curMed) : ''}">
+    </label>
+  </div>
+  <label class="field form-span-all"><span class="field__label">Dental remarks</span><textarea class="textarea" name="dentalRemarks" placeholder="e.g. No cavities, Mild plaque buildup, Fluoride varnish applied, Orthodontic evaluation recommended">${child ? escapeHTML(child.dentalRemarks || '') : ''}</textarea></label>
+  <label class="field form-span-all"><span class="field__label">Hygiene Index</span><select class="input" name="hygieneIndex"><option value="">Select hygiene index...</option><option value="Good (Optimal Oral & Physical Hygiene)" ${child && child.hygieneIndex?.includes('Good') ? 'selected' : ''}>Good (Optimal Oral & Physical Hygiene)</option><option value="Fair (Moderate Plaque / Needs Supervision)" ${child && child.hygieneIndex?.includes('Fair') ? 'selected' : ''}>Fair (Moderate Plaque / Needs Supervision)</option><option value="Poor (High Cavity Risk / Overdue Dental Care)" ${child && child.hygieneIndex?.includes('Poor') ? 'selected' : ''}>Poor (High Cavity Risk / Overdue Dental Care)</option><option value="Not Assessed" ${child && child.hygieneIndex === 'Not Assessed' ? 'selected' : ''}>Not Assessed</option></select></label>
+  </div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
 }

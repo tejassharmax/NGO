@@ -935,6 +935,18 @@ async function handleGoogleAuth(email) {
     }
   });
 
+  document.addEventListener('change', (event) => {
+    if (event.target.matches('[data-meds-select]')) {
+      const customField = document.querySelector('#custom-med-field');
+      if (customField) {
+        customField.style.display = event.target.value === 'Other' ? 'block' : 'none';
+        if (event.target.value === 'Other') {
+          customField.querySelector('input')?.focus();
+        }
+      }
+    }
+  });
+
   // Live date & time text update in booking popup
   document.addEventListener('input', (event) => {
     const form = event.target.closest('#cal-booking-form');
