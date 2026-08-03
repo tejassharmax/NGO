@@ -25,11 +25,11 @@ export const EXACT_SHEET_COLUMNS = [
   'Weight (kg)',
   'Medical Conditions',
   'Allergies',
+  'Status',
+  'Registration Date',
   'Current Medications',
   'Dental Remarks',
-  'Oral Hygiene Index',
-  'Status',
-  'Registration Date'
+  'Oral Hygiene Index'
 ];
 
 export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjQzPTgcdhoEDLSVBmQLoiVPy98Dnq5iF8VfrHOt6GDRH-8hjuw6H3209dqOdNQdo5ig/exec';
@@ -74,11 +74,11 @@ export function formatChildToSheetRow(child) {
     formatUnitValue(child.weight, 'kg'),
     child.medicalConditions || 'None',
     child.allergies || 'None',
+    child.status || 'Active',
+    child.registeredDate || new Date().toISOString().slice(0, 10),
     child.medications || 'None',
     child.dentalRemarks || 'None',
-    child.hygieneIndex || 'Not Assessed',
-    child.status || 'Active',
-    child.registeredDate || new Date().toISOString().slice(0, 10)
+    child.hygieneIndex || 'Not Assessed'
   ];
 }
 
@@ -377,11 +377,11 @@ export async function autoSyncChildToGoogleSheets(child) {
     weight: extractRawNumber(child.weight),
     medicalConditions: child.medicalConditions || 'None',
     allergies: child.allergies || 'None',
+    status: child.status || 'Active',
+    registeredDate: child.registeredDate || new Date().toISOString().slice(0, 10),
     medications: child.medications || 'None',
     dentalRemarks: child.dentalRemarks || 'None',
-    hygieneIndex: child.hygieneIndex || 'Not Assessed',
-    status: child.status || 'Active',
-    registeredDate: child.registeredDate || new Date().toISOString().slice(0, 10)
+    hygieneIndex: child.hygieneIndex || 'Not Assessed'
   };
 
   // Send live HTTP POST to connected Google Apps Script Web App
