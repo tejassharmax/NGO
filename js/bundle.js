@@ -3384,7 +3384,7 @@
       weight: values.weight ? String(values.weight).replace(/[^0-9.]/g, '').trim() : '',
       medicalConditions: values.medicalConditions || '',
       allergies: values.allergies || '',
-      medications,
+      medications: values.medications || '',
       dentalRemarks: values.dentalRemarks || '',
       hygieneIndex: values.hygieneIndex || '',
       emergencyContact: values.emergencyContact || '',
