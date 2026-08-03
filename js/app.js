@@ -181,13 +181,18 @@ document.addEventListener('click', (event) => {
   if (deleteBtn) {
     const id = deleteBtn.getAttribute('data-delete-event-id');
     deleteAppointment(id);
-    toast('Appointment Deleted', 'Appointment has been removed from schedule.');
+    toast('Appointment Deleted', 'Appointment removed permanently from schedule.');
     
-    // Remove popover modal & event chips immediately from DOM
+    // 1. Remove popover modal if open
     document.querySelector('#cal-booking-modal')?.remove();
+
+    // 2. Remove table row if deleted from data table
+    deleteBtn.closest('tr.gcal-appt-row')?.remove();
+
+    // 3. Remove all matching event chips and cards from DOM
     document.querySelectorAll(`[data-event-id="${id}"]`).forEach(el => el.remove());
 
-    // Refresh calendar view immediately
+    // 4. Refresh calendar grid view dynamically if present
     const calRoot = document.querySelector('[data-calendar-root]');
     if (calRoot) {
       const mode = calRoot.getAttribute('data-cal-view-mode') || 'month';
@@ -195,8 +200,6 @@ document.addEventListener('click', (event) => {
       const month = parseInt(calRoot.getAttribute('data-cal-month')) || new Date().getMonth();
       const day = parseInt(calRoot.getAttribute('data-cal-day')) || new Date().getDate();
       updateCalendarView(calRoot, mode, year, month, day);
-    } else {
-      window.setTimeout(() => window.location.reload(), 300);
     }
     return;
   }
