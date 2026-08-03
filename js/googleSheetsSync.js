@@ -32,7 +32,7 @@ export const EXACT_SHEET_COLUMNS = [
   'Oral Hygiene Index'
 ];
 
-export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjQzPTgcdhoEDLSVBmQLoiVPy98Dnq5iF8VfrHOt6GDRH-8hjuw6H3209dqOdNQdo5ig/exec';
+export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzKtL3Ik4Ji_so-tuNtvuJF9zS2Ts9qUMAtTwmka-EnBWzW08mPJNZEzLS3hPUxh1CeBg/exec';
 export const LIVE_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
 
 /**
