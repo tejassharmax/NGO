@@ -299,6 +299,54 @@ document.addEventListener('click', (event) => {
     if (parent) {
       parent.querySelectorAll('.gcal-popup-tab').forEach(t => t.classList.remove('gcal-popup-tab--active'));
       popupTab.classList.add('gcal-popup-tab--active');
+
+      const form = popupTab.closest('form');
+      if (form) {
+        const isReminder = popupTab.textContent.trim().toLowerCase() === 'reminder';
+        const modeInput = form.querySelector('[name="mode"]');
+        if (modeInput) modeInput.value = isReminder ? 'Reminder' : 'Appointment';
+
+        const titleInput = form.querySelector('.gcal-popup-title-input');
+        if (titleInput) {
+          titleInput.placeholder = isReminder ? 'Add reminder title (e.g. Give Vitamin D3)' : 'Add title';
+        }
+
+        const typeSelect = form.querySelector('select[name="type"]');
+        if (typeSelect) {
+          if (isReminder) {
+            typeSelect.innerHTML = `
+              <option value="">Reminder type</option>
+              <option value="Medication Dose">Medication Dose</option>
+              <option value="Follow-up Reminder">Follow-up Reminder</option>
+              <option value="Vaccination Due">Vaccination Due</option>
+              <option value="Diet & Nutrition">Diet & Nutrition</option>
+              <option value="Hygiene Check">Hygiene Check</option>
+              <option value="General Reminder">General Reminder</option>
+            `;
+          } else {
+            typeSelect.innerHTML = `
+              <option value="">Appointment type</option>
+              <option value="Doctor visit">Doctor Visit</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Dental checkup">Dental Checkup</option>
+              <option value="Deworming">Deworming</option>
+              <option value="Vaccination">Vaccination</option>
+              <option value="Eye checkup">Eye Checkup</option>
+              <option value="General checkup">General Checkup</option>
+            `;
+          }
+        }
+
+        const deviceBadge = form.querySelector('#gcal-device-sync-badge');
+        if (deviceBadge) {
+          deviceBadge.style.display = isReminder ? 'block' : 'none';
+        }
+
+        const saveBtn = form.querySelector('.gcal-popup-save-btn');
+        if (saveBtn) {
+          saveBtn.textContent = isReminder ? 'Save Reminder & Sync Devices 🔔' : 'Save';
+        }
+      }
     }
     return;
   }
