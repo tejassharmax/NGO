@@ -38421,12 +38421,8 @@
 
     const syncBtn = target.closest('[data-sync-event-id]');
     if (syncBtn) {
-      const id = syncBtn.getAttribute('data-sync-event-id');
-      const appt = getAppointments().find(a => String(a.id) === String(id));
-      if (appt) {
-        window.open(buildGoogleCalendarUrl(appt), '_blank');
-        toast('Google Calendar Sync', 'Opening event in Google Calendar...');
-      }
+      window.open('https://calendar.google.com/', '_blank');
+      toast('Google Calendar', 'Opening Google Calendar...');
       return;
     }
 
