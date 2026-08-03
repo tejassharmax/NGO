@@ -521,28 +521,31 @@ export function registerChildPage() {
   return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName)}${field('Last name *', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '')}${field('Gender *', 'gender', 'e.g. Male', 'text', '', child ? child.gender : '')}${field('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML(child.allergies) : ''}</textarea></label>
-  <label class="field form-span-all">
+  <div class="field form-span-all">
     <span class="field__label">Current medications</span>
-    <div style="position:relative; width:100%;">
-      <input class="input" type="text" name="medications" list="medications-preset-list" placeholder="Select from list or type any medication..." value="${escapeHTML(curMed)}" autocomplete="off" style="padding-right:36px; font-weight:500;">
-      <datalist id="medications-preset-list">
-        <option value="None">
-        <option value="Paracetamol / Crocin">
-        <option value="Amoxicillin Syrup">
-        <option value="Inhaler / Asthma Medication">
-        <option value="Vitamin D3 Drops / Syrup">
-        <option value="Multivitamin Syrup">
-        <option value="Iron Syrup / Supplement">
-        <option value="Albendazole / Deworming">
-        <option value="Cetirizine Syrup">
-        <option value="ORAL Rehydration Salts (ORS)">
-      </datalist>
-      <div style="position:absolute; right:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:#2563eb; display:flex; align-items:center;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+    <div class="combobox" data-combobox>
+      <input type="hidden" name="medications" value="${escapeHTML(curMed)}">
+      <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10v7h7Z"/><path d="m8.5 15.5 7-7"/></svg></span>
+      <input class="combobox__input" type="text" placeholder="Search or type a medication..." value="${escapeHTML(curMed)}" autocomplete="off" data-combobox-input>
+      <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
+      <div class="combobox__panel" data-combobox-panel>
+        <div class="combobox__hint">Common medications</div>
+        <div data-combobox-option="None" class="combobox__option"><span class="combobox__option-icon">🚫</span>None<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Paracetamol / Crocin" class="combobox__option"><span class="combobox__option-icon">💊</span>Paracetamol / Crocin<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Amoxicillin Syrup" class="combobox__option"><span class="combobox__option-icon">🧴</span>Amoxicillin Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Inhaler / Asthma Medication" class="combobox__option"><span class="combobox__option-icon">🫁</span>Inhaler / Asthma Medication<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Vitamin D3 Drops / Syrup" class="combobox__option"><span class="combobox__option-icon">☀️</span>Vitamin D3 Drops / Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Multivitamin Syrup" class="combobox__option"><span class="combobox__option-icon">🌈</span>Multivitamin Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Iron Syrup / Supplement" class="combobox__option"><span class="combobox__option-icon">🩸</span>Iron Syrup / Supplement<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Albendazole / Deworming" class="combobox__option"><span class="combobox__option-icon">🛡️</span>Albendazole / Deworming<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Cetirizine Syrup" class="combobox__option"><span class="combobox__option-icon">🤧</span>Cetirizine Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="ORAL Rehydration Salts (ORS)" class="combobox__option"><span class="combobox__option-icon">💧</span>ORAL Rehydration Salts (ORS)<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div class="combobox__divider"></div>
+        <div class="combobox__empty" data-combobox-empty style="display:none;"><b>No matches found</b>Press Enter to use your custom medication</div>
       </div>
     </div>
-    <span class="field__hint">Click to choose a preset medication or type any custom medicine directly into the box.</span>
-  </label>
+    <span class="field__hint">Select a preset or type any custom medicine name directly.</span>
+  </div>
   <label class="field form-span-all"><span class="field__label">Dental remarks</span><textarea class="textarea" name="dentalRemarks" placeholder="e.g. RESTORATION, SCALING, ORTHODONTIC TREATMENT">${child ? escapeHTML(child.dentalRemarks || '') : ''}</textarea></label>
   <label class="field form-span-all"><span class="field__label">Oral Hygiene Index</span><select class="input" name="hygieneIndex"><option value="">Select Hygiene Index...</option><option value="SATISFACTORY" ${child && child.hygieneIndex === 'SATISFACTORY' ? 'selected' : ''}>SATISFACTORY</option><option value="AVERAGE" ${child && child.hygieneIndex === 'AVERAGE' ? 'selected' : ''}>AVERAGE</option><option value="POOR" ${child && child.hygieneIndex === 'POOR' ? 'selected' : ''}>POOR</option></select></label>
   </div></section>

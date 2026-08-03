@@ -2494,28 +2494,31 @@
     return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath$1('child-profile')}?id=${child.id}` : pagePath$1('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field$1('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName)}${field$1('Last name *', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field$1('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '')}${field$1('Gender *', 'gender', 'e.g. Male', 'text', '', child ? child.gender : '')}${field$1('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field$1('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field$1('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML$1(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML$1(child.allergies) : ''}</textarea></label>
-  <label class="field form-span-all">
+  <div class="field form-span-all">
     <span class="field__label">Current medications</span>
-    <div style="position:relative; width:100%;">
-      <input class="input" type="text" name="medications" list="medications-preset-list" placeholder="Select from list or type any medication..." value="${escapeHTML$1(curMed)}" autocomplete="off" style="padding-right:36px; font-weight:500;">
-      <datalist id="medications-preset-list">
-        <option value="None">
-        <option value="Paracetamol / Crocin">
-        <option value="Amoxicillin Syrup">
-        <option value="Inhaler / Asthma Medication">
-        <option value="Vitamin D3 Drops / Syrup">
-        <option value="Multivitamin Syrup">
-        <option value="Iron Syrup / Supplement">
-        <option value="Albendazole / Deworming">
-        <option value="Cetirizine Syrup">
-        <option value="ORAL Rehydration Salts (ORS)">
-      </datalist>
-      <div style="position:absolute; right:12px; top:50%; transform:translateY(-50%); pointer-events:none; color:#2563eb; display:flex; align-items:center;">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+    <div class="combobox" data-combobox>
+      <input type="hidden" name="medications" value="${escapeHTML$1(curMed)}">
+      <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10v7h7Z"/><path d="m8.5 15.5 7-7"/></svg></span>
+      <input class="combobox__input" type="text" placeholder="Search or type a medication..." value="${escapeHTML$1(curMed)}" autocomplete="off" data-combobox-input>
+      <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
+      <div class="combobox__panel" data-combobox-panel>
+        <div class="combobox__hint">Common medications</div>
+        <div data-combobox-option="None" class="combobox__option"><span class="combobox__option-icon">🚫</span>None<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Paracetamol / Crocin" class="combobox__option"><span class="combobox__option-icon">💊</span>Paracetamol / Crocin<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Amoxicillin Syrup" class="combobox__option"><span class="combobox__option-icon">🧴</span>Amoxicillin Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Inhaler / Asthma Medication" class="combobox__option"><span class="combobox__option-icon">🫁</span>Inhaler / Asthma Medication<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Vitamin D3 Drops / Syrup" class="combobox__option"><span class="combobox__option-icon">☀️</span>Vitamin D3 Drops / Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Multivitamin Syrup" class="combobox__option"><span class="combobox__option-icon">🌈</span>Multivitamin Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Iron Syrup / Supplement" class="combobox__option"><span class="combobox__option-icon">🩸</span>Iron Syrup / Supplement<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Albendazole / Deworming" class="combobox__option"><span class="combobox__option-icon">🛡️</span>Albendazole / Deworming<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Cetirizine Syrup" class="combobox__option"><span class="combobox__option-icon">🤧</span>Cetirizine Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="ORAL Rehydration Salts (ORS)" class="combobox__option"><span class="combobox__option-icon">💧</span>ORAL Rehydration Salts (ORS)<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div class="combobox__divider"></div>
+        <div class="combobox__empty" data-combobox-empty style="display:none;"><b>No matches found</b>Press Enter to use your custom medication</div>
       </div>
     </div>
-    <span class="field__hint">Click to choose a preset medication or type any custom medicine directly into the box.</span>
-  </label>
+    <span class="field__hint">Select a preset or type any custom medicine name directly.</span>
+  </div>
   <label class="field form-span-all"><span class="field__label">Dental remarks</span><textarea class="textarea" name="dentalRemarks" placeholder="e.g. RESTORATION, SCALING, ORTHODONTIC TREATMENT">${child ? escapeHTML$1(child.dentalRemarks || '') : ''}</textarea></label>
   <label class="field form-span-all"><span class="field__label">Oral Hygiene Index</span><select class="input" name="hygieneIndex"><option value="">Select Hygiene Index...</option><option value="SATISFACTORY" ${child && child.hygieneIndex === 'SATISFACTORY' ? 'selected' : ''}>SATISFACTORY</option><option value="AVERAGE" ${child && child.hygieneIndex === 'AVERAGE' ? 'selected' : ''}>AVERAGE</option><option value="POOR" ${child && child.hygieneIndex === 'POOR' ? 'selected' : ''}>POOR</option></select></label>
   </div></section>
@@ -39109,17 +39112,118 @@
       }
     });
 
-    document.addEventListener('change', (event) => {
-      if (event.target.matches('[data-meds-select]')) {
-        const customField = document.querySelector('#custom-med-field');
-        if (customField) {
-          customField.style.display = event.target.value === 'Other' ? 'block' : 'none';
-          if (event.target.value === 'Other') {
-            customField.querySelector('input')?.focus();
+    // ── Custom Combobox Dropdown ──
+    (function initCombobox() {
+      document.addEventListener('click', (e) => {
+        // Toggle open on input or chevron click
+        const combobox = e.target.closest('[data-combobox]');
+        if (combobox && (e.target.closest('[data-combobox-input]') || e.target.closest('.combobox__chevron'))) {
+          const isOpen = combobox.classList.contains('combobox--open');
+          closeAllComboboxes();
+          if (!isOpen) {
+            combobox.classList.add('combobox--open');
+            const input = combobox.querySelector('[data-combobox-input]');
+            input?.focus();
+            syncComboboxSelected(combobox);
+          }
+          return;
+        }
+        // Select an option
+        const option = e.target.closest('[data-combobox-option]');
+        if (option) {
+          const cb = option.closest('[data-combobox]');
+          const value = option.getAttribute('data-combobox-option');
+          const input = cb.querySelector('[data-combobox-input]');
+          const hidden = cb.querySelector('input[type="hidden"]');
+          input.value = value;
+          if (hidden) hidden.value = value;
+          closeAllComboboxes();
+          return;
+        }
+        // Click outside closes
+        if (!e.target.closest('[data-combobox]')) {
+          closeAllComboboxes();
+        }
+      });
+
+      // Search filtering on typing
+      document.addEventListener('input', (e) => {
+        if (!e.target.matches('[data-combobox-input]')) return;
+        const cb = e.target.closest('[data-combobox]');
+        if (!cb) return;
+        if (!cb.classList.contains('combobox--open')) cb.classList.add('combobox--open');
+        const query = e.target.value.toLowerCase().trim();
+        const hidden = cb.querySelector('input[type="hidden"]');
+        if (hidden) hidden.value = e.target.value;
+        const options = cb.querySelectorAll('[data-combobox-option]');
+        let visibleCount = 0;
+        options.forEach(opt => {
+          const label = opt.getAttribute('data-combobox-option').toLowerCase();
+          const match = !query || label.includes(query);
+          opt.style.display = match ? '' : 'none';
+          if (match) visibleCount++;
+        });
+        const empty = cb.querySelector('[data-combobox-empty]');
+        if (empty) empty.style.display = visibleCount === 0 && query ? '' : 'none';
+        const hint = cb.querySelector('.combobox__hint');
+        if (hint) hint.style.display = query ? 'none' : '';
+        const divider = cb.querySelector('.combobox__divider');
+        if (divider) divider.style.display = query ? 'none' : '';
+        syncComboboxSelected(cb);
+      });
+
+      // Keyboard navigation
+      document.addEventListener('keydown', (e) => {
+        if (!e.target.matches('[data-combobox-input]')) return;
+        const cb = e.target.closest('[data-combobox]');
+        if (!cb) return;
+        const options = [...cb.querySelectorAll('[data-combobox-option]')].filter(o => o.style.display !== 'none');
+        if (e.key === 'Escape') {
+          closeAllComboboxes();
+          e.target.blur();
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const focused = cb.querySelector('.combobox__option--focused');
+          if (focused) {
+            focused.click();
+          } else {
+            const hidden = cb.querySelector('input[type="hidden"]');
+            if (hidden) hidden.value = e.target.value;
+            closeAllComboboxes();
+          }
+          return;
+        }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          if (!cb.classList.contains('combobox--open')) cb.classList.add('combobox--open');
+          const focused = cb.querySelector('.combobox__option--focused');
+          let idx = focused ? options.indexOf(focused) : -1;
+          if (focused) focused.classList.remove('combobox__option--focused');
+          idx = e.key === 'ArrowDown' ? Math.min(idx + 1, options.length - 1) : Math.max(idx - 1, 0);
+          if (options[idx]) {
+            options[idx].classList.add('combobox__option--focused');
+            options[idx].scrollIntoView({ block: 'nearest' });
           }
         }
+      });
+
+      function closeAllComboboxes() {
+        document.querySelectorAll('[data-combobox].combobox--open').forEach(cb => {
+          cb.classList.remove('combobox--open');
+          cb.querySelectorAll('.combobox__option--focused').forEach(o => o.classList.remove('combobox__option--focused'));
+        });
       }
-    });
+
+      function syncComboboxSelected(cb) {
+        const hidden = cb.querySelector('input[type="hidden"]');
+        const val = hidden ? hidden.value : '';
+        cb.querySelectorAll('[data-combobox-option]').forEach(opt => {
+          opt.classList.toggle('combobox__option--selected', opt.getAttribute('data-combobox-option') === val);
+        });
+      }
+    })();
 
     // Live date & time text update in booking popup
     document.addEventListener('input', (event) => {
