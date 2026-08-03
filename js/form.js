@@ -23,11 +23,6 @@ export function collectChild(form) {
   const dob = values.dob || values.birthDate || '';
   const idNumber = values.idNumber || '';
 
-  let medications = values.medications_preset || values.medications || '';
-  if (values.medications_preset === 'Other') {
-    medications = values.medications_custom || 'Other';
-  }
-
   return {
     id,
     name: `${values.firstName || 'New'} ${values.lastName || 'Child'}`.trim(),

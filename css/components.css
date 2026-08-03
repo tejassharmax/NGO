@@ -33,11 +33,33 @@
 .field { display: grid; gap: 7px; }
 .field__label { color: #374151; font-size: 12px; font-weight: 700; }
 .field__hint { color: var(--color-text-muted); font-size: 11px; }
-.input, .select, .textarea { width: 100%; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); outline: 0; transition: border var(--transition), box-shadow var(--transition); }
-.input, .select { height: 42px; padding: 0 12px; }
-.textarea { min-height: 104px; padding: 10px 12px; resize: vertical; }
-.input:hover, .select:hover, .textarea:hover { border-color: #d1d5db; }
-.input:focus, .select:focus, .textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgb(37 99 235 / 10%); }
+.input, select.input, .select, .textarea {
+  width: 100%;
+  color: var(--color-text);
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: 0;
+  font-size: 13.5px;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+select.input, .select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%25232563eb' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+.input, select.input, .select { height: 44px; padding-left: 14px; }
+.textarea { min-height: 104px; padding: 12px 14px; resize: vertical; }
+.input:hover, select.input:hover, .select:hover, .textarea:hover { border-color: #9ca3af; }
+.input:focus, select.input:focus, .select:focus, .textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3.5px rgba(37, 99, 235, 0.12); }
 .input::placeholder, .textarea::placeholder { color: #9ca3af; }
 .input-group { position: relative; }
 .input-group svg { position: absolute; top: 11px; left: 12px; width: 18px; color: var(--color-text-muted); }
