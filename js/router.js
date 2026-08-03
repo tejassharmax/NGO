@@ -153,33 +153,6 @@ export function dashboardPage() {
   </div>
   <div style="margin-top: 20px;">
     ${calendarCard()}
-  </div>
-
-  <div style="margin-top: 24px;">
-    <section class="card">
-      <header class="card__header">
-        <div>
-          <h2 class="card__title">Children needing attention</h2>
-          <p class="card__caption">Health alerts and flagged clinical records</p>
-        </div>
-        <a class="button button--sm" href="${pagePath('children')}">View all ${icon('arrowRight')}</a>
-      </header>
-      <div class="data-table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Child</th>
-              <th>Age</th>
-              <th class="hide-tablet">Health flags</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${attentionHTML}
-          </tbody>
-        </table>
-      </div>
-    </section>
   </div>`);
 }
 
