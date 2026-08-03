@@ -67,7 +67,7 @@ export function generateExecutiveDocContent() {
 
   reportText += `2. REGISTERED CHILD ROSTER & CLINICAL METRICS\n`;
   reportText += `------------------------------------------------------------------------\n`;
-  reportText += `ID         | Name                     | Age | Gender | Status  | Height  | Weight \n`;
+  reportText += `ID         | Name                     | Age | Gender | Status  | Height  | Weight  | Medications          | Hygiene\n`;
   reportText += `------------------------------------------------------------------------\n`;
 
   children.forEach(c => {
@@ -78,9 +78,11 @@ export function generateExecutiveDocContent() {
     const gender = String(c.gender || '—').slice(0, 6).padEnd(7, ' ');
     const status = String(c.status || 'Active').slice(0, 7).padEnd(8, ' ');
     const h = String(c.height ? `${c.height}cm` : '—').padEnd(8, ' ');
-    const w = String(c.weight ? `${c.weight}kg` : '—');
+    const w = String(c.weight ? `${c.weight}kg` : '—').padEnd(8, ' ');
+    const meds = String(c.medications || 'None').slice(0, 20).padEnd(20, ' ');
+    const hygiene = String(c.hygieneIndex || 'N/A');
 
-    reportText += `${id} | ${name} | ${ageStr} | ${gender} | ${status} | ${h} | ${w}\n`;
+    reportText += `${id} | ${name} | ${ageStr} | ${gender} | ${status} | ${h} | ${w} | ${meds} | ${hygiene}\n`;
   });
 
   reportText += `\n------------------------------------------------------------------------\n`;
@@ -144,6 +146,9 @@ export function openGoogleDocsTemplateModal() {
       <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML(c.gender || '—')}</td>
       <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.height ? `${c.height} cm` : '—'}</td>
       <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.weight ? `${c.weight} kg` : '—'}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML(c.medications || 'None')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML(c.dentalRemarks || '—')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML(c.hygieneIndex || 'N/A')}</td>
       <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px;">
         <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:#dcfce7; color:#15803d;">
           ${escapeHTML(c.status || 'Active')}
@@ -232,6 +237,9 @@ export function openGoogleDocsTemplateModal() {
                   <th style="padding:10px 14px; border:1px solid #cbd5e1;">Gender</th>
                   <th style="padding:10px 14px; border:1px solid #cbd5e1;">Height</th>
                   <th style="padding:10px 14px; border:1px solid #cbd5e1;">Weight</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Medications</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Dental</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Hygiene</th>
                   <th style="padding:10px 14px; border:1px solid #cbd5e1;">Status</th>
                 </tr>
               </thead>

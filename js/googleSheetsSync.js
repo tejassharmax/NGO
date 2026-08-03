@@ -3,7 +3,7 @@
  * Automatic Google Sheets generation and real-time record synchronization service.
  * Automatically formats and syncs child health records to Google Spreadsheets
  * matching the exact export data format:
- * ID | Child Name | Date of Birth | Age | Gender | Blood Group | Aadhaar ID | Guardian | Contact Phone | Height (cm) | Weight (kg) | Medical Conditions | Allergies | Status | Registration Date
+ * ID | Child Name | Date of Birth | Age | Gender | Blood Group | Aadhaar ID | Guardian | Contact Phone | Height (cm) | Weight (kg) | Medical Conditions | Allergies | Current Medications | Dental Remarks | Oral Hygiene Index | Status | Registration Date
  */
 
 import { getSession } from './session.js';
@@ -25,6 +25,9 @@ export const EXACT_SHEET_COLUMNS = [
   'Weight (kg)',
   'Medical Conditions',
   'Allergies',
+  'Current Medications',
+  'Dental Remarks',
+  'Oral Hygiene Index',
   'Status',
   'Registration Date'
 ];
@@ -71,6 +74,9 @@ export function formatChildToSheetRow(child) {
     formatUnitValue(child.weight, 'kg'),
     child.medicalConditions || 'None',
     child.allergies || 'None',
+    child.medications || 'None',
+    child.dentalRemarks || 'None',
+    child.hygieneIndex || 'Not Assessed',
     child.status || 'Active',
     child.registeredDate || new Date().toISOString().slice(0, 10)
   ];
@@ -125,7 +131,7 @@ export function openGoogleSheetsTemplateModal() {
   const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
   const children = getChildren() || [];
 
-  const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'];
+  const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R'];
 
   const headerColsHTML = EXACT_SHEET_COLUMNS.map((col, idx) => `
     <th style="padding: 10px 14px; background: #f8fafc; border: 1px solid #cbd5e1; font-weight: 700; color: #334155; text-align: left; font-size: 12px; white-space: nowrap; user-select: none;">
@@ -140,7 +146,7 @@ export function openGoogleSheetsTemplateModal() {
     const bgStyle = isEven ? 'background: #f8fafc;' : 'background: #ffffff;';
 
     const cellHTML = row.map((val, cellIdx) => {
-      if (cellIdx === 13) {
+      if (cellIdx === 16) {
         const isVerified = String(val).toLowerCase() === 'verified' || String(val).toLowerCase() === 'active';
         const badgeBg = isVerified ? '#dcfce7' : '#fef3c7';
         const badgeColor = isVerified ? '#15803d' : '#b45309';
@@ -187,7 +193,7 @@ export function openGoogleSheetsTemplateModal() {
               <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px; display:flex; align-items:center; gap:8px;">
                 <span>Google Account: <b>${escapeHTML(userEmail)}</b></span>
                 <span>•</span>
-                <span><b>${children.length} Records</b> Formatted (15 Columns)</span>
+                <span><b>${children.length} Records</b> Formatted (18 Columns)</span>
               </div>
             </div>
           </div>
@@ -211,7 +217,7 @@ export function openGoogleSheetsTemplateModal() {
           </div>
 
           <button id="modal-copy-only-btn" class="button button--sm button--ghost" type="button" style="color:#15803d; border-color:rgba(21,128,61,0.3); font-weight:600;">
-            📋 Copy 15-Column Data
+            📋 Copy 18-Column Data
           </button>
         </div>
 
@@ -371,6 +377,9 @@ export async function autoSyncChildToGoogleSheets(child) {
     weight: extractRawNumber(child.weight),
     medicalConditions: child.medicalConditions || 'None',
     allergies: child.allergies || 'None',
+    medications: child.medications || 'None',
+    dentalRemarks: child.dentalRemarks || 'None',
+    hygieneIndex: child.hygieneIndex || 'Not Assessed',
     status: child.status || 'Active',
     registeredDate: child.registeredDate || new Date().toISOString().slice(0, 10)
   };
