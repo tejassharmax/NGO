@@ -38389,9 +38389,22 @@
       const id = deleteBtn.getAttribute('data-delete-event-id');
       deleteAppointment(id);
       toast('Appointment Deleted', 'Appointment has been removed from schedule.');
-      const calModal = document.querySelector('#cal-booking-modal');
-      if (calModal) calModal.remove();
-      window.setTimeout(() => window.location.reload(), 400);
+      
+      // Remove popover modal & event chips immediately from DOM
+      document.querySelector('#cal-booking-modal')?.remove();
+      document.querySelectorAll(`[data-event-id="${id}"]`).forEach(el => el.remove());
+
+      // Refresh calendar view immediately
+      const calRoot = document.querySelector('[data-calendar-root]');
+      if (calRoot) {
+        const mode = calRoot.getAttribute('data-cal-view-mode') || 'month';
+        const year = parseInt(calRoot.getAttribute('data-cal-year')) || new Date().getFullYear();
+        const month = parseInt(calRoot.getAttribute('data-cal-month')) || new Date().getMonth();
+        const day = parseInt(calRoot.getAttribute('data-cal-day')) || new Date().getDate();
+        updateCalendarView(calRoot, mode, year, month, day);
+      } else {
+        window.setTimeout(() => window.location.reload(), 300);
+      }
       return;
     }
 
