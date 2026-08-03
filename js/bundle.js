@@ -2122,13 +2122,8 @@
 
     // Flagged children for alerts
     const flaggedChildren = children.filter(c => healthStatus(c).level !== 'good');
-
-    // Children Needing Attention
-    let attentionHTML = '';
-    if (flaggedChildren.length === 0) {
-      attentionHTML = `<tr><td colspan="4"><div class="empty-state" style="padding:30px 12px"><span class="empty-state__icon">${icon('check')}</span><h3 style="font-size:13px">All children healthy</h3><p>No health alerts at this time.</p></div></td></tr>`;
-    } else {
-      attentionHTML = flaggedChildren.slice(0, 4).map(child => {
+    if (flaggedChildren.length === 0) ; else {
+      flaggedChildren.slice(0, 4).map(child => {
         const hs = healthStatus(child);
         return `<tr><td><a class="table-person" href="${pagePath$1('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
       }).join('');
@@ -2145,33 +2140,6 @@
   </div>
   <div style="margin-top: 20px;">
     ${calendarCard()}
-  </div>
-
-  <div style="margin-top: 24px;">
-    <section class="card">
-      <header class="card__header">
-        <div>
-          <h2 class="card__title">Children needing attention</h2>
-          <p class="card__caption">Health alerts and flagged clinical records</p>
-        </div>
-        <a class="button button--sm" href="${pagePath$1('children')}">View all ${icon('arrowRight')}</a>
-      </header>
-      <div class="data-table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Child</th>
-              <th>Age</th>
-              <th class="hide-tablet">Health flags</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${attentionHTML}
-          </tbody>
-        </table>
-      </div>
-    </section>
   </div>`);
   }
 
