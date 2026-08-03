@@ -547,7 +547,20 @@ export function registerChildPage() {
     <span class="field__hint">Select a preset or type any custom medicine name directly.</span>
   </div>
   <label class="field form-span-all"><span class="field__label">Dental remarks</span><textarea class="textarea" name="dentalRemarks" placeholder="e.g. RESTORATION, SCALING, ORTHODONTIC TREATMENT">${child ? escapeHTML(child.dentalRemarks || '') : ''}</textarea></label>
-  <label class="field form-span-all"><span class="field__label">Oral Hygiene Index</span><select class="input" name="hygieneIndex"><option value="">Select Hygiene Index...</option><option value="SATISFACTORY" ${child && child.hygieneIndex === 'SATISFACTORY' ? 'selected' : ''}>SATISFACTORY</option><option value="AVERAGE" ${child && child.hygieneIndex === 'AVERAGE' ? 'selected' : ''}>AVERAGE</option><option value="POOR" ${child && child.hygieneIndex === 'POOR' ? 'selected' : ''}>POOR</option></select></label>
+  <div class="field form-span-all">
+    <span class="field__label">Oral Hygiene Index</span>
+    <div class="combobox" data-combobox>
+      <input type="hidden" name="hygieneIndex" value="${child ? escapeHTML(child.hygieneIndex || '') : ''}">
+      <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <input class="combobox__input" type="text" placeholder="Select hygiene index..." value="${child ? escapeHTML(child.hygieneIndex || '') : ''}" autocomplete="off" data-combobox-input readonly style="cursor:pointer;">
+      <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
+      <div class="combobox__panel" data-combobox-panel>
+        <div data-combobox-option="SATISFACTORY" class="combobox__option">SATISFACTORY<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="AVERAGE" class="combobox__option">AVERAGE<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="POOR" class="combobox__option">POOR<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+      </div>
+    </div>
+  </div>
   </div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
