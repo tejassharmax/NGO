@@ -112,21 +112,25 @@ function parseTime(timeStr) {
 }
 
 export function bookAppointment(data) {
+  const isReminder = data.mode === 'Reminder' || (data.type && data.type.toLowerCase().includes('reminder'));
+  const eventType = data.type || (isReminder ? 'General Reminder' : 'Doctor visit');
   const appt = addAppointment({
     childId: data.childId,
     childName: data.childName,
-    type: data.type,
+    type: eventType,
     date: data.date,
     time: data.time || '10:00',
-    doctor: data.doctor || '',
+    doctor: data.doctor || (isReminder ? 'Reminder Note' : 'Checkup'),
     notes: data.notes || '',
+    mode: isReminder ? 'Reminder' : 'Appointment',
     status: 'Upcoming'
   });
 
   const calUrl = buildGoogleCalendarUrl(appt);
   window.open(calUrl, '_blank');
 
-  toast('Appointment Scheduled', `${data.childName} — ${data.type} on ${data.date}. Google Calendar synced.`);
+  const titleText = isReminder ? '🔔 Reminder Created & Synced' : '📅 Appointment Scheduled';
+  toast(titleText, `${data.childName} — ${eventType} on ${data.date}. Google Calendar synced.`);
   return appt;
 }
 
@@ -142,6 +146,7 @@ function firstDayOfWeek(year, month) {
 function typeColor(type) {
   if (!type) return 'blue';
   const t = type.toLowerCase();
+  if (t.includes('reminder') || t.includes('dose') || t.includes('hygiene') || t.includes('diet')) return 'violet';
   if (t.includes('doctor') || t.includes('general')) return 'blue';
   if (t.includes('follow') || t.includes('vaccin')) return 'green';
   if (t.includes('dental') || t.includes('eye')) return 'amber';
@@ -344,6 +349,7 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
 
   return `
     <form class="gcal-popup-form" id="cal-booking-form">
+      <input type="hidden" name="mode" value="Appointment" />
       <!-- Title row (Google Calendar style borderless input) -->
       <div class="gcal-popup-title-row">
         <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add title" autocomplete="off" />

@@ -1482,21 +1482,25 @@
   }
 
   function bookAppointment(data) {
+    const isReminder = data.mode === 'Reminder' || (data.type && data.type.toLowerCase().includes('reminder'));
+    const eventType = data.type || (isReminder ? 'General Reminder' : 'Doctor visit');
     const appt = addAppointment({
       childId: data.childId,
       childName: data.childName,
-      type: data.type,
+      type: eventType,
       date: data.date,
       time: data.time || '10:00',
-      doctor: data.doctor || '',
+      doctor: data.doctor || (isReminder ? 'Reminder Note' : 'Checkup'),
       notes: data.notes || '',
+      mode: isReminder ? 'Reminder' : 'Appointment',
       status: 'Upcoming'
     });
 
     const calUrl = buildGoogleCalendarUrl(appt);
     window.open(calUrl, '_blank');
 
-    toast('Appointment Scheduled', `${data.childName} — ${data.type} on ${data.date}. Google Calendar synced.`);
+    const titleText = isReminder ? '🔔 Reminder Created & Synced' : '📅 Appointment Scheduled';
+    toast(titleText, `${data.childName} — ${eventType} on ${data.date}. Google Calendar synced.`);
     return appt;
   }
 
@@ -1512,6 +1516,7 @@
   function typeColor(type) {
     if (!type) return 'blue';
     const t = type.toLowerCase();
+    if (t.includes('reminder') || t.includes('dose') || t.includes('hygiene') || t.includes('diet')) return 'violet';
     if (t.includes('doctor') || t.includes('general')) return 'blue';
     if (t.includes('follow') || t.includes('vaccin')) return 'green';
     if (t.includes('dental') || t.includes('eye')) return 'amber';
@@ -1714,6 +1719,7 @@
 
     return `
     <form class="gcal-popup-form" id="cal-booking-form">
+      <input type="hidden" name="mode" value="Appointment" />
       <!-- Title row (Google Calendar style borderless input) -->
       <div class="gcal-popup-title-row">
         <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add title" autocomplete="off" />
@@ -38512,6 +38518,49 @@
         if (parent) {
           parent.querySelectorAll('.gcal-popup-tab').forEach(t => t.classList.remove('gcal-popup-tab--active'));
           popupTab.classList.add('gcal-popup-tab--active');
+
+          const form = popupTab.closest('form');
+          if (form) {
+            const isReminder = popupTab.textContent.trim().toLowerCase() === 'reminder';
+            const modeInput = form.querySelector('[name="mode"]');
+            if (modeInput) modeInput.value = isReminder ? 'Reminder' : 'Appointment';
+
+            const titleInput = form.querySelector('.gcal-popup-title-input');
+            if (titleInput) {
+              titleInput.placeholder = isReminder ? 'Add reminder title (e.g. Give Vitamin D3)' : 'Add title';
+            }
+
+            const typeSelect = form.querySelector('select[name="type"]');
+            if (typeSelect) {
+              if (isReminder) {
+                typeSelect.innerHTML = `
+                <option value="">Reminder type</option>
+                <option value="Medication Dose">Medication Dose</option>
+                <option value="Follow-up Reminder">Follow-up Reminder</option>
+                <option value="Vaccination Due">Vaccination Due</option>
+                <option value="Diet & Nutrition">Diet & Nutrition</option>
+                <option value="Hygiene Check">Hygiene Check</option>
+                <option value="General Reminder">General Reminder</option>
+              `;
+              } else {
+                typeSelect.innerHTML = `
+                <option value="">Appointment type</option>
+                <option value="Doctor visit">Doctor Visit</option>
+                <option value="Follow-up">Follow-up</option>
+                <option value="Dental checkup">Dental Checkup</option>
+                <option value="Deworming">Deworming</option>
+                <option value="Vaccination">Vaccination</option>
+                <option value="Eye checkup">Eye Checkup</option>
+                <option value="General checkup">General Checkup</option>
+              `;
+              }
+            }
+
+            const saveBtn = form.querySelector('.gcal-popup-save-btn');
+            if (saveBtn) {
+              saveBtn.textContent = isReminder ? 'Save Reminder' : 'Save';
+            }
+          }
         }
         return;
       }
@@ -39115,6 +39164,7 @@
       bookAppointment({
         childId: values.childId,
         childName: child ? child.name : 'Unknown',
+        mode: values.mode || 'Appointment',
         type: values.type,
         date: values.date,
         time: values.time || '',
