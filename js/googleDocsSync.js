@@ -10,24 +10,38 @@ import { toast } from './toast.js';
 import { getChildren, getHealthRecords, healthStatus, calculateAge } from './storage.js';
 import { escapeHTML } from './utils.js';
 
-export const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/u/0/';
-export const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzRCHXXREdsubNksomt6wkZHspuJzREL8jZdjrThAzPfLwny5QXaAKTy2HAn7LtTIFHQ/exec';
+let cachedDocsConfig = null;
 
 /**
- * Get live view link to the Google Doc report
+ * Fetch Docs config for the current NGO from backend API
  */
-export function getGoogleDocUrl() {
-  return localStorage.getItem('custom-google-doc-url') || DEFAULT_GOOGLE_DOC_URL;
+export async function fetchDocsConfig(ngoSlug) {
+  const session = getSession() || {};
+  const slug = ngoSlug || session.ngo || 'ayusha-nilayam';
+  try {
+    const res = await fetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
+    if (res.ok) {
+      cachedDocsConfig = await res.json();
+      return cachedDocsConfig;
+    }
+  } catch (err) {
+    console.warn('[Google Docs] Config fetch warning:', err);
+  }
+  return cachedDocsConfig || { connected: false };
 }
 
 /**
- * Set custom Google Doc URL
+ * Get cached Docs config object
  */
-export function setGoogleDocUrl(url) {
-  if (url && url.trim()) {
-    localStorage.setItem('custom-google-doc-url', url.trim());
-    toast('Google Doc Link Saved!', 'Custom Google Doc link updated successfully.');
-  }
+export function getDocsConfig() {
+  return cachedDocsConfig;
+}
+
+/**
+ * Get live view link to the Google Doc report (returns null if not connected)
+ */
+export function getGoogleDocUrl() {
+  return cachedDocsConfig?.documentUrl || null;
 }
 
 /**
@@ -92,35 +106,53 @@ export function generateExecutiveDocContent() {
 }
 
 /**
- * Automatically sync executive report to Google Docs in background whenever records change
+ * Automatically sync executive report to Google Docs in background via OAuth API
  */
-export function autoSyncToGoogleDocs() {
-  fetch(GOOGLE_DOCS_APPS_SCRIPT_URL, {
-    method: 'POST',
-    mode: 'no-cors',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'sync_doc',
-      timestamp: new Date().toISOString(),
-      content: generateExecutiveDocContent()
-    })
-  }).catch(err => {
-    console.warn('Google Docs background auto-sync notice:', err);
-  });
+export async function autoSyncToGoogleDocs() {
+  const session = getSession() || {};
+  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+  const reportContent = generateExecutiveDocContent();
+
+  try {
+    const res = await fetch('/api/docs/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reportContent, ngo: ngoSlug, ngoName })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        if (data.documentUrl) {
+          if (!cachedDocsConfig) cachedDocsConfig = { connected: true };
+          cachedDocsConfig.connected = true;
+          cachedDocsConfig.documentUrl = data.documentUrl;
+        }
+        console.log('[Google Docs] Executive report live synced.');
+      } else if (data && data.message === 'Not connected') {
+        console.log('[Google Docs] Skip auto-sync: NGO is not connected to Google Workspace.');
+      }
+    }
+  } catch (err) {
+    console.warn('[Google Docs] OAuth sync notice:', err);
+  }
 }
 
 /**
  * Trigger live API sync to Google Docs and open document
  */
-export function syncAndOpenGoogleDoc() {
-  toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
-  
-  autoSyncToGoogleDocs();
+export async function syncAndOpenGoogleDoc() {
+  const docUrl = getGoogleDocUrl();
+  if (!docUrl) {
+    toast('Google Workspace Not Connected', 'Please connect your Google Account in Settings first.', 'warning');
+    return;
+  }
 
-  window.setTimeout(() => {
-    toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
-    window.open(getGoogleDocUrl(), '_blank');
-  }, 500);
+  toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
+  await autoSyncToGoogleDocs();
+  toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
+  window.open(docUrl, '_blank');
 }
 
 /**
@@ -264,13 +296,5 @@ export function openGoogleDocsTemplateModal() {
 
   document.querySelector('#modal-sync-doc-btn')?.addEventListener('click', () => {
     syncAndOpenGoogleDoc();
-  });
-
-  document.querySelector('#modal-edit-doc-url-btn')?.addEventListener('click', () => {
-    const current = getGoogleDocUrl();
-    const input = prompt('Paste your Google Doc URL (e.g. https://docs.google.com/document/d/.../edit):', current);
-    if (input && input.trim()) {
-      setGoogleDocUrl(input);
-    }
   });
 }

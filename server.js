@@ -11,8 +11,18 @@ const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const vision = require('@google-cloud/vision');
-const { google } = require('googleapis');
 require('dotenv').config();
+
+// Per-NGO OAuth Integration Module
+const {
+  buildOAuthClient,
+  getAuthUrl,
+  getClientForNgo,
+  getNgoIntegration,
+  saveNgoIntegration,
+  syncChildrenToGoogleSheets: oauthSyncSheets,
+  syncExecutiveDocToGoogleDocs
+} = require('./js/server/googleOAuth');
 
 // Initialize the Google Cloud Vision client
 const visionClient = new vision.ImageAnnotatorClient({
@@ -932,6 +942,124 @@ async function syncChildrenToGoogleSheets(children) {
     };
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   PER-NGO GOOGLE WORKSPACE OAUTH ROUTES & ENDPOINTS
+   ═══════════════════════════════════════════════════════ */
+
+// GET /api/google/connect?ngo=<slug> -> Redirect to OAuth consent screen
+app.get('/api/google/connect', (req, res) => {
+  const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+  const authUrl = getAuthUrl(ngoSlug);
+  res.redirect(authUrl);
+});
+
+// GET /auth/google/callback -> Exchange authorization code for refresh token
+app.get('/auth/google/callback', async (req, res) => {
+  try {
+    const code = req.query.code;
+    const ngoSlug = (req.query.state || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    if (!code) {
+      return res.status(400).send('Authorization code missing from callback');
+    }
+
+    const oauthClient = buildOAuthClient();
+    const { tokens } = await oauthClient.getToken(code);
+
+    let adminEmail = 'Admin';
+    if (tokens.id_token) {
+      try {
+        const payload = JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64').toString());
+        if (payload && payload.email) adminEmail = payload.email;
+      } catch (e) {}
+    }
+
+    const existing = getNgoIntegration(ngoSlug);
+    const updated = {
+      ...existing,
+      refresh_token: tokens.refresh_token || existing.refresh_token,
+      connectedAt: new Date().toISOString(),
+      adminEmail: adminEmail !== 'Admin' ? adminEmail : (existing.adminEmail || 'Connected Admin')
+    };
+    saveNgoIntegration(ngoSlug, updated);
+
+    res.redirect('/pages/index.html#/settings?google_connected=true');
+  } catch (err) {
+    console.error('OAuth Callback Error:', err);
+    res.redirect('/pages/index.html#/settings?google_error=true');
+  }
+});
+
+// GET & POST /api/google/disconnect?ngo=<slug> -> Clear stored tokens for NGO
+app.all('/api/google/disconnect', (req, res) => {
+  const ngoSlug = (req.query.ngo || req.body?.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+  const existing = getNgoIntegration(ngoSlug);
+  delete existing.refresh_token;
+  delete existing.connectedAt;
+  delete existing.adminEmail;
+  delete existing.sheetId;
+  delete existing.spreadsheetUrl;
+  delete existing.docId;
+  delete existing.documentUrl;
+  saveNgoIntegration(ngoSlug, existing);
+
+  if (req.method === 'POST' || req.headers['content-type'] === 'application/json') {
+    return res.json({ success: true, message: 'Disconnected' });
+  }
+  res.redirect('/pages/index.html#/settings?google_disconnected=true');
+});
+
+// GET /api/sheets/config?ngo=...
+app.get('/api/sheets/config', (req, res) => {
+  const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+  const integration = getNgoIntegration(ngoSlug);
+  const connected = !!(integration && integration.refresh_token);
+  res.json({
+    connected,
+    adminEmail: integration.adminEmail || null,
+    sheetId: integration.sheetId || null,
+    spreadsheetUrl: integration.spreadsheetUrl || null
+  });
+});
+
+// POST /api/sheets/sync
+app.post('/api/sheets/sync', async (req, res) => {
+  try {
+    const { children, ngo, ngoName } = req.body || {};
+    const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const result = await oauthSyncSheets(children || [], ngoSlug, ngoName);
+    res.json(result);
+  } catch (err) {
+    console.warn('Per-NGO Sheets sync notice:', err.message);
+    res.json({ success: false, message: err.message });
+  }
+});
+
+// GET /api/docs/config?ngo=...
+app.get('/api/docs/config', (req, res) => {
+  const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+  const integration = getNgoIntegration(ngoSlug);
+  const connected = !!(integration && integration.refresh_token);
+  res.json({
+    connected,
+    adminEmail: integration.adminEmail || null,
+    docId: integration.docId || null,
+    documentUrl: integration.documentUrl || null
+  });
+});
+
+// POST /api/docs/sync
+app.post('/api/docs/sync', async (req, res) => {
+  try {
+    const { reportContent, ngo, ngoName } = req.body || {};
+    const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const result = await syncExecutiveDocToGoogleDocs(reportContent, ngoSlug, ngoName);
+    res.json(result);
+  } catch (err) {
+    console.warn('Per-NGO Docs sync notice:', err.message);
+    res.json({ success: false, message: err.message });
+  }
+});
 
 // POST /api/sync - Merges and saves the database
 app.post('/api/sync', (req, res) => {
