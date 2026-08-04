@@ -18,7 +18,7 @@ const SEED_DEMO_USERS = [
     active: true
   },
   {
-    email: "wondertaleai123@gmail.com",
+    email: "sachinsharma.hr@gmail.com",
     ngo: "Alex Agape",
     role: "Admin",
     active: true
