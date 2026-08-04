@@ -860,18 +860,35 @@ export function settingsPage() {
           </button>
         </div>
 
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+        <div class="card" style="padding: 18px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: span 2;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            <b style="font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
               ${icon('googleSheets')}
-              Google Sheets
+              Live Google Sheets Auto-Sync
             </b>
-            ${isSheetsConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
+            ${isSheetsConnected ? `<span class="badge badge--success">Active & Auto-Syncing</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Live spreadsheet synchronization for NGO health records.</p>
-          <button class="button button--sm ${isSheetsConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="sheets" style="width: 100%; justify-content: center;">
-            ${isSheetsConnected ? 'Disconnect Google Sheets' : 'Connect Google Sheets'}
-          </button>
+          <p style="font-size: 12.5px; color: var(--color-text-muted); margin: 0 0 14px 0;">
+            Real-time spreadsheet auto-sync. Simply paste your NGO Google Sheet link below—all 18 child health columns automatically update live in real time. No code editing or copy-pasting required!
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--color-text);">Admin Google Sheet URL:</label>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <input type="text" id="admin-google-sheet-input" value="${escapeHTML(getGoogleSheetUrl())}" placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit" style="flex: 1; min-width: 260px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg-alt); font-size: 13px; font-family: monospace;" />
+              <button class="button button--primary button--sm" type="button" data-save-custom-sheet-url style="font-weight: 600; white-space: nowrap;">
+                Save & Connect Sheet
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px; flex-wrap: wrap; gap: 8px;">
+              <span style="font-size: 11.5px; color: #15803d; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981;"></span>
+                Connected to Admin Live Sheet (18 Columns)
+              </span>
+              <a href="${escapeHTML(getGoogleSheetUrl())}" target="_blank" style="font-size: 12px; color: #0b8043; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
+                Open Active Google Sheet ↗
+              </a>
+            </div>
+          </div>
         </div>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">

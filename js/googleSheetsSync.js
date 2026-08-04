@@ -33,13 +33,26 @@ export const EXACT_SHEET_COLUMNS = [
 ];
 
 export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzKtL3Ik4Ji_so-tuNtvuJF9zS2Ts9qUMAtTwmka-EnBWzW08mPJNZEzLS3hPUxh1CeBg/exec';
-export const LIVE_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
+export const DEFAULT_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
 
 /**
  * Get live view link to the logged-in user's Google Sheet
  */
 export function getGoogleSheetUrl() {
-  return LIVE_GOOGLE_SHEET_URL;
+  return localStorage.getItem('custom-google-sheet-url') || DEFAULT_GOOGLE_SHEET_URL;
+}
+
+/**
+ * Set and persist target Google Sheet URL for admin configuration
+ */
+export function setGoogleSheetUrl(url) {
+  if (url && typeof url === 'string') {
+    const cleanUrl = url.trim();
+    localStorage.setItem('custom-google-sheet-url', cleanUrl);
+    localStorage.setItem('google-sheets-connected', 'true');
+    return cleanUrl;
+  }
+  return getGoogleSheetUrl();
 }
 
 export function formatUnitValue(val, unit) {
@@ -117,7 +130,7 @@ export function copySheetDataToClipboard() {
  */
 export function copyAndOpenGoogleSheets() {
   copySheetDataToClipboard();
-  window.open(LIVE_GOOGLE_SHEET_URL, '_blank');
+  window.open(getGoogleSheetUrl(), '_blank');
 }
 
 /**
@@ -199,7 +212,7 @@ export function openGoogleSheetsTemplateModal() {
           </div>
           
           <div style="display:flex; align-items:center; gap:12px;">
-            <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" class="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+            <a href="${getGoogleSheetUrl()}" target="_blank" class="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
               Open Live Google Sheet
             </a>
@@ -212,7 +225,7 @@ export function openGoogleSheetsTemplateModal() {
           <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:#166534;">
             <span style="font-size:16px;">💡</span>
             <span>
-              <b>Live Sheet Connected</b>: Click <b>Open Live Google Sheet</b> to open <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">https://docs.google.com/spreadsheets/d/1rQB_KAh8FR...</a> directly in Google Drive!
+              <b>Live Sheet Connected</b>: Click <b>Open Live Google Sheet</b> to open <a href="${getGoogleSheetUrl()}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">Connected Sheet</a> directly in Google Drive!
             </span>
           </div>
 
@@ -240,7 +253,7 @@ export function openGoogleSheetsTemplateModal() {
         <div style="padding:12px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:12.5px; color:#64748b;">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
-            Connected File: <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0f9d58; font-weight:600; text-decoration:none;">NGO_Child_Health_Master_Records</a>
+            Connected File: <a href="${getGoogleSheetUrl()}" target="_blank" style="color:#0f9d58; font-weight:600; text-decoration:none;">NGO_Child_Health_Master_Records</a>
           </div>
           <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Template</button>
         </div>
@@ -297,7 +310,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
+        <a href="${getGoogleSheetUrl()}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
           Open Connected Live Google Sheet
         </a>
@@ -403,7 +416,7 @@ export async function autoSyncChildToGoogleSheets(child) {
     fetch('/api/sync-google-sheets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL, sheetUrl: LIVE_GOOGLE_SHEET_URL })
+      body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL, sheetUrl: getGoogleSheetUrl() })
     }).catch(err => console.warn('Backend sync notice:', err));
   } catch (e) {
     // Ignore offline errors
