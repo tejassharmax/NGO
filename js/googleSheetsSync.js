@@ -295,6 +295,9 @@ export function showSheetsSyncLoader(childName, onComplete) {
   overlay.id = 'sheets-sync-modal-overlay';
   overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
   
+  const activeSheetUrl = getGoogleSheetUrl() || '#';
+  const activeSheetId = cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : 'Active NGO Sheet';
+
   overlay.innerHTML = `
     <div class="card" style="position:relative; width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
       <button id="sync-overlay-close-btn" style="position:absolute; top:14px; right:16px; background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:22px; line-height:1; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; transition:background 0.2s ease;" aria-label="Close">&times;</button>
@@ -321,7 +324,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a href="${getGoogleSheetUrl()}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
+        <a id="sync-open-sheet-btn" href="${activeSheetUrl}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
           Open Connected Live Google Sheet
         </a>
@@ -329,7 +332,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        Connected: 1rQB_KAh8FR...
+        <span id="sync-footer-label">Synced to ${escapeHTML(activeSheetId)}</span>
       </div>
     </div>
   `;
@@ -340,12 +343,13 @@ export function showSheetsSyncLoader(childName, onComplete) {
   const stagePct = overlay.querySelector('#sync-stage-pct');
   const progressBar = overlay.querySelector('#sync-progress-bar');
   const actionsArea = overlay.querySelector('#sync-actions-area');
-  const footerNote = overlay.querySelector('#sync-footer-note');
+  const footerLabel = overlay.querySelector('#sync-footer-label');
+  const openBtn = overlay.querySelector('#sync-open-sheet-btn');
   const spinnerRing = overlay.querySelector('#sync-spinner-ring');
 
   overlay.querySelector('#sync-overlay-close-btn')?.addEventListener('click', () => {
     overlay.remove();
-    window.location.href = pagePath('dashboard');
+    if (typeof onComplete === 'function') onComplete();
   });
 
   setTimeout(() => {
@@ -369,7 +373,14 @@ export function showSheetsSyncLoader(childName, onComplete) {
     if (progressBar) progressBar.style.width = '100%';
     if (spinnerRing) spinnerRing.style.display = 'none';
 
-    if (footerNote) footerNote.innerHTML = '<span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Synced to 1rQB_KAh8FR...';
+    const latestUrl = getGoogleSheetUrl();
+    if (openBtn && latestUrl) {
+      openBtn.href = latestUrl;
+    }
+    if (footerLabel && cachedSheetsConfig?.sheetId) {
+      footerLabel.textContent = `Synced to ${cachedSheetsConfig.sheetId.slice(0, 15)}...`;
+    }
+
     if (actionsArea) actionsArea.style.display = 'flex';
   }, 1300);
 }
@@ -384,7 +395,10 @@ export async function autoSyncChildToGoogleSheets(child) {
   const session = getSession() || {};
   const ngoSlug = session.ngo || 'ayusha-nilayam';
   const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
-  const children = getChildren() || [child];
+  let children = getChildren() || [];
+  if (child && !children.some(c => c.id === child.id)) {
+    children = [...children, child];
+  }
 
   try {
     const res = await fetch('/api/sheets/sync', {

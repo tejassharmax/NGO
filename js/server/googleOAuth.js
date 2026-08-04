@@ -72,9 +72,10 @@ function saveNgoIntegration(ngoSlug, data) {
  * Build OAuth2 client instance using environment variables
  */
 function buildOAuthClient() {
+  require('dotenv').config();
   const clientId = (process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
-  const redirectUri = (process.env.GOOGLE_OAUTH_REDIRECT_URI || '').trim();
+  const redirectUri = (process.env.GOOGLE_OAUTH_REDIRECT_URI || 'http://localhost:3000/auth/google/callback').trim();
 
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
@@ -160,25 +161,39 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     'Current Medications', 'Dental Remarks', 'Oral Hygiene Index'
   ];
 
-  const rows = (children || []).map(c => [
-    c.id || 'CH-0000',
-    c.name || 'Unnamed Child',
-    c.dob || '—',
-    c.age || '—',
-    c.gender || '—',
-    c.blood || '—',
-    c.idNumber || '—',
-    c.father || c.guardian || '—',
-    c.phone || '—',
-    c.height ? `${c.height} cm` : '—',
-    c.weight ? `${c.weight} kg` : '—',
-    c.medicalConditions || 'None',
-    c.allergies || 'None',
-    c.status || 'Active',
-    c.registeredDate || new Date().toISOString().slice(0, 10),
-    c.medications || 'None',
-    c.dentalRemarks || 'None',
-    c.hygieneIndex || 'Not Assessed'
+  function cleanCell(val) {
+    if (val === null || val === undefined || val === '') return '—';
+    const str = String(val);
+    if (str.startsWith('+') || str.startsWith('=')) {
+      return "'" + str;
+    }
+    return str;
+  }
+
+  const PRESET_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-1001', 'CH-1002', 'CH-3938', 'CH-1079'];
+  const PRESET_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Ananya Patel'];
+
+  const cleanChildren = (children || []).filter(c => c && !PRESET_IDS.includes(c.id) && !PRESET_NAMES.includes(c.name));
+
+  const rows = cleanChildren.map(c => [
+    cleanCell(c.id || 'CH-0000'),
+    cleanCell(c.name || 'Unnamed Child'),
+    cleanCell(c.dob),
+    cleanCell(c.age),
+    cleanCell(c.gender),
+    cleanCell(c.blood),
+    cleanCell(c.idNumber),
+    cleanCell(c.father || c.guardian),
+    cleanCell(c.phone),
+    cleanCell(c.height ? `${c.height} cm` : '—'),
+    cleanCell(c.weight ? `${c.weight} kg` : '—'),
+    cleanCell(c.medicalConditions || 'None'),
+    cleanCell(c.allergies || 'None'),
+    cleanCell(c.status || 'Active'),
+    cleanCell(c.registeredDate || new Date().toISOString().slice(0, 10)),
+    cleanCell(c.medications || 'None'),
+    cleanCell(c.dentalRemarks || 'None'),
+    cleanCell(c.hygieneIndex || 'Not Assessed')
   ]);
 
   const tableData = [headerRow, ...rows];

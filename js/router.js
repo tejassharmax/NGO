@@ -228,8 +228,18 @@ export function childrenPage() {
    CHILD HEALTH PROFILE
    ═══════════════════════════════════════════════════════ */
 
+function getURLParam(key) {
+  let searchParams = new URLSearchParams(window.location.search);
+  let val = searchParams.get(key);
+  if (!val && window.location.hash.includes('?')) {
+    const hashQuery = window.location.hash.split('?')[1];
+    val = new URLSearchParams(hashQuery).get(key);
+  }
+  return val;
+}
+
 export function childProfilePage() {
-  const id = new URLSearchParams(window.location.search).get('id');
+  const id = getURLParam('id');
   const child = getChild(id);
   if (!child) return shell('child-profile', '<div class="card"><div class="card__body">Child record not found.</div></div>');
 
@@ -246,7 +256,7 @@ export function childProfilePage() {
   // Docs HTML for Documents tab
   let docsHTML = '';
   if (docs.length === 0) {
-    docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records and certificates uploaded for ${child.name} will appear here.</p></div>`;
+    docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records, Aadhaar cards, and health certificates uploaded for ${escapeHTML(child.name)} will appear here.</p><div style="margin-top:16px;"><button class="button button--primary" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML(child.name)}">${icon('upload')} Upload Document for ${escapeHTML(child.name)}</button></div></div>`;
   } else {
     docsHTML = `<div class="document-grid">${docs.map((d, idx) => `
       <article class="card document-card" style="position:relative;">
@@ -447,8 +457,9 @@ export function childProfilePage() {
     <!-- DOCUMENTS TAB -->
     <div data-tab-panel="documents" style="display: none;">
       <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Uploaded Documents & Records</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports</p></div>
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div><h2 class="card__title">Uploaded Documents & Records</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports for ${escapeHTML(child.name)}</p></div>
+          <button class="button button--primary button--sm" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML(child.name)}">${icon('upload')} Upload Document</button>
         </header>
         <div class="card__body">
           ${docsHTML}
@@ -480,9 +491,8 @@ function steps(active, upload = false) {
 }
 
 export function registerChildPage() {
-  const searchParams = new URLSearchParams(window.location.search);
-  const method = searchParams.get('method');
-  const editId = searchParams.get('edit');
+  const method = getURLParam('method');
+  const editId = getURLParam('edit');
   const child = editId ? getChild(editId) : null;
 
   if (method !== 'manual' && !editId) {
@@ -1048,6 +1058,7 @@ export function renderPage(page) {
     children: childrenPage,
     appointments: appointmentsPage,
     'child-profile': childProfilePage,
+    'child_profile': childProfilePage,
     'register-child': registerChildPage,
     'ocr-upload': ocrUploadPage,
     'ocr-processing': ocrProcessingPage,

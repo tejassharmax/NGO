@@ -60,10 +60,9 @@
   const initials = (name) => name.split(' ').map((item) => item[0]).join('').slice(0, 2).toUpperCase();
   const escapeHTML$1 = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
   const formatDate = (date) => { try { return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date)); } catch { return date || ''; } };
-  const pagePath$1 = (page) => {
-    const inPages = window.location.pathname.replace(/\\/g, '/').includes('/pages/');
-    if (page === 'dashboard') return inPages ? '../index.html' : 'index.html';
-    return inPages ? `${page}.html` : `pages/${page}.html`;
+  const pagePath = (page) => {
+    if (!page || page === 'dashboard') return 'index.html#/';
+    return `index.html#/${page}`;
   };
   const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
   const healthDot = (level) => `<span class="health-dot health-dot--${level}" aria-label="${level}"></span>`;
@@ -89,18 +88,21 @@
 
   /* ─── Children (was Students) ─── */
 
+  const PRESET_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-1001', 'CH-1002', 'CH-3938', 'CH-1079'];
+  const PRESET_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Ananya Patel'];
+
   function getChildren() {
     let data = localStorage.getItem(CHILDREN_KEY);
-    if (!data || JSON.parse(data).length === 0) {
-      const oldData = localStorage.getItem('sample-students');
-      if (oldData && JSON.parse(oldData).length > 0) {
-        localStorage.setItem(CHILDREN_KEY, oldData);
-        return JSON.parse(oldData);
-      }
+    if (!data) {
       seedDatabase();
       data = localStorage.getItem(CHILDREN_KEY);
     }
-    return JSON.parse(data);
+    const list = JSON.parse(data || '[]');
+    const filtered = list.filter(c => c && !PRESET_IDS.includes(c.id) && !PRESET_NAMES.includes(c.name));
+    if (filtered.length !== list.length) {
+      localStorage.setItem(CHILDREN_KEY, JSON.stringify(filtered));
+    }
+    return filtered;
   }
 
   function updateChild(child) {
@@ -172,16 +174,17 @@
     return JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
   }
 
-  function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report') {
+  function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report', childId = null) {
     const docs = getUploadedDocs();
     docs.unshift({
       id: `DOC-${Date.now()}`,
       name: docName,
       child: childName,
       childName: childName,
+      childId: childId,
       docType: docType,
       category: docType,
-      meta: fileData ? `Image · ${Math.round(fileData.length * 0.75 / 1024)} KB` : 'No file',
+      meta: fileData ? `File · ${Math.round(fileData.length * 0.75 / 1024)} KB` : 'No file',
       status: status,
       image: fileData,
       fileData: fileData,
@@ -468,221 +471,18 @@
     return { level: 'warning', label: 'Review needed', flags };
   }
 
-  /* ─── Database Seeder ─── */
   function seedDatabase() {
-    const children = [
-      {
-        id: 'CH-1025',
-        name: 'Naveen Roy',
-        dob: '2013-06-15',
-        gender: 'Male',
-        blood: 'O+',
-        idNumber: '3948 2938 1029',
-        father: 'A.N. Roy',
-        mother: 'Priya Roy',
-        phone: '+91 98765 43210',
-        address: 'Sector 4, Ludhiana, Punjab - 141001',
-        status: 'Verified',
-        registeredDate: '2026-03-10',
-        height: '142',
-        weight: '36',
-        medicalConditions: 'Anemia history',
-        allergies: 'Dust',
-        medications: 'Iron supplements',
-        emergencyContact: 'Dr. Amit Kumar',
-        emergencyPhone: '+91 98888 77777',
-        hospitalName: 'Ludhiana Children Hospital',
-        notes: 'Recovering from mild anemia.'
-      },
-      {
-        id: 'CH-1026',
-        name: 'Aisha Khan',
-        dob: '2021-02-18',
-        gender: 'Female',
-        blood: 'A+',
-        idNumber: '8392 1029 3847',
-        father: 'Kabir Khan',
-        mother: 'Yasmin Khan',
-        phone: '+91 91234 56789',
-        address: 'Civil Lines, Ludhiana, Punjab - 141001',
-        status: 'Active',
-        registeredDate: '2026-05-15',
-        height: '105',
-        weight: '13.5',
-        medicalConditions: 'Undernourished',
-        allergies: 'Lactose intolerance',
-        medications: 'Multivitamin Syrup',
-        emergencyContact: 'Sarita Devi (Caregiver)',
-        emergencyPhone: '+91 98221 40393',
-        hospitalName: 'Sanjeevani Clinic',
-        notes: 'Needs daily monitoring of dietary intake.'
-      },
-      {
-        id: 'CH-1027',
-        name: 'Aarav Sharma',
-        dob: '2018-09-10',
-        gender: 'Male',
-        blood: 'B+',
-        idNumber: '9203 8472 1092',
-        father: 'Rohan Sharma',
-        mother: 'Seema Sharma',
-        phone: '+91 98123 45678',
-        address: 'Dholewal, Ludhiana, Punjab - 141003',
-        status: 'Verified',
-        registeredDate: '2026-01-20',
-        height: '128',
-        weight: '28',
-        medicalConditions: 'None',
-        allergies: 'Peanuts',
-        medications: 'Vitamin D drops',
-        emergencyContact: 'Rohan Sharma',
-        emergencyPhone: '+91 98123 45678',
-        hospitalName: 'Apollo Hospital',
-        notes: 'Healthy active child.'
-      },
-      {
-        id: 'CH-1028',
-        name: 'Ananya Patil',
-        dob: '2016-11-22',
-        gender: 'Female',
-        blood: 'AB+',
-        idNumber: '4829 3019 4829',
-        father: 'Sunil Patil',
-        mother: 'Neha Patil',
-        phone: '+91 97654 32109',
-        address: 'Model Town, Ludhiana, Punjab - 141002',
-        status: 'Verified',
-        registeredDate: '2026-02-28',
-        height: '135',
-        weight: '31',
-        medicalConditions: 'Cavity (Oral health)',
-        allergies: 'None',
-        medications: 'Fluoride rinse',
-        emergencyContact: 'Neha Patil',
-        emergencyPhone: '+91 97654 32109',
-        hospitalName: 'Fortis Hospital',
-        notes: 'Scheduled for dental cleaning.'
-      },
-      {
-        id: 'CH-1029',
-        name: 'Diya Nair',
-        dob: '2023-04-05',
-        gender: 'Female',
-        blood: 'O-',
-        idNumber: '1092 3847 2938',
-        father: 'Ramesh Nair',
-        mother: 'Lekha Nair',
-        phone: '+91 95432 10987',
-        address: 'Sarabha Nagar, Ludhiana, Punjab - 141001',
-        status: 'Pending',
-        registeredDate: '2026-07-12',
-        height: '92',
-        weight: '11.5',
-        medicalConditions: 'None',
-        allergies: 'None',
-        medications: 'None',
-        emergencyContact: 'Ramesh Nair',
-        emergencyPhone: '+91 95432 10987',
-        hospitalName: 'Apollo Hospital',
-        notes: 'Recent registration, waiting for physical verification documents.'
-      }
-    ];
-
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(children));
-
-    const growth = [
-      { childId: 'CH-1025', childName: 'Naveen Roy', date: '2026-04-10', height: 140, weight: 35, bmi: 17.9 },
-      { childId: 'CH-1025', childName: 'Naveen Roy', date: '2026-05-15', height: 141, weight: 35.5, bmi: 17.9 },
-      { childId: 'CH-1025', childName: 'Naveen Roy', date: '2026-07-15', height: 142, weight: 36.0, bmi: 17.9 },
-
-      { childId: 'CH-1026', childName: 'Aisha Khan', date: '2026-05-15', height: 104, weight: 13.0, bmi: 12.0 },
-      { childId: 'CH-1026', childName: 'Aisha Khan', date: '2026-07-15', height: 105, weight: 13.5, bmi: 12.2 },
-
-      { childId: 'CH-1027', childName: 'Aarav Sharma', date: '2026-03-20', height: 126, weight: 27, bmi: 17.0 },
-      { childId: 'CH-1027', childName: 'Aarav Sharma', date: '2026-06-20', height: 128, weight: 28, bmi: 17.1 }
-    ];
-    localStorage.setItem(GROWTH_KEY, JSON.stringify(growth));
-
-    const meals = [
-      { childId: 'CH-1027', childName: 'Aarav Sharma', mealType: 'Breakfast', date: '2026-07-21', description: 'Milk and Oats with Honey', calories: 250 },
-      { childId: 'CH-1027', childName: 'Aarav Sharma', mealType: 'Lunch', date: '2026-07-21', description: 'Roti, Dal Tadka, and Potato Sabzi', calories: 450 },
-      { childId: 'CH-1027', childName: 'Aarav Sharma', mealType: 'Snack', date: '2026-07-21', description: 'One Apple and Almonds', calories: 120 },
-      
-      { childId: 'CH-1026', childName: 'Aisha Khan', mealType: 'Breakfast', date: '2026-07-21', description: 'Ragi Porridge and Banana', calories: 300 },
-      { childId: 'CH-1026', childName: 'Aisha Khan', mealType: 'Lunch', date: '2026-07-21', description: 'Khichdi with ghee and spinach', calories: 380 },
-      
-      { childId: 'CH-1025', childName: 'Naveen Roy', mealType: 'Lunch', date: '2026-07-21', description: 'Rice, Fish Curry, and Cabbage', calories: 500 }
-    ];
-    localStorage.setItem(NUTRITION_KEY, JSON.stringify(meals));
-
-    const medicines = [
-      { id: 'MED-1', childId: 'CH-1027', childName: 'Aarav Sharma', medicineName: 'Vitamin D3 Drops', dosage: '400 IU daily', frequency: 'Once a day after breakfast', startDate: '2026-07-10', endDate: '2026-08-10', status: 'Active' },
-      { id: 'MED-2', childId: 'CH-1026', childName: 'Aisha Khan', medicineName: 'Iron Syrup (Dexorange)', dosage: '5ml twice daily', frequency: 'Morning and evening after meals', startDate: '2026-07-16', endDate: '2026-08-15', status: 'Active' },
-      { id: 'MED-3', childId: 'CH-1025', childName: 'Naveen Roy', medicineName: 'Folic Acid Tab', dosage: '5mg once daily', frequency: 'Night before bedtime', startDate: '2026-07-01', endDate: '2026-07-15', status: 'Completed' }
-    ];
-    localStorage.setItem(MEDICINES_KEY, JSON.stringify(medicines));
-
-    const appointments = [
-      { id: 'APT-1', childId: 'CH-1025', childName: 'Naveen Roy', type: 'Doctor visit', date: '2026-07-24', time: '10:00 AM', doctor: 'Dr. Amit Kumar (Pediatrician)', notes: 'Blood test follow-up for RBC and Haemoglobin levels', status: 'Upcoming' },
-      { id: 'APT-2', childId: 'CH-1026', childName: 'Aisha Khan', type: 'Follow-up', date: '2026-07-26', time: '11:30 AM', doctor: 'Dr. Amit Kumar', notes: 'Check weight and progress of iron syrup therapy', status: 'Upcoming' },
-      { id: 'APT-3', childId: 'CH-1027', childName: 'Aarav Sharma', type: 'Dental checkup', date: '2026-07-16', time: '02:00 PM', doctor: 'Dr. Ritu Goel (Dentist)', notes: 'Routine checkup, no issues found', status: 'Completed' },
-      { id: 'APT-4', childId: 'CH-1029', childName: 'Diya Nair', type: 'Deworming', date: '2026-07-19', time: '09:30 AM', doctor: 'Caregiver Clinic', notes: 'Albendazole 400mg dose scheduled', status: 'Upcoming' }
-    ];
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(appointments));
-
-    const emergency = [
-      { id: 'EMC-1', name: 'Ludhiana Children Hospital', type: 'Hospital', phone: '+91 161 4567890', specialty: '24/7 Pediatrics & Emergency', address: 'Ferozepur Road, Ludhiana' },
-      { id: 'EMC-2', name: 'Dr. Amit Kumar', type: 'Doctor', phone: '+91 98888 77777', specialty: 'Pediatric Consultant', address: 'Model Town, Ludhiana' },
-      { id: 'EMC-3', name: 'Sarita Devi', type: 'Caregiver', phone: '+91 98221 40393', specialty: 'NGO Incharge', address: 'Ludhiana Shelter' },
-      { id: 'EMC-4', name: 'Pediatric Cardiac Care', type: 'Hospital', phone: '+91 161 8881234', specialty: 'Cardiology', address: 'Sarabha Nagar, Ludhiana' }
-    ];
-    localStorage.setItem(EMERGENCY_KEY, JSON.stringify(emergency));
-
-    const sponsors = [
-      { id: 'SP-1', name: 'Rotary Club Ludhiana', phone: '+91 161 9991111', email: 'rotary.ludhiana@gmail.com', totalContribution: 50000, childrenIds: ['CH-1027', 'CH-1028'] },
-      { id: 'SP-2', name: 'Dr. Meera Sen', phone: '+91 98111 22222', email: 'meera.sen@outlook.com', totalContribution: 15000, childrenIds: ['CH-1026'] }
-    ];
-    localStorage.setItem(SPONSORS_KEY, JSON.stringify(sponsors));
-
-    const expenses = [
-      { id: 'EXP-1', date: '2026-07-05', category: 'Food', amount: '8500', description: 'Fresh vegetables, milk, pulses for shelter', childId: '', childName: '' },
-      { id: 'EXP-2', date: '2026-07-10', category: 'Medical', amount: '12000', description: 'Pediatric consult & laboratory testing fees', childId: '', childName: '' },
-      { id: 'EXP-3', date: '2026-07-12', category: 'Education', amount: '6200', description: 'School bags, uniforms, books for supported children', childId: 'CH-1027', childName: 'Aarav Sharma' },
-      { id: 'EXP-4', date: '2026-07-15', category: 'Daily needs', amount: '1500', description: 'Toothbrushes, soaps, dental hygiene kits', childId: '', childName: '' }
-    ];
-    localStorage.setItem(EXPENSES_KEY, JSON.stringify(expenses));
-
-    const healthRecords = [
-      {
-        id: 'HR-1',
-        childId: 'CH-1025',
-        childName: 'Naveen Roy',
-        type: 'cbc',
-        date: '2026-06-27',
-        hemoglobin: '9.5',
-        wbc: '9300',
-        rbc: '5.4',
-        platelets: '3.25',
-        pcv: '49.8'
-      }
-    ];
-    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(healthRecords));
-
-    const activity = [
-      { type: 'child_added', subject: 'Naveen Roy', description: 'New child registered', timestamp: Date.now() - 3600000 * 24 * 5 },
-      { type: 'doc_processed', subject: 'Naveen Roy', description: 'Blood Test Report processed via OCR', timestamp: Date.now() - 3600000 * 24 * 4 },
-      { type: 'health_alert', subject: 'Naveen Roy', description: 'Abnormal blood values: Low Hemoglobin (Anemia risk), High RBC Count', timestamp: Date.now() - 3600000 * 24 * 4 },
-      { type: 'growth_logged', subject: 'Aisha Khan', description: 'Growth recorded - Height: 105cm, Weight: 13.5kg', timestamp: Date.now() - 3600000 * 2 },
-      { type: 'meal_logged', subject: 'Aisha Khan', description: 'Breakfast: Ragi Porridge and Banana', timestamp: Date.now() - 600000 }
-    ];
-    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activity));
-
-    const alerts = [
-      { id: 'ALR-1', type: 'critical', childName: 'Naveen Roy', message: 'Critical: Anemia risk flagged (Hemoglobin: 9.5 g/dL)', timestamp: Date.now() - 3600000 * 24, dismissed: false },
-      { id: 'ALR-2', type: 'warning', childName: 'Aisha Khan', message: 'Warning: Aisha Khan is undernourished (BMI: 12.2)', timestamp: Date.now() - 3600000 * 12, dismissed: false },
-      { id: 'ALR-3', type: 'info', childName: 'Diya Nair', message: 'Reminder: Overdue deworming appointment for Diya Nair', timestamp: Date.now() - 3600000 * 6, dismissed: false }
-    ];
-    localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
+    localStorage.setItem(CHILDREN_KEY, JSON.stringify([]));
+    localStorage.setItem(GROWTH_KEY, JSON.stringify([]));
+    localStorage.setItem(NUTRITION_KEY, JSON.stringify([]));
+    localStorage.setItem(MEDICINES_KEY, JSON.stringify([]));
+    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify([]));
+    localStorage.setItem(EMERGENCY_KEY, JSON.stringify([]));
+    localStorage.setItem(SPONSORS_KEY, JSON.stringify([]));
+    localStorage.setItem(EXPENSES_KEY, JSON.stringify([]));
+    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify([]));
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify([]));
+    localStorage.setItem(ALERTS_KEY, JSON.stringify([]));
   }
 
   /* ───────────────────────────────────────────────────────
@@ -717,11 +517,31 @@
 
       if (res.ok) {
         const serverData = await res.json();
-        // Apply merged state from server
+        // Apply merged state from server without overwriting non-empty local storage with empty server state
         Object.keys(serverData).forEach(k => {
           if (serverData[k] !== null && serverData[k] !== undefined) {
-            if (localStorage.getItem(k) !== serverData[k]) {
-              localStorage.setItem(k, serverData[k]);
+            const localStr = localStorage.getItem(k);
+            if (!localStr || localStr === '[]' || localStr === '') {
+              if (serverData[k] !== '[]' && serverData[k] !== '') {
+                localStorage.setItem(k, serverData[k]);
+              }
+            } else if (serverData[k] && serverData[k] !== '[]') {
+              try {
+                const localArr = JSON.parse(localStr);
+                const serverArr = JSON.parse(serverData[k]);
+                if (Array.isArray(localArr) && Array.isArray(serverArr)) {
+                  const map = new Map();
+                  serverArr.concat(localArr).forEach(item => {
+                    if (item) {
+                      const key = item.id || JSON.stringify(item);
+                      map.set(key, item);
+                    }
+                  });
+                  localStorage.setItem(k, JSON.stringify(Array.from(map.values())));
+                }
+              } catch (e) {
+                localStorage.setItem(k, serverData[k]);
+              }
             }
           }
         });
@@ -753,9 +573,9 @@
       const age = calculateAge(child.dob);
       return `<tr>
     <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
-    <td><a class="table-person" href="${pagePath$1('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name">${child.name}</span><span class="table-person__id">${child.id}</span></div></a></td>
+    <td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name">${child.name}</span><span class="table-person__id">${child.id}</span></div></a></td>
     <td data-column="age">${age || '—'}</td><td class="hide-tablet" data-column="gender">${child.gender || '—'}</td><td class="hide-tablet" data-column="blood">${child.blood || '—'}</td><td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>
-    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath$1('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
+    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
   </tr>`;
     }).join('');
   }
@@ -1254,6 +1074,9 @@
     overlay.id = 'sheets-sync-modal-overlay';
     overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
     
+    const activeSheetUrl = getGoogleSheetUrl() || '#';
+    const activeSheetId = cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : 'Active NGO Sheet';
+
     overlay.innerHTML = `
     <div class="card" style="position:relative; width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
       <button id="sync-overlay-close-btn" style="position:absolute; top:14px; right:16px; background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:22px; line-height:1; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; transition:background 0.2s ease;" aria-label="Close">&times;</button>
@@ -1280,7 +1103,7 @@
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a href="${getGoogleSheetUrl()}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
+        <a id="sync-open-sheet-btn" href="${activeSheetUrl}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
           Open Connected Live Google Sheet
         </a>
@@ -1288,7 +1111,7 @@
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        Connected: 1rQB_KAh8FR...
+        <span id="sync-footer-label">Synced to ${escapeHTML$1(activeSheetId)}</span>
       </div>
     </div>
   `;
@@ -1299,12 +1122,13 @@
     const stagePct = overlay.querySelector('#sync-stage-pct');
     const progressBar = overlay.querySelector('#sync-progress-bar');
     const actionsArea = overlay.querySelector('#sync-actions-area');
-    const footerNote = overlay.querySelector('#sync-footer-note');
+    const footerLabel = overlay.querySelector('#sync-footer-label');
+    const openBtn = overlay.querySelector('#sync-open-sheet-btn');
     const spinnerRing = overlay.querySelector('#sync-spinner-ring');
 
     overlay.querySelector('#sync-overlay-close-btn')?.addEventListener('click', () => {
       overlay.remove();
-      window.location.href = pagePath('dashboard');
+      if (typeof onComplete === 'function') onComplete();
     });
 
     setTimeout(() => {
@@ -1328,7 +1152,14 @@
       if (progressBar) progressBar.style.width = '100%';
       if (spinnerRing) spinnerRing.style.display = 'none';
 
-      if (footerNote) footerNote.innerHTML = '<span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span> Synced to 1rQB_KAh8FR...';
+      const latestUrl = getGoogleSheetUrl();
+      if (openBtn && latestUrl) {
+        openBtn.href = latestUrl;
+      }
+      if (footerLabel && cachedSheetsConfig?.sheetId) {
+        footerLabel.textContent = `Synced to ${cachedSheetsConfig.sheetId.slice(0, 15)}...`;
+      }
+
       if (actionsArea) actionsArea.style.display = 'flex';
     }, 1300);
   }
@@ -1343,7 +1174,10 @@
     const session = getSession() || {};
     const ngoSlug = session.ngo || 'ayusha-nilayam';
     const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
-    const children = getChildren() || [child];
+    let children = getChildren() || [];
+    if (child && !children.some(c => c.id === child.id)) {
+      children = [...children, child];
+    }
 
     try {
       const res = await fetch('/api/sheets/sync', {
@@ -2323,7 +2157,7 @@
 
   function navItem(item, active) {
     const [page, label, glyph] = item;
-    return `<a class="nav-item ${page === active ? 'nav-item--active' : ''}" href="${pagePath$1(page)}" ${page === active ? 'aria-current="page"' : ''}>${icon(glyph)}<span class="nav-item__text">${label}</span></a>`;
+    return `<a class="nav-item ${page === active ? 'nav-item--active' : ''}" href="${pagePath(page)}" ${page === active ? 'aria-current="page"' : ''}>${icon(glyph)}<span class="nav-item__text">${label}</span></a>`;
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -2343,8 +2177,8 @@
 
     return `<div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
-      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath$1('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
-      <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath$1('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
+      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
+      <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
       <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML$1(ngoName)}</span><span class="workspace-user__role">${escapeHTML$1(role)}</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
     <main class="app-main" id="app-main">
@@ -2369,7 +2203,7 @@
                 <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML$1(email)}</div>
                 <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML$1(ngoName)}</span></div>
               </div>
-              <a class="dropdown__item" href="${pagePath$1('settings')}">${icon('settings')}Account & Google Workspace</a>
+              <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
               <div class="divider"></div>
               <button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button>
             </div>
@@ -2423,11 +2257,11 @@
     if (flaggedChildren.length === 0) ; else {
       flaggedChildren.slice(0, 4).map(child => {
         const hs = healthStatus(child);
-        return `<tr><td><a class="table-person" href="${pagePath$1('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
+        return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
       }).join('');
     }
 
-    return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath$1('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath$1('register-child')}">${icon('plus')}Register child</a>`)}
+    return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
     ${statCard('Total Children', totalChildren.toLocaleString(), 'Active records', 'users', 'blue')}
     ${statCard('Recent Health Reports', healthReportsCount.toLocaleString(), 'Lab test panels', 'heartPulse', 'green')}
@@ -2504,7 +2338,7 @@
 
     const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;">${icon('googleSheets')}Google Sheets Auto-Sync (Connected)</button>`;
 
-    return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `${sheetsStatusBadge}<a class="button button--primary" href="${pagePath$1('register-child')}">${icon('plus')}Register child</a>`)}
+    return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `${sheetsStatusBadge}<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon('chevronDown')}</button></th><th data-resizable data-column="age">Age</th><th class="hide-tablet" data-column="gender">Gender</th><th class="hide-tablet" data-column="blood">Blood group</th><th data-column="status">Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
   }
 
@@ -2512,8 +2346,18 @@
      CHILD HEALTH PROFILE
      ═══════════════════════════════════════════════════════ */
 
+  function getURLParam(key) {
+    let searchParams = new URLSearchParams(window.location.search);
+    let val = searchParams.get(key);
+    if (!val && window.location.hash.includes('?')) {
+      const hashQuery = window.location.hash.split('?')[1];
+      val = new URLSearchParams(hashQuery).get(key);
+    }
+    return val;
+  }
+
   function childProfilePage() {
-    const id = new URLSearchParams(window.location.search).get('id');
+    const id = getURLParam('id');
     const child = getChild(id);
     if (!child) return shell('child-profile', '<div class="card"><div class="card__body">Child record not found.</div></div>');
 
@@ -2530,7 +2374,7 @@
     // Docs HTML for Documents tab
     let docsHTML = '';
     if (docs.length === 0) {
-      docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records and certificates uploaded for ${child.name} will appear here.</p></div>`;
+      docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records, Aadhaar cards, and health certificates uploaded for ${escapeHTML$1(child.name)} will appear here.</p><div style="margin-top:16px;"><button class="button button--primary" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$1(child.name)}">${icon('upload')} Upload Document for ${escapeHTML$1(child.name)}</button></div></div>`;
     } else {
       docsHTML = `<div class="document-grid">${docs.map((d, idx) => `
       <article class="card document-card" style="position:relative;">
@@ -2731,8 +2575,9 @@
     <!-- DOCUMENTS TAB -->
     <div data-tab-panel="documents" style="display: none;">
       <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Uploaded Documents & Records</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports</p></div>
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div><h2 class="card__title">Uploaded Documents & Records</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports for ${escapeHTML$1(child.name)}</p></div>
+          <button class="button button--primary button--sm" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$1(child.name)}">${icon('upload')} Upload Document</button>
         </header>
         <div class="card__body">
           ${docsHTML}
@@ -2764,13 +2609,12 @@
   }
 
   function registerChildPage() {
-    const searchParams = new URLSearchParams(window.location.search);
-    const method = searchParams.get('method');
-    const editId = searchParams.get('edit');
+    const method = getURLParam('method');
+    const editId = getURLParam('edit');
     const child = editId ? getChild(editId) : null;
 
     if (method !== 'manual' && !editId) {
-      return shell('register-child', `${heading('Register a child', 'Choose the quickest, most reliable way to start a new child record.')}<section class="card"><div class="card__body"><div class="method-grid"><article class="method-card card card--interactive"><span class="method-card__icon">${icon('pencil')}</span><div><h2 class="card__title">Enter details manually</h2><p>Start with a clean, guided form. Best when information is already at hand.</p></div><a class="button" href="${pagePath$1('register-child')}?method=manual">Start manual entry ${icon('arrowRight')}</a></article><article class="method-card card card--interactive"><span class="method-card__icon">${icon('scan')}</span><div><h2 class="card__title">Google Cloud Vision API Document Upload</h2><p>Extract information automatically from medical documents using Cloud Vision API, then verify before saving.</p></div><a class="button button--primary" href="${pagePath$1('ocr-upload')}">Upload document ${icon('arrowRight')}</a></article></div></div></section>`);
+      return shell('register-child', `${heading('Register a child', 'Choose the quickest, most reliable way to start a new child record.')}<section class="card"><div class="card__body"><div class="method-grid"><article class="method-card card card--interactive"><span class="method-card__icon">${icon('pencil')}</span><div><h2 class="card__title">Enter details manually</h2><p>Start with a clean, guided form. Best when information is already at hand.</p></div><a class="button" href="${pagePath('register-child')}?method=manual">Start manual entry ${icon('arrowRight')}</a></article><article class="method-card card card--interactive"><span class="method-card__icon">${icon('scan')}</span><div><h2 class="card__title">Google Cloud Vision API Document Upload</h2><p>Extract information automatically from medical documents using Cloud Vision API, then verify before saving.</p></div><a class="button button--primary" href="${pagePath('ocr-upload')}">Upload document ${icon('arrowRight')}</a></article></div></div></section>`);
     }
 
     let firstName = '', lastName = '', email = '', father = '', phone = '', blood = '';
@@ -2789,7 +2633,7 @@
     const submitText = child ? 'Save changes' : 'Save child record';
     const curMed = child ? child.medications : '';
 
-    return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath$1('child-profile')}?id=${child.id}` : pagePath$1('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
+    return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field$1('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName)}${field$1('Last name *', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field$1('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '')}${field$1('Gender *', 'gender', 'e.g. Male', 'text', '', child ? child.gender : '')}${field$1('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field$1('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field$1('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML$1(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML$1(child.allergies) : ''}</textarea></label>
   <div class="field form-span-all">
@@ -2842,7 +2686,7 @@
      ═══════════════════════════════════════════════════════ */
 
   function ocrUploadPage() {
-    return shell('ocr-upload', `${heading('Google Cloud Vision API Extraction', 'Upload a medical document (Blood Reports, Prescriptions, Medical Certificates, Vaccination Records, Aadhaar). Google Cloud Vision API will extract structured fields for review.', `<a class="button button--ghost" href="${pagePath$1('register-child')}">Cancel</a>`)}<div class="form-layout"><section class="card"><div class="card__body"><div class="upload-zone" data-upload-zone><span class="upload-zone__icon">${icon('upload')}</span><h2 class="card__title">Drop a medical document here</h2><p>Choose a file from your device. Google Cloud Vision API will scan and extract health & child details.</p><button class="button button--primary" type="button" data-start-ocr>${icon('file')}Choose document</button><input class="sr-only" type="file" accept=".jpg,.jpeg,.png" data-upload-input><span class="upload-zone__formats">JPG or PNG · Up to 15 MB</span></div></div><div style="padding:16px; background:var(--color-bg-alt); border-top:1px solid var(--color-border);"><b style="font-size:13px; display:block; margin-bottom:8px;">Supported Document Types:</b><div style="display:flex; flex-wrap:wrap; gap:8px;"><span class="badge badge--blue">Blood Reports</span><span class="badge badge--blue">Prescriptions</span><span class="badge badge--blue">Handwritten Medical Notes</span><span class="badge badge--blue">Medical Certificates</span><span class="badge badge--blue">Vaccination Records</span></div></div></section>${steps(0, true)}</div>`);
+    return shell('ocr-upload', `${heading('Google Cloud Vision API Extraction', 'Upload a medical document (Blood Reports, Prescriptions, Medical Certificates, Vaccination Records, Aadhaar). Google Cloud Vision API will extract structured fields for review.', `<a class="button button--ghost" href="${pagePath('register-child')}">Cancel</a>`)}<div class="form-layout"><section class="card"><div class="card__body"><div class="upload-zone" data-upload-zone><span class="upload-zone__icon">${icon('upload')}</span><h2 class="card__title">Drop a medical document here</h2><p>Choose a file from your device. Google Cloud Vision API will scan and extract health & child details.</p><button class="button button--primary" type="button" data-start-ocr>${icon('file')}Choose document</button><input class="sr-only" type="file" accept=".jpg,.jpeg,.png" data-upload-input><span class="upload-zone__formats">JPG or PNG · Up to 15 MB</span></div></div><div style="padding:16px; background:var(--color-bg-alt); border-top:1px solid var(--color-border);"><b style="font-size:13px; display:block; margin-bottom:8px;">Supported Document Types:</b><div style="display:flex; flex-wrap:wrap; gap:8px;"><span class="badge badge--blue">Blood Reports</span><span class="badge badge--blue">Prescriptions</span><span class="badge badge--blue">Handwritten Medical Notes</span><span class="badge badge--blue">Medical Certificates</span><span class="badge badge--blue">Vaccination Records</span></div></div></section>${steps(0, true)}</div>`);
   }
 
   function ocrProcessingPage() {
@@ -2885,7 +2729,7 @@
     const phone = ocrData.phone || '';
     const idNumber = ocrData.idNumber || '';
 
-    return shell('ocr-details', `${heading('Additional details', 'Complete remaining health details before saving.', `<a class="button" href="${pagePath$1('ocr-review')}">Back</a><button class="button button--primary" type="submit" form="ocr-additional-form">Save child record</button>`)}<div class="form-layout"><form class="card" id="ocr-additional-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Registration & contact</h2><p>Complete any additional details for this record.</p></div><div class="form-grid--two">${field$1('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', mother)}${field$1('Mobile number *', 'phone', 'e.g. +91 98221 40393', 'tel', '', phone)}${field$1('Email address', 'email', 'guardian@example.com', 'email')}${field$1('Height (cm)', 'height', 'e.g. 140', 'number')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes"></textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin"></textarea></label><label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode"></textarea></label><label class="field form-span-all"><span class="field__label">Upload Additional Medical Records / Reports</span><input class="input" type="file" name="additionalDoc" accept=".jpg,.jpeg,.png,.pdf" data-additional-doc-input><span style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">Upload blood test reports, immunization records, or medical certificates.</span></label></div></section><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Final verification</h2><p>You're about to create the child record.</p></div><label class="checkbox"><input type="checkbox" required><span>I confirm the information is accurate and complete.</span></label></section><input type="hidden" name="firstName" value="${firstName}"><input type="hidden" name="lastName" value="${lastName}"><input type="hidden" name="father" value="${father}"><input type="hidden" name="gender" value="${gender}"><input type="hidden" name="blood" value="${blood}"><input type="hidden" name="idNumber" value="${idNumber}"><input type="hidden" name="dob" value="${ocrData.dob || ''}"></form>${steps(3, true)}</div>`);
+    return shell('ocr-details', `${heading('Additional details', 'Complete remaining health details before saving.', `<a class="button" href="${pagePath('ocr-review')}">Back</a><button class="button button--primary" type="submit" form="ocr-additional-form">Save child record</button>`)}<div class="form-layout"><form class="card" id="ocr-additional-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Registration & contact</h2><p>Complete any additional details for this record.</p></div><div class="form-grid--two">${field$1('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', mother)}${field$1('Mobile number *', 'phone', 'e.g. +91 98221 40393', 'tel', '', phone)}${field$1('Email address', 'email', 'guardian@example.com', 'email')}${field$1('Height (cm)', 'height', 'e.g. 140', 'number')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes"></textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin"></textarea></label><label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode"></textarea></label><label class="field form-span-all"><span class="field__label">Upload Additional Medical Records / Reports</span><input class="input" type="file" name="additionalDoc" accept=".jpg,.jpeg,.png,.pdf" data-additional-doc-input><span style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">Upload blood test reports, immunization records, or medical certificates.</span></label></div></section><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Final verification</h2><p>You're about to create the child record.</p></div><label class="checkbox"><input type="checkbox" required><span>I confirm the information is accurate and complete.</span></label></section><input type="hidden" name="firstName" value="${firstName}"><input type="hidden" name="lastName" value="${lastName}"><input type="hidden" name="father" value="${father}"><input type="hidden" name="gender" value="${gender}"><input type="hidden" name="blood" value="${blood}"><input type="hidden" name="idNumber" value="${idNumber}"><input type="hidden" name="dob" value="${ocrData.dob || ''}"></form>${steps(3, true)}</div>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -3010,7 +2854,7 @@
 
     const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
 
-    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<span class="badge badge--warning" style="padding:6px 12px; font-size:12px; font-weight:600; align-self:center;">Drive Sync: Coming Soon</span><button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath$1('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
+    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<span class="badge badge--warning" style="padding:6px 12px; font-size:12px; font-weight:600; align-self:center;">Drive Sync: Coming Soon</span><button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -3284,7 +3128,7 @@
         </table>
       </div>`;
 
-    return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath$1('children')}">${icon('users')}View Children</a>`)}
+    return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}View Children</a>`)}
   <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
     ${statCard('Total Appointments', appointments.length.toLocaleString(), 'All records', 'calendar', 'blue')}
     ${statCard('Upcoming', upcomingCount.toLocaleString(), 'Scheduled visits', 'clock', 'amber')}
@@ -3318,6 +3162,7 @@
       children: childrenPage,
       appointments: appointmentsPage,
       'child-profile': childProfilePage,
+      'child_profile': childProfilePage,
       'register-child': registerChildPage,
       'ocr-upload': ocrUploadPage,
       'ocr-processing': ocrProcessingPage,
@@ -3345,7 +3190,7 @@
     return results.map((child) => {
       const age = calculateAge(child.dob) || child.age || '—';
       return `
-      <a class="global-search__result" href="${pagePath$1('child-profile')}?id=${child.id}" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; text-decoration:none; color:var(--color-text); border-bottom:1px solid var(--color-border);">
+      <a class="global-search__result" href="${pagePath('child-profile')}?id=${child.id}" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; text-decoration:none; color:var(--color-text); border-bottom:1px solid var(--color-border);">
         <div style="display:flex; align-items:center; gap:12px;">
           <span class="table-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--color-primary-light); color:var(--color-primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">${initials(child.name)}</span>
           <div>
@@ -3410,10 +3255,11 @@
     const mother = values.mother || '';
     const dob = values.dob || values.birthDate || '';
     const idNumber = values.idNumber || '';
+    const fullName = values.name || `${values.firstName || ''} ${values.lastName || ''}`.trim() || 'Unnamed Child';
 
     return {
       id,
-      name: `${values.firstName || 'New'} ${values.lastName || 'Child'}`.trim(),
+      name: fullName,
       email: values.email || '',
       gender: values.gender || '',
       blood: values.blood || '',
@@ -3441,8 +3287,51 @@
   }
 
   function saveChild(form) {
+    const values = Object.fromEntries(new FormData(form));
+    const firstName = (values.firstName || '').trim().toLowerCase();
+    const lastName = (values.lastName || '').trim().toLowerCase();
+    const fullName = (values.name || `${values.firstName || ''} ${values.lastName || ''}`).trim().toLowerCase();
+    const dob = (values.dob || values.birthDate || '').trim();
+
+    // Deduplication Check: Same First Name, Last Name / Full Name AND Date of Birth
+    const existingChildren = getChildren() || [];
+    const isEditing = !!values.id;
+
+    const duplicate = existingChildren.find(c => {
+      if (!c) return false;
+      if (values.id && c.id === values.id) return false;
+
+      const cNameClean = (c.name || '').trim().toLowerCase();
+      const cDobClean = (c.dob || '').trim();
+
+      const nameMatches = cNameClean === fullName || (firstName && lastName && cNameClean.includes(firstName) && cNameClean.includes(lastName));
+      const dobMatches = dob && cDobClean && dob === cDobClean;
+
+      return nameMatches && dobMatches;
+    });
+
+    if (duplicate && !isEditing) {
+      let idInput = form.querySelector('input[name="id"]');
+      if (!idInput) {
+        idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'id';
+        idInput.dataset.tempId = 'true';
+        form.appendChild(idInput);
+      }
+      idInput.value = duplicate.id;
+      toast('Duplicate prevented', `Updating existing profile for ${duplicate.name} (${duplicate.id}) instead of creating duplicate.`);
+    }
+
     const child = collectChild(form);
     const updated = updateChild(child);
+
+    // Clean up any temporary hidden ID element from form so subsequent submissions start fresh!
+    const tempIdInput = form.querySelector('input[data-temp-id="true"]');
+    if (tempIdInput) {
+      tempIdInput.remove();
+    }
+
     // Automatically generate / append row to Google Sheets & update Google Docs in user's account
     autoSyncChildToGoogleSheets(child);
     autoSyncToGoogleDocs();
@@ -38313,19 +38202,45 @@
 
   // ─── Authentication Guard & Async App Start ───
   (async () => {
+    localStorage.removeItem('sample-students');
     const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
-    page = document.body.dataset.page || 'dashboard';
 
-    const deprecatedPages = ['emergency', 'expenses', 'nutrition', 'export'];
-    if (deprecatedPages.includes(page)) {
-      window.location.href = pagePath$1('dashboard');
-      return;
+    function getActivePage() {
+      const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+      if (hash && hash.trim() !== '') return hash.trim();
+      return document.body.dataset.page || 'dashboard';
     }
 
+    function renderCurrentPage() {
+      page = getActivePage();
+
+      const deprecatedPages = ['emergency', 'expenses', 'nutrition', 'export'];
+      if (deprecatedPages.includes(page)) {
+        window.location.hash = '#/dashboard';
+        return;
+      }
+
+      const app = document.querySelector('#app');
+      if (app) {
+        app.innerHTML = renderPage(page);
+        applyColumnVisibility();
+        initFormListeners();
+        initOCRProcessing();
+      }
+
+      if (page === 'dashboard' || page === 'reports') {
+        initChart();
+      }
+
+      enableColumnResize();
+    }
+
+    page = getActivePage();
+
     if (!isLoggedIn && page !== 'login') {
-      window.location.href = pagePath$1('login');
+      window.location.href = pagePath('login');
     } else if (isLoggedIn && page === 'login') {
-      window.location.href = pagePath$1('dashboard');
+      window.location.href = pagePath('dashboard');
     } else {
       // Await database sync from server & Google Workspace config if logged in
       if (page !== 'login') {
@@ -38342,22 +38257,11 @@
         toast('Google Workspace Disconnected', 'Workspace integration turned off.');
       }
 
-      // Render the active page
-      const app = document.querySelector('#app');
-      if (app) {
-        app.innerHTML = renderPage(page);
-        applyColumnVisibility();
-        initFormListeners();
-        initOCRProcessing();
-      }
+      renderCurrentPage();
 
-      // Initialize interactive chart if on dashboard or reports
-      if (page === 'dashboard' || page === 'reports') {
-        initChart();
-      }
-
-      // Initialize Column Resize functionality on tables
-      enableColumnResize();
+      window.addEventListener('hashchange', () => {
+        renderCurrentPage();
+      });
     }
   })();
 
@@ -38383,7 +38287,7 @@
         'medicines': 'dashboard'
       };
       const prev = prevPageMap[page] || 'dashboard';
-      window.location.href = pagePath$1(prev);
+      window.location.href = pagePath(prev);
     }
 
     if (target.matches('[data-collapse-sidebar]')) document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
@@ -38396,7 +38300,7 @@
     if (target.matches('[data-sign-out]')) {
       logoutUser().then(() => {
         toast('Signed out', 'Terminated Firebase Session and cleared workspace state.');
-        window.setTimeout(() => { window.location.href = pagePath$1('login'); }, 600);
+        window.setTimeout(() => { window.location.href = pagePath('login'); }, 600);
       });
     }
 
@@ -38405,7 +38309,7 @@
       loginWithGoogle().then((res) => {
         if (res.success) {
           toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
-          window.setTimeout(() => { window.location.href = pagePath$1('dashboard'); }, 850);
+          window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
         } else if (res.errorCode === 'ACCESS_DENIED') {
           modal({
             title: 'Access Denied',
@@ -38650,7 +38554,7 @@
 
     if (target.matches('[data-edit]')) {
       const id = target.dataset.edit;
-      window.location.href = `${pagePath$1('register-child')}?method=manual&edit=${id}`;
+      window.location.href = `${pagePath('register-child')}?method=manual&edit=${id}`;
     }
 
     if (target.matches('#btn-prev')) {
@@ -38671,7 +38575,61 @@
     const childCard = target.closest('[data-child-id]');
     if (childCard && !target.matches('button, a')) {
       const childId = childCard.dataset.childId;
-      window.location.href = `${pagePath$1('child-profile')}?id=${childId}`;
+      window.location.href = `${pagePath('child-profile')}?id=${childId}`;
+    }
+
+    const uploadProfileBtn = target.closest('[data-upload-profile-doc]');
+    if (uploadProfileBtn) {
+      const childId = uploadProfileBtn.dataset.uploadProfileDoc;
+      const childName = uploadProfileBtn.dataset.childName || 'Child';
+
+      modal({
+        title: `Upload Document for ${childName}`,
+        body: `
+        <form id="profile-doc-upload-form" class="form-layout" style="display:flex; flex-direction:column; gap:14px;">
+          <label class="field">
+            <span class="field__label">Document Title *</span>
+            <input class="input" type="text" name="title" placeholder="e.g. Aadhaar Card, Vaccination Certificate, Blood Report" required />
+          </label>
+          <label class="field">
+            <span class="field__label">Category / Document Type *</span>
+            <select class="select" name="docType">
+              <option value="Medical Report">Medical Report / Lab Test</option>
+              <option value="Aadhaar Card">Aadhaar Card / Govt ID</option>
+              <option value="Birth Certificate">Birth Certificate</option>
+              <option value="Vaccination Record">Immunization / Vaccination Record</option>
+              <option value="Prescription">Doctor Prescription</option>
+              <option value="School Certificate">School / Admission Certificate</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field__label">Select Document File (JPG, PNG, PDF) *</span>
+            <input class="input" type="file" name="docFile" accept=".jpg,.jpeg,.png,.pdf" required />
+          </label>
+        </form>
+      `,
+        confirmText: 'Upload Document',
+        onConfirm: () => {
+          const form = document.querySelector('#profile-doc-upload-form');
+          if (!form) return;
+          const title = form.querySelector('[name="title"]')?.value.trim();
+          const docType = form.querySelector('[name="docType"]')?.value;
+          const fileInput = form.querySelector('[name="docFile"]');
+          if (!title || !fileInput || !fileInput.files || !fileInput.files[0]) {
+            toast('Upload failed', 'Please enter a title and select a document file.');
+            return;
+          }
+          const file = fileInput.files[0];
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+            logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
+            toast('Document uploaded', `${title} linked to ${childName}'s profile.`);
+            render();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
     }
 
     const docCardClick = target.closest('[data-document-idx]');
@@ -38793,7 +38751,7 @@
           }
         });
         localStorage.setItem('ocr-parsed-data', JSON.stringify(ocrData));
-        window.location.href = pagePath$1('ocr-details');
+        window.location.href = pagePath('ocr-details');
       } else {
         toast('Review required', 'Confirm that you have checked the extracted details before continuing.');
       }
@@ -39048,8 +39006,13 @@
       const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const child = saveChild(form);
+      form.reset();
+      form.querySelector('input[name="id"]')?.remove();
 
-      showSheetsSyncLoader(child.name);
+      showSheetsSyncLoader(child.name, () => {
+        toast('Child saved & synced', `${child.name}'s record generated in Google Sheets.`);
+        window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
+      });
     });
 
     // OCR additional form
@@ -39113,7 +39076,10 @@
         }
       }
 
-      showSheetsSyncLoader(child.name);
+      showSheetsSyncLoader(child.name, () => {
+        toast('Verified child saved', `${child.name}'s record generated in Google Sheets.`);
+        window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
+      });
     });
 
     // Growth form (using delegated submit handler for dynamic form cards)
@@ -39404,7 +39370,7 @@
       if (adminIdInput === 'admin-ngo') {
         localStorage.setItem('sample-logged-in', 'true');
         toast('Login Successful', 'Welcome to the Child Health Management workspace.');
-        window.setTimeout(() => { window.location.href = pagePath$1('dashboard'); }, 850);
+        window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
       } else {
         toast('Access Denied', 'Incorrect Admin User ID. Please check the demo credentials.');
       }
@@ -39482,7 +39448,7 @@
                 const elapsed = Date.now() - startTime;
                 const remaining = Math.max(0, 1000 - elapsed);
                 window.setTimeout(() => {
-                  window.location.href = pagePath$1('ocr-review');
+                  window.location.href = pagePath('ocr-review');
                 }, remaining);
               } else {
                 throw new Error(result.error || 'Extraction failed');
@@ -39498,7 +39464,7 @@
                 body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
                 confirmText: 'Try Again',
                 onConfirm: () => {
-                  window.location.href = pagePath$1('ocr-upload');
+                  window.location.href = pagePath('ocr-upload');
                 }
               });
 
@@ -39509,7 +39475,7 @@
             });
         });
     } else {
-      window.setTimeout(() => { window.location.href = pagePath$1('ocr-review'); }, 1850);
+      window.setTimeout(() => { window.location.href = pagePath('ocr-review'); }, 1850);
     }
   }
 
@@ -39656,14 +39622,14 @@
           localStorage.setItem('ocr-upload-filename', file.name);
           localStorage.setItem('ocr-upload-filetype', file.type);
         }
-        window.setTimeout(() => { window.location.href = pagePath$1('ocr-processing'); }, 500);
+        window.setTimeout(() => { window.location.href = pagePath('ocr-processing'); }, 500);
       };
       img.onerror = function () {
         console.warn('Image loading failed, saving original:', file.name);
         localStorage.setItem('ocr-upload-file', e.target.result);
         localStorage.setItem('ocr-upload-filename', file.name);
         localStorage.setItem('ocr-upload-filetype', file.type);
-        window.setTimeout(() => { window.location.href = pagePath$1('ocr-processing'); }, 500);
+        window.setTimeout(() => { window.location.href = pagePath('ocr-processing'); }, 500);
       };
       img.src = e.target.result;
     };
