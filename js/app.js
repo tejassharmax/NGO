@@ -23,12 +23,12 @@ let page = 'dashboard';
 // ─── Authentication Guard & Async App Start ───
 (async () => {
   localStorage.removeItem('sample-students');
-  const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
+  const isLoggedIn = isSessionActive();
 
   function getActivePage() {
     const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
     if (hash && hash.trim() !== '') return hash.trim();
-    return document.body.dataset.page || 'dashboard';
+    return isLoggedIn ? 'dashboard' : 'login';
   }
 
   function renderCurrentPage() {

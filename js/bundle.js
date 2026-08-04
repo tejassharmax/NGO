@@ -782,6 +782,14 @@
     localStorage.removeItem('google-user-email');
   }
 
+  /**
+   * Check if a valid session exists
+   * @returns {boolean}
+   */
+  function isSessionActive() {
+    return localStorage.getItem('sample-logged-in') === 'true';
+  }
+
   function toast(title, message = 'Your changes have been saved.') {
     const root = document.querySelector('#toast-root');
     if (!root) return;
@@ -855,7 +863,10 @@
    * Get live view link to the logged-in NGO's Google Sheet (returns null if not connected)
    */
   function getGoogleSheetUrl() {
-    return cachedSheetsConfig?.spreadsheetUrl || null;
+    const session = getSession() || {};
+    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
+    return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
   }
 
   function formatUnitValue(val, unit) {
@@ -1153,8 +1164,26 @@
       if (spinnerRing) spinnerRing.style.display = 'none';
 
       const latestUrl = getGoogleSheetUrl();
-      if (openBtn && latestUrl) {
-        openBtn.href = latestUrl;
+      if (openBtn) {
+        if (latestUrl && latestUrl !== '#') {
+          openBtn.href = latestUrl;
+        }
+        openBtn.onclick = (e) => {
+          e.preventDefault();
+          const targetUrl = getGoogleSheetUrl();
+          if (targetUrl && targetUrl !== '#') {
+            window.open(targetUrl, '_blank');
+          } else {
+            toast('Fetching Google Sheet...', 'Connecting to your NGO Google Sheet...');
+            fetchSheetsConfig().then(cfg => {
+              if (cfg && cfg.spreadsheetUrl) {
+                window.open(cfg.spreadsheetUrl, '_blank');
+              } else {
+                toast('Google Sheet Not Found', 'Please connect Google Workspace in Settings to view your live Sheet.');
+              }
+            });
+          }
+        };
       }
       if (footerLabel && cachedSheetsConfig?.sheetId) {
         footerLabel.textContent = `Synced to ${cachedSheetsConfig.sheetId.slice(0, 15)}...`;
@@ -1193,6 +1222,9 @@
             if (!cachedSheetsConfig) cachedSheetsConfig = { connected: true };
             cachedSheetsConfig.connected = true;
             cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
+            cachedSheetsConfig.sheetId = data.sheetId;
+            localStorage.setItem(`google_sheet_url_${ngoSlug}`, data.spreadsheetUrl);
+            localStorage.setItem('google_sheet_url', data.spreadsheetUrl);
           }
           toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
         } else if (data && data.message === 'Not connected') {
@@ -38205,12 +38237,12 @@
   // ─── Authentication Guard & Async App Start ───
   (async () => {
     localStorage.removeItem('sample-students');
-    const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
+    const isLoggedIn = isSessionActive();
 
     function getActivePage() {
       const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
       if (hash && hash.trim() !== '') return hash.trim();
-      return document.body.dataset.page || 'dashboard';
+      return isLoggedIn ? 'dashboard' : 'login';
     }
 
     function renderCurrentPage() {
