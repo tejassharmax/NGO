@@ -71,11 +71,20 @@ function saveNgoIntegration(ngoSlug, data) {
 /**
  * Build OAuth2 client instance using environment variables
  */
-function buildOAuthClient() {
+function buildOAuthClient(req = null) {
   require('dotenv').config();
   const clientId = (process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
-  const redirectUri = (process.env.GOOGLE_OAUTH_REDIRECT_URI || 'http://localhost:3000/auth/google/callback').trim();
+
+  let redirectUri = (process.env.GOOGLE_OAUTH_REDIRECT_URI || '').trim();
+  if (!redirectUri && req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.headers.host || 'ngo-4xde.onrender.com';
+    redirectUri = `${protocol}://${host}/auth/google/callback`;
+  }
+  if (!redirectUri) {
+    redirectUri = 'http://localhost:3000/auth/google/callback';
+  }
 
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
@@ -83,9 +92,9 @@ function buildOAuthClient() {
 /**
  * Generate OAuth consent URL for an NGO
  */
-function getAuthUrl(ngoSlug) {
+function getAuthUrl(ngoSlug, req = null) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
-  const oauthClient = buildOAuthClient();
+  const oauthClient = buildOAuthClient(req);
 
   return oauthClient.generateAuthUrl({
     access_type: 'offline',
