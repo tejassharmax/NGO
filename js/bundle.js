@@ -1004,38 +1004,44 @@
     'Oral Hygiene Index'
   ];
 
-  const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzKtL3Ik4Ji_so-tuNtvuJF9zS2Ts9qUMAtTwmka-EnBWzW08mPJNZEzLS3hPUxh1CeBg/exec';
-  const DEFAULT_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
+  let cachedSheetsConfig = null;
 
   /**
-   * Get live view link to the logged-in user's Google Sheet
+   * Fetch Sheets config for the current NGO from backend API
    */
-  function getGoogleSheetUrl() {
-    return localStorage.getItem('custom-google-sheet-url') || DEFAULT_GOOGLE_SHEET_URL;
+  async function fetchSheetsConfig(ngoSlug) {
+    const session = getSession() || {};
+    const slug = session.ngo || 'ayusha-nilayam';
+    try {
+      const res = await fetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        cachedSheetsConfig = await res.json();
+        return cachedSheetsConfig;
+      }
+    } catch (err) {
+      console.warn('[Google Sheets] Config fetch warning:', err);
+    }
+    return cachedSheetsConfig || { connected: false };
   }
 
   /**
-   * Set and persist target Google Sheet URL for admin configuration
+   * Get cached Sheets config object
    */
-  function setGoogleSheetUrl(url) {
-    if (url && typeof url === 'string') {
-      const cleanUrl = url.trim();
-      localStorage.setItem('custom-google-sheet-url', cleanUrl);
-      localStorage.setItem('google-sheets-connected', 'true');
-      return cleanUrl;
-    }
-    return getGoogleSheetUrl();
+  function getSheetsConfig() {
+    return cachedSheetsConfig;
+  }
+
+  /**
+   * Get live view link to the logged-in NGO's Google Sheet (returns null if not connected)
+   */
+  function getGoogleSheetUrl() {
+    return cachedSheetsConfig?.spreadsheetUrl || null;
   }
 
   function formatUnitValue(val, unit) {
     if (val === null || val === undefined || val === '') return '—';
     const num = String(val).replace(/[^0-9.]/g, '').trim();
     return num ? `${num} ${unit}` : '—';
-  }
-
-  function extractRawNumber(val) {
-    if (val === null || val === undefined || val === '') return '';
-    return String(val).replace(/[^0-9.]/g, '').trim();
   }
 
   /**
@@ -1328,68 +1334,337 @@
   }
 
   /**
-   * Automatically sync a child health record to Google Sheets
+   * Automatically sync child health records to the NGO's Google Sheet via OAuth API
    * @param {Object} child 
    */
   async function autoSyncChildToGoogleSheets(child) {
     if (!child) return;
 
     const session = getSession() || {};
-    session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+    const children = getChildren() || [child];
 
-    localStorage.setItem('google-sheets-connected', 'true');
-
-    const age = calculateAge(child.dob) || child.age || '—';
-    const payload = {
-      id: child.id || '',
-      name: child.name || '',
-      dob: child.dob || '',
-      age: age,
-      gender: child.gender || '',
-      blood: child.blood || '',
-      idNumber: child.idNumber || '',
-      father: child.father || child.guardian || '',
-      phone: child.phone || '',
-      height: extractRawNumber(child.height),
-      weight: extractRawNumber(child.weight),
-      medicalConditions: child.medicalConditions || 'None',
-      allergies: child.allergies || 'None',
-      status: child.status || 'Active',
-      registeredDate: child.registeredDate || new Date().toISOString().slice(0, 10),
-      medications: child.medications || 'None',
-      dentalRemarks: child.dentalRemarks || 'None',
-      hygieneIndex: child.hygieneIndex || 'Not Assessed'
-    };
-
-    // Send live HTTP POST to connected Google Apps Script Web App
     try {
-      fetch(GOOGLE_APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }).then(() => {
-        console.log('✓ Live Google Apps Script WebApp auto-sync successful for:', child.name);
-      }).catch(err => console.warn('Google Apps Script live sync warning:', err));
-    } catch (e) {
-      console.warn('Apps Script sync exception:', e);
-    }
-
-    // Also sync to local backend backup
-    try {
-      fetch('/api/sync-google-sheets', {
+      const res = await fetch('/api/sheets/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL, sheetUrl: getGoogleSheetUrl() })
-      }).catch(err => console.warn('Backend sync notice:', err));
+        body: JSON.stringify({ children, ngo: ngoSlug, ngoName })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          if (data.spreadsheetUrl) {
+            if (!cachedSheetsConfig) cachedSheetsConfig = { connected: true };
+            cachedSheetsConfig.connected = true;
+            cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
+          }
+          toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
+        } else if (data && data.message === 'Not connected') {
+          console.log('[Google Sheets] Skip auto-sync: NGO is not connected to Google Workspace.');
+        }
+      }
     } catch (e) {
-      // Ignore offline errors
+      console.warn('[Google Sheets] OAuth sync exception:', e);
+    }
+  }
+
+  /**
+   * googleDocsSync.js
+   * Real-time Executive Health Report synchronization to Google Docs.
+   * Automatically formats and updates executive health summaries, audit statistics,
+   * WHO growth metrics, and child clinical logs directly into the live Google Doc.
+   */
+
+
+  let cachedDocsConfig = null;
+
+  /**
+   * Fetch Docs config for the current NGO from backend API
+   */
+  async function fetchDocsConfig(ngoSlug) {
+    const session = getSession() || {};
+    const slug = session.ngo || 'ayusha-nilayam';
+    try {
+      const res = await fetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        cachedDocsConfig = await res.json();
+        return cachedDocsConfig;
+      }
+    } catch (err) {
+      console.warn('[Google Docs] Config fetch warning:', err);
+    }
+    return cachedDocsConfig || { connected: false };
+  }
+
+  /**
+   * Get cached Docs config object
+   */
+  function getDocsConfig() {
+    return cachedDocsConfig;
+  }
+
+  /**
+   * Get live view link to the Google Doc report (returns null if not connected)
+   */
+  function getGoogleDocUrl() {
+    return cachedDocsConfig?.documentUrl || null;
+  }
+
+  /**
+   * Generate formatted executive report document text
+   */
+  function generateExecutiveDocContent() {
+    const session = getSession() || {};
+    const ngoName = session.ngo || 'Ayusha Nilayam';
+    const children = getChildren() || [];
+    const total = children.length;
+    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
+    const healthyCount = total - flaggedCount;
+    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
+    const healthRecords = getHealthRecords() || [];
+
+    const timestamp = new Date().toLocaleString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    let reportText = `========================================================================\n`;
+    reportText += `       EXECUTIVE CHILD HEALTH AUDIT REPORT — ${ngoName.toUpperCase()}\n`;
+    reportText += `       Auto-Synced Live Document | ${timestamp}\n`;
+    reportText += `========================================================================\n\n`;
+
+    reportText += `1. EXECUTIVE HEALTH SUMMARY\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+    reportText += `• Total Registered Children : ${total}\n`;
+    reportText += `• Optimal Health Status     : ${healthyCount} children (${healthyPct}%)\n`;
+    reportText += `• Health Alerts / Flagged   : ${flaggedCount} children\n`;
+    reportText += `• Verified Clinical Records : ${healthRecords.length} lab test reports\n`;
+    reportText += `• Audited Status            : Verified & Compliant\n\n`;
+
+    reportText += `2. REGISTERED CHILD ROSTER & CLINICAL METRICS\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+    reportText += `ID         | Name                     | Age | Gender | Status  | Height  | Weight  | Medications          | Hygiene\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+
+    children.forEach(c => {
+      const age = calculateAge(c.dob) || c.age || '—';
+      const id = String(c.id || 'CH-0000').padEnd(10, ' ');
+      const name = String(c.name || 'Child').slice(0, 24).padEnd(24, ' ');
+      const ageStr = String(age).slice(0, 3).padEnd(4, ' ');
+      const gender = String(c.gender || '—').slice(0, 6).padEnd(7, ' ');
+      const status = String(c.status || 'Active').slice(0, 7).padEnd(8, ' ');
+      const h = String(c.height ? `${c.height}cm` : '—').padEnd(8, ' ');
+      const w = String(c.weight ? `${c.weight}kg` : '—').padEnd(8, ' ');
+      const meds = String(c.medications || 'None').slice(0, 20).padEnd(20, ' ');
+      const hygiene = String(c.hygieneIndex || 'N/A');
+
+      reportText += `${id} | ${name} | ${ageStr} | ${gender} | ${status} | ${h} | ${w} | ${meds} | ${hygiene}\n`;
+    });
+
+    reportText += `\n------------------------------------------------------------------------\n`;
+    reportText += `End of Live Synced Report | Child Health Management Platform\n`;
+
+    return reportText;
+  }
+
+  /**
+   * Automatically sync executive report to Google Docs in background via OAuth API
+   */
+  async function autoSyncToGoogleDocs() {
+    const session = getSession() || {};
+    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+    const reportContent = generateExecutiveDocContent();
+
+    try {
+      const res = await fetch('/api/docs/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportContent, ngo: ngoSlug, ngoName })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          if (data.documentUrl) {
+            if (!cachedDocsConfig) cachedDocsConfig = { connected: true };
+            cachedDocsConfig.connected = true;
+            cachedDocsConfig.documentUrl = data.documentUrl;
+          }
+          console.log('[Google Docs] Executive report live synced.');
+        } else if (data && data.message === 'Not connected') {
+          console.log('[Google Docs] Skip auto-sync: NGO is not connected to Google Workspace.');
+        }
+      }
+    } catch (err) {
+      console.warn('[Google Docs] OAuth sync notice:', err);
+    }
+  }
+
+  /**
+   * Trigger live API sync to Google Docs and open document
+   */
+  async function syncAndOpenGoogleDoc() {
+    const docUrl = getGoogleDocUrl();
+    if (!docUrl) {
+      toast('Google Workspace Not Connected', 'Please connect your Google Account in Settings first.');
+      return;
     }
 
-    toast(
-      'Auto-Synced to Google Sheets',
-      `Record for ${child.name} live synced to Google Sheets.`
-    );
+    toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
+    await autoSyncToGoogleDocs();
+    toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
+    window.open(docUrl, '_blank');
+  }
+
+  /**
+   * Display interactive Google Docs Live Report Viewer Modal
+   */
+  function openGoogleDocsTemplateModal() {
+    document.querySelector('#google-docs-view-modal')?.remove();
+
+    const session = getSession() || {};
+    const ngoName = session.ngo || 'Ayusha Nilayam';
+    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+    const children = getChildren() || [];
+    const total = children.length;
+    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
+    const healthyCount = total - flaggedCount;
+    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
+
+    const rowsHTML = children.map((c, idx) => `
+    <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : 'background:#ffffff;'}">
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-family:monospace; font-size:12px; font-weight:700; color:#1a73e8;">${escapeHTML$1(c.id || 'CH-0000')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:13px; font-weight:600; color:#1e293b;">${escapeHTML$1(c.name || 'Child')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${calculateAge(c.dob) || c.age || '—'}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.gender || '—')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.height ? `${c.height} cm` : '—'}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.weight ? `${c.weight} kg` : '—'}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.medications || 'None')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.dentalRemarks || '—')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.hygieneIndex || 'N/A')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px;">
+        <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:#dcfce7; color:#15803d;">
+          ${escapeHTML$1(c.status || 'Active')}
+        </span>
+      </td>
+    </tr>
+  `).join('');
+
+    const modalHTML = `
+    <div id="google-docs-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
+      <div class="card" style="width:min(1100px, 94vw); height:min(780px, 92vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
+        
+        <!-- Google Docs Header Bar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #1a73e8 0%, #1557b0 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden;">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#4285F4"/><path d="M14 2V8H20L14 2Z" fill="#A1C2FA"/><path d="M16 13H8V11H16V13ZM16 17H8V15H16V17ZM10 9H8V7H10V9Z" fill="white"/></svg>
+            </div>
+            <div>
+              <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
+                Child_Health_Executive_Report_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
+                <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                  <span style="width:6px; height:6px; border-radius:50%; background:#60a5fa; box-shadow:0 0 6px #60a5fa;"></span>
+                  Live Auto-Synced Google Doc
+                </span>
+              </div>
+              <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px;">
+                Connected Account: <b>${escapeHTML$1(userEmail)}</b> • Real-time Executive Report
+              </div>
+            </div>
+          </div>
+          
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button id="modal-edit-doc-url-btn" class="button" style="background:rgba(255,255,255,0.18); color:white; border:1px solid rgba(255,255,255,0.3); font-weight:600; font-size:12.5px; padding:9px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Set Doc URL
+            </button>
+            <button id="modal-sync-doc-btn" class="button" style="background:#ffffff; color:#1a73e8; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              Open Live Google Doc
+            </button>
+            <button id="modal-close-docs-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1;">&times;</button>
+          </div>
+        </div>
+
+        <!-- Document Body Preview -->
+        <div style="flex:1; overflow-y:auto; padding:28px 36px; background:#f8fafc;">
+          
+          <!-- Document Sheet Paper -->
+          <div style="max-width:900px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:40px 48px; box-shadow:0 4px 20px rgba(0,0,0,0.05);">
+            
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1a73e8; padding-bottom:16px; margin-bottom:24px;">
+              <div>
+                <h1 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 4px 0; letter-spacing:-0.02em;">CHILD HEALTH EXECUTIVE REPORT</h1>
+                <p style="font-size:13px; color:#64748b; margin:0; font-weight:600;">NGO: ${escapeHTML$1(ngoName)} • Live Auto-Synced Document</p>
+              </div>
+              <span style="font-size:11px; background:#eff6ff; color:#1a73e8; font-weight:700; padding:6px 12px; border-radius:20px; border:1px solid #bfdbfe;">
+                Status: Updated Today
+              </span>
+            </div>
+
+            <!-- Stats Bar -->
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:28px;">
+              <div style="background:#f1f5f9; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:24px; font-weight:800; color:#1a73e8;">${total}</div>
+                <div style="font-size:12px; color:#475569; font-weight:600; margin-top:2px;">Total Registered Children</div>
+              </div>
+              <div style="background:#ecfdf5; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:24px; font-weight:800; color:#15803d;">${healthyPct}%</div>
+                <div style="font-size:12px; color:#166534; font-weight:600; margin-top:2px;">Optimal Health (${healthyCount} children)</div>
+              </div>
+              <div style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:24px; font-weight:800; color:#b45309;">${flaggedCount}</div>
+                <div style="font-size:12px; color:#92400e; font-weight:600; margin-top:2px;">Health Alerts / Flagged</div>
+              </div>
+            </div>
+
+            <!-- Table -->
+            <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin:0 0 14px 0;">Audited Clinical Roster</h3>
+            <table style="width:100%; border-collapse:collapse; text-align:left;">
+              <thead>
+                <tr style="background:#f1f5f9; color:#475569; font-size:12px; font-weight:700;">
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Child ID</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Name</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Age</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Gender</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Height</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Weight</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Medications</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Dental</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Hygiene</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHTML}
+              </tbody>
+            </table>
+
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    document.querySelector('#modal-close-docs-btn')?.addEventListener('click', () => {
+      document.querySelector('#google-docs-view-modal')?.remove();
+    });
+
+    document.querySelector('#modal-sync-doc-btn')?.addEventListener('click', () => {
+      syncAndOpenGoogleDoc();
+    });
   }
 
   /**
@@ -2797,13 +3072,17 @@
      SETTINGS & GOOGLE WORKSPACE
      ═══════════════════════════════════════════════════════ */
 
-  /* ═══════════════════════════════════════════════════════
-     SETTINGS & GOOGLE WORKSPACE
-     ═══════════════════════════════════════════════════════ */
-
   function settingsPage() {
+    const session = getSession() || {};
+    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const sheetsConfig = getSheetsConfig() || {};
+    const docsConfig = getDocsConfig() || {};
+    const isConnected = !!(sheetsConfig.connected || docsConfig.connected);
+    const adminEmail = sheetsConfig.adminEmail || docsConfig.adminEmail || 'Admin';
+    const sheetUrl = getGoogleSheetUrl();
+    const docUrl = getGoogleDocUrl();
+
     const isDriveConnected = localStorage.getItem('google-drive-connected') === 'true';
-    const isSheetsConnected = localStorage.getItem('google-sheets-connected') === 'true';
     const isCalendarConnected = localStorage.getItem('google-calendar-connected') === 'true';
 
     return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Workspace service connections.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
@@ -2856,34 +3135,44 @@
           </button>
         </div>
 
+        <!-- Google Workspace OAuth (Sheets & Docs) Card -->
         <div class="card" style="padding: 18px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: span 2;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <b style="font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
               ${icon('googleSheets')}
-              Live Google Sheets Auto-Sync
+              Google Workspace (Sheets & Docs)
             </b>
-            ${isSheetsConnected ? `<span class="badge badge--success">Active & Auto-Syncing</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
+            ${isConnected ? `<span class="badge badge--success">Connected as ${escapeHTML$1(adminEmail)}</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
           <p style="font-size: 12.5px; color: var(--color-text-muted); margin: 0 0 14px 0;">
-            Real-time spreadsheet auto-sync. Simply paste your NGO Google Sheet link below—all 18 child health columns automatically update live in real time. No code editing or copy-pasting required!
+            ${isConnected 
+              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Your spreadsheets and executive audit documents are automatically created and owned by your Google account.`
+              : `Authorize your NGO Google Account once to enable automated, private Google Sheets & Docs synchronization. Created files are stored directly in your own Google Account.`
+            }
           </p>
-          <div style="display: flex; flex-direction: column; gap: 10px;">
-            <label style="font-size: 12px; font-weight: 600; color: var(--color-text);">Admin Google Sheet URL:</label>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-              <input type="text" id="admin-google-sheet-input" value="${escapeHTML$1(getGoogleSheetUrl())}" placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit" style="flex: 1; min-width: 260px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg-alt); font-size: 13px; font-family: monospace;" />
-              <button class="button button--primary button--sm" type="button" data-save-custom-sheet-url style="font-weight: 600; white-space: nowrap;">
-                Save & Connect Sheet
-              </button>
-            </div>
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px; flex-wrap: wrap; gap: 8px;">
-              <span style="font-size: 11.5px; color: #15803d; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-                <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981;"></span>
-                Connected to Admin Live Sheet (18 Columns)
-              </span>
-              <a href="${escapeHTML$1(getGoogleSheetUrl())}" target="_blank" style="font-size: 12px; color: #0b8043; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
-                Open Active Google Sheet ↗
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            ${!isConnected ? `
+              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+                Connect Google Workspace
               </a>
-            </div>
+            ` : `
+              ${sheetUrl ? `
+                <a href="${escapeHTML$1(sheetUrl)}" target="_blank" class="button button--secondary button--sm" style="font-weight: 600; color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                  ${icon('googleSheets')}
+                  Open My Sheet ↗
+                </a>
+              ` : ''}
+              ${docUrl ? `
+                <a href="${escapeHTML$1(docUrl)}" target="_blank" class="button button--secondary button--sm" style="font-weight: 600; color: #1a73e8; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                  Open Executive Doc ↗
+                </a>
+              ` : ''}
+              <a href="/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; text-decoration: none; margin-left: auto;">
+                Disconnect
+              </a>
+            `}
           </div>
         </div>
 
@@ -3099,279 +3388,6 @@
     root.querySelector('.modal-backdrop').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
     root.querySelector('[data-modal-confirm]').addEventListener('click', () => { onConfirm?.(); closeModal(); });
     root.querySelector('[data-modal-close]')?.focus();
-  }
-
-  /**
-   * googleDocsSync.js
-   * Real-time Executive Health Report synchronization to Google Docs.
-   * Automatically formats and updates executive health summaries, audit statistics,
-   * WHO growth metrics, and child clinical logs directly into the live Google Doc.
-   */
-
-
-  const DEFAULT_GOOGLE_DOC_URL = 'https://docs.google.com/document/u/0/';
-  const GOOGLE_DOCS_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzzRCHXXREdsubNksomt6wkZHspuJzREL8jZdjrThAzPfLwny5QXaAKTy2HAn7LtTIFHQ/exec';
-
-  /**
-   * Get live view link to the Google Doc report
-   */
-  function getGoogleDocUrl() {
-    return localStorage.getItem('custom-google-doc-url') || DEFAULT_GOOGLE_DOC_URL;
-  }
-
-  /**
-   * Set custom Google Doc URL
-   */
-  function setGoogleDocUrl(url) {
-    if (url && url.trim()) {
-      localStorage.setItem('custom-google-doc-url', url.trim());
-      toast('Google Doc Link Saved!', 'Custom Google Doc link updated successfully.');
-    }
-  }
-
-  /**
-   * Generate formatted executive report document text
-   */
-  function generateExecutiveDocContent() {
-    const session = getSession() || {};
-    const ngoName = session.ngo || 'Ayusha Nilayam';
-    const children = getChildren() || [];
-    const total = children.length;
-    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
-    const healthyCount = total - flaggedCount;
-    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
-    const healthRecords = getHealthRecords() || [];
-
-    const timestamp = new Date().toLocaleString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    let reportText = `========================================================================\n`;
-    reportText += `       EXECUTIVE CHILD HEALTH AUDIT REPORT — ${ngoName.toUpperCase()}\n`;
-    reportText += `       Auto-Synced Live Document | ${timestamp}\n`;
-    reportText += `========================================================================\n\n`;
-
-    reportText += `1. EXECUTIVE HEALTH SUMMARY\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-    reportText += `• Total Registered Children : ${total}\n`;
-    reportText += `• Optimal Health Status     : ${healthyCount} children (${healthyPct}%)\n`;
-    reportText += `• Health Alerts / Flagged   : ${flaggedCount} children\n`;
-    reportText += `• Verified Clinical Records : ${healthRecords.length} lab test reports\n`;
-    reportText += `• Audited Status            : Verified & Compliant\n\n`;
-
-    reportText += `2. REGISTERED CHILD ROSTER & CLINICAL METRICS\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-    reportText += `ID         | Name                     | Age | Gender | Status  | Height  | Weight  | Medications          | Hygiene\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-
-    children.forEach(c => {
-      const age = calculateAge(c.dob) || c.age || '—';
-      const id = String(c.id || 'CH-0000').padEnd(10, ' ');
-      const name = String(c.name || 'Child').slice(0, 24).padEnd(24, ' ');
-      const ageStr = String(age).slice(0, 3).padEnd(4, ' ');
-      const gender = String(c.gender || '—').slice(0, 6).padEnd(7, ' ');
-      const status = String(c.status || 'Active').slice(0, 7).padEnd(8, ' ');
-      const h = String(c.height ? `${c.height}cm` : '—').padEnd(8, ' ');
-      const w = String(c.weight ? `${c.weight}kg` : '—').padEnd(8, ' ');
-      const meds = String(c.medications || 'None').slice(0, 20).padEnd(20, ' ');
-      const hygiene = String(c.hygieneIndex || 'N/A');
-
-      reportText += `${id} | ${name} | ${ageStr} | ${gender} | ${status} | ${h} | ${w} | ${meds} | ${hygiene}\n`;
-    });
-
-    reportText += `\n------------------------------------------------------------------------\n`;
-    reportText += `End of Live Synced Report | Child Health Management Platform\n`;
-
-    return reportText;
-  }
-
-  /**
-   * Automatically sync executive report to Google Docs in background whenever records change
-   */
-  function autoSyncToGoogleDocs() {
-    fetch(GOOGLE_DOCS_APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'sync_doc',
-        timestamp: new Date().toISOString(),
-        content: generateExecutiveDocContent()
-      })
-    }).catch(err => {
-      console.warn('Google Docs background auto-sync notice:', err);
-    });
-  }
-
-  /**
-   * Trigger live API sync to Google Docs and open document
-   */
-  function syncAndOpenGoogleDoc() {
-    toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
-    
-    autoSyncToGoogleDocs();
-
-    window.setTimeout(() => {
-      toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
-      window.open(getGoogleDocUrl(), '_blank');
-    }, 500);
-  }
-
-  /**
-   * Display interactive Google Docs Live Report Viewer Modal
-   */
-  function openGoogleDocsTemplateModal() {
-    document.querySelector('#google-docs-view-modal')?.remove();
-
-    const session = getSession() || {};
-    const ngoName = session.ngo || 'Ayusha Nilayam';
-    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
-    const children = getChildren() || [];
-    const total = children.length;
-    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
-    const healthyCount = total - flaggedCount;
-    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
-
-    const rowsHTML = children.map((c, idx) => `
-    <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : 'background:#ffffff;'}">
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-family:monospace; font-size:12px; font-weight:700; color:#1a73e8;">${escapeHTML$1(c.id || 'CH-0000')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:13px; font-weight:600; color:#1e293b;">${escapeHTML$1(c.name || 'Child')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${calculateAge(c.dob) || c.age || '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.gender || '—')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.height ? `${c.height} cm` : '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.weight ? `${c.weight} kg` : '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.medications || 'None')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.dentalRemarks || '—')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.hygieneIndex || 'N/A')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px;">
-        <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:#dcfce7; color:#15803d;">
-          ${escapeHTML$1(c.status || 'Active')}
-        </span>
-      </td>
-    </tr>
-  `).join('');
-
-    const modalHTML = `
-    <div id="google-docs-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
-      <div class="card" style="width:min(1100px, 94vw); height:min(780px, 92vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
-        
-        <!-- Google Docs Header Bar -->
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #1a73e8 0%, #1557b0 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
-          <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden;">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#4285F4"/><path d="M14 2V8H20L14 2Z" fill="#A1C2FA"/><path d="M16 13H8V11H16V13ZM16 17H8V15H16V17ZM10 9H8V7H10V9Z" fill="white"/></svg>
-            </div>
-            <div>
-              <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
-                Child_Health_Executive_Report_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
-                <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
-                  <span style="width:6px; height:6px; border-radius:50%; background:#60a5fa; box-shadow:0 0 6px #60a5fa;"></span>
-                  Live Auto-Synced Google Doc
-                </span>
-              </div>
-              <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px;">
-                Connected Account: <b>${escapeHTML$1(userEmail)}</b> • Real-time Executive Report
-              </div>
-            </div>
-          </div>
-          
-          <div style="display:flex; align-items:center; gap:12px;">
-            <button id="modal-edit-doc-url-btn" class="button" style="background:rgba(255,255,255,0.18); color:white; border:1px solid rgba(255,255,255,0.3); font-weight:600; font-size:12.5px; padding:9px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              Set Doc URL
-            </button>
-            <button id="modal-sync-doc-btn" class="button" style="background:#ffffff; color:#1a73e8; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-              Open Live Google Doc
-            </button>
-            <button id="modal-close-docs-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1;">&times;</button>
-          </div>
-        </div>
-
-        <!-- Document Body Preview -->
-        <div style="flex:1; overflow-y:auto; padding:28px 36px; background:#f8fafc;">
-          
-          <!-- Document Sheet Paper -->
-          <div style="max-width:900px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:40px 48px; box-shadow:0 4px 20px rgba(0,0,0,0.05);">
-            
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1a73e8; padding-bottom:16px; margin-bottom:24px;">
-              <div>
-                <h1 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 4px 0; letter-spacing:-0.02em;">CHILD HEALTH EXECUTIVE REPORT</h1>
-                <p style="font-size:13px; color:#64748b; margin:0; font-weight:600;">NGO: ${escapeHTML$1(ngoName)} • Live Auto-Synced Document</p>
-              </div>
-              <span style="font-size:11px; background:#eff6ff; color:#1a73e8; font-weight:700; padding:6px 12px; border-radius:20px; border:1px solid #bfdbfe;">
-                Status: Updated Today
-              </span>
-            </div>
-
-            <!-- Stats Bar -->
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:28px;">
-              <div style="background:#f1f5f9; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#1a73e8;">${total}</div>
-                <div style="font-size:12px; color:#475569; font-weight:600; margin-top:2px;">Total Registered Children</div>
-              </div>
-              <div style="background:#ecfdf5; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#15803d;">${healthyPct}%</div>
-                <div style="font-size:12px; color:#166534; font-weight:600; margin-top:2px;">Optimal Health (${healthyCount} children)</div>
-              </div>
-              <div style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#b45309;">${flaggedCount}</div>
-                <div style="font-size:12px; color:#92400e; font-weight:600; margin-top:2px;">Health Alerts / Flagged</div>
-              </div>
-            </div>
-
-            <!-- Table -->
-            <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin:0 0 14px 0;">Audited Clinical Roster</h3>
-            <table style="width:100%; border-collapse:collapse; text-align:left;">
-              <thead>
-                <tr style="background:#f1f5f9; color:#475569; font-size:12px; font-weight:700;">
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Child ID</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Name</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Age</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Gender</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Height</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Weight</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Medications</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Dental</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Hygiene</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHTML}
-              </tbody>
-            </table>
-
-          </div>
-
-        </div>
-
-      </div>
-    </div>
-  `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    document.querySelector('#modal-close-docs-btn')?.addEventListener('click', () => {
-      document.querySelector('#google-docs-view-modal')?.remove();
-    });
-
-    document.querySelector('#modal-sync-doc-btn')?.addEventListener('click', () => {
-      syncAndOpenGoogleDoc();
-    });
-
-    document.querySelector('#modal-edit-doc-url-btn')?.addEventListener('click', () => {
-      const current = getGoogleDocUrl();
-      const input = prompt('Paste your Google Doc URL (e.g. https://docs.google.com/document/d/.../edit):', current);
-      if (input && input.trim()) {
-        setGoogleDocUrl(input);
-      }
-    });
   }
 
   function collectChild(form) {
@@ -38311,9 +38327,19 @@
     } else if (isLoggedIn && page === 'login') {
       window.location.href = pagePath$1('dashboard');
     } else {
-      // Await database sync from server if logged in
+      // Await database sync from server & Google Workspace config if logged in
       if (page !== 'login') {
-        await syncWithServer();
+        await Promise.all([
+          syncWithServer(),
+          fetchSheetsConfig(),
+          fetchDocsConfig()
+        ]);
+      }
+
+      if (window.location.href.includes('google_connected=true')) {
+        toast('Google Workspace Connected!', 'Your NGO Google Account is connected for Sheets & Docs sync.');
+      } else if (window.location.href.includes('google_disconnected=true')) {
+        toast('Google Workspace Disconnected', 'Workspace integration turned off.');
       }
 
       // Render the active page
@@ -38420,18 +38446,7 @@
       }, 400);
     }
 
-    const saveSheetUrlBtn = target.closest('[data-save-custom-sheet-url]');
-    if (saveSheetUrlBtn) {
-      const input = document.querySelector('#admin-google-sheet-input');
-      if (input && input.value.trim()) {
-        const savedUrl = setGoogleSheetUrl(input.value.trim());
-        toast('Google Sheet Connected!', `Target spreadsheet updated to: ${savedUrl.slice(0, 45)}...`);
-        window.setTimeout(() => window.location.reload(), 500);
-      } else {
-        toast('Invalid Sheet URL', 'Please enter a valid Google Spreadsheet URL.');
-      }
-      return;
-    }
+
 
     // ─── Open Event Details Popover Card ───
     const deleteBtn = target.closest('[data-delete-event-id]');

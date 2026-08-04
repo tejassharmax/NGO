@@ -10,8 +10,8 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, setGoogleSheetUrl, getGoogleSheetUrl } from './googleSheetsSync.js';
-import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc } from './googleDocsSync.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig } from './googleSheetsSync.js';
+import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
@@ -36,9 +36,19 @@ let page = 'dashboard';
   } else if (isLoggedIn && page === 'login') {
     window.location.href = pagePath('dashboard');
   } else {
-    // Await database sync from server if logged in
+    // Await database sync from server & Google Workspace config if logged in
     if (page !== 'login') {
-      await syncWithServer();
+      await Promise.all([
+        syncWithServer(),
+        fetchSheetsConfig(),
+        fetchDocsConfig()
+      ]);
+    }
+
+    if (window.location.href.includes('google_connected=true')) {
+      toast('Google Workspace Connected!', 'Your NGO Google Account is connected for Sheets & Docs sync.');
+    } else if (window.location.href.includes('google_disconnected=true')) {
+      toast('Google Workspace Disconnected', 'Workspace integration turned off.');
     }
 
     // Render the active page
@@ -176,18 +186,7 @@ document.addEventListener('click', (event) => {
     }, 400);
   }
 
-  const saveSheetUrlBtn = target.closest('[data-save-custom-sheet-url]');
-  if (saveSheetUrlBtn) {
-    const input = document.querySelector('#admin-google-sheet-input');
-    if (input && input.value.trim()) {
-      const savedUrl = setGoogleSheetUrl(input.value.trim());
-      toast('Google Sheet Connected!', `Target spreadsheet updated to: ${savedUrl.slice(0, 45)}...`);
-      window.setTimeout(() => window.location.reload(), 500);
-    } else {
-      toast('Invalid Sheet URL', 'Please enter a valid Google Spreadsheet URL.', 'warning');
-    }
-    return;
-  }
+
 
   // ─── Open Event Details Popover Card ───
   const deleteBtn = target.closest('[data-delete-event-id]');

@@ -32,27 +32,38 @@ export const EXACT_SHEET_COLUMNS = [
   'Oral Hygiene Index'
 ];
 
-export const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzKtL3Ik4Ji_so-tuNtvuJF9zS2Ts9qUMAtTwmka-EnBWzW08mPJNZEzLS3hPUxh1CeBg/exec';
-export const DEFAULT_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
+let cachedSheetsConfig = null;
 
 /**
- * Get live view link to the logged-in user's Google Sheet
+ * Fetch Sheets config for the current NGO from backend API
  */
-export function getGoogleSheetUrl() {
-  return localStorage.getItem('custom-google-sheet-url') || DEFAULT_GOOGLE_SHEET_URL;
+export async function fetchSheetsConfig(ngoSlug) {
+  const session = getSession() || {};
+  const slug = ngoSlug || session.ngo || 'ayusha-nilayam';
+  try {
+    const res = await fetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
+    if (res.ok) {
+      cachedSheetsConfig = await res.json();
+      return cachedSheetsConfig;
+    }
+  } catch (err) {
+    console.warn('[Google Sheets] Config fetch warning:', err);
+  }
+  return cachedSheetsConfig || { connected: false };
 }
 
 /**
- * Set and persist target Google Sheet URL for admin configuration
+ * Get cached Sheets config object
  */
-export function setGoogleSheetUrl(url) {
-  if (url && typeof url === 'string') {
-    const cleanUrl = url.trim();
-    localStorage.setItem('custom-google-sheet-url', cleanUrl);
-    localStorage.setItem('google-sheets-connected', 'true');
-    return cleanUrl;
-  }
-  return getGoogleSheetUrl();
+export function getSheetsConfig() {
+  return cachedSheetsConfig;
+}
+
+/**
+ * Get live view link to the logged-in NGO's Google Sheet (returns null if not connected)
+ */
+export function getGoogleSheetUrl() {
+  return cachedSheetsConfig?.spreadsheetUrl || null;
 }
 
 export function formatUnitValue(val, unit) {
@@ -364,68 +375,40 @@ export function showSheetsSyncLoader(childName, onComplete) {
 }
 
 /**
- * Automatically sync a child health record to Google Sheets
+ * Automatically sync child health records to the NGO's Google Sheet via OAuth API
  * @param {Object} child 
  */
 export async function autoSyncChildToGoogleSheets(child) {
   if (!child) return;
 
   const session = getSession() || {};
-  const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+  const children = getChildren() || [child];
 
-  localStorage.setItem('google-sheets-connected', 'true');
-
-  const age = calculateAge(child.dob) || child.age || '—';
-  const payload = {
-    id: child.id || '',
-    name: child.name || '',
-    dob: child.dob || '',
-    age: age,
-    gender: child.gender || '',
-    blood: child.blood || '',
-    idNumber: child.idNumber || '',
-    father: child.father || child.guardian || '',
-    phone: child.phone || '',
-    height: extractRawNumber(child.height),
-    weight: extractRawNumber(child.weight),
-    medicalConditions: child.medicalConditions || 'None',
-    allergies: child.allergies || 'None',
-    status: child.status || 'Active',
-    registeredDate: child.registeredDate || new Date().toISOString().slice(0, 10),
-    medications: child.medications || 'None',
-    dentalRemarks: child.dentalRemarks || 'None',
-    hygieneIndex: child.hygieneIndex || 'Not Assessed'
-  };
-
-  // Send live HTTP POST to connected Google Apps Script Web App
   try {
-    fetch(GOOGLE_APPS_SCRIPT_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(() => {
-      console.log('✓ Live Google Apps Script WebApp auto-sync successful for:', child.name);
-    }).catch(err => console.warn('Google Apps Script live sync warning:', err));
-  } catch (e) {
-    console.warn('Apps Script sync exception:', e);
-  }
-
-  // Also sync to local backend backup
-  try {
-    fetch('/api/sync-google-sheets', {
+    const res = await fetch('/api/sheets/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL, sheetUrl: getGoogleSheetUrl() })
-    }).catch(err => console.warn('Backend sync notice:', err));
-  } catch (e) {
-    // Ignore offline errors
-  }
+      body: JSON.stringify({ children, ngo: ngoSlug, ngoName })
+    });
 
-  toast(
-    'Auto-Synced to Google Sheets',
-    `Record for ${child.name} live synced to Google Sheets.`
-  );
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success) {
+        if (data.spreadsheetUrl) {
+          if (!cachedSheetsConfig) cachedSheetsConfig = { connected: true };
+          cachedSheetsConfig.connected = true;
+          cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
+        }
+        toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
+      } else if (data && data.message === 'Not connected') {
+        console.log('[Google Sheets] Skip auto-sync: NGO is not connected to Google Workspace.');
+      }
+    }
+  } catch (e) {
+    console.warn('[Google Sheets] OAuth sync exception:', e);
+  }
 }
 
 /**
