@@ -38075,19 +38075,23 @@
       const displayName = fbUser.displayName || email.split('@')[0] || 'Authorized User';
 
       // 2. Query Cloud Firestore for authorization record in 'authorized_users' collection
-      let userDoc = await getAuthorizedUser(email);
+      const userDoc = await getAuthorizedUser(email);
 
-      // If new Google user, dynamically authorize them under their account context
+      // 3. Validate existence and active status against Cloud Firestore
       if (!userDoc || !userDoc.active) {
-        userDoc = {
-          email: email,
-          ngo: 'Ayusha Nilayam',
-          role: 'Admin',
-          active: true
+        // Immediately sign out from Firebase if email is not in Firestore authorized_users
+        await signOut(auth);
+        clearSession();
+
+        return {
+          success: false,
+          errorCode: 'ACCESS_DENIED',
+          message: `Access Denied\n\nThe Google account (${email}) is not authorized to access this workspace.\nOnly approved NGO admin accounts listed in Cloud Firestore are permitted.`,
+          email: email
         };
       }
 
-      // 3. Create Session and save state with actual Google Account details
+      // 4. Create Session and save state with actual Google Account details & Firestore NGO context
       const sessionUser = {
         uid: fbUser.uid,
         displayName: displayName,
