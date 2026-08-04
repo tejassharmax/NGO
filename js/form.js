@@ -1,6 +1,7 @@
-import { updateChild, getChild } from './storage.js';
+import { updateChild, getChild, getChildren } from './storage.js';
 import { autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
 import { autoSyncToGoogleDocs } from './googleDocsSync.js';
+import { toast } from './toast.js';
 
 export function collectChild(form) {
   const values = Object.fromEntries(new FormData(form));
@@ -22,10 +23,11 @@ export function collectChild(form) {
   const mother = values.mother || '';
   const dob = values.dob || values.birthDate || '';
   const idNumber = values.idNumber || '';
+  const fullName = values.name || `${values.firstName || ''} ${values.lastName || ''}`.trim() || 'Unnamed Child';
 
   return {
     id,
-    name: `${values.firstName || 'New'} ${values.lastName || 'Child'}`.trim(),
+    name: fullName,
     email: values.email || '',
     gender: values.gender || '',
     blood: values.blood || '',
@@ -53,8 +55,51 @@ export function collectChild(form) {
 }
 
 export function saveChild(form) {
+  const values = Object.fromEntries(new FormData(form));
+  const firstName = (values.firstName || '').trim().toLowerCase();
+  const lastName = (values.lastName || '').trim().toLowerCase();
+  const fullName = (values.name || `${values.firstName || ''} ${values.lastName || ''}`).trim().toLowerCase();
+  const dob = (values.dob || values.birthDate || '').trim();
+
+  // Deduplication Check: Same First Name, Last Name / Full Name AND Date of Birth
+  const existingChildren = getChildren() || [];
+  const isEditing = !!values.id;
+
+  const duplicate = existingChildren.find(c => {
+    if (!c) return false;
+    if (values.id && c.id === values.id) return false;
+
+    const cNameClean = (c.name || '').trim().toLowerCase();
+    const cDobClean = (c.dob || '').trim();
+
+    const nameMatches = cNameClean === fullName || (firstName && lastName && cNameClean.includes(firstName) && cNameClean.includes(lastName));
+    const dobMatches = dob && cDobClean && dob === cDobClean;
+
+    return nameMatches && dobMatches;
+  });
+
+  if (duplicate && !isEditing) {
+    let idInput = form.querySelector('input[name="id"]');
+    if (!idInput) {
+      idInput = document.createElement('input');
+      idInput.type = 'hidden';
+      idInput.name = 'id';
+      idInput.dataset.tempId = 'true';
+      form.appendChild(idInput);
+    }
+    idInput.value = duplicate.id;
+    toast('Duplicate prevented', `Updating existing profile for ${duplicate.name} (${duplicate.id}) instead of creating duplicate.`);
+  }
+
   const child = collectChild(form);
   const updated = updateChild(child);
+
+  // Clean up any temporary hidden ID element from form so subsequent submissions start fresh!
+  const tempIdInput = form.querySelector('input[data-temp-id="true"]');
+  if (tempIdInput) {
+    tempIdInput.remove();
+  }
+
   // Automatically generate / append row to Google Sheets & update Google Docs in user's account
   autoSyncChildToGoogleSheets(child);
   autoSyncToGoogleDocs();

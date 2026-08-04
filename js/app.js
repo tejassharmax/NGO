@@ -22,14 +22,40 @@ let page = 'dashboard';
 
 // ─── Authentication Guard & Async App Start ───
 (async () => {
+  localStorage.removeItem('sample-students');
   const isLoggedIn = localStorage.getItem('sample-logged-in') === 'true';
-  page = document.body.dataset.page || 'dashboard';
 
-  const deprecatedPages = ['emergency', 'expenses', 'nutrition', 'export'];
-  if (deprecatedPages.includes(page)) {
-    window.location.href = pagePath('dashboard');
-    return;
+  function getActivePage() {
+    const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+    if (hash && hash.trim() !== '') return hash.trim();
+    return document.body.dataset.page || 'dashboard';
   }
+
+  function renderCurrentPage() {
+    page = getActivePage();
+
+    const deprecatedPages = ['emergency', 'expenses', 'nutrition', 'export'];
+    if (deprecatedPages.includes(page)) {
+      window.location.hash = '#/dashboard';
+      return;
+    }
+
+    const app = document.querySelector('#app');
+    if (app) {
+      app.innerHTML = renderPage(page);
+      applyColumnVisibility();
+      initFormListeners();
+      initOCRProcessing();
+    }
+
+    if (page === 'dashboard' || page === 'reports') {
+      initChart();
+    }
+
+    enableColumnResize();
+  }
+
+  page = getActivePage();
 
   if (!isLoggedIn && page !== 'login') {
     window.location.href = pagePath('login');
@@ -51,22 +77,11 @@ let page = 'dashboard';
       toast('Google Workspace Disconnected', 'Workspace integration turned off.');
     }
 
-    // Render the active page
-    const app = document.querySelector('#app');
-    if (app) {
-      app.innerHTML = renderPage(page);
-      applyColumnVisibility();
-      initFormListeners();
-      initOCRProcessing();
-    }
+    renderCurrentPage();
 
-    // Initialize interactive chart if on dashboard or reports
-    if (page === 'dashboard' || page === 'reports') {
-      initChart();
-    }
-
-    // Initialize Column Resize functionality on tables
-    enableColumnResize();
+    window.addEventListener('hashchange', () => {
+      renderCurrentPage();
+    });
   }
 })();
 
@@ -412,6 +427,60 @@ document.addEventListener('click', (event) => {
   if (childCard && !target.matches('button, a')) {
     const childId = childCard.dataset.childId;
     window.location.href = `${pagePath('child-profile')}?id=${childId}`;
+  }
+
+  const uploadProfileBtn = target.closest('[data-upload-profile-doc]');
+  if (uploadProfileBtn) {
+    const childId = uploadProfileBtn.dataset.uploadProfileDoc;
+    const childName = uploadProfileBtn.dataset.childName || 'Child';
+
+    modal({
+      title: `Upload Document for ${childName}`,
+      body: `
+        <form id="profile-doc-upload-form" class="form-layout" style="display:flex; flex-direction:column; gap:14px;">
+          <label class="field">
+            <span class="field__label">Document Title *</span>
+            <input class="input" type="text" name="title" placeholder="e.g. Aadhaar Card, Vaccination Certificate, Blood Report" required />
+          </label>
+          <label class="field">
+            <span class="field__label">Category / Document Type *</span>
+            <select class="select" name="docType">
+              <option value="Medical Report">Medical Report / Lab Test</option>
+              <option value="Aadhaar Card">Aadhaar Card / Govt ID</option>
+              <option value="Birth Certificate">Birth Certificate</option>
+              <option value="Vaccination Record">Immunization / Vaccination Record</option>
+              <option value="Prescription">Doctor Prescription</option>
+              <option value="School Certificate">School / Admission Certificate</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field__label">Select Document File (JPG, PNG, PDF) *</span>
+            <input class="input" type="file" name="docFile" accept=".jpg,.jpeg,.png,.pdf" required />
+          </label>
+        </form>
+      `,
+      confirmText: 'Upload Document',
+      onConfirm: () => {
+        const form = document.querySelector('#profile-doc-upload-form');
+        if (!form) return;
+        const title = form.querySelector('[name="title"]')?.value.trim();
+        const docType = form.querySelector('[name="docType"]')?.value;
+        const fileInput = form.querySelector('[name="docFile"]');
+        if (!title || !fileInput || !fileInput.files || !fileInput.files[0]) {
+          toast('Upload failed', 'Please enter a title and select a document file.');
+          return;
+        }
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+          logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
+          toast('Document uploaded', `${title} linked to ${childName}'s profile.`);
+          render();
+        };
+        reader.readAsDataURL(file);
+      }
+    });
   }
 
   const docCardClick = target.closest('[data-document-idx]');
@@ -788,6 +857,8 @@ function initFormListeners() {
     const form = event.currentTarget;
     if (!form.reportValidity()) return;
     const child = saveChild(form);
+    form.reset();
+    form.querySelector('input[name="id"]')?.remove();
 
     showSheetsSyncLoader(child.name, () => {
       toast('Child saved & synced', `${child.name}'s record generated in Google Sheets.`);

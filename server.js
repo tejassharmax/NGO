@@ -983,10 +983,10 @@ app.get('/auth/google/callback', async (req, res) => {
     };
     saveNgoIntegration(ngoSlug, updated);
 
-    res.redirect('/pages/index.html#/settings?google_connected=true');
+    res.redirect('/index.html?google_connected=true#/settings');
   } catch (err) {
     console.error('OAuth Callback Error:', err);
-    res.redirect('/pages/index.html#/settings?google_error=true');
+    res.redirect('/index.html?google_error=true#/settings');
   }
 });
 
@@ -1006,7 +1006,7 @@ app.all('/api/google/disconnect', (req, res) => {
   if (req.method === 'POST' || req.headers['content-type'] === 'application/json') {
     return res.json({ success: true, message: 'Disconnected' });
   }
-  res.redirect('/pages/index.html#/settings?google_disconnected=true');
+  res.redirect('/index.html?google_disconnected=true#/settings');
 });
 
 // GET /api/sheets/config?ngo=...
@@ -1061,6 +1061,30 @@ app.post('/api/docs/sync', async (req, res) => {
   }
 });
 
+function mergeJSONArrays(clientJSON, serverJSON) {
+  let clientArr = [];
+  let serverArr = [];
+  try { clientArr = JSON.parse(clientJSON || '[]'); } catch (e) {}
+  try { serverArr = JSON.parse(serverJSON || '[]'); } catch (e) {}
+  if (!Array.isArray(clientArr)) clientArr = [];
+  if (!Array.isArray(serverArr)) serverArr = [];
+
+  const map = new Map();
+  const PRESET_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-1001', 'CH-1002', 'CH-3938', 'CH-1079'];
+  const PRESET_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Ananya Patel'];
+
+  serverArr.concat(clientArr).forEach(item => {
+    if (item && typeof item === 'object') {
+      if (item.id && PRESET_IDS.includes(item.id)) return;
+      if (item.name && PRESET_NAMES.includes(item.name)) return;
+      const key = item.id || JSON.stringify(item);
+      map.set(key, item);
+    }
+  });
+
+  return JSON.stringify(Array.from(map.values()));
+}
+
 // POST /api/sync - Merges and saves the database
 app.post('/api/sync', (req, res) => {
   try {
@@ -1101,7 +1125,9 @@ app.post('/api/sync', (req, res) => {
         const children = JSON.parse(mergedData['chm-children']);
         if (Array.isArray(children)) {
           updateLocalCSVExport(children);
-          syncChildrenToGoogleSheets(children).catch(err => {
+          const ngoSlug = req.body?.ngo || 'ayusha-nilayam';
+          const ngoName = req.body?.ngoName || 'Ayusha Nilayam';
+          syncChildrenToGoogleSheets(children, ngoSlug, ngoName).catch(err => {
             console.warn('Background Google Sheets auto-sync notice:', err.message);
           });
         }
@@ -1117,10 +1143,14 @@ app.post('/api/sync', (req, res) => {
 
 // GET /api/sheets/config - Get Google Sheets config and sync status
 app.get('/api/sheets/config', (req, res) => {
-  const config = getSheetsConfig();
+  const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+  const integration = getNgoIntegration(ngoSlug);
+  const isConnected = !!(integration && integration.refresh_token);
   res.json({
-    ...config,
-    url: config.sheetId ? `https://docs.google.com/spreadsheets/d/${config.sheetId}` : null
+    connected: isConnected,
+    adminEmail: integration?.adminEmail || null,
+    sheetId: integration?.sheetId || null,
+    spreadsheetUrl: integration?.spreadsheetUrl || null
   });
 });
 
@@ -1128,13 +1158,15 @@ app.get('/api/sheets/config', (req, res) => {
 app.post('/api/sheets/sync', async (req, res) => {
   try {
     let children = req.body.children;
+    const ngoSlug = req.body?.ngo || 'ayusha-nilayam';
+    const ngoName = req.body?.ngoName || 'Ayusha Nilayam';
     if (!children && fs.existsSync(DB_FILE)) {
       const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
       if (db['chm-children']) children = JSON.parse(db['chm-children']);
     }
     if (!children) return res.status(400).json({ error: 'No child records found to sync' });
 
-    const result = await syncChildrenToGoogleSheets(children);
+    const result = await syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
