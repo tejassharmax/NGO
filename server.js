@@ -950,7 +950,7 @@ async function syncChildrenToGoogleSheets(children) {
 // GET /api/google/connect?ngo=<slug> -> Redirect to OAuth consent screen
 app.get('/api/google/connect', (req, res) => {
   const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
-  const authUrl = getAuthUrl(ngoSlug);
+  const authUrl = getAuthUrl(ngoSlug, req);
   res.redirect(authUrl);
 });
 
@@ -963,7 +963,7 @@ app.get('/auth/google/callback', async (req, res) => {
       return res.status(400).send('Authorization code missing from callback');
     }
 
-    const oauthClient = buildOAuthClient();
+    const oauthClient = buildOAuthClient(req);
     const { tokens } = await oauthClient.getToken(code);
 
     let adminEmail = 'Admin';
