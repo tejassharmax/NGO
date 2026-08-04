@@ -10,7 +10,7 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets } from './googleSheetsSync.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, setGoogleSheetUrl, getGoogleSheetUrl } from './googleSheetsSync.js';
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc } from './googleDocsSync.js';
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 
@@ -174,6 +174,19 @@ document.addEventListener('click', (event) => {
     window.setTimeout(() => {
       window.location.reload();
     }, 400);
+  }
+
+  const saveSheetUrlBtn = target.closest('[data-save-custom-sheet-url]');
+  if (saveSheetUrlBtn) {
+    const input = document.querySelector('#admin-google-sheet-input');
+    if (input && input.value.trim()) {
+      const savedUrl = setGoogleSheetUrl(input.value.trim());
+      toast('Google Sheet Connected!', `Target spreadsheet updated to: ${savedUrl.slice(0, 45)}...`);
+      window.setTimeout(() => window.location.reload(), 500);
+    } else {
+      toast('Invalid Sheet URL', 'Please enter a valid Google Spreadsheet URL.', 'warning');
+    }
+    return;
   }
 
   // ─── Open Event Details Popover Card ───
@@ -433,12 +446,17 @@ document.addEventListener('click', (event) => {
     const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
     const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
 
+    const sheetInput = document.querySelector('#admin-google-sheet-input')?.value.trim();
+    if (sheetInput) {
+      setGoogleSheetUrl(sheetInput);
+    }
+
     localStorage.setItem('sample-org-name', orgNameInput);
     localStorage.setItem('sample-org-code', orgCodeInput);
     localStorage.setItem('sample-org-email', orgEmailInput);
     localStorage.setItem('sample-org-timezone', orgTimezoneInput);
 
-    toast('Settings saved', 'Your workspace preferences are up to date.');
+    toast('Settings saved', 'Your workspace preferences and Google Sheet connection are up to date.');
     window.setTimeout(() => { window.location.reload(); }, 600);
   }
 

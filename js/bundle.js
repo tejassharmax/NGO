@@ -1005,7 +1005,27 @@
   ];
 
   const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzKtL3Ik4Ji_so-tuNtvuJF9zS2Ts9qUMAtTwmka-EnBWzW08mPJNZEzLS3hPUxh1CeBg/exec';
-  const LIVE_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
+  const DEFAULT_GOOGLE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1rQB_KAh8FRtdUcmL8J31BH4xDDdnFSuA3eESGGAw2IE/edit?gid=0#gid=0';
+
+  /**
+   * Get live view link to the logged-in user's Google Sheet
+   */
+  function getGoogleSheetUrl() {
+    return localStorage.getItem('custom-google-sheet-url') || DEFAULT_GOOGLE_SHEET_URL;
+  }
+
+  /**
+   * Set and persist target Google Sheet URL for admin configuration
+   */
+  function setGoogleSheetUrl(url) {
+    if (url && typeof url === 'string') {
+      const cleanUrl = url.trim();
+      localStorage.setItem('custom-google-sheet-url', cleanUrl);
+      localStorage.setItem('google-sheets-connected', 'true');
+      return cleanUrl;
+    }
+    return getGoogleSheetUrl();
+  }
 
   function formatUnitValue(val, unit) {
     if (val === null || val === undefined || val === '') return '—';
@@ -1156,7 +1176,7 @@
           </div>
           
           <div style="display:flex; align-items:center; gap:12px;">
-            <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" class="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+            <a href="${getGoogleSheetUrl()}" target="_blank" class="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
               Open Live Google Sheet
             </a>
@@ -1169,7 +1189,7 @@
           <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:#166534;">
             <span style="font-size:16px;">💡</span>
             <span>
-              <b>Live Sheet Connected</b>: Click <b>Open Live Google Sheet</b> to open <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">https://docs.google.com/spreadsheets/d/1rQB_KAh8FR...</a> directly in Google Drive!
+              <b>Live Sheet Connected</b>: Click <b>Open Live Google Sheet</b> to open <a href="${getGoogleSheetUrl()}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">Connected Sheet</a> directly in Google Drive!
             </span>
           </div>
 
@@ -1197,7 +1217,7 @@
         <div style="padding:12px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:12.5px; color:#64748b;">
           <div style="display:flex; align-items:center; gap:8px;">
             <span style="width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
-            Connected File: <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" style="color:#0f9d58; font-weight:600; text-decoration:none;">NGO_Child_Health_Master_Records</a>
+            Connected File: <a href="${getGoogleSheetUrl()}" target="_blank" style="color:#0f9d58; font-weight:600; text-decoration:none;">NGO_Child_Health_Master_Records</a>
           </div>
           <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Template</button>
         </div>
@@ -1254,7 +1274,7 @@
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a href="${LIVE_GOOGLE_SHEET_URL}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
+        <a href="${getGoogleSheetUrl()}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
           Open Connected Live Google Sheet
         </a>
@@ -1360,7 +1380,7 @@
       fetch('/api/sync-google-sheets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL, sheetUrl: LIVE_GOOGLE_SHEET_URL })
+        body: JSON.stringify({ children: [child], appsScriptUrl: GOOGLE_APPS_SCRIPT_URL, sheetUrl: getGoogleSheetUrl() })
       }).catch(err => console.warn('Backend sync notice:', err));
     } catch (e) {
       // Ignore offline errors
@@ -2836,18 +2856,35 @@
           </button>
         </div>
 
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+        <div class="card" style="padding: 18px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: span 2;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+            <b style="font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
               ${icon('googleSheets')}
-              Google Sheets
+              Live Google Sheets Auto-Sync
             </b>
-            ${isSheetsConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
+            ${isSheetsConnected ? `<span class="badge badge--success">Active & Auto-Syncing</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Live spreadsheet synchronization for NGO health records.</p>
-          <button class="button button--sm ${isSheetsConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="sheets" style="width: 100%; justify-content: center;">
-            ${isSheetsConnected ? 'Disconnect Google Sheets' : 'Connect Google Sheets'}
-          </button>
+          <p style="font-size: 12.5px; color: var(--color-text-muted); margin: 0 0 14px 0;">
+            Real-time spreadsheet auto-sync. Simply paste your NGO Google Sheet link below—all 18 child health columns automatically update live in real time. No code editing or copy-pasting required!
+          </p>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <label style="font-size: 12px; font-weight: 600; color: var(--color-text);">Admin Google Sheet URL:</label>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+              <input type="text" id="admin-google-sheet-input" value="${escapeHTML$1(getGoogleSheetUrl())}" placeholder="https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/edit" style="flex: 1; min-width: 260px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg-alt); font-size: 13px; font-family: monospace;" />
+              <button class="button button--primary button--sm" type="button" data-save-custom-sheet-url style="font-weight: 600; white-space: nowrap;">
+                Save & Connect Sheet
+              </button>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px; flex-wrap: wrap; gap: 8px;">
+              <span style="font-size: 11.5px; color: #15803d; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #10b981;"></span>
+                Connected to Admin Live Sheet (18 Columns)
+              </span>
+              <a href="${escapeHTML$1(getGoogleSheetUrl())}" target="_blank" style="font-size: 12px; color: #0b8043; font-weight: 700; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
+                Open Active Google Sheet ↗
+              </a>
+            </div>
+          </div>
         </div>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
@@ -38383,6 +38420,19 @@
       }, 400);
     }
 
+    const saveSheetUrlBtn = target.closest('[data-save-custom-sheet-url]');
+    if (saveSheetUrlBtn) {
+      const input = document.querySelector('#admin-google-sheet-input');
+      if (input && input.value.trim()) {
+        const savedUrl = setGoogleSheetUrl(input.value.trim());
+        toast('Google Sheet Connected!', `Target spreadsheet updated to: ${savedUrl.slice(0, 45)}...`);
+        window.setTimeout(() => window.location.reload(), 500);
+      } else {
+        toast('Invalid Sheet URL', 'Please enter a valid Google Spreadsheet URL.');
+      }
+      return;
+    }
+
     // ─── Open Event Details Popover Card ───
     const deleteBtn = target.closest('[data-delete-event-id]');
     if (deleteBtn) {
@@ -38640,12 +38690,17 @@
       const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
       const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
 
+      const sheetInput = document.querySelector('#admin-google-sheet-input')?.value.trim();
+      if (sheetInput) {
+        setGoogleSheetUrl(sheetInput);
+      }
+
       localStorage.setItem('sample-org-name', orgNameInput);
       localStorage.setItem('sample-org-code', orgCodeInput);
       localStorage.setItem('sample-org-email', orgEmailInput);
       localStorage.setItem('sample-org-timezone', orgTimezoneInput);
 
-      toast('Settings saved', 'Your workspace preferences are up to date.');
+      toast('Settings saved', 'Your workspace preferences and Google Sheet connection are up to date.');
       window.setTimeout(() => { window.location.reload(); }, 600);
     }
 
