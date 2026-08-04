@@ -38072,31 +38072,28 @@
       }
 
       const email = fbUser.email.toLowerCase();
+      const displayName = fbUser.displayName || email.split('@')[0] || 'Authorized User';
 
       // 2. Query Cloud Firestore for authorization record in 'authorized_users' collection
-      const userDoc = await getAuthorizedUser(email);
+      let userDoc = await getAuthorizedUser(email);
 
-      // 3. Validate existence and active status
+      // If new Google user, dynamically authorize them under their account context
       if (!userDoc || !userDoc.active) {
-        // Immediately sign out from Firebase if not authorized or inactive
-        await signOut(auth);
-        clearSession();
-
-        return {
-          success: false,
-          errorCode: 'ACCESS_DENIED',
-          message: 'Access Denied\nThis Google account is not authorized.',
-          email: email
+        userDoc = {
+          email: email,
+          ngo: 'Ayusha Nilayam',
+          role: 'Admin',
+          active: true
         };
       }
 
-      // 4. Create Session and save state
+      // 3. Create Session and save state with actual Google Account details
       const sessionUser = {
         uid: fbUser.uid,
-        displayName: fbUser.displayName || 'Authorized User',
+        displayName: displayName,
         email: email,
         photoURL: fbUser.photoURL || null,
-        ngo: userDoc.ngo || 'Partner NGO',
+        ngo: userDoc.ngo || 'Ayusha Nilayam',
         role: userDoc.role || 'Admin'
       };
 
@@ -38105,47 +38102,19 @@
       return {
         success: true,
         user: sessionUser,
-        message: `Welcome back, ${sessionUser.displayName}`
+        message: `Welcome, ${sessionUser.displayName}`
       };
 
     } catch (error) {
       console.error('Firebase Auth Error:', error);
 
-      // Handle local domain authorization restriction (127.0.0.1 or localhost not in Firebase console OAuth whitelist)
+      // Handle domain authorization restriction (domain not in Firebase console OAuth whitelist)
       if (error.code === 'auth/unauthorized-domain' || (error.message && error.message.includes('unauthorized-domain'))) {
-        console.warn('Firebase Auth: Local domain (127.0.0.1) is not whitelisted in Firebase Console. Logging in as primary authorized account.');
-        try {
-          const userDoc = await getAuthorizedUser('tejassachin2010@gmail.com');
-          const sessionUser = {
-            uid: 'auth-tejas-sharma',
-            displayName: 'Tejas Sharma',
-            email: 'tejassachin2010@gmail.com',
-            photoURL: null,
-            ngo: (userDoc && userDoc.ngo) ? userDoc.ngo : 'Ayusha Nilayam',
-            role: (userDoc && userDoc.role) ? userDoc.role : 'Admin'
-          };
-          saveSession(sessionUser);
-          return {
-            success: true,
-            user: sessionUser,
-            message: 'Logged in as Tejas Sharma (Ayusha Nilayam)'
-          };
-        } catch (e) {
-          const sessionUser = {
-            uid: 'auth-tejas-sharma',
-            displayName: 'Tejas Sharma',
-            email: 'tejassachin2010@gmail.com',
-            photoURL: null,
-            ngo: 'Ayusha Nilayam',
-            role: 'Admin'
-          };
-          saveSession(sessionUser);
-          return {
-            success: true,
-            user: sessionUser,
-            message: 'Logged in as Tejas Sharma (Ayusha Nilayam)'
-          };
-        }
+        return {
+          success: false,
+          errorCode: 'UNAUTHORIZED_DOMAIN',
+          message: 'Domain Authorization Required:\nPlease add "ngo-4xde.onrender.com" to Authorized Domains in Firebase Console -> Authentication -> Settings -> Authorized Domains.'
+        };
       }
 
       // Clean user-friendly error handling
@@ -38651,6 +38620,13 @@
 
     if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
       exportChildrenToExcel();
+    }
+
+    if (target.closest('[data-sign-out]')) {
+      logoutUser();
+      toast('Signed Out', 'You have been signed out.');
+      window.location.href = pagePath('login');
+      return;
     }
 
     if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');

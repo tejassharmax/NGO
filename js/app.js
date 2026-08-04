@@ -504,6 +504,13 @@ document.addEventListener('click', (event) => {
     exportChildrenToExcel();
   }
 
+  if (target.closest('[data-sign-out]')) {
+    logoutUser();
+    toast('Signed Out', 'You have been signed out.');
+    window.location.href = pagePath('login');
+    return;
+  }
+
   if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
   if (target.matches('[data-report-print], [data-profile-print]')) window.print();
   if (target.matches('[data-apply-report]')) toast('Report updated', 'Your report now reflects the selected filters.');
