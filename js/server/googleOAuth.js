@@ -76,14 +76,20 @@ function buildOAuthClient(req = null) {
   const clientId = (process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
 
-  let redirectUri = (process.env.GOOGLE_OAUTH_REDIRECT_URI || '').trim();
-  if (!redirectUri && req) {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'ngo-4xde.onrender.com';
-    redirectUri = `${protocol}://${host}/auth/google/callback`;
+  let redirectUri = '';
+
+  // If request is from a live web server (e.g. Render), auto-force live domain callback URI
+  if (req) {
+    const host = (req.headers['x-forwarded-host'] || req.headers.host || '').trim();
+    if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+      redirectUri = `${protocol}://${host}/auth/google/callback`;
+    }
   }
+
+  // Fallback to process.env or local development URI
   if (!redirectUri) {
-    redirectUri = 'http://localhost:3000/auth/google/callback';
+    redirectUri = (process.env.GOOGLE_OAUTH_REDIRECT_URI || 'http://localhost:3000/auth/google/callback').trim();
   }
 
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
