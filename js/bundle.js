@@ -38013,29 +38013,58 @@
   async function getAuthorizedUser(email) {
     if (!email) return null;
     const normalizedEmail = email.trim().toLowerCase();
+    const docId = normalizedEmail.replace(/[@.]/g, '_');
 
     try {
-      // Primary Firestore query against 'authorized_users' collection
+      // 1. Direct document lookup by normalized email docId
+      const directRef = doc(db, AUTHORIZED_USERS_COLLECTION, docId);
+      const directSnap = await getDoc(directRef);
+      if (directSnap.exists()) {
+        const data = directSnap.data();
+        return {
+          email: data.email || normalizedEmail,
+          ngo: data.ngo || 'Partner NGO',
+          role: data.role || 'Admin',
+          active: data.active !== undefined ? Boolean(data.active) : true
+        };
+      }
+
+      // 2. Query collection where email field equals normalizedEmail
       const q = query(
         collection(db, AUTHORIZED_USERS_COLLECTION),
         where('email', '==', normalizedEmail)
       );
       const querySnapshot = await getDocs(q);
-
       if (!querySnapshot.empty) {
-        const docData = querySnapshot.docs[0].data();
+        const data = querySnapshot.docs[0].data();
         return {
-          email: docData.email,
-          ngo: docData.ngo || 'Partner NGO',
-          role: docData.role || 'Member',
-          active: Boolean(docData.active)
+          email: data.email || normalizedEmail,
+          ngo: data.ngo || 'Partner NGO',
+          role: data.role || 'Admin',
+          active: data.active !== undefined ? Boolean(data.active) : true
         };
       }
+
+      // 3. Scan all documents in authorized_users collection as fail-safe (handles legacy doc IDs)
+      const allSnap = await getDocs(collection(db, AUTHORIZED_USERS_COLLECTION));
+      if (!allSnap.empty) {
+        for (const d of allSnap.docs) {
+          const data = d.data();
+          if (data && data.email && data.email.trim().toLowerCase() === normalizedEmail) {
+            return {
+              email: data.email || normalizedEmail,
+              ngo: data.ngo || 'Partner NGO',
+              role: data.role || 'Admin',
+              active: data.active !== undefined ? Boolean(data.active) : true
+            };
+          }
+        }
+      }
     } catch (error) {
-      console.warn('Firestore query fallback:', error.message || error);
+      console.warn('Firestore user lookup notice:', error.message || error);
     }
 
-    // Check seed/local cache if Firestore is unreachable or offline
+    // 4. Fallback check against SEED_DEMO_USERS
     const fallbackUser = SEED_DEMO_USERS.find(u => u.email.toLowerCase() === normalizedEmail);
     if (fallbackUser) {
       return { ...fallbackUser };
