@@ -10,6 +10,7 @@ import { getSession } from './session.js';
 import { toast } from './toast.js';
 import { getChildren, calculateAge } from './storage.js';
 import { escapeHTML } from './utils.js';
+import { apiFetch } from './apiClient.js';
 
 export const EXACT_SHEET_COLUMNS = [
   'ID',
@@ -41,7 +42,7 @@ export async function fetchSheetsConfig(ngoSlug) {
   const session = getSession() || {};
   const slug = ngoSlug || session.ngo || 'ayusha-nilayam';
   try {
-    const res = await fetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
+    const res = await apiFetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
     if (res.ok) {
       cachedSheetsConfig = await res.json();
       return cachedSheetsConfig;
@@ -422,7 +423,7 @@ export async function autoSyncChildToGoogleSheets(child) {
   }
 
   try {
-    const res = await fetch('/api/sheets/sync', {
+    const res = await apiFetch('/api/sheets/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ children, ngo: ngoSlug, ngoName })

@@ -8,7 +8,7 @@ import { saveChild } from './form.js';
 import { pagePath, icon } from './utils.js';
 import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
-import { getAuthorizedUser, getAuthorizedUsersList } from './firestore.js';
+import { getAuthorizedUser } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig } from './googleSheetsSync.js';
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
@@ -85,36 +85,6 @@ let page = 'dashboard';
   }
 })();
 
-async function handleGoogleAuth(email) {
-  const userDoc = await getAuthorizedUser(email);
-  if (userDoc && userDoc.active) {
-    closeModal();
-    saveSession({
-      uid: 'demo-uid-' + Date.now(),
-      displayName: email.split('@')[0],
-      email: email,
-      ngo: userDoc.ngo,
-      role: userDoc.role
-    });
-    toast('Authentication Successful', `Logged in as ${email} (${userDoc.ngo})`);
-    window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
-  } else {
-    closeModal();
-    modal({
-      title: 'Access Denied',
-      body: `<div style="text-align:center; padding:16px 8px;">
-        <div style="font-size:44px; margin-bottom:8px;">🚫</div>
-        <h3 style="color:var(--color-danger); margin:0 0 8px 0; font-size:18px; font-weight:700;">Access Denied</h3>
-        <p style="font-size:14px; color:var(--color-text); margin:0 0 12px 0; font-weight:600;">This Google account is not authorized.</p>
-        <div style="padding:10px; background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:6px; font-size:12px; font-weight:500;">
-          Tried account: <code>${email}</code>
-        </div>
-      </div>`,
-      confirmText: 'Try Authorized Account',
-      onConfirm: () => { window.location.reload(); }
-    });
-  }
-}
 
 // ─── Event Listeners ───
 
@@ -1285,7 +1255,7 @@ function initOCRProcessing() {
 
         const startTime = Date.now();
 
-        fetch('http://localhost:3000/api/ocr', {
+        apiFetch('/api/ocr', {
           method: 'POST',
           body: formData
         })

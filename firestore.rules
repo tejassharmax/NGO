@@ -1,0 +1,35 @@
+rules_version = '2';
+
+// Firestore security rules for the Child Health Management platform.
+//
+// Threat model: before these rules, the database was in open test mode. Anyone
+// on the internet could read every authorized_users document AND write new ones,
+// which meant an attacker could grant themselves `active: true` and sign in as
+// an NGO admin. These rules close that hole.
+//
+// Principle: the allowlist is server/console-managed data. The web client may
+// only read the single document describing itself, and may never write.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /authorized_users/{userId} {
+      // A signed-in user may read only their own allowlist entry. This is what
+      // auth.js needs to decide whether to admit the session. Listing the whole
+      // collection is denied, so the admin roster is no longer public.
+      allow get: if request.auth != null
+                 && request.auth.token.email_verified == true
+                 && request.auth.token.email.lower() == resource.data.email.lower();
+
+      // Never writable from the client. Manage the allowlist in the Firebase
+      // console or from a trusted server using the Admin SDK, which bypasses
+      // these rules.
+      allow list, write: if false;
+    }
+
+    // Everything else is denied by default. Add explicit rules above if the app
+    // later needs another collection.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

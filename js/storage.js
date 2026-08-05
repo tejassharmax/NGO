@@ -3,6 +3,8 @@
    All data is stored in localStorage as JSON.
    ═══════════════════════════════════════════════════════ */
 
+import { apiFetch } from './apiClient.js';
+
 const CHILDREN_KEY = 'chm-children';
 const ACTIVITY_KEY = 'chm-activity';
 const PENDING_KEY = 'chm-pending-docs';
@@ -575,8 +577,8 @@ export async function syncWithServer() {
       payload[k] = localStorage.getItem(k);
     });
 
-    // POST payload to merge/save on server
-    const res = await fetch('http://localhost:3000/api/sync', {
+    // POST payload to merge/save on server (relative URL + auth token)
+    const res = await apiFetch('/api/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

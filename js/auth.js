@@ -5,7 +5,7 @@
 
 import { auth, googleProvider } from './firebase-config.js';
 import { signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
-import { getAuthorizedUser, seedAuthorizedUsers } from './firestore.js';
+import { getAuthorizedUser } from './firestore.js';
 import { saveSession, clearSession } from './session.js';
 
 /**
@@ -14,9 +14,6 @@ import { saveSession, clearSession } from './session.js';
  */
 export async function loginWithGoogle() {
   try {
-    // Ensure initial Firestore demo accounts exist
-    await seedAuthorizedUsers();
-
     // 1. Firebase Google Popup Sign-In
     const result = await signInWithPopup(auth, googleProvider);
     const fbUser = result.user;

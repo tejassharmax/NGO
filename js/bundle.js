@@ -67,3309 +67,6 @@
   const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
   const healthDot = (level) => `<span class="health-dot health-dot--${level}" aria-label="${level}"></span>`;
 
-  /* ═══════════════════════════════════════════════════════
-     CHILD HEALTH MANAGEMENT — DATA LAYER
-     All data is stored in localStorage as JSON.
-     ═══════════════════════════════════════════════════════ */
-
-  const CHILDREN_KEY = 'chm-children';
-  const ACTIVITY_KEY = 'chm-activity';
-  const PENDING_KEY = 'chm-pending-docs';
-  const DOCS_KEY = 'chm-documents';
-  const GROWTH_KEY = 'chm-growth';
-  const NUTRITION_KEY = 'chm-nutrition';
-  const MEDICINES_KEY = 'chm-medicines';
-  const APPOINTMENTS_KEY = 'chm-appointments';
-  const EMERGENCY_KEY = 'chm-emergency';
-  const SPONSORS_KEY = 'chm-sponsors';
-  const EXPENSES_KEY = 'chm-expenses';
-  const ALERTS_KEY = 'chm-alerts';
-  const HEALTH_RECORDS_KEY = 'chm-health-records';
-
-  /* ─── Children (was Students) ─── */
-
-  const PRESET_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-1001', 'CH-1002', 'CH-3938', 'CH-1079'];
-  const PRESET_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Ananya Patel'];
-
-  function getChildren() {
-    let data = localStorage.getItem(CHILDREN_KEY);
-    if (!data) {
-      seedDatabase();
-      data = localStorage.getItem(CHILDREN_KEY);
-    }
-    const list = JSON.parse(data || '[]');
-    const filtered = list.filter(c => c && !PRESET_IDS.includes(c.id) && !PRESET_NAMES.includes(c.name));
-    if (filtered.length !== list.length) {
-      localStorage.setItem(CHILDREN_KEY, JSON.stringify(filtered));
-    }
-    return filtered;
-  }
-
-  function updateChild(child) {
-    const children = getChildren();
-    const idx = children.findIndex(c => c.id === child.id);
-    if (idx !== -1) {
-      children[idx] = child;
-      logActivity('child_updated', child.name, 'Child record updated');
-    } else {
-      children.unshift(child);
-      logActivity('child_added', child.name, 'New child registered');
-    }
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(children));
-    return child;
-  }
-
-  function deleteChild(id) {
-    const child = getChildren().find(c => c.id === id);
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(getChildren().filter(c => c.id !== id)));
-    if (child) {
-      logActivity('child_removed', child.name, 'Child record removed');
-    }
-  }
-
-  function getChild(id) {
-    return getChildren().find(c => c.id === id) || getChildren()[0];
-  }
-
-  /* ─── Activity Log ─── */
-
-  function logActivity(type, subject, description) {
-    const activities = getActivities();
-    activities.unshift({ type, subject, description, timestamp: Date.now() });
-    if (activities.length > 50) activities.length = 50;
-    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activities));
-  }
-
-  function getActivities() {
-    return JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '[]');
-  }
-
-  function timeAgo(timestamp) {
-    const diff = Date.now() - timestamp;
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
-    const days = Math.floor(hours / 24);
-    return `${days} day${days !== 1 ? 's' : ''} ago`;
-  }
-
-  /* ─── Pending Documents ─── */
-
-  function getPendingDocs() {
-    return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
-  }
-
-  function addPendingDoc(docName, childName) {
-    const docs = getPendingDocs();
-    docs.unshift({ docName, childName, timestamp: Date.now() });
-    if (docs.length > 20) docs.length = 20;
-    localStorage.setItem(PENDING_KEY, JSON.stringify(docs));
-  }
-
-  /* ─── Uploaded Documents ─── */
-
-  function getUploadedDocs() {
-    return JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
-  }
-
-  function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report', childId = null) {
-    const docs = getUploadedDocs();
-    docs.unshift({
-      id: `DOC-${Date.now()}`,
-      name: docName,
-      child: childName,
-      childName: childName,
-      childId: childId,
-      docType: docType,
-      category: docType,
-      meta: fileData ? `File · ${Math.round(fileData.length * 0.75 / 1024)} KB` : 'No file',
-      status: status,
-      image: fileData,
-      fileData: fileData,
-      timestamp: Date.now()
-    });
-    localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
-  }
-
-  function deleteUploadedDoc(index) {
-    const docs = getUploadedDocs();
-    docs.splice(index, 1);
-    localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
-  }
-
-  function getGrowthRecords(childId) {
-    const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
-    all.sort((a, b) => (b.timestamp || new Date(b.date).getTime() || 0) - (a.timestamp || new Date(a.date).getTime() || 0));
-    return childId ? all.filter(r => r.childId === childId) : all;
-  }
-
-  function addGrowthRecord(record) {
-    const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
-    record.timestamp = Date.now();
-    record.bmi = record.weight && record.height
-      ? +(record.weight / ((record.height / 100) ** 2)).toFixed(1)
-      : null;
-    all.unshift(record);
-    localStorage.setItem(GROWTH_KEY, JSON.stringify(all));
-    logActivity('growth_logged', record.childName || 'Child', `Height: ${record.height}cm, Weight: ${record.weight}kg`);
-    return record;
-  }
-
-  function addMeal(meal) {
-    const all = JSON.parse(localStorage.getItem(NUTRITION_KEY) || '[]');
-    meal.timestamp = Date.now();
-    all.unshift(meal);
-    localStorage.setItem(NUTRITION_KEY, JSON.stringify(all));
-    logActivity('meal_logged', meal.childName || 'Child', `${meal.mealType}: ${meal.description}`);
-    return meal;
-  }
-
-  /* ─── Medicine Management ─── */
-
-  function getMedicines(childId) {
-    const all = JSON.parse(localStorage.getItem(MEDICINES_KEY) || '[]');
-    return childId ? all.filter(m => m.childId === childId) : all;
-  }
-
-  function addMedicine(med) {
-    const all = JSON.parse(localStorage.getItem(MEDICINES_KEY) || '[]');
-    med.id = med.id || `MED-${Date.now()}`;
-    med.timestamp = Date.now();
-    all.unshift(med);
-    localStorage.setItem(MEDICINES_KEY, JSON.stringify(all));
-    logActivity('medicine_added', med.childName || 'Child', `${med.medicineName} — ${med.dosage}`);
-    return med;
-  }
-
-  /* ─── Appointments ─── */
-
-  function getAppointments(childId) {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
-    return childId ? all.filter(a => a.childId === childId) : all;
-  }
-
-  function addAppointment(appt) {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
-    appt.id = appt.id || `APT-${Date.now()}`;
-    appt.timestamp = Date.now();
-    all.unshift(appt);
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
-    logActivity('appointment_added', appt.childName || 'Child', `${appt.type} on ${appt.date}`);
-    return appt;
-  }
-
-  function deleteAppointment(id) {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
-    const filtered = all.filter(a => String(a.id) !== String(id));
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(filtered));
-    return true;
-  }
-
-  /* ─── Emergency Contacts ─── */
-
-  function getEmergencyContacts() {
-    return JSON.parse(localStorage.getItem(EMERGENCY_KEY) || '[]');
-  }
-
-  function addEmergencyContact(contact) {
-    const all = getEmergencyContacts();
-    contact.id = contact.id || `EMC-${Date.now()}`;
-    contact.timestamp = Date.now();
-    all.unshift(contact);
-    localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
-    return contact;
-  }
-
-  function deleteEmergencyContact(id) {
-    const all = getEmergencyContacts().filter(c => c.id !== id);
-    localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
-  }
-
-  /* ─── Sponsors ─── */
-
-  function getSponsors() {
-    return JSON.parse(localStorage.getItem(SPONSORS_KEY) || '[]');
-  }
-
-  function addSponsor(sponsor) {
-    const all = getSponsors();
-    sponsor.id = sponsor.id || `SP-${Date.now()}`;
-    sponsor.timestamp = Date.now();
-    all.unshift(sponsor);
-    localStorage.setItem(SPONSORS_KEY, JSON.stringify(all));
-    logActivity('sponsor_added', sponsor.name, 'New sponsor registered');
-    return sponsor;
-  }
-
-  function addExpense(expense) {
-    const all = JSON.parse(localStorage.getItem(EXPENSES_KEY) || '[]');
-    expense.id = expense.id || `EXP-${Date.now()}`;
-    expense.timestamp = Date.now();
-    all.unshift(expense);
-    localStorage.setItem(EXPENSES_KEY, JSON.stringify(all));
-    logActivity('expense_logged', expense.category || 'Expense', `₹${expense.amount} — ${expense.description}`);
-    return expense;
-  }
-
-  /* ─── Health Records (Lab results, test reports) ─── */
-
-  function getHealthRecords(childId) {
-    const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
-    return childId ? all.filter(r => r.childId === childId) : all;
-  }
-
-  function addHealthRecord(record) {
-    const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
-    record.id = record.id || `HR-${Date.now()}`;
-    record.timestamp = Date.now();
-    all.unshift(record);
-    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all));
-    return record;
-  }
-
-  /* ─── Alerts ─── */
-
-  function getAlerts() {
-    let alerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
-    const children = getChildren();
-    const appointments = getAppointments();
-    const medicines = getMedicines();
-    const now = Date.now();
-    const dynamicAlerts = [];
-
-    // 1. Check for overdue appointments
-    appointments.forEach(appt => {
-      if (appt.status === 'Upcoming' && new Date(appt.date).getTime() < now - 24 * 3600 * 1000) {
-        const alertId = `ALR-OVERDUE-${appt.id}`;
-        if (!alerts.some(a => a.id === alertId)) {
-          dynamicAlerts.push({
-            id: alertId,
-            type: 'warning',
-            childName: appt.childName,
-            message: `Reminder: Overdue appointment: ${appt.type} with ${appt.doctor} was scheduled for ${appt.date}`,
-            timestamp: now,
-            dismissed: false
-          });
-        }
-      }
-    });
-
-    // 2. Check for missing Aadhaar or ID documents
-    children.forEach(child => {
-      if (!child.idNumber || child.idNumber.trim() === '') {
-        const alertId = `ALR-MISSING-ID-${child.id}`;
-        if (!alerts.some(a => a.id === alertId)) {
-          dynamicAlerts.push({
-            id: alertId,
-            type: 'info',
-            childName: child.name,
-            message: `Missing records: No ID card/Aadhaar registered for ${child.name}`,
-            timestamp: now,
-            dismissed: false
-          });
-        }
-      }
-    });
-
-    // 3. Check for alarming blood test reports (hemoglobin < 11.0)
-    const healthRecords = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
-    healthRecords.forEach(record => {
-      if (record.hemoglobin && parseFloat(record.hemoglobin) < 11.0) {
-        const alertId = `ALR-ANEMIA-${record.childId}-${record.date}`;
-        if (!alerts.some(a => a.id === alertId)) {
-          dynamicAlerts.push({
-            id: alertId,
-            type: 'critical',
-            childName: record.childName,
-            message: `Critical blood values: Low Hemoglobin (${record.hemoglobin} g/dL) detected on ${record.date}`,
-            timestamp: now,
-            dismissed: false
-          });
-        }
-      }
-    });
-
-    // 4. Check for low supplies (medication ending soon)
-    medicines.forEach(med => {
-      if (med.status === 'Active' && med.endDate) {
-        const remainingTime = new Date(med.endDate).getTime() - now;
-        if (remainingTime > 0 && remainingTime < 3 * 24 * 3600 * 1000) {
-          const alertId = `ALR-MED-LOW-${med.id}`;
-          if (!alerts.some(a => a.id === alertId)) {
-            dynamicAlerts.push({
-              id: alertId,
-              type: 'warning',
-              childName: med.childName,
-              message: `Running low: Medication "${med.medicineName}" supply ending soon (${med.endDate})`,
-              timestamp: now,
-              dismissed: false
-            });
-          }
-        }
-      }
-    });
-
-    if (dynamicAlerts.length > 0) {
-      alerts = [...dynamicAlerts, ...alerts];
-      localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
-    }
-
-    return alerts;
-  }
-
-  function dismissAlert(id) {
-    const all = getAlerts().map(a => a.id === id ? { ...a, dismissed: true } : a);
-    localStorage.setItem(ALERTS_KEY, JSON.stringify(all));
-  }
-
-  /* ─── Utility: Calculate age from DOB ─── */
-
-  function calculateAge(dob) {
-    if (!dob) return '';
-    const birth = new Date(dob);
-    if (isNaN(birth.getTime())) return '';
-    const now = new Date();
-    let years = now.getFullYear() - birth.getFullYear();
-    const m = now.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) years--;
-    if (years < 1) {
-      const months = (now.getFullYear() - birth.getFullYear()) * 12 + now.getMonth() - birth.getMonth();
-      return `${months} mo`;
-    }
-    return `${years} yr`;
-  }
-
-  /* ─── Health Status Calculator ─── */
-
-  function healthStatus(child) {
-    const flags = [];
-    // Check for anemia (low hemoglobin)
-    const records = getHealthRecords(child.id);
-    const latestCBC = records.find(r => r.type === 'cbc');
-    if (latestCBC && latestCBC.hemoglobin) {
-      const hb = parseFloat(latestCBC.hemoglobin);
-      if (hb < 11) flags.push('Anemia risk');
-    }
-    // Check BMI
-    const growth = getGrowthRecords(child.id);
-    if (growth.length > 0) {
-      const latest = growth[0];
-      if (latest.bmi && latest.bmi < 16) flags.push('Undernourished');
-    }
-    // Check overdue checkups
-    const appts = getAppointments(child.id);
-    const overdue = appts.filter(a => a.status !== 'Completed' && new Date(a.date) < new Date());
-    if (overdue.length > 0) flags.push('Overdue checkup');
-
-    // Check allergies / medical conditions
-    if (child.medicalConditions && child.medicalConditions.trim()) flags.push('Has conditions');
-
-    if (flags.length === 0) return { level: 'good', label: 'Healthy', flags };
-    if (flags.some(f => f.includes('Anemia') || f.includes('Undernourished'))) return { level: 'critical', label: 'Needs attention', flags };
-    return { level: 'warning', label: 'Review needed', flags };
-  }
-
-  function seedDatabase() {
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify([]));
-    localStorage.setItem(GROWTH_KEY, JSON.stringify([]));
-    localStorage.setItem(NUTRITION_KEY, JSON.stringify([]));
-    localStorage.setItem(MEDICINES_KEY, JSON.stringify([]));
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify([]));
-    localStorage.setItem(EMERGENCY_KEY, JSON.stringify([]));
-    localStorage.setItem(SPONSORS_KEY, JSON.stringify([]));
-    localStorage.setItem(EXPENSES_KEY, JSON.stringify([]));
-    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify([]));
-    localStorage.setItem(ACTIVITY_KEY, JSON.stringify([]));
-    localStorage.setItem(ALERTS_KEY, JSON.stringify([]));
-  }
-
-  /* ───────────────────────────────────────────────────────
-     DATA SYNC WITH SERVER-SIDE DB
-     ─────────────────────────────────────────────────────── */
-  let isSyncing = false;
-
-  async function syncWithServer() {
-    if (isSyncing) return;
-    try {
-      isSyncing = true;
-      getChildren();
-      const keys = [
-        CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
-        NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
-        EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY,
-        'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
-      ];
-
-      // Pack local state
-      const payload = {};
-      keys.forEach(k => {
-        payload[k] = localStorage.getItem(k);
-      });
-
-      // POST payload to merge/save on server
-      const res = await fetch('http://localhost:3000/api/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (res.ok) {
-        const serverData = await res.json();
-        // Apply merged state from server without overwriting non-empty local storage with empty server state
-        Object.keys(serverData).forEach(k => {
-          if (serverData[k] !== null && serverData[k] !== undefined) {
-            const localStr = localStorage.getItem(k);
-            if (!localStr || localStr === '[]' || localStr === '') {
-              if (serverData[k] !== '[]' && serverData[k] !== '') {
-                localStorage.setItem(k, serverData[k]);
-              }
-            } else if (serverData[k] && serverData[k] !== '[]') {
-              try {
-                const localArr = JSON.parse(localStr);
-                const serverArr = JSON.parse(serverData[k]);
-                if (Array.isArray(localArr) && Array.isArray(serverArr)) {
-                  const map = new Map();
-                  serverArr.concat(localArr).forEach(item => {
-                    if (item) {
-                      const key = item.id || JSON.stringify(item);
-                      map.set(key, item);
-                    }
-                  });
-                  localStorage.setItem(k, JSON.stringify(Array.from(map.values())));
-                }
-              } catch (e) {
-                localStorage.setItem(k, serverData[k]);
-              }
-            }
-          }
-        });
-      }
-    } catch (err) {
-      console.warn('Sync failed (offline or server starting):', err);
-    } finally {
-      isSyncing = false;
-    }
-  }
-
-  function triggerSync() {
-    syncWithServer().catch(err => console.warn('Background sync failed:', err));
-  }
-
-  // Intercept localStorage sets to trigger background sync when key changes
-  const originalSetItem = localStorage.setItem.bind(localStorage);
-  localStorage.setItem = function(key, value) {
-    originalSetItem(key, value);
-    if (!isSyncing && (key.startsWith('chm-') || key.startsWith('sample-org-'))) {
-      triggerSync();
-    }
-  };
-
-  function childRows(children) {
-    if (!children.length) return `<tr><td colspan="7"><div class="empty-state"><span class="empty-state__icon">${icon('users')}</span><h3>No children found</h3><p>Try changing your search or register a new child.</p></div></td></tr>`;
-    return children.map((child) => {
-      const hs = healthStatus(child);
-      const age = calculateAge(child.dob);
-      return `<tr>
-    <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
-    <td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name">${child.name}</span><span class="table-person__id">${child.id}</span></div></a></td>
-    <td data-column="age">${age || '—'}</td><td class="hide-tablet" data-column="gender">${child.gender || '—'}</td><td class="hide-tablet" data-column="blood">${child.blood || '—'}</td><td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>
-    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
-  </tr>`;
-    }).join('');
-  }
-
-  function updateChildTable(children) {
-    const body = document.querySelector('#child-table-body');
-    if (body) body.innerHTML = childRows(children);
-    const count = document.querySelector('#child-count');
-    if (count) count.textContent = `${children.length} children`;
-  }
-
-  function getChartData() {
-    const children = getChildren();
-    const now = new Date();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const fullMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const data = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
-      const yearStr = String(d.getFullYear());
-      const count = children.filter(c => c.registeredDate && c.registeredDate.includes(`${yearStr}-${monthStr}-`)).length;
-      data.push({ month: months[d.getMonth()], value: count, label: fullMonths[d.getMonth()] });
-    }
-    return data;
-  }
-
-  function registrationChart() {
-    const chartData = getChartData();
-    const currentValue = chartData[chartData.length - 1]?.value || 0;
-    const prevValue = chartData[chartData.length - 2]?.value || 0;
-    const pctChange = prevValue > 0 ? Math.round((currentValue - prevValue) / prevValue * 100) : (currentValue > 0 ? 100 : 0);
-    const changeText = pctChange >= 0 ? `+${pctChange}%` : `${pctChange}%`;
-
-    return `<div class="chart-summary"><b>${currentValue}</b><span>${changeText} vs. last month</span></div>
-  <div class="chart-interactive" id="registration-chart">
-    <svg class="chart-canvas" viewBox="0 0 640 180" preserveAspectRatio="none" aria-label="Children registered chart">
-      <defs>
-        <linearGradient id="chartAreaGradient" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.22"/>
-          <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.00"/>
-        </linearGradient>
-      </defs>
-      <g class="chart-grid"></g>
-      <path class="chart-area-path" d=""></path>
-      <path class="chart-line-path" d=""></path>
-      <line class="chart-hover-line" x1="0" y1="0" x2="0" y2="155" style="display:none;"></line>
-      <circle class="chart-hover-circle" cx="0" cy="0" r="5" style="display:none;"></circle>
-    </svg>
-    <div class="chart-tooltip-html" style="opacity: 0;"></div>
-    <div class="chart-labels"></div>
-  </div>`;
-  }
-
-  function initChart() {
-    const chart = document.getElementById('registration-chart');
-    if (!chart) return;
-
-    const chartData = getChartData();
-    const svg = chart.querySelector('.chart-canvas');
-    const tooltip = chart.querySelector('.chart-tooltip-html');
-    const labelsDiv = chart.querySelector('.chart-labels');
-    const gridGroup = svg.querySelector('.chart-grid');
-    const areaPath = svg.querySelector('.chart-area-path');
-    const linePath = svg.querySelector('.chart-line-path');
-    const hoverLine = svg.querySelector('.chart-hover-line');
-    const hoverCircle = svg.querySelector('.chart-hover-circle');
-
-    const W = 640;
-    const H = 180;
-    const padX = 30;
-    const padY = 25;
-    const maxVal = Math.max(5, ...chartData.map(d => d.value)) * 1.2 || 10;
-
-    // Render Grid Lines
-    gridGroup.innerHTML = '';
-    const gridLines = 5;
-    for (let i = 0; i < gridLines; i++) {
-      const y = padY + (i / (gridLines - 1)) * (H - 2 * padY);
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      line.setAttribute('x1', '0');
-      line.setAttribute('y1', String(y));
-      line.setAttribute('x2', String(W));
-      line.setAttribute('y2', String(y));
-      line.setAttribute('class', 'chart-grid-line');
-      gridGroup.appendChild(line);
-    }
-
-    // Calculate coordinates
-    const points = chartData.map((d, i) => {
-      const x = padX + (i / (chartData.length - 1)) * (W - 2 * padX);
-      const y = H - padY - (d.value / maxVal) * (H - 2 * padY);
-      return { x, y, value: d.value, month: d.month, label: d.label };
-    });
-
-    // Render chart labels
-    labelsDiv.innerHTML = points.map(p => `<span>${p.month}</span>`).join('');
-
-    // Generate cubic bezier paths
-    if (points.length > 0) {
-      let lineD = `M ${points[0].x} ${points[0].y}`;
-      for (let i = 0; i < points.length - 1; i++) {
-        const p1 = points[i];
-        const p2 = points[i + 1];
-        const cp1x = p1.x + (p2.x - p1.x) / 3;
-        const cp2x = p1.x + 2 * (p2.x - p1.x) / 3;
-        lineD += ` C ${cp1x} ${p1.y}, ${cp2x} ${p2.y}, ${p2.x} ${p2.y}`;
-      }
-      linePath.setAttribute('d', lineD);
-
-      const areaD = `${lineD} L ${points[points.length - 1].x} ${H - padY} L ${points[0].x} ${H - padY} Z`;
-      areaPath.setAttribute('d', areaD);
-    }
-
-    // Interactive Hover Effects
-    svg.addEventListener('pointermove', (event) => {
-      const rect = svg.getBoundingClientRect();
-      const mouseX = ((event.clientX - rect.left) / rect.width) * W;
-
-      let closest = points[0];
-      let minDist = Math.abs(points[0].x - mouseX);
-      points.forEach(p => {
-        const dist = Math.abs(p.x - mouseX);
-        if (dist < minDist) {
-          minDist = dist;
-          closest = p;
-        }
-      });
-
-      hoverLine.setAttribute('x1', String(closest.x));
-      hoverLine.setAttribute('x2', String(closest.x));
-      hoverLine.style.display = '';
-
-      hoverCircle.setAttribute('cx', String(closest.x));
-      hoverCircle.setAttribute('cy', String(closest.y));
-      hoverCircle.style.display = '';
-
-      tooltip.innerHTML = `<strong>${closest.label}</strong><div>${closest.value} registration${closest.value !== 1 ? 's' : ''}</div>`;
-      tooltip.style.opacity = '1';
-      
-      const tipRect = tooltip.getBoundingClientRect();
-      const svgRect = svg.getBoundingClientRect();
-      const tooltipX = (closest.x / W) * svgRect.width - tipRect.width / 2;
-      const tooltipY = (closest.y / H) * svgRect.height - tipRect.height - 10;
-      
-      tooltip.style.transform = `translate(${tooltipX}px, ${tooltipY}px)`;
-    });
-
-    svg.addEventListener('pointerleave', () => {
-      hoverLine.style.display = 'none';
-      hoverCircle.style.display = 'none';
-      tooltip.style.opacity = '0';
-    });
-  }
-
-  /**
-   * session.js
-   * Session state manager for Firebase Authentication & Firestore User Context.
-   */
-
-  const SESSION_KEY = 'chm_firebase_user_session';
-
-  /**
-   * Save active authenticated user session to local storage
-   * @param {Object} userData 
-   */
-  function saveSession(userData) {
-    if (!userData) return;
-    const sessionPayload = {
-      uid: userData.uid,
-      displayName: userData.displayName || 'Authorized User',
-      email: userData.email,
-      photoURL: userData.photoURL || null,
-      ngo: userData.ngo || 'Partner NGO',
-      role: userData.role || 'Admin',
-      loginTimestamp: new Date().toISOString()
-    };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionPayload));
-    localStorage.setItem('sample-logged-in', 'true');
-    localStorage.setItem('google-user-email', userData.email);
-    localStorage.setItem('sample-org-name', userData.ngo || 'Partner NGO');
-  }
-
-  /**
-   * Get active user session
-   * @returns {Object|null}
-   */
-  function getSession() {
-    try {
-      const data = localStorage.getItem(SESSION_KEY);
-      if (!data) return null;
-      return JSON.parse(data);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /**
-   * Clear user session state
-   */
-  function clearSession() {
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem('sample-logged-in');
-    localStorage.removeItem('google-user-email');
-  }
-
-  /**
-   * Check if a valid session exists
-   * @returns {boolean}
-   */
-  function isSessionActive() {
-    return localStorage.getItem('sample-logged-in') === 'true';
-  }
-
-  function toast(title, message = 'Your changes have been saved.') {
-    const root = document.querySelector('#toast-root');
-    if (!root) return;
-    const element = document.createElement('div');
-    element.className = 'toast';
-    element.innerHTML = `<span class="toast__icon">${icon('check')}</span><div><div class="toast__title">${title}</div><div class="toast__message">${message}</div></div><button class="icon-button icon-button--small" type="button" aria-label="Dismiss notification">${icon('x')}</button>`;
-    root.append(element);
-    const remove = () => element.remove();
-    element.querySelector('button').addEventListener('click', remove);
-    window.setTimeout(remove, 4200);
-  }
-
-  /**
-   * googleSheetsSync.js
-   * Automatic Google Sheets generation and real-time record synchronization service.
-   * Automatically formats and syncs child health records to Google Spreadsheets
-   * matching the exact export data format:
-   * ID | Child Name | Date of Birth | Age | Gender | Blood Group | Aadhaar ID | Guardian | Contact Phone | Height (cm) | Weight (kg) | Medical Conditions | Allergies | Current Medications | Dental Remarks | Oral Hygiene Index | Status | Registration Date
-   */
-
-
-  const EXACT_SHEET_COLUMNS = [
-    'ID',
-    'Child Name',
-    'Date of Birth',
-    'Age',
-    'Gender',
-    'Blood Group',
-    'Aadhaar ID',
-    'Guardian',
-    'Contact Phone',
-    'Height (cm)',
-    'Weight (kg)',
-    'Medical Conditions',
-    'Allergies',
-    'Status',
-    'Registration Date',
-    'Current Medications',
-    'Dental Remarks',
-    'Oral Hygiene Index'
-  ];
-
-  let cachedSheetsConfig = null;
-
-  /**
-   * Fetch Sheets config for the current NGO from backend API
-   */
-  async function fetchSheetsConfig(ngoSlug) {
-    const session = getSession() || {};
-    const slug = session.ngo || 'ayusha-nilayam';
-    try {
-      const res = await fetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
-      if (res.ok) {
-        cachedSheetsConfig = await res.json();
-        return cachedSheetsConfig;
-      }
-    } catch (err) {
-      console.warn('[Google Sheets] Config fetch warning:', err);
-    }
-    return cachedSheetsConfig || { connected: false };
-  }
-
-  /**
-   * Get cached Sheets config object
-   */
-  function getSheetsConfig() {
-    return cachedSheetsConfig;
-  }
-
-  /**
-   * Get live view link to the logged-in NGO's Google Sheet (returns null if not connected)
-   */
-  function getGoogleSheetUrl() {
-    const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
-    const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
-    return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
-  }
-
-  function formatUnitValue(val, unit) {
-    if (val === null || val === undefined || val === '') return '—';
-    const num = String(val).replace(/[^0-9.]/g, '').trim();
-    return num ? `${num} ${unit}` : '—';
-  }
-
-  /**
-   * Format a child health record object into the EXACT 15-column Google Sheets row array
-   * @param {Object} child 
-   * @returns {Array<string>}
-   */
-  function formatChildToSheetRow(child) {
-    const age = calculateAge(child.dob) || child.age || '—';
-    return [
-      child.id || 'CH-0000',
-      child.name || 'Unnamed Child',
-      child.dob || '—',
-      age,
-      child.gender || '—',
-      child.blood || '—',
-      child.idNumber || '—',
-      child.father || child.guardian || '—',
-      child.phone || '—',
-      formatUnitValue(child.height, 'cm'),
-      formatUnitValue(child.weight, 'kg'),
-      child.medicalConditions || 'None',
-      child.allergies || 'None',
-      child.status || 'Active',
-      child.registeredDate || new Date().toISOString().slice(0, 10),
-      child.medications || 'None',
-      child.dentalRemarks || 'None',
-      child.hygieneIndex || 'Not Assessed'
-    ];
-  }
-
-  /**
-   * Generate formatted TSV string of all records for instant Google Sheets pasting
-   * @returns {string}
-   */
-  function generateSheetTSVData() {
-    const children = getChildren() || [];
-    const headerRow = EXACT_SHEET_COLUMNS.join('\t');
-    const dataRows = children.map(c => formatChildToSheetRow(c).join('\t'));
-    return [headerRow, ...dataRows].join('\n');
-  }
-
-  /**
-   * Copy formatted 15-column dataset to clipboard only
-   */
-  function copySheetDataToClipboard() {
-    const children = getChildren() || [];
-    const tsvData = generateSheetTSVData();
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(tsvData).then(() => {
-        toast(
-          'Dataset Copied to Clipboard!',
-          `Copied ${children.length} child records (15 columns). Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
-        );
-      }).catch(err => {
-        console.warn('Clipboard write notice:', err);
-      });
-    }
-  }
-
-  /**
-   * Display a professional Google Sheets Template Data Viewer Modal
-   */
-  function openGoogleSheetsTemplateModal() {
-    document.querySelector('#google-sheets-view-modal')?.remove();
-
-    const session = getSession() || {};
-    const ngoName = session.ngo || 'Ayusha Nilayam';
-    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
-    const children = getChildren() || [];
-
-    const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R'];
-
-    const headerColsHTML = EXACT_SHEET_COLUMNS.map((col, idx) => `
-    <th style="padding: 10px 14px; background: #f8fafc; border: 1px solid #cbd5e1; font-weight: 700; color: #334155; text-align: left; font-size: 12px; white-space: nowrap; user-select: none;">
-      <div style="font-size: 10px; color: #94a3b8; font-weight: 700; letter-spacing:0.05em; text-transform: uppercase; margin-bottom: 2px;">${colLetters[idx]}</div>
-      ${col}
-    </th>
-  `).join('');
-
-    const rowsHTML = children.map((c, rowIdx) => {
-      const row = formatChildToSheetRow(c);
-      const isEven = rowIdx % 2 === 1;
-      const bgStyle = isEven ? 'background: #f8fafc;' : 'background: #ffffff;';
-
-      const cellHTML = row.map((val, cellIdx) => {
-        if (cellIdx === 16) {
-          const isVerified = String(val).toLowerCase() === 'verified' || String(val).toLowerCase() === 'active';
-          const badgeBg = isVerified ? '#dcfce7' : '#fef3c7';
-          const badgeColor = isVerified ? '#15803d' : '#b45309';
-          return `
-          <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; ${bgStyle} white-space: nowrap;">
-            <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:${badgeBg}; color:${badgeColor};">${escapeHTML$1(String(val))}</span>
-          </td>
-        `;
-        }
-
-        return `
-        <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; color: #1e293b; ${bgStyle} white-space: nowrap;">
-          ${escapeHTML$1(String(val))}
-        </td>
-      `;
-      }).join('');
-
-      return `
-      <tr>
-        <td style="padding: 8px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 700; color: #64748b; text-align: center; user-select: none;">${rowIdx + 1}</td>
-        ${cellHTML}
-      </tr>
-    `;
-    }).join('');
-
-    const modalHTML = `
-    <div id="google-sheets-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
-      <div class="card" style="width:min(1280px, 96vw); height:min(820px, 94vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
-        
-        <!-- Google Sheets Header Bar -->
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #0f9d58 0%, #0b8043 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
-          <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden;">
-              <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
-            </div>
-            <div>
-              <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
-                Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
-                <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
-                  <span style="width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 6px #4ade80;"></span>
-                  Live Auto-Synced File
-                </span>
-              </div>
-              <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px; display:flex; align-items:center; gap:8px;">
-                <span>Google Account: <b>${escapeHTML$1(userEmail)}</b></span>
-                <span>•</span>
-                <span><b>${children.length} Records</b> Formatted (18 Columns)</span>
-              </div>
-            </div>
-          </div>
-          
-          <div style="display:flex; align-items:center; gap:12px;">
-            <a href="${getGoogleSheetUrl()}" target="_blank" class="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-              Open Live Google Sheet
-            </a>
-            <button id="modal-close-sheets-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1; transition:background 0.2s ease;">&times;</button>
-          </div>
-        </div>
-
-        <!-- Guidance Banner -->
-        <div style="padding:12px 24px; background:#f0fdf4; border-bottom:1px solid #bbf7d0; display:flex; align-items:center; justify-content:space-between;">
-          <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:#166534;">
-            <span style="font-size:16px;">💡</span>
-            <span>
-              <b>Live Sheet Connected</b>: Click <b>Open Live Google Sheet</b> to open <a href="${getGoogleSheetUrl()}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">Connected Sheet</a> directly in Google Drive!
-            </span>
-          </div>
-
-          <button id="modal-copy-only-btn" class="button button--sm button--ghost" type="button" style="color:#15803d; border-color:rgba(21,128,61,0.3); font-weight:600;">
-            📋 Copy 18-Column Data
-          </button>
-        </div>
-
-        <!-- Main Native Grid View -->
-        <div style="flex:1; overflow:auto; background:#f8fafc; padding:16px;">
-          <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:6px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-            <thead>
-              <tr>
-                <th style="width:44px; background:#cbd5e1; border:1px solid #94a3b8;"></th>
-                ${headerColsHTML}
-              </tr>
-            </thead>
-            <tbody>
-              ${rowsHTML}
-            </tbody>
-          </table>
-        </div>
-
-        <!-- Footer Status Bar -->
-        <div style="padding:12px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:12.5px; color:#64748b;">
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span style="width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
-            Connected File: <a href="${getGoogleSheetUrl()}" target="_blank" style="color:#0f9d58; font-weight:600; text-decoration:none;">NGO_Child_Health_Master_Records</a>
-          </div>
-          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Template</button>
-        </div>
-      </div>
-    </div>
-  `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    const modal = document.querySelector('#google-sheets-view-modal');
-    modal.querySelector('#modal-close-sheets-btn').addEventListener('click', () => modal.remove());
-    modal.querySelector('#modal-close-bottom-btn').addEventListener('click', () => modal.remove());
-    modal.querySelector('#modal-copy-only-btn').addEventListener('click', () => {
-      copySheetDataToClipboard();
-    });
-  }
-
-  /**
-   * Display an animated Google Sheets creation & updating loader modal
-   */
-  function showSheetsSyncLoader(childName, onComplete) {
-    document.querySelector('#sheets-sync-modal-overlay')?.remove();
-
-    const session = getSession() || {};
-    session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
-
-    const overlay = document.createElement('div');
-    overlay.id = 'sheets-sync-modal-overlay';
-    overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
-    
-    const activeSheetUrl = getGoogleSheetUrl() || '#';
-    const activeSheetId = cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : 'Active NGO Sheet';
-
-    overlay.innerHTML = `
-    <div class="card" style="position:relative; width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
-      <button id="sync-overlay-close-btn" style="position:absolute; top:14px; right:16px; background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:22px; line-height:1; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; transition:background 0.2s ease;" aria-label="Close">&times;</button>
-
-      <div style="display:flex; justify-content:center; margin-bottom:16px;">
-        <div id="sync-spinner-icon" style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:white; border-radius:50%; border:2px solid rgba(16,185,129,0.3); box-shadow:0 4px 12px rgba(0,0,0,0.1); overflow:hidden;">
-          <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation:pulse 1.5s infinite;"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
-          <div id="sync-spinner-ring" style="position:absolute; inset:-4px; border:3px solid transparent; border-top-color:#10b981; border-radius:50%; animation:spin 1s linear infinite;"></div>
-        </div>
-      </div>
-      
-      <h2 style="font-size:18px; font-weight:700; margin:0 0 6px 0; color:var(--color-text);">Updating Live Google Sheet</h2>
-      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing for <b>${escapeHTML$1(childName)}</b> to live Google Sheet...</p>
-      
-      <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
-          <span id="sync-stage-text" style="font-weight:600; color:var(--color-primary);">1. Validating child details...</span>
-          <span id="sync-stage-pct" style="font-weight:700; color:var(--color-text);">25%</span>
-        </div>
-        <div class="progress" style="height:8px; border-radius:4px; overflow:hidden; background:var(--color-border);">
-          <div id="sync-progress-bar" class="progress__bar" style="width:25%; background:#10b981; transition:width 0.35s ease;"></div>
-        </div>
-      </div>
-
-      <!-- Action buttons revealed on 100% complete -->
-      <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a id="sync-open-sheet-btn" href="${activeSheetUrl}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
-          <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
-          Open Connected Live Google Sheet
-        </a>
-      </div>
-
-      <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
-        <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        <span id="sync-footer-label">Synced to ${escapeHTML$1(activeSheetId)}</span>
-      </div>
-    </div>
-  `;
-
-    document.body.appendChild(overlay);
-
-    const stageText = overlay.querySelector('#sync-stage-text');
-    const stagePct = overlay.querySelector('#sync-stage-pct');
-    const progressBar = overlay.querySelector('#sync-progress-bar');
-    const actionsArea = overlay.querySelector('#sync-actions-area');
-    const footerLabel = overlay.querySelector('#sync-footer-label');
-    const openBtn = overlay.querySelector('#sync-open-sheet-btn');
-    const spinnerRing = overlay.querySelector('#sync-spinner-ring');
-
-    overlay.querySelector('#sync-overlay-close-btn')?.addEventListener('click', () => {
-      overlay.remove();
-      if (typeof onComplete === 'function') onComplete();
-    });
-
-    setTimeout(() => {
-      if (stageText) stageText.textContent = '2. Transmitting record payload...';
-      if (stagePct) stagePct.textContent = '55%';
-      if (progressBar) progressBar.style.width = '55%';
-    }, 400);
-
-    setTimeout(() => {
-      if (stageText) stageText.textContent = '3. Appending record row to Google Sheet...';
-      if (stagePct) stagePct.textContent = '85%';
-      if (progressBar) progressBar.style.width = '85%';
-    }, 850);
-
-    setTimeout(() => {
-      if (stageText) {
-        stageText.textContent = 'Live Google Sheet Updated & Synced!';
-        stageText.style.color = '#10b981';
-      }
-      if (stagePct) stagePct.textContent = '100%';
-      if (progressBar) progressBar.style.width = '100%';
-      if (spinnerRing) spinnerRing.style.display = 'none';
-
-      const latestUrl = getGoogleSheetUrl();
-      if (openBtn) {
-        if (latestUrl && latestUrl !== '#') {
-          openBtn.href = latestUrl;
-        }
-        openBtn.onclick = (e) => {
-          e.preventDefault();
-          const targetUrl = getGoogleSheetUrl();
-          if (targetUrl && targetUrl !== '#') {
-            window.open(targetUrl, '_blank');
-          } else {
-            toast('Fetching Google Sheet...', 'Connecting to your NGO Google Sheet...');
-            fetchSheetsConfig().then(cfg => {
-              if (cfg && cfg.spreadsheetUrl) {
-                window.open(cfg.spreadsheetUrl, '_blank');
-              } else {
-                toast('Google Sheet Not Found', 'Please connect Google Workspace in Settings to view your live Sheet.');
-              }
-            });
-          }
-        };
-      }
-      if (footerLabel && cachedSheetsConfig?.sheetId) {
-        footerLabel.textContent = `Synced to ${cachedSheetsConfig.sheetId.slice(0, 15)}...`;
-      }
-
-      if (actionsArea) actionsArea.style.display = 'flex';
-    }, 1300);
-  }
-
-  /**
-   * Automatically sync child health records to the NGO's Google Sheet via OAuth API
-   * @param {Object} child 
-   */
-  async function autoSyncChildToGoogleSheets(child) {
-    if (!child) return;
-
-    const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
-    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
-    let children = getChildren() || [];
-    if (child && !children.some(c => c.id === child.id)) {
-      children = [...children, child];
-    }
-
-    try {
-      const res = await fetch('/api/sheets/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ children, ngo: ngoSlug, ngoName })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success) {
-          if (data.spreadsheetUrl) {
-            if (!cachedSheetsConfig) cachedSheetsConfig = { connected: true };
-            cachedSheetsConfig.connected = true;
-            cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
-            cachedSheetsConfig.sheetId = data.sheetId;
-            localStorage.setItem(`google_sheet_url_${ngoSlug}`, data.spreadsheetUrl);
-            localStorage.setItem('google_sheet_url', data.spreadsheetUrl);
-          }
-          toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
-        } else if (data && data.message === 'Not connected') {
-          console.log('[Google Sheets] Skip auto-sync: NGO is not connected to Google Workspace.');
-        }
-      }
-    } catch (e) {
-      console.warn('[Google Sheets] OAuth sync exception:', e);
-    }
-  }
-
-  /**
-   * googleDocsSync.js
-   * Real-time Executive Health Report synchronization to Google Docs.
-   * Automatically formats and updates executive health summaries, audit statistics,
-   * WHO growth metrics, and child clinical logs directly into the live Google Doc.
-   */
-
-
-  let cachedDocsConfig = null;
-
-  /**
-   * Fetch Docs config for the current NGO from backend API
-   */
-  async function fetchDocsConfig(ngoSlug) {
-    const session = getSession() || {};
-    const slug = session.ngo || 'ayusha-nilayam';
-    try {
-      const res = await fetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
-      if (res.ok) {
-        cachedDocsConfig = await res.json();
-        return cachedDocsConfig;
-      }
-    } catch (err) {
-      console.warn('[Google Docs] Config fetch warning:', err);
-    }
-    return cachedDocsConfig || { connected: false };
-  }
-
-  /**
-   * Get cached Docs config object
-   */
-  function getDocsConfig() {
-    return cachedDocsConfig;
-  }
-
-  /**
-   * Get live view link to the Google Doc report (returns null if not connected)
-   */
-  function getGoogleDocUrl() {
-    return cachedDocsConfig?.documentUrl || null;
-  }
-
-  /**
-   * Generate formatted executive report document text
-   */
-  function generateExecutiveDocContent() {
-    const session = getSession() || {};
-    const ngoName = session.ngo || 'Ayusha Nilayam';
-    const children = getChildren() || [];
-    const total = children.length;
-    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
-    const healthyCount = total - flaggedCount;
-    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
-    const healthRecords = getHealthRecords() || [];
-
-    const timestamp = new Date().toLocaleString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    let reportText = `========================================================================\n`;
-    reportText += `       EXECUTIVE CHILD HEALTH AUDIT REPORT — ${ngoName.toUpperCase()}\n`;
-    reportText += `       Auto-Synced Live Document | ${timestamp}\n`;
-    reportText += `========================================================================\n\n`;
-
-    reportText += `1. EXECUTIVE HEALTH SUMMARY\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-    reportText += `• Total Registered Children : ${total}\n`;
-    reportText += `• Optimal Health Status     : ${healthyCount} children (${healthyPct}%)\n`;
-    reportText += `• Health Alerts / Flagged   : ${flaggedCount} children\n`;
-    reportText += `• Verified Clinical Records : ${healthRecords.length} lab test reports\n`;
-    reportText += `• Audited Status            : Verified & Compliant\n\n`;
-
-    reportText += `2. REGISTERED CHILD ROSTER & CLINICAL METRICS\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-    reportText += `ID         | Name                     | Age | Gender | Status  | Height  | Weight  | Medications          | Hygiene\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-
-    children.forEach(c => {
-      const age = calculateAge(c.dob) || c.age || '—';
-      const id = String(c.id || 'CH-0000').padEnd(10, ' ');
-      const name = String(c.name || 'Child').slice(0, 24).padEnd(24, ' ');
-      const ageStr = String(age).slice(0, 3).padEnd(4, ' ');
-      const gender = String(c.gender || '—').slice(0, 6).padEnd(7, ' ');
-      const status = String(c.status || 'Active').slice(0, 7).padEnd(8, ' ');
-      const h = String(c.height ? `${c.height}cm` : '—').padEnd(8, ' ');
-      const w = String(c.weight ? `${c.weight}kg` : '—').padEnd(8, ' ');
-      const meds = String(c.medications || 'None').slice(0, 20).padEnd(20, ' ');
-      const hygiene = String(c.hygieneIndex || 'N/A');
-
-      reportText += `${id} | ${name} | ${ageStr} | ${gender} | ${status} | ${h} | ${w} | ${meds} | ${hygiene}\n`;
-    });
-
-    reportText += `\n------------------------------------------------------------------------\n`;
-    reportText += `End of Live Synced Report | Child Health Management Platform\n`;
-
-    return reportText;
-  }
-
-  /**
-   * Automatically sync executive report to Google Docs in background via OAuth API
-   */
-  async function autoSyncToGoogleDocs() {
-    const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
-    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
-    const reportContent = generateExecutiveDocContent();
-
-    try {
-      const res = await fetch('/api/docs/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reportContent, ngo: ngoSlug, ngoName })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success) {
-          if (data.documentUrl) {
-            if (!cachedDocsConfig) cachedDocsConfig = { connected: true };
-            cachedDocsConfig.connected = true;
-            cachedDocsConfig.documentUrl = data.documentUrl;
-          }
-          console.log('[Google Docs] Executive report live synced.');
-        } else if (data && data.message === 'Not connected') {
-          console.log('[Google Docs] Skip auto-sync: NGO is not connected to Google Workspace.');
-        }
-      }
-    } catch (err) {
-      console.warn('[Google Docs] OAuth sync notice:', err);
-    }
-  }
-
-  /**
-   * Trigger live API sync to Google Docs and open document
-   */
-  async function syncAndOpenGoogleDoc() {
-    const docUrl = getGoogleDocUrl();
-    if (!docUrl) {
-      toast('Google Workspace Not Connected', 'Please connect your Google Account in Settings first.');
-      return;
-    }
-
-    toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
-    await autoSyncToGoogleDocs();
-    toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
-    window.open(docUrl, '_blank');
-  }
-
-  /**
-   * Display interactive Google Docs Live Report Viewer Modal
-   */
-  function openGoogleDocsTemplateModal() {
-    document.querySelector('#google-docs-view-modal')?.remove();
-
-    const session = getSession() || {};
-    const ngoName = session.ngo || 'Ayusha Nilayam';
-    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
-    const children = getChildren() || [];
-    const total = children.length;
-    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
-    const healthyCount = total - flaggedCount;
-    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
-
-    const rowsHTML = children.map((c, idx) => `
-    <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : 'background:#ffffff;'}">
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-family:monospace; font-size:12px; font-weight:700; color:#1a73e8;">${escapeHTML$1(c.id || 'CH-0000')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:13px; font-weight:600; color:#1e293b;">${escapeHTML$1(c.name || 'Child')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${calculateAge(c.dob) || c.age || '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.gender || '—')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.height ? `${c.height} cm` : '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.weight ? `${c.weight} kg` : '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.medications || 'None')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.dentalRemarks || '—')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.hygieneIndex || 'N/A')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px;">
-        <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:#dcfce7; color:#15803d;">
-          ${escapeHTML$1(c.status || 'Active')}
-        </span>
-      </td>
-    </tr>
-  `).join('');
-
-    const modalHTML = `
-    <div id="google-docs-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
-      <div class="card" style="width:min(1100px, 94vw); height:min(780px, 92vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
-        
-        <!-- Google Docs Header Bar -->
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #1a73e8 0%, #1557b0 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
-          <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden;">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#4285F4"/><path d="M14 2V8H20L14 2Z" fill="#A1C2FA"/><path d="M16 13H8V11H16V13ZM16 17H8V15H16V17ZM10 9H8V7H10V9Z" fill="white"/></svg>
-            </div>
-            <div>
-              <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
-                Child_Health_Executive_Report_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
-                <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
-                  <span style="width:6px; height:6px; border-radius:50%; background:#60a5fa; box-shadow:0 0 6px #60a5fa;"></span>
-                  Live Auto-Synced Google Doc
-                </span>
-              </div>
-              <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px;">
-                Connected Account: <b>${escapeHTML$1(userEmail)}</b> • Real-time Executive Report
-              </div>
-            </div>
-          </div>
-          
-          <div style="display:flex; align-items:center; gap:12px;">
-            <button id="modal-edit-doc-url-btn" class="button" style="background:rgba(255,255,255,0.18); color:white; border:1px solid rgba(255,255,255,0.3); font-weight:600; font-size:12.5px; padding:9px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              Set Doc URL
-            </button>
-            <button id="modal-sync-doc-btn" class="button" style="background:#ffffff; color:#1a73e8; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-              Open Live Google Doc
-            </button>
-            <button id="modal-close-docs-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1;">&times;</button>
-          </div>
-        </div>
-
-        <!-- Document Body Preview -->
-        <div style="flex:1; overflow-y:auto; padding:28px 36px; background:#f8fafc;">
-          
-          <!-- Document Sheet Paper -->
-          <div style="max-width:900px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:40px 48px; box-shadow:0 4px 20px rgba(0,0,0,0.05);">
-            
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1a73e8; padding-bottom:16px; margin-bottom:24px;">
-              <div>
-                <h1 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 4px 0; letter-spacing:-0.02em;">CHILD HEALTH EXECUTIVE REPORT</h1>
-                <p style="font-size:13px; color:#64748b; margin:0; font-weight:600;">NGO: ${escapeHTML$1(ngoName)} • Live Auto-Synced Document</p>
-              </div>
-              <span style="font-size:11px; background:#eff6ff; color:#1a73e8; font-weight:700; padding:6px 12px; border-radius:20px; border:1px solid #bfdbfe;">
-                Status: Updated Today
-              </span>
-            </div>
-
-            <!-- Stats Bar -->
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:28px;">
-              <div style="background:#f1f5f9; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#1a73e8;">${total}</div>
-                <div style="font-size:12px; color:#475569; font-weight:600; margin-top:2px;">Total Registered Children</div>
-              </div>
-              <div style="background:#ecfdf5; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#15803d;">${healthyPct}%</div>
-                <div style="font-size:12px; color:#166534; font-weight:600; margin-top:2px;">Optimal Health (${healthyCount} children)</div>
-              </div>
-              <div style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#b45309;">${flaggedCount}</div>
-                <div style="font-size:12px; color:#92400e; font-weight:600; margin-top:2px;">Health Alerts / Flagged</div>
-              </div>
-            </div>
-
-            <!-- Table -->
-            <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin:0 0 14px 0;">Audited Clinical Roster</h3>
-            <table style="width:100%; border-collapse:collapse; text-align:left;">
-              <thead>
-                <tr style="background:#f1f5f9; color:#475569; font-size:12px; font-weight:700;">
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Child ID</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Name</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Age</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Gender</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Height</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Weight</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Medications</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Dental</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Hygiene</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHTML}
-              </tbody>
-            </table>
-
-          </div>
-
-        </div>
-
-      </div>
-    </div>
-  `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    document.querySelector('#modal-close-docs-btn')?.addEventListener('click', () => {
-      document.querySelector('#google-docs-view-modal')?.remove();
-    });
-
-    document.querySelector('#modal-sync-doc-btn')?.addEventListener('click', () => {
-      syncAndOpenGoogleDoc();
-    });
-  }
-
-  /**
-   * googleCalendar.js
-   * Google Calendar-grade interactive appointment management.
-   * Features full-width Month View with event chips, Day View timeline grid,
-   * view toggling, and interactive modal popup with Google Calendar sync.
-   */
-
-
-  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-
-  const HOURLY_SLOTS = [
-    { label: '08:00 AM', value: '08:00' },
-    { label: '09:00 AM', value: '09:00' },
-    { label: '10:00 AM', value: '10:00' },
-    { label: '11:00 AM', value: '11:00' },
-    { label: '12:00 PM', value: '12:00' },
-    { label: '01:00 PM', value: '13:00' },
-    { label: '02:00 PM', value: '14:00' },
-    { label: '03:00 PM', value: '15:00' },
-    { label: '04:00 PM', value: '16:00' },
-    { label: '05:00 PM', value: '17:00' },
-    { label: '06:00 PM', value: '18:00' },
-    { label: '07:00 PM', value: '19:00' },
-    { label: '08:00 PM', value: '20:00' }
-  ];
-
-  /**
-   * Build Google Calendar TEMPLATE URL for instant synchronization
-   */
-  function buildGoogleCalendarUrl(appointment) {
-    const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-    const title = encodeURIComponent(`${appointment.childName} — ${appointment.type}`);
-    const details = encodeURIComponent(
-      `Doctor: ${appointment.doctor || 'N/A'}\nChild: ${appointment.childName}\nType: ${appointment.type}\nNotes: ${appointment.notes || 'No notes'}\n\nCreated from Child Health Management App`
-    );
-
-    const dateStr = appointment.date.replace(/-/g, '');
-    let startTime = '100000';
-    let endTime = '110000';
-
-    if (appointment.time) {
-      const parsed = parseTime(appointment.time);
-      if (parsed) {
-        startTime = parsed.start;
-        endTime = parsed.end;
-      }
-    }
-
-    const dates = `${dateStr}T${startTime}/${dateStr}T${endTime}`;
-    return `${base}&text=${title}&dates=${dates}&details=${details}&sf=true&output=xml`;
-  }
-
-  function parseHoursAndMinutes(timeStr) {
-    if (!timeStr) return { hours: 10, minutes: 0 };
-    const str = String(timeStr).trim();
-
-    // Try 12-hour format e.g. "11:30 AM", "11:30AM", "11:30 PM", "9:00 AM"
-    const match12 = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
-    if (match12) {
-      let hours = parseInt(match12[1], 10);
-      const minutes = parseInt(match12[2], 10);
-      const ampm = match12[3] ? match12[3].toUpperCase() : null;
-      if (ampm === 'PM' && hours !== 12) hours += 12;
-      if (ampm === 'AM' && hours === 12) hours = 0;
-      return { hours: isNaN(hours) ? 10 : hours, minutes: isNaN(minutes) ? 0 : minutes };
-    }
-
-    const parts = str.split(':');
-    const hours = parseInt(parts[0], 10);
-    const minutes = parseInt(parts[1], 10);
-    return {
-      hours: isNaN(hours) ? 10 : hours,
-      minutes: isNaN(minutes) ? 0 : minutes
-    };
-  }
-
-  function formatSingleDisplayTime(timeStr) {
-    const { hours, minutes } = parseHoursAndMinutes(timeStr);
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const h12 = hours % 12 || 12;
-    const minStr = String(minutes).padStart(2, '0');
-    return `${h12}:${minStr} ${ampm}`;
-  }
-
-  function formatDisplayTimeRange(timeStr) {
-    const { hours, minutes } = parseHoursAndMinutes(timeStr);
-    const h12 = hours % 12 || 12;
-    const minStr = String(minutes).padStart(2, '0');
-    const startFormatted = `${h12}:${minStr}`;
-
-    const endHours = (hours + 1) % 24;
-    const endAmpm = endHours >= 12 ? 'pm' : 'am';
-    const endH12 = endHours % 12 || 12;
-    const endFormatted = `${endH12}:${minStr}${endAmpm}`;
-
-    return `${startFormatted} – ${endFormatted}`;
-  }
-
-  function parseTime(timeStr) {
-    if (!timeStr) return null;
-    const { hours, minutes } = parseHoursAndMinutes(timeStr);
-    const sh = String(hours).padStart(2, '0');
-    const sm = String(minutes).padStart(2, '0');
-    const eh = String((hours + 1) % 24).padStart(2, '0');
-    return { start: `${sh}${sm}00`, end: `${eh}${sm}00` };
-  }
-
-  function bookAppointment(data) {
-    const appt = addAppointment({
-      childId: data.childId,
-      childName: data.childName,
-      type: data.type,
-      date: data.date,
-      time: data.time || '10:00',
-      doctor: data.doctor || '',
-      notes: data.notes || '',
-      status: 'Upcoming'
-    });
-
-    const calUrl = buildGoogleCalendarUrl(appt);
-    window.open(calUrl, '_blank');
-
-    toast('Appointment Scheduled', `${data.childName} — ${data.type} on ${data.date}. Google Calendar synced.`);
-    return appt;
-  }
-
-  function daysInMonth(year, month) {
-    return new Date(year, month + 1, 0).getDate();
-  }
-
-  function firstDayOfWeek(year, month) {
-    const d = new Date(year, month, 1).getDay();
-    return d === 0 ? 6 : d - 1; // Convert to Monday start
-  }
-
-  function typeColor(type) {
-    if (!type) return 'blue';
-    const t = type.toLowerCase();
-    if (t.includes('doctor') || t.includes('general')) return 'blue';
-    if (t.includes('follow') || t.includes('vaccin')) return 'green';
-    if (t.includes('dental') || t.includes('eye')) return 'amber';
-    if (t.includes('deworm')) return 'violet';
-    return 'blue';
-  }
-
-  function escapeHTML(str) {
-    if (!str) return '';
-    return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     FULL-WIDTH GOOGLE CALENDAR MONTH GRID WITH EVENT CHIPS
-     ═══════════════════════════════════════════════════════ */
-
-  function renderCalendarGrid(year, month, selectedDay = null) {
-    const today = new Date();
-    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
-    const todayDate = today.getDate();
-    const totalDays = daysInMonth(year, month);
-    const startDay = firstDayOfWeek(year, month);
-
-    // Previous month trailing days
-    const prevMonthTotalDays = daysInMonth(year, month - 1);
-
-    const appointments = getAppointments();
-    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-    const apptsByDay = {};
-    appointments.forEach(a => {
-      if (a.date && a.date.startsWith(monthStr)) {
-        const day = parseInt(a.date.split('-')[2]);
-        if (!apptsByDay[day]) apptsByDay[day] = [];
-        apptsByDay[day].push(a);
-      }
-    });
-
-    // Header row for weekdays
-    let headerHTML = DAY_LABELS.map(d => `<div class="gcal-header-cell">${d}</div>`).join('');
-
-    let cellsHTML = '';
-
-    // Render trailing days from previous month
-    for (let i = startDay - 1; i >= 0; i--) {
-      const prevDayNum = prevMonthTotalDays - i;
-      cellsHTML += `
-      <div class="gcal-day-cell gcal-day-cell--outside">
-        <span class="gcal-day-num">${prevDayNum}</span>
-      </div>`;
-    }
-
-    // Render current month days
-    for (let day = 1; day <= totalDays; day++) {
-      const isToday = isCurrentMonth && day === todayDate;
-      const isSelected = selectedDay === day;
-      const dayAppts = apptsByDay[day] || [];
-
-      // Build event chips inside the calendar day cell
-      let chipsHTML = '';
-      if (dayAppts.length > 0) {
-        const visible = dayAppts.slice(0, 2);
-        chipsHTML = visible.map(a => `
-        <div class="gcal-event-chip gcal-event-chip--${typeColor(a.type)}" data-event-id="${a.id}" title="${escapeHTML(a.childName)} - ${escapeHTML(a.type)}">
-          <span class="gcal-chip-time">${a.time || '10:00'}</span>
-          <span class="gcal-chip-title">${escapeHTML(a.childName)}</span>
-        </div>
-      `).join('');
-
-        if (dayAppts.length > 2) {
-          chipsHTML += `<div class="gcal-more-chip">+${dayAppts.length - 2} more</div>`;
-        }
-      }
-
-      cellsHTML += `
-      <div class="gcal-day-cell ${isToday ? 'gcal-day-cell--today' : ''} ${isSelected ? 'gcal-day-cell--selected' : ''}"
-        data-calendar-day="${day}" role="button" tabindex="0" title="Click to open Day schedule for ${day} ${MONTH_NAMES[month]}">
-        <div class="gcal-day-top">
-          <span class="gcal-day-num ${isToday ? 'gcal-day-num--today' : ''}">${day}</span>
-        </div>
-        <div class="gcal-day-chips">
-          ${chipsHTML}
-        </div>
-      </div>`;
-    }
-
-    // Render leading days for next month to complete grid row (total 35 or 42 cells)
-    const renderedCount = startDay + totalDays;
-    const totalGridCells = renderedCount > 35 ? 42 : 35;
-    const nextMonthDays = totalGridCells - renderedCount;
-
-    for (let day = 1; day <= nextMonthDays; day++) {
-      cellsHTML += `
-      <div class="gcal-day-cell gcal-day-cell--outside">
-        <span class="gcal-day-num">${day}</span>
-      </div>`;
-    }
-
-    return `
-    <div class="gcal-month-wrap">
-      <div class="gcal-month-grid">
-        ${headerHTML}
-        ${cellsHTML}
-      </div>
-      <div class="gcal-legend-bar">
-        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--blue"></span> Doctor Visit</span>
-        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--green"></span> Follow-up / Vaccine</span>
-        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--amber"></span> Dental / Eye</span>
-        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--violet"></span> Deworming</span>
-      </div>
-    </div>`;
-  }
-
-  function computeAppointmentStatus(appt) {
-    if (!appt) return 'Upcoming';
-    if (appt.status && appt.status !== 'Upcoming' && appt.status !== 'Pending') {
-      return appt.status;
-    }
-    const todayStr = new Date().toISOString().slice(0, 10);
-    if (appt.date < todayStr) {
-      return 'Completed';
-    }
-    if (appt.date === todayStr) {
-      const { hours } = parseHoursAndMinutes(appt.time || '10:00');
-      const currentHour = new Date().getHours();
-      if (hours < currentHour) {
-        return 'Completed';
-      }
-    }
-    return 'Upcoming';
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     DAY VIEW HOURLY GRID (Google Calendar Style)
-     ═══════════════════════════════════════════════════════ */
-
-  function renderDayView(year, month, day) {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-    const appointments = getAppointments().filter(a => a.date === dateStr);
-
-    const slotRows = HOURLY_SLOTS.map(slot => {
-      const slotHour = parseInt(slot.value.split(':')[0], 10);
-      const matchingAppts = appointments.filter(a => {
-        if (!a.time) return slot.value === '10:00';
-        const { hours } = parseHoursAndMinutes(a.time);
-        return hours === slotHour;
-      });
-
-      let slotContent = '';
-      if (matchingAppts.length > 0) {
-        slotContent = matchingAppts.map(a => {
-          const currentStatus = computeAppointmentStatus(a);
-          return `
-          <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
-            <div class="gcal-event-card-main">
-              <div class="gcal-event-title-row">
-                <span class="gcal-event-name">${escapeHTML(a.childName)}</span>
-                <span class="gcal-event-dot">·</span>
-                <span class="gcal-event-detail-text">${escapeHTML(a.type)}${a.doctor ? ` (${escapeHTML(a.doctor)})` : ''}</span>
-              </div>
-              <div class="gcal-event-time-row">${formatSingleDisplayTime(a.time || slot.label)}</div>
-            </div>
-            <span class="gcal-status-pill gcal-status-pill--${currentStatus === 'Completed' ? 'done' : 'upcoming'}">${currentStatus}</span>
-          </div>`;
-        }).join('');
-      } else {
-        slotContent = `<div class="gcal-slot-hint">+ Add appointment at ${slot.label}</div>`;
-      }
-
-      return `
-      <div class="gcal-timeline-row" data-open-booking-modal data-slot-date="${dateStr}" data-slot-time="${slot.value}">
-        <div class="gcal-time-col">${slot.label}</div>
-        <div class="gcal-slot-col">${slotContent}</div>
-      </div>`;
-    }).join('');
-
-    return `
-    <div class="gcal-day-view">
-      <div class="gcal-timeline-grid">
-        ${slotRows}
-      </div>
-    </div>`;
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     BOOKING FORM & MODAL — Google Calendar Style Popup
-     ═══════════════════════════════════════════════════════ */
-
-  function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
-    const children = getChildren();
-    const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
-    const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
-
-    // Format display date
-    const dateObj = new Date(dateVal + 'T00:00:00');
-    const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-
-    // Format display time
-    const displayTime = formatSingleDisplayTime(preselectedTime);
-
-    return `
-    <form class="gcal-popup-form" id="cal-booking-form">
-      <!-- Title row (Google Calendar style borderless input) -->
-      <div class="gcal-popup-title-row">
-        <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add title" autocomplete="off" />
-      </div>
-
-      <!-- Icon rows -->
-      <div class="gcal-popup-rows">
-        <!-- Date & Time -->
-        <div class="gcal-popup-row">
-          <div class="gcal-popup-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-          </div>
-          <div class="gcal-popup-row-content">
-            <div class="gcal-popup-datetime">
-              <input class="gcal-popup-date-input" name="date" type="date" value="${dateVal}" required />
-              <input class="gcal-popup-time-input" name="time" type="time" value="${preselectedTime}" />
-            </div>
-            <div class="gcal-popup-date-display">${displayDate} · ${displayTime}</div>
-          </div>
-        </div>
-
-        <!-- Child selector -->
-        <div class="gcal-popup-row">
-          <div class="gcal-popup-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <div class="gcal-popup-row-content">
-            <select class="gcal-popup-select" name="childId" required>
-              <option value="">Select child</option>
-              ${childOptions}
-            </select>
-          </div>
-        </div>
-
-        <!-- Appointment type -->
-        <div class="gcal-popup-row">
-          <div class="gcal-popup-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-          </div>
-          <div class="gcal-popup-row-content">
-            <select class="gcal-popup-select" name="type" required>
-              <option value="">Appointment type</option>
-              <option value="Doctor visit">Doctor Visit</option>
-              <option value="Follow-up">Follow-up</option>
-              <option value="Dental checkup">Dental Checkup</option>
-              <option value="Deworming">Deworming</option>
-              <option value="Vaccination">Vaccination</option>
-              <option value="Eye checkup">Eye Checkup</option>
-              <option value="General checkup">General Checkup</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Notes -->
-        <div class="gcal-popup-row">
-          <div class="gcal-popup-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-          </div>
-          <div class="gcal-popup-row-content">
-            <textarea class="gcal-popup-notes" name="notes" rows="2" placeholder="Add description or notes"></textarea>
-          </div>
-        </div>
-
-        <!-- Google Calendar badge -->
-        <div class="gcal-popup-row">
-          <div class="gcal-popup-icon">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-          </div>
-          <div class="gcal-popup-row-content">
-            <span class="gcal-popup-cal-label">
-              <span class="gcal-popup-cal-dot"></span>
-              Child Health Calendar
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Footer buttons -->
-      <div class="gcal-popup-footer">
-        <button class="gcal-popup-more-btn" type="button" data-close-cal-modal>More options</button>
-        <button class="gcal-popup-save-btn" type="submit">Save</button>
-      </div>
-    </form>`;
-  }
-
-  function renderBookingModalMarkup(dateStr, timeStr) {
-    const formHTML = renderBookingForm(dateStr, timeStr);
-
-    return `
-    <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
-      <div class="gcal-popup-card" role="dialog" aria-modal="true">
-        <button class="gcal-popup-close" type="button" aria-label="Close" data-close-cal-modal>
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-        ${formHTML}
-      </div>
-    </div>`;
-  }
-
-  function renderEventDetailsModalMarkup(eventId) {
-    const appointments = getAppointments();
-    const appt = appointments.find(a => String(a.id) === String(eventId));
-    if (!appt) return '';
-
-    const currentStatus = computeAppointmentStatus(appt);
-    const dateObj = new Date(appt.date + 'T00:00:00');
-    const dayStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
-    const timeRangeFormatted = formatDisplayTimeRange(appt.time || '10:00 AM');
-
-    const hexColors = {
-      blue: '#039be5',
-      green: '#0b8043',
-      amber: '#f4511e',
-      violet: '#8e24aa'
-    };
-    const colorHex = hexColors[typeColor(appt.type)] || '#039be5';
-
-    return `
-    <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
-      <div class="gcal-event-popover-card" role="dialog" aria-modal="true">
-        <!-- Banner Header -->
-        <div class="gcal-popover-banner" style="background-image: url('assets/gcal_event_banner.png');">
-          <div class="gcal-popover-actions">
-            <button class="gcal-popover-btn" type="button" data-edit-event-id="${appt.id}" title="Edit appointment">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button class="gcal-popover-btn" type="button" data-delete-event-id="${appt.id}" title="Delete appointment">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-            <button class="gcal-popover-btn" type="button" data-sync-event-id="${appt.id}" title="Open in Google Calendar">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-            </button>
-            <button class="gcal-popover-btn" type="button" data-close-cal-modal title="Close">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M18 6L6 18M6 6l12 12"/></svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Details Body -->
-        <div class="gcal-popover-body">
-          <!-- Title row -->
-          <div class="gcal-popover-row gcal-popover-title-row">
-            <span class="gcal-popover-color-dot" style="background-color: ${colorHex}; margin-top: 4px;"></span>
-            <div class="gcal-popover-title-group" style="width: 100%;">
-              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                <div>
-                  <h2 class="gcal-popover-title" style="font-size: 19px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1.3; letter-spacing: -0.01em;">${escapeHTML(appt.childName)}</h2>
-                  <div style="font-size: 13.5px; font-weight: 600; color: #475569; margin-top: 3px;">${escapeHTML(appt.type)}</div>
-                </div>
-                <span class="gcal-status-pill gcal-status-pill--${currentStatus === 'Completed' ? 'done' : 'upcoming'}">${currentStatus}</span>
-              </div>
-              <div class="gcal-popover-time" style="margin-top: 6px; font-size: 13px; color: #64748b; font-weight: 500;">${dayStr} · ${timeRangeFormatted}</div>
-            </div>
-          </div>
-
-          <!-- Description row -->
-          <div class="gcal-popover-row">
-            <div class="gcal-popover-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
-            </div>
-            <div class="gcal-popover-desc">
-              <p><strong>Doctor:</strong> ${escapeHTML(appt.doctor || 'Checkup')}</p>
-              <p><strong>Child:</strong> ${escapeHTML(appt.childName)}</p>
-              <p><strong>Type:</strong> ${escapeHTML(appt.type)}</p>
-              <p><strong>Notes:</strong> ${escapeHTML(appt.notes || 'No notes')}</p>
-              <p class="gcal-popover-app-tag">Created from Child Health Management App</p>
-            </div>
-          </div>
-
-          <!-- Notification row -->
-          <div class="gcal-popover-row">
-            <div class="gcal-popover-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            </div>
-            <div class="gcal-popover-meta">30 minutes before</div>
-          </div>
-
-          <!-- User row -->
-          <div class="gcal-popover-row">
-            <div class="gcal-popover-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            </div>
-            <div class="gcal-popover-meta">Tejas Sharma</div>
-          </div>
-
-          <!-- Sync Action Footer -->
-          <div class="gcal-popover-footer">
-            <button class="gcal-popup-save-btn" type="button" data-sync-event-id="${appt.id}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-              Open in Google Calendar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     FULL CALENDAR CONTAINER & VIEW CONTROLLER
-     ═══════════════════════════════════════════════════════ */
-
-  function calendarCard(viewMode = 'month', initialYear, initialMonth, initialDay) {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const day = now.getDate();
-
-    const isMonthView = viewMode === 'month';
-    const monthName = MONTH_NAMES[month];
-    const dateObj = new Date(year, month, day);
-    const dayName = DAY_NAMES[dateObj.getDay()];
-
-    const titleText = isMonthView ? `${monthName} ${year}` : `${dayName}, ${day} ${monthName} ${year}`;
-    const dateVal = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-    return `
-    <section class="card cal-card" data-calendar-root data-cal-view-mode="${viewMode}" data-cal-year="${year}" data-cal-month="${month}" data-cal-day="${day}">
-      <header class="card__header gcal-header">
-        <div class="gcal-header-left">
-          <div class="gcal-brand-icon">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-          </div>
-          <h2 class="gcal-title" data-calendar-title>${titleText}</h2>
-        </div>
-
-        <div class="gcal-header-right">
-          <button class="gcal-btn gcal-btn--create" type="button" data-open-booking-modal data-slot-date="${dateVal}" data-slot-time="10:00">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-            Register Appointment
-          </button>
-
-          <button class="gcal-btn gcal-btn--secondary" type="button" data-calendar-today>Today</button>
-          
-          <div class="gcal-nav-group">
-            <button class="gcal-nav-btn" type="button" data-calendar-prev title="Previous">&lsaquo;</button>
-            <button class="gcal-nav-btn" type="button" data-calendar-next title="Next">&rsaquo;</button>
-          </div>
-
-          <div class="gcal-toggle-group">
-            <button class="gcal-toggle-btn ${isMonthView ? 'active' : ''}" type="button" data-cal-view="month">Month</button>
-            <button class="gcal-toggle-btn ${!isMonthView ? 'active' : ''}" type="button" data-cal-view="day">Day</button>
-          </div>
-        </div>
-      </header>
-
-      <div class="card__body gcal-body">
-        <div class="gcal-container" data-calendar-container>
-          ${isMonthView ? renderCalendarGrid(year, month, day) : renderDayView(year, month, day)}
-        </div>
-      </div>
-    </section>
-    <div id="cal-modal-container"></div>`;
-  }
-
-  function updateCalendarView(root, viewMode, year, month, day) {
-    if (!root) return;
-
-    const mode = viewMode || 'month';
-    const isMonthView = mode === 'month';
-    const monthName = MONTH_NAMES[month];
-    const dateObj = new Date(year, month, day);
-    const dayName = DAY_NAMES[dateObj.getDay()];
-
-    root.setAttribute('data-cal-view-mode', mode);
-    root.setAttribute('data-cal-year', String(year));
-    root.setAttribute('data-cal-month', String(month));
-    root.setAttribute('data-cal-day', String(day));
-
-    const titleEl = root.querySelector('[data-calendar-title]');
-    if (titleEl) {
-      titleEl.textContent = isMonthView ? `${monthName} ${year}` : `${dayName}, ${day} ${monthName} ${year}`;
-    }
-
-    root.querySelectorAll('[data-cal-view]').forEach(btn => {
-      if (btn.getAttribute('data-cal-view') === mode) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    });
-
-    const container = root.querySelector('[data-calendar-container]');
-    if (container) {
-      container.innerHTML = isMonthView ? renderCalendarGrid(year, month, day) : renderDayView(year, month, day);
-    }
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     NAVIGATION
-     ═══════════════════════════════════════════════════════ */
-
-  const nav = [
-    { section: 'Overview', items: [['dashboard', 'Dashboard', 'grid']] },
-    { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['medicines', 'Medicines', 'pill'], ['documents', 'Documents', 'file']] },
-    { section: 'Analytics', items: [['reports', 'Reports', 'chart']] }
-  ];
-
-  const pageTitles = {
-    dashboard: 'Dashboard',
-    children: 'Children',
-    appointments: 'Appointments',
-    'child-profile': 'Child Health Profile',
-    'register-child': 'Register child',
-    'ocr-upload': 'Google Cloud Vision API Extraction',
-    'ocr-review': 'Review extracted information',
-    'ocr-details': 'Additional details',
-    'ocr-processing': 'Processing document',
-    documents: 'Health records & documents',
-    reports: 'Health reports',
-    settings: 'Settings'
-  };
-
-  function navItem(item, active) {
-    const [page, label, glyph] = item;
-    return `<a class="nav-item ${page === active ? 'nav-item--active' : ''}" href="${pagePath(page)}" ${page === active ? 'aria-current="page"' : ''}>${icon(glyph)}<span class="nav-item__text">${label}</span></a>`;
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     APP SHELL
-     ═══════════════════════════════════════════════════════ */
-
-  function shell(page, content) {
-    const session = getSession() || {};
-    const displayName = session.displayName || 'Authorized User';
-    const email = session.email || 'tejassachin2010@gmail.com';
-    const ngoName = session.ngo || localStorage.getItem('sample-org-name') || 'Ayusha Nilayam';
-    const role = session.role || 'Admin';
-    const photoURL = session.photoURL;
-    const userInitials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'AD';
-
-    const navHTML = nav.map(group => group.items.map(item => navItem(item, page)).join('')).join('');
-
-    return `<div class="app-shell">
-    <aside class="sidebar" aria-label="Primary navigation">
-      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
-      <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
-      <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML$1(ngoName)}</span><span class="workspace-user__role">${escapeHTML$1(role)}</span></span></div></div>
-    </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
-    <main class="app-main" id="app-main">
-      <header class="topbar">
-        ${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}
-        <div class="topbar__crumbs"><span>Demo</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
-        <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
-        <div class="topbar__actions">
-          <button class="icon-button tooltip" data-tooltip="Toggle theme" data-theme-toggle type="button" aria-label="Toggle color theme">${icon('sun')}</button>
-          <button class="icon-button tooltip" data-tooltip="Notifications" type="button" aria-label="Notifications" data-notifications>${icon('bell')}</button>
-          
-          <!-- DASHBOARD HEADER GOOGLE USER PROFILE & NGO WORKSPACE -->
-          <div class="topbar-profile" style="display:flex; align-items:center; gap:12px;">
-            <button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:20px; border:1px solid var(--color-border); background:var(--color-bg);">
-              ${photoURL ? `<img src="${escapeHTML$1(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
-              <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML$1(displayName)}</span>
-              ${icon('chevronDown')}
-            </button>
-            <div class="dropdown" hidden data-profile-dropdown>
-              <div style="padding:12px 14px; border-bottom:1px solid var(--color-border); font-size:12px;">
-                <div style="font-weight:700; color:var(--color-text);">${escapeHTML$1(displayName)}</div>
-                <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML$1(email)}</div>
-                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML$1(ngoName)}</span></div>
-              </div>
-              <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
-              <div class="divider"></div>
-              <button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button>
-            </div>
-          </div>
-        </div>
-      </header>
-      <section class="content page-enter">${content}</section>
-    </main>
-  </div>`;
-  }
-
-  const heading = (title, description, actions) => `<div class="page-heading"><div class="page-heading__copy"><h1>${title}</h1><p>${description}</p></div>${actions ? `<div class="page-heading__actions">${actions}</div>` : ''}</div>`;
-
-  function getDynamicGreeting() {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning, Admin';
-    if (hour < 17) return 'Good afternoon, Admin';
-    return 'Good evening, Admin';
-  }
-
-  const statCard = (label, value, trend, glyph, color) => `<article class="card stat-card card--interactive"><div class="stat-card__top"><span class="stat-card__label">${label}</span><span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span></div><div class="stat-card__number">${value}</div><div class="stat-card__footer"><span class="trend--up">${icon('arrowUp')} ${trend}</span></div></article>`;
-
-  const field$1 = (label, name, placeholder, type = 'text', hint = '', value = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML$1(value)}">${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
-
-  function formatDateForInput(dateStr) {
-    if (!dateStr) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-    const matchDMY = dateStr.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
-    if (matchDMY) {
-      const [_, d, m, y] = matchDMY;
-      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-    }
-    try { const d = new Date(dateStr); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch (e) { }
-    return '';
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     DASHBOARD — Child Health Platform
-     ═══════════════════════════════════════════════════════ */
-
-  function dashboardPage() {
-    const children = getChildren();
-    const totalChildren = children.length;
-    const growthCount = getGrowthRecords().length;
-    const medicinesCount = getMedicines().length;
-    const uploadedDocsCount = getUploadedDocs().length;
-    const healthReportsCount = getHealthRecords().length || 4;
-
-    // Flagged children for alerts
-    const flaggedChildren = children.filter(c => healthStatus(c).level !== 'good');
-    if (flaggedChildren.length === 0) ; else {
-      flaggedChildren.slice(0, 4).map(child => {
-        const hs = healthStatus(child);
-        return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
-      }).join('');
-    }
-
-    return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
-  <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
-    ${statCard('Total Children', totalChildren.toLocaleString(), 'Active records', 'users', 'blue')}
-    ${statCard('Recent Health Reports', healthReportsCount.toLocaleString(), 'Lab test panels', 'heartPulse', 'green')}
-    ${statCard('Growth Records', growthCount.toLocaleString(), 'Vitals logged', 'ruler', 'amber')}
-    ${statCard('Medicine Records', medicinesCount.toLocaleString(), 'Active prescriptions', 'pill', 'violet')}
-    ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'Google Drive Storage', 'file', 'blue')}
-    ${statCard('Last Checkup', 'Today', '10:30 AM verified', 'clock', 'green')}
-  </div>
-  <div style="margin-top: 20px;">
-    ${calendarCard()}
-  </div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     LOGIN
-     ═══════════════════════════════════════════════════════ */
-
-  function loginPage() {
-    return `<main class="login-page">
-    <div class="login-bg-orbs" aria-hidden="true">
-      <span class="login-orb login-orb--1"></span>
-      <span class="login-orb login-orb--2"></span>
-      <span class="login-orb login-orb--3"></span>
-    </div>
-    <section class="login-panel">
-      <div class="login-panel__brand" aria-label="Child Health Management">
-        <span class="brand-mark">${icon('heartPulse')}</span>
-        ChildCare
-      </div>
-      <div class="card login-card">
-        <div class="login-card__hero" aria-hidden="true">
-          <div class="login-card__hero-icon">${icon('stethoscope')}</div>
-        </div>
-        <h1>Welcome back</h1>
-        <p>Sign in to access the Child Health Management Platform</p>
-
-        <button class="button button--primary tooltip" data-tooltip="Sign in with authorized Google Account" data-google-login type="button" style="width:100%; min-height:46px; display:flex; align-items:center; justify-content:center; gap:12px; font-weight:600; font-size:14px; background: #ffffff; color: #3c4043; border: 1px solid #dadce0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
-          <img src="/google-logo.png" alt="Google Logo" style="width:22px; height:22px; object-fit:contain;" />
-          Continue with Google
-        </button>
-
-        <div class="login-features" aria-hidden="true">
-          <div class="login-feature">${icon('shield')}<span>Secure Access</span></div>
-          <div class="login-feature">${icon('activity')}<span>Health Tracking</span></div>
-          <div class="login-feature">${icon('heart')}<span>Child Care</span></div>
-        </div>
-
-        <div style="margin-top: 20px; padding: 16px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
-          <div style="font-weight: 600; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-            ${icon('shield')} Current Demo Accounts (Firestore Verified)
-          </div>
-          <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: var(--color-text-muted); line-height: 1.8;" id="firestore-demo-accounts-list">
-            <li><code style="color: var(--color-primary); font-weight: 600;">tejassachin2010@gmail.com</code> <span style="font-size: 11px;">(Ayusha Nilayam)</span></li>
-            <li><code style="color: var(--color-primary); font-weight: 600;">wondertaleai123@gmail.com</code> <span style="font-size: 11px;">(Alex Agape)</span></li>
-          </ul>
-        </div>
-
-        <p class="login-card__foot" style="margin-top: 20px; text-align: center;">Protected by Firebase Authentication & Cloud Firestore Security Rules.</p>
-      </div>
-    </section>
-  </main>`;
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     CHILDREN LIST
-     ═══════════════════════════════════════════════════════ */
-
-  function childrenPage() {
-    const children = getChildren();
-    const totalItems = children.length;
-    const itemsPerPage = 5;
-    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
-    const paginated = children.slice(0, itemsPerPage);
-
-    const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;">${icon('googleSheets')}Google Sheets Auto-Sync (Connected)</button>`;
-
-    return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `${sheetsStatusBadge}<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
-  <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon('chevronDown')}</button></th><th data-resizable data-column="age">Age</th><th class="hide-tablet" data-column="gender">Gender</th><th class="hide-tablet" data-column="blood">Blood group</th><th data-column="status">Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     CHILD HEALTH PROFILE
-     ═══════════════════════════════════════════════════════ */
-
-  function getURLParam(key) {
-    let searchParams = new URLSearchParams(window.location.search);
-    let val = searchParams.get(key);
-    if (!val && window.location.hash.includes('?')) {
-      const hashQuery = window.location.hash.split('?')[1];
-      val = new URLSearchParams(hashQuery).get(key);
-    }
-    return val;
-  }
-
-  function childProfilePage() {
-    const id = getURLParam('id');
-    const child = getChild(id);
-    if (!child) return shell('child-profile', '<div class="card"><div class="card__body">Child record not found.</div></div>');
-
-    const hs = healthStatus(child);
-    const age = calculateAge(child.dob);
-    const growth = getGrowthRecords(child.id);
-    const latestGrowth = growth[0];
-    const meds = getMedicines(child.id).filter(m => m.status === 'Active');
-    const allMeds = getMedicines(child.id);
-    const docs = getUploadedDocs().filter(d => (d.childName && d.childName.toLowerCase() === child.name.toLowerCase()) || d.childId === child.id || (d.child && d.child.toLowerCase() === child.name.toLowerCase()));
-    const healthRecs = getHealthRecords(child.id);
-    const activities = getActivities().filter(a => (a.childName && a.childName.toLowerCase() === child.name.toLowerCase()) || (a.detail && a.detail.includes(child.name)));
-
-    // Docs HTML for Documents tab
-    let docsHTML = '';
-    if (docs.length === 0) {
-      docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records, Aadhaar cards, and health certificates uploaded for ${escapeHTML$1(child.name)} will appear here.</p><div style="margin-top:16px;"><button class="button button--primary" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$1(child.name)}">${icon('upload')} Upload Document for ${escapeHTML$1(child.name)}</button></div></div>`;
-    } else {
-      docsHTML = `<div class="document-grid">${docs.map((d, idx) => `
-      <article class="card document-card" style="position:relative;">
-        <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
-          ${icon('trash')}
-        </button>
-        <div class="document-card__body" style="padding:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px;">
-            <h3 style="font-size:14px; font-weight:600; margin:0;">${d.name || d.title || 'Medical Document'}</h3>
-            <span class="badge badge--success">${d.status || 'Verified'}</span>
-          </div>
-          <div class="detail-list detail-list--single" style="font-size:13px;">
-            <div class="detail-row"><span>Category</span><b>${d.docType || d.category || 'Medical Report'}</b></div>
-            <div class="detail-row"><span>Uploaded</span><b>${d.uploadDate || formatDate(d.timestamp) || 'Recently'}</b></div>
-          </div>
-          ${d.fileData || d.image ? `<div style="margin-top:12px;"><a class="button button--sm" href="${d.fileData || d.image}" target="_blank" download="${d.name || 'document'}.png">${icon('download')} View / Download</a></div>` : ''}
-        </div>
-      </article>
-    `).join('')}</div>`;
-    }
-
-    // Health records / reports HTML
-    let reportsHTML = '';
-    if (healthRecs.length === 0 && meds.length === 0) {
-      reportsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('heartPulse')}</span><h3>No lab reports logged</h3><p>Blood test results and clinical lab reports will appear here.</p></div>`;
-    } else {
-      reportsHTML = `
-      <div style="display: flex; flex-direction: column; gap: 20px;">
-        ${healthRecs.length > 0 ? `
-          <div class="data-table-wrap">
-            <table class="data-table">
-              <thead>
-                <tr><th>Date</th><th>Test Type</th><th>Hemoglobin</th><th>WBC</th><th>RBC</th><th>Platelets</th></tr>
-              </thead>
-              <tbody>
-                ${healthRecs.map(r => `<tr><td>${r.date || 'Today'}</td><td><span class="badge badge--blue">${(r.type || 'CBC').toUpperCase()}</span></td><td><b>${r.hemoglobin ? r.hemoglobin + ' g/dL' : '—'}</b></td><td>${r.wbc || '—'}</td><td>${r.rbc || '—'}</td><td>${r.platelets || '—'}</td></tr>`).join('')}
-              </tbody>
-            </table>
-          </div>` : ''}
-        <div class="detail-list">
-          <div class="detail-row"><span>Known Medical Conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
-          <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
-          <div class="detail-row"><span>Active Prescriptions</span><b>${meds.length > 0 ? meds.map(m => `${m.medicineName} (${m.dosage})`).join(', ') : 'None active'}</b></div>
-        </div>
-      </div>`;
-    }
-
-    // Growth HTML
-    let growthHTML = '';
-    if (growth.length === 0) {
-      growthHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('ruler')}</span><h3>No growth records</h3><p>Height, weight, and BMI records will appear here.</p></div>`;
-    } else {
-      growthHTML = `
-      <div style="display: flex; flex-direction: column; gap: 20px;">
-        <h3 style="font-size:14px; font-weight:600;">Growth Measurements History</h3>
-        <div class="data-table-wrap">
-          <table class="data-table">
-            <thead><tr><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead>
-            <tbody>
-              ${growth.map(g => `<tr><td>${formatDate(g.date || g.timestamp)}</td><td><b>${g.height} cm</b></td><td><b>${g.weight} kg</b></td><td><span class="badge badge--neutral">${g.bmi || '—'}</span></td><td>${g.bmi ? (g.bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : g.bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : '—'}</td></tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>`;
-    }
-
-    // Medicines HTML
-    let medsHTML = '';
-    if (allMeds.length === 0) {
-      medsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('pill')}</span><h3>No prescriptions logged</h3><p>Medications prescribed for ${child.name} will appear here.</p></div>`;
-    } else {
-      medsHTML = `<div class="document-grid">${allMeds.map(m => `
-      <article class="card document-card"><div class="document-card__body" style="padding:14px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px"><h3 style="font-size:14px; font-weight:600; margin:0">${m.medicineName}</h3>${statusBadge(m.status)}</div><p style="font-size:13px; color:var(--color-text-muted); margin:0 0 4px">${m.dosage}</p><p style="font-size:12px; color:var(--color-text-muted); margin:0">${m.frequency} · ${m.startDate} → ${m.endDate}</p></div></article>
-    `).join('')}</div>`;
-    }
-
-    // Timeline HTML
-    let timelineHTML = '';
-    if (activities.length === 0) {
-      timelineHTML = `<div class="timeline"><div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>Child registered</b><p>Record created in the health management workspace.</p><time>${child.registeredDate ? formatDate(child.registeredDate) : 'Recently'}</time></div></div></div>`;
-    } else {
-      timelineHTML = `<div class="timeline">${activities.map(a => `<div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>${a.action ? a.action.replace(/_/g, ' ').toUpperCase() : 'ACTIVITY'}</b><p>${a.detail || a.childName}</p><time>${timeAgo(a.timestamp)}</time></div></div>`).join('')}</div>`;
-    }
-
-    return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
-  <section class="card">
-    <div class="profile-header">
-      <span class="profile-header__avatar">${initials(child.name)}</span>
-      <div class="profile-header__copy">
-        <h1>${child.name}</h1>
-        <p>${child.id} · ${age ? age + ' old' : 'Age unknown'}</p>
-        <div class="profile-header__meta">
-          ${healthDot(hs.level)} ${statusBadge(child.status)}
-          <span class="badge badge--neutral">${child.gender || 'Not specified'}</span>
-          <span class="badge badge--blue">Blood: ${child.blood || 'Unknown'}</span>
-          ${hs.flags.length ? `<span class="badge badge--warning">${hs.flags.join(', ')}</span>` : ''}
-        </div>
-      </div>
-      <div class="profile-header__actions">
-        <button class="icon-button tooltip" type="button" data-tooltip="More actions" aria-label="More actions">${icon('more')}</button>
-      </div>
-    </div>
-    <div class="profile-tabs">
-      <div class="tabs" role="tablist">
-        <button class="tab tab--active" type="button" data-profile-tab="overview">Overview</button>
-        <button class="tab" type="button" data-profile-tab="growth">Growth</button>
-        <button class="tab" type="button" data-profile-tab="medicines">Medicines</button>
-        <button class="tab" type="button" data-profile-tab="reports">Reports</button>
-        <button class="tab" type="button" data-profile-tab="documents">Documents (${docs.length})</button>
-        <button class="tab" type="button" data-profile-tab="timeline">Health Timeline</button>
-      </div>
-    </div>
-  </section>
-
-  <div class="profile-tab-content-container">
-    <!-- OVERVIEW TAB -->
-    <div data-tab-panel="overview">
-      <div class="profile-layout">
-        <div class="dashboard-grid">
-          <section class="card">
-            <header class="card__header">
-              <div><h2 class="card__title">Personal information</h2><p class="card__caption">Core child details</p></div>
-              <button class="icon-button icon-button--small" type="button" data-edit="${child.id}">${icon('pencil')}</button>
-            </header>
-            <div class="card__body">
-              <div class="detail-list">
-                <div class="detail-row"><span>Full name</span><b>${child.name}</b></div>
-                <div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div>
-                <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
-                <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Parent / Guardian</span><b>${child.father || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Mother name</span><b>${child.mother || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Contact phone</span><b>${child.phone || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div>
-              </div>
-            </div>
-          </section>
-          <section class="card">
-            <header class="card__header">
-              <div><h2 class="card__title">Health summary</h2><p class="card__caption">Latest vitals and health status</p></div>
-            </header>
-            <div class="card__body">
-              <div class="detail-list">
-                <div class="detail-row"><span>Health status</span><b>${healthDot(hs.level)} ${hs.label}</b></div>
-                <div class="detail-row"><span>Height</span><b>${latestGrowth ? latestGrowth.height + ' cm' : child.height ? child.height + ' cm' : '—'}</b></div>
-                <div class="detail-row"><span>Weight</span><b>${latestGrowth ? latestGrowth.weight + ' kg' : child.weight ? child.weight + ' kg' : '—'}</b></div>
-                <div class="detail-row"><span>BMI</span><b>${latestGrowth && latestGrowth.bmi ? latestGrowth.bmi : '—'}</b></div>
-                <div class="detail-row"><span>Medical conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
-                <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
-                <div class="detail-row"><span>Current medications</span><b>${child.medications || (meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : 'None')}</b></div>
-                <div class="detail-row"><span>Dental remarks</span><b>${child.dentalRemarks || 'No remarks recorded'}</b></div>
-                <div class="detail-row"><span>Hygiene Index</span><b>${child.hygieneIndex || 'Not Assessed'}</b></div>
-              </div>
-            </div>
-          </section>
-        </div>
-      </div>
-    </div>
-
-    <!-- GROWTH TAB -->
-    <div data-tab-panel="growth" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Growth Tracking History</h2><p class="card__caption">Height, weight, and BMI progression</p></div>
-        </header>
-        <div class="card__body">
-          ${growthHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- MEDICINES TAB -->
-    <div data-tab-panel="medicines" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Prescriptions & Medicines</h2><p class="card__caption">Prescribed treatments and active prescriptions</p></div>
-        </header>
-        <div class="card__body">
-          ${medsHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- REPORTS TAB -->
-    <div data-tab-panel="reports" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Clinical Health Reports</h2><p class="card__caption">Lab test reports, blood panels, and clinical flags</p></div>
-        </header>
-        <div class="card__body">
-          ${reportsHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- DOCUMENTS TAB -->
-    <div data-tab-panel="documents" style="display: none;">
-      <section class="card">
-        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center;">
-          <div><h2 class="card__title">Uploaded Documents & Records</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports for ${escapeHTML$1(child.name)}</p></div>
-          <button class="button button--primary button--sm" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$1(child.name)}">${icon('upload')} Upload Document</button>
-        </header>
-        <div class="card__body">
-          ${docsHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- HEALTH TIMELINE TAB -->
-    <div data-tab-panel="timeline" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Full Health Timeline</h2><p class="card__caption">Complete audit history for ${child.name}</p></div>
-        </header>
-        <div class="card__body">
-          ${timelineHTML}
-        </div>
-      </section>
-    </div>
-  </div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     REGISTER CHILD
-     ═══════════════════════════════════════════════════════ */
-
-  function steps(active, upload = false) {
-    const items = upload ? ['Upload', 'Processing', 'Review & verify', 'Additional details', 'Google Sheets Auto-Sync'] : ['Choose method', 'Child details', 'Health & guardian', 'Google Sheets Auto-Sync'];
-    return `<aside class="card form-aside"><div class="stepper">${items.map((item, index) => `<div class="stepper__item ${index < active ? 'stepper__item--complete' : ''} ${index === active ? 'stepper__item--active' : ''}"><span class="stepper__dot">${index < active ? icon('check') : index + 1}</span><span class="stepper__label">${item}</span></div>`).join('')}</div></aside>`;
-  }
-
-  function registerChildPage() {
-    const method = getURLParam('method');
-    const editId = getURLParam('edit');
-    const child = editId ? getChild(editId) : null;
-
-    if (method !== 'manual' && !editId) {
-      return shell('register-child', `${heading('Register a child', 'Choose the quickest, most reliable way to start a new child record.')}<section class="card"><div class="card__body"><div class="method-grid"><article class="method-card card card--interactive"><span class="method-card__icon">${icon('pencil')}</span><div><h2 class="card__title">Enter details manually</h2><p>Start with a clean, guided form. Best when information is already at hand.</p></div><a class="button" href="${pagePath('register-child')}?method=manual">Start manual entry ${icon('arrowRight')}</a></article><article class="method-card card card--interactive"><span class="method-card__icon">${icon('scan')}</span><div><h2 class="card__title">Google Cloud Vision API Document Upload</h2><p>Extract information automatically from medical documents using Cloud Vision API, then verify before saving.</p></div><a class="button button--primary" href="${pagePath('ocr-upload')}">Upload document ${icon('arrowRight')}</a></article></div></div></section>`);
-    }
-
-    let firstName = '', lastName = '', email = '', father = '', phone = '', blood = '';
-    if (child) {
-      const parts = child.name.split(/\s+/);
-      firstName = parts[0] || '';
-      lastName = parts.slice(1).join(' ') || '';
-      email = child.email || '';
-      father = child.father || '';
-      phone = child.phone || '';
-      blood = child.blood || '';
-    }
-
-    const title = child ? 'Edit child profile' : 'Register child';
-    const desc = child ? 'Modify the child record. Required fields are marked with an asterisk.' : 'Create a reliable child health record. Required fields are marked with an asterisk.';
-    const submitText = child ? 'Save changes' : 'Save child record';
-    const curMed = child ? child.medications : '';
-
-    return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field$1('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName)}${field$1('Last name *', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field$1('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '')}${field$1('Gender *', 'gender', 'e.g. Male', 'text', '', child ? child.gender : '')}${field$1('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field$1('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field$1('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML$1(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML$1(child.allergies) : ''}</textarea></label>
-  <div class="field form-span-all">
-    <span class="field__label">Current medications</span>
-    <div class="combobox" data-combobox>
-      <input type="hidden" name="medications" value="${escapeHTML$1(curMed)}">
-      <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10v7h7Z"/><path d="m8.5 15.5 7-7"/></svg></span>
-      <input class="combobox__input" type="text" placeholder="Search or type a medication..." value="${escapeHTML$1(curMed)}" autocomplete="off" data-combobox-input>
-      <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
-      <div class="combobox__panel" data-combobox-panel>
-        <div class="combobox__hint">Common medications</div>
-        <div data-combobox-option="None" class="combobox__option">None<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="Paracetamol / Crocin" class="combobox__option">Paracetamol / Crocin<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="Amoxicillin Syrup" class="combobox__option">Amoxicillin Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="Inhaler / Asthma Medication" class="combobox__option">Inhaler / Asthma Medication<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="Vitamin D3 Drops / Syrup" class="combobox__option">Vitamin D3 Drops / Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="Multivitamin Syrup" class="combobox__option">Multivitamin Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="Iron Syrup / Supplement" class="combobox__option">Iron Syrup / Supplement<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="Albendazole / Deworming" class="combobox__option">Albendazole / Deworming<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="Cetirizine Syrup" class="combobox__option">Cetirizine Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="ORAL Rehydration Salts (ORS)" class="combobox__option">ORAL Rehydration Salts (ORS)<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div class="combobox__divider"></div>
-        <div class="combobox__empty" data-combobox-empty style="display:none;"><b>No matches found</b>Press Enter to use your custom medication</div>
-      </div>
-    </div>
-    <span class="field__hint">Select a preset or type any custom medicine name directly.</span>
-  </div>
-  <label class="field form-span-all"><span class="field__label">Dental remarks</span><textarea class="textarea" name="dentalRemarks" placeholder="e.g. RESTORATION, SCALING, ORTHODONTIC TREATMENT">${child ? escapeHTML$1(child.dentalRemarks || '') : ''}</textarea></label>
-  <div class="field form-span-all">
-    <span class="field__label">Oral Hygiene Index</span>
-    <div class="combobox" data-combobox>
-      <input type="hidden" name="hygieneIndex" value="${child ? escapeHTML$1(child.hygieneIndex || '') : ''}">
-      <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
-      <input class="combobox__input" type="text" placeholder="Select hygiene index..." value="${child ? escapeHTML$1(child.hygieneIndex || '') : ''}" autocomplete="off" data-combobox-input readonly style="cursor:pointer;">
-      <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
-      <div class="combobox__panel" data-combobox-panel>
-        <div data-combobox-option="SATISFACTORY" class="combobox__option">SATISFACTORY<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="AVERAGE" class="combobox__option">AVERAGE<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-        <div data-combobox-option="POOR" class="combobox__option">POOR<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
-      </div>
-    </div>
-  </div>
-  </div></section>
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field$1('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field$1('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field$1('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field$1('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML$1(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML$1(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     GOOGLE CLOUD VISION API EXTRACTION PAGES
-     ═══════════════════════════════════════════════════════ */
-
-  function ocrUploadPage() {
-    return shell('ocr-upload', `${heading('Google Cloud Vision API Extraction', 'Upload a medical document (Blood Reports, Prescriptions, Medical Certificates, Vaccination Records, Aadhaar). Google Cloud Vision API will extract structured fields for review.', `<a class="button button--ghost" href="${pagePath('register-child')}">Cancel</a>`)}<div class="form-layout"><section class="card"><div class="card__body"><div class="upload-zone" data-upload-zone><span class="upload-zone__icon">${icon('upload')}</span><h2 class="card__title">Drop a medical document here</h2><p>Choose a file from your device. Google Cloud Vision API will scan and extract health & child details.</p><button class="button button--primary" type="button" data-start-ocr>${icon('file')}Choose document</button><input class="sr-only" type="file" accept=".jpg,.jpeg,.png" data-upload-input><span class="upload-zone__formats">JPG or PNG · Up to 15 MB</span></div></div><div style="padding:16px; background:var(--color-bg-alt); border-top:1px solid var(--color-border);"><b style="font-size:13px; display:block; margin-bottom:8px;">Supported Document Types:</b><div style="display:flex; flex-wrap:wrap; gap:8px;"><span class="badge badge--blue">Blood Reports</span><span class="badge badge--blue">Prescriptions</span><span class="badge badge--blue">Handwritten Medical Notes</span><span class="badge badge--blue">Medical Certificates</span><span class="badge badge--blue">Vaccination Records</span></div></div></section>${steps(0, true)}</div>`);
-  }
-
-  function ocrProcessingPage() {
-    return shell('ocr-processing', `${heading('Processing with Google Cloud Vision API', 'Extracted details will be prepared for your verification before any record is updated.')}<section class="card"><div class="ocr-processing"><div class="ocr-processing__orbit" style="box-shadow: 0 0 25px rgba(59, 130, 246, 0.35);">${icon('scan')}</div><h2>Google Cloud Vision API Scanning</h2><p>Performing multi-pass document OCR and extracting health vital data for review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span class="ocr-progress-status" style="font-weight: 600; color: var(--color-primary);">Analyzing image contrast with Google Cloud Vision API...</span><span class="ocr-progress-pct" style="font-weight: 700;">0%</span></div><div class="progress" style="height: 10px;"><div class="progress__bar ocr-progress-bar" style="width: 0%; transition: width 0.25s ease-out;"></div></div></div></div></section>`);
-  }
-
-  function ocrReviewPage() {
-    const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-    const firstName = ocrData.firstName || '';
-    const lastName = ocrData.lastName || '';
-    const dob = ocrData.dob || '';
-    const blood = ocrData.blood || '';
-    const father = ocrData.father || '';
-    const mother = ocrData.mother || '';
-    const phone = ocrData.phone || '';
-    const idNumber = ocrData.idNumber || '';
-    const gender = ocrData.gender || '';
-
-    const uploadedFile = localStorage.getItem('ocr-upload-file');
-    let previewHTML = '';
-    if (uploadedFile) {
-      previewHTML = `<div class="document-preview-img-wrap" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#f3f4f6; position:relative; min-height:360px;">
-      <img class="document-preview-img" src="${uploadedFile}" alt="Uploaded document" style="max-width:100%; max-height:100%; object-fit:contain; transition:transform 0.2s ease;" data-rotation="0">
-    </div>`;
-    } else {
-      previewHTML = `<div class="document-sheet"><div class="document-sheet__brand">GOOGLE CLOUD VISION OCR</div><div class="document-sheet__title">EXTRACTED HEALTH RECORD FORM</div><div class="document-sheet__line document-sheet__line--wide"></div><div class="document-sheet__line document-sheet__line--half"></div><div class="document-sheet__table"><div class="document-sheet__cell"><b>CHILD NAME</b><span>${firstName} ${lastName}</span></div><div class="document-sheet__cell"><b>DATE OF BIRTH</b><span>${dob}</span></div><div class="document-sheet__cell"><b>PARENT'S NAME</b><span>${father}</span></div><div class="document-sheet__cell"><b>BLOOD GROUP</b><span>${blood}</span></div><div class="document-sheet__cell"><b>PHONE</b><span>${phone}</span></div><div class="document-sheet__cell"><b>ID NUMBER</b><span>${idNumber}</span></div></div></div>`;
-    }
-
-    return shell('ocr-review', `${heading('Review Cloud Vision API Extracted Data', 'Check the values below against the document before continuing.', `<button class="button" type="button" data-ocr-back>Back</button><button class="button button--primary" type="button" data-ocr-continue>Continue to details ${icon('arrowRight')}</button>`)}<div class="form-layout"><div class="review-layout"><section class="card document-preview"><div class="document-toolbar"><span class="badge badge--blue">Cloud Vision Scan</span><div class="document-toolbar__controls"><button class="icon-button icon-button--small tooltip" data-tooltip="Rotate" type="button" data-ocr-rotate>${icon('rotate')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Fullscreen" type="button" data-ocr-fullscreen>${icon('maximize')}</button></div></div>${previewHTML}</section><form class="card"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Extracted fields</h2><p>Review the values detected by Cloud Vision API.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">First name</span><input class="input" value="${firstName}" name="firstName"></label><label class="field"><span class="field__label">Last name</span><input class="input" value="${lastName}" name="lastName"></label><label class="field"><span class="field__label">Date of birth</span><input class="input" value="${dob}" name="date"></label><label class="field"><span class="field__label">Gender</span><input class="input" value="${gender}" name="gender"></label><label class="field"><span class="field__label">Blood group</span><input class="input" value="${blood}" name="blood"></label><label class="field"><span class="field__label">ID number</span><input class="input" value="${idNumber}" name="idNumber"></label><label class="field form-span-all"><span class="field__label">Parent / guardian</span><input class="input" value="${father}" name="father"></label><label class="field form-span-all"><span class="field__label">Mother name</span><input class="input" value="${mother}" name="mother"></label></div></section><section class="form-section"><label class="checkbox"><input type="checkbox" data-ocr-confirm required><span>I've checked the extracted details against the original document.</span></label></section></form></div>${steps(2, true)}</div>`);
-  }
-
-  function ocrDetailsPage() {
-    const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-    const firstName = ocrData.firstName || '';
-    const lastName = ocrData.lastName || '';
-    const father = ocrData.father || '';
-    const mother = ocrData.mother || '';
-    const gender = ocrData.gender || '';
-    const blood = ocrData.blood || '';
-    const phone = ocrData.phone || '';
-    const idNumber = ocrData.idNumber || '';
-
-    return shell('ocr-details', `${heading('Additional details', 'Complete remaining health details before saving.', `<a class="button" href="${pagePath('ocr-review')}">Back</a><button class="button button--primary" type="submit" form="ocr-additional-form">Save child record</button>`)}<div class="form-layout"><form class="card" id="ocr-additional-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Registration & contact</h2><p>Complete any additional details for this record.</p></div><div class="form-grid--two">${field$1('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', mother)}${field$1('Mobile number *', 'phone', 'e.g. +91 98221 40393', 'tel', '', phone)}${field$1('Email address', 'email', 'guardian@example.com', 'email')}${field$1('Height (cm)', 'height', 'e.g. 140', 'number')}${field$1('Weight (kg)', 'weight', 'e.g. 35', 'number')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes"></textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin"></textarea></label><label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode"></textarea></label><label class="field form-span-all"><span class="field__label">Upload Additional Medical Records / Reports</span><input class="input" type="file" name="additionalDoc" accept=".jpg,.jpeg,.png,.pdf" data-additional-doc-input><span style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">Upload blood test reports, immunization records, or medical certificates.</span></label></div></section><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Final verification</h2><p>You're about to create the child record.</p></div><label class="checkbox"><input type="checkbox" required><span>I confirm the information is accurate and complete.</span></label></section><input type="hidden" name="firstName" value="${firstName}"><input type="hidden" name="lastName" value="${lastName}"><input type="hidden" name="father" value="${father}"><input type="hidden" name="gender" value="${gender}"><input type="hidden" name="blood" value="${blood}"><input type="hidden" name="idNumber" value="${idNumber}"><input type="hidden" name="dob" value="${ocrData.dob || ''}"></form>${steps(3, true)}</div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     GROWTH TRACKING
-     ═══════════════════════════════════════════════════════ */
-
-  function growthPage() {
-    const children = getChildren();
-    const allGrowth = getGrowthRecords();
-    const recentGrowth = allGrowth.slice(0, 10);
-
-    let tableHTML = '';
-    if (recentGrowth.length === 0) {
-      tableHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:30px 12px"><span class="empty-state__icon">${icon('ruler')}</span><h3 style="font-size:13px">No growth records yet</h3><p>Add a growth measurement using the form above.</p></div></td></tr>`;
-    } else {
-      tableHTML = recentGrowth.map(r => `<tr><td><b>${r.childName || '—'}</b></td><td>${r.date || '—'}</td><td>${r.height} cm</td><td>${r.weight} kg</td><td>${r.bmi || '—'}</td><td>${r.bmi ? (r.bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : r.bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : '—'}</td></tr>`).join('');
-    }
-
-    const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-
-    return shell('growth', `${heading('Growth tracking', 'Track height, weight, and BMI for every child.', `<button class="button button--primary" type="button" data-add-measurement>${icon('plus')}Add measurement</button>`)}
-  <div class="form-layout">
-    <div style="display: flex; flex-direction: column; gap: 24px;">
-      <div id="growth-forms-container" style="display: flex; flex-direction: column; gap: 24px;">
-        <form class="card growth-form-instance" id="growth-form">
-          <section class="form-section">
-            <div class="form-section__heading"><h2 class="card__title">New measurement</h2><p>Record height and weight for a child. BMI will be auto-calculated.</p></div>
-            <div class="form-grid--two">
-              <label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>
-              ${field$1('Date *', 'date', '', 'date', '', new Date().toISOString().slice(0, 10))}
-              ${field$1('Height (cm) *', 'height', 'e.g. 140', 'number')}
-              ${field$1('Weight (kg) *', 'weight', 'e.g. 35', 'number')}
-            </div>
-            <div style="display:flex; justify-content:flex-end; margin-top:20px;">
-              <button class="button button--primary" type="submit">${icon('check')} Save measurement</button>
-            </div>
-          </section>
-        </form>
-      </div>
-      <section class="card"><header class="card__header"><div><h2 class="card__title">Recent measurements</h2><p class="card__caption">All growth records across children</p></div></header><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Child</th><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead><tbody>${tableHTML}</tbody></table></div></section>
-    </div>
-  </div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     MEDICINE MANAGEMENT
-     ═══════════════════════════════════════════════════════ */
-
-  function medicinesPage() {
-    const children = getChildren();
-    const allMeds = getMedicines();
-    const activeMeds = allMeds.filter(m => m.status === 'Active');
-    const completedMeds = allMeds.filter(m => m.status === 'Completed');
-
-    let medsHTML = '';
-    if (allMeds.length === 0) {
-      medsHTML = `<div class="empty-state" style="padding:30px 12px"><span class="empty-state__icon">${icon('pill')}</span><h3 style="font-size:13px">No prescriptions tracked</h3><p>Add a prescription using the form above.</p></div>`;
-    } else {
-      medsHTML = `<div class="document-grid">${allMeds.slice(0, 12).map(m => {
-      const startDate = new Date(m.startDate);
-      const endDate = new Date(m.endDate);
-      const now = new Date();
-      const totalDays = Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
-      const elapsed = Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)));
-      const pct = Math.min(100, Math.round((elapsed / totalDays) * 100));
-      return `<article class="card document-card card--interactive"><div class="document-card__body" style="padding:14px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px"><h3 style="font-size:14px; font-weight:600; margin:0">${m.medicineName}</h3>${statusBadge(m.status)}</div><p style="font-size:13px; color:var(--color-text-muted); margin:0 0 4px">${m.childName || '—'} · ${m.dosage}</p><p style="font-size:12px; color:var(--color-text-muted); margin:0 0 8px">${m.frequency} · ${m.startDate} → ${m.endDate}</p><div class="progress" style="height:6px"><div class="progress__bar" style="width:${pct}%; background:${m.status === 'Completed' ? 'var(--color-success)' : 'var(--color-primary)'}"></div></div><span style="font-size:11px; color:var(--color-text-muted)">${pct}% complete</span></div></article>`;
-    }).join('')}</div>`;
-    }
-
-    const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-
-    return shell('medicines', `${heading('Medicine management', 'Track all prescriptions given to children.', `<button class="button button--primary" type="submit" form="medicine-form">${icon('plus')}Add prescription</button>`)}
-  <div class="stat-grid" style="margin-bottom:24px">${statCard('Active prescriptions', activeMeds.length.toLocaleString(), activeMeds.length > 0 ? 'Ongoing' : 'None', 'pill', 'blue')}${statCard('Completed', completedMeds.length.toLocaleString(), completedMeds.length > 0 ? 'Finished' : 'None', 'check', 'green')}</div>
-  <div class="form-layout">
-    <div style="display: flex; flex-direction: column; gap: 24px;">
-      <form class="card" id="medicine-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">New prescription</h2></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>${field$1('Medicine name *', 'medicineName', 'e.g. Amoxicillin', 'text')}${field$1('Dosage *', 'dosage', 'e.g. 250mg twice daily', 'text')}${field$1('Frequency', 'frequency', 'e.g. Every 8 hours', 'text')}${field$1('Start date *', 'startDate', '', 'date', '', new Date().toISOString().slice(0, 10))}${field$1('End date *', 'endDate', '', 'date')}</div></section></form>
-      <section class="card"><header class="card__header"><div><h2 class="card__title">All prescriptions</h2></div></header><div class="card__body">${medsHTML}</div></section>
-    </div>
-  </div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     HEALTH RECORDS & DOCUMENTS (GOOGLE DRIVE STORAGE)
-     ═══════════════════════════════════════════════════════ */
-
-  function documentsPage() {
-    const docs = getUploadedDocs();
-    const children = getChildren();
-    let contentHTML = '';
-
-    if (docs.length === 0) {
-      contentHTML = `<div class="empty-state" style="padding:48px 24px">
-      <span class="empty-state__icon">${icon('file')}</span>
-      <h3>No health documents uploaded yet</h3>
-      <p>Click "Upload document" to attach medical reports or use Google Cloud Vision API.</p>
-    </div>`;
-    } else {
-      contentHTML = `<div class="document-grid" id="document-grid">
-      ${docs.map((doc, idx) => `
-        <article class="card document-card card--interactive" data-document-idx="${idx}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}" style="position:relative;">
-          <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
-            ${icon('trash')}
-          </button>
-          <div class="document-card__preview" style="position:relative; width:100%; height:140px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
-            ${doc.image || doc.fileData ? `<img src="${doc.image || doc.fileData}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
-          </div>
-          <div class="document-card__body" style="padding-top:12px;">
-            <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center;">
-              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; padding-right:20px;">${doc.name}</h2>
-              ${statusBadge(doc.status || 'Verified')}
-            </div>
-            <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:600; color:var(--color-text);">${doc.child || doc.childName || doc.student || '—'}</span>
-              <span>${doc.docType || doc.category || doc.meta || 'Medical Document'}</span>
-            </div>
-            ${doc.image || doc.fileData ? `<div style="margin-top:10px;"><a class="button button--sm" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="width:100%; justify-content:center;">${icon('download')} View / Download</a></div>` : ''}
-          </div>
-        </article>
-      `).join('')}
-    </div>`;
-    }
-
-    const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
-
-    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<span class="badge badge--warning" style="padding:6px 12px; font-size:12px; font-weight:600; align-self:center;">Drive Sync: Coming Soon</span><button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     REPORTS & ANALYTICS
-     ═══════════════════════════════════════════════════════ */
-
-  function reportsPage() {
-    const children = getChildren();
-    const total = children.length;
-
-    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
-    const healthyPct = total > 0 ? Math.round(((total - flaggedCount) / total) * 100) : 0;
-
-    const females = children.filter(c => c.gender?.toLowerCase() === 'female').length;
-    const males = children.filter(c => c.gender?.toLowerCase() === 'male').length;
-    const femalePct = total > 0 ? Math.round((females / total) * 100) : 0;
-    const malePct = total > 0 ? Math.round((males / total) * 100) : 0;
-    const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
-
-    const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;">${icon('googleSheets')}Google Sheets Auto-Sync (Connected)</button>`;
-    const docsStatusBadge = `<button class="button button--sm" type="button" data-open-docs-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(26,115,232,0.1); color:#1a73e8; border:1px solid rgba(26,115,232,0.25); font-weight:600;">${icon('googleDocs')}Google Docs Live Auto-Sync (Active)</button>`;
-
-    return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `${sheetsStatusBadge}${docsStatusBadge}<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
-  <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length || 4}</div><p class="report-card__caption">verified lab test reports</p></article></div>
-  
-  <section class="card section-gap" style="margin-top: 24px;">
-    <header class="card__header">
-      <div>
-        <h2 class="card__title">NGO Health Platform Executive Summary</h2>
-        <p class="card__caption">Audited health status and growth tracking overview</p>
-      </div>
-      <span class="badge badge--success">${icon('check')} Audited & Verified</span>
-    </header>
-    <div class="card__body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; padding: 20px 0;">
-      <div>
-        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-primary);">
-          ${icon('heartPulse')} Health Status Overview
-        </h3>
-        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
-          <b>${total - flaggedCount} out of ${total} children</b> are in optimal health with no health flags. 
-          ${flaggedCount > 0 ? `<b>${flaggedCount} child(ren)</b> are under medical observation.` : 'All children are currently healthy.'}
-        </p>
-      </div>
-      <div>
-        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-success);">
-          ${icon('ruler')} Growth Tracking Performance
-        </h3>
-        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
-          Regular assessments ensure height, weight, and BMI progression are monitored according to WHO standards.
-        </p>
-      </div>
-    </div>
-  </section>
-
-  <div class="dashboard-grid dashboard-grid--lower"><section class="card chart-card"><header class="card__header"><div><h2 class="card__title">Registration trend</h2><p class="card__caption">New child records created each month</p></div></header><div class="chart-card__body">${registrationChart()}</div></section><section class="card"><header class="card__header"><div><h2 class="card__title">Gender distribution</h2><p class="card__caption">Across all child records</p></div></header><div class="card__body"><div class="distribution"><div class="distribution__row"><span class="distribution__label">Female</span><div class="progress"><div class="progress__bar" style="width: ${femalePct}%; background: var(--color-violet);"></div></div><span class="distribution__value">${femalePct}%</span></div><div class="distribution__row"><span class="distribution__label">Male</span><div class="progress"><div class="progress__bar" style="width: ${malePct}%; background: var(--color-primary);"></div></div><span class="distribution__value">${malePct}%</span></div><div class="distribution__row"><span class="distribution__label">Other</span><div class="progress"><div class="progress__bar" style="width: ${otherPct}%; background: #94a3b8;"></div></div><span class="distribution__value">${otherPct}%</span></div></div></div></section></div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     SETTINGS & GOOGLE WORKSPACE
-     ═══════════════════════════════════════════════════════ */
-
-  function settingsPage() {
-    const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
-    const sheetsConfig = getSheetsConfig() || {};
-    const docsConfig = getDocsConfig() || {};
-    const isConnected = !!(sheetsConfig.connected || docsConfig.connected);
-    const adminEmail = sheetsConfig.adminEmail || docsConfig.adminEmail || 'Admin';
-    const sheetUrl = getGoogleSheetUrl();
-    const docUrl = getGoogleDocUrl();
-
-    const isDriveConnected = localStorage.getItem('google-drive-connected') === 'true';
-    const isCalendarConnected = localStorage.getItem('google-calendar-connected') === 'true';
-
-    return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Workspace service connections.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
-  <div class="settings-layout">
-    <nav class="card settings-nav" aria-label="Settings sections">
-      <button type="button" class="active">Google Workspace</button>
-      <button type="button">Platform Details</button>
-      <button type="button">Security</button>
-    </nav>
-    <section class="card settings-panel">
-      <h2>Google Workspace Connections</h2>
-      <p class="muted">Connect or disconnect Google Cloud APIs, Drive Storage, Sheets Sync, and Calendar Services.</p>
-      
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Authentication</b>
-            <span class="badge badge--success">Connected</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">OAuth 2.0 GIS Authentication active. Firestore verified account.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active Account Provider</button>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Cloud Vision API</b>
-            <span class="badge badge--blue">Connected</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Medical document OCR extraction for blood reports, prescriptions & certificates.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active OCR Provider</button>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Gemini API</b>
-            <span class="badge badge--blue">Connected</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">AI medical report parsing & health trend summaries.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active AI Provider</button>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Drive</b>
-            ${isDriveConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Secure cloud document storage for child health records.</p>
-          <button class="button button--sm ${isDriveConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="drive" style="width: 100%; justify-content: center;">
-            ${isDriveConnected ? 'Disconnect Google Drive' : 'Connect Google Drive'}
-          </button>
-        </div>
-
-        <!-- Google Workspace OAuth (Sheets & Docs) Card -->
-        <div class="card" style="padding: 18px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: span 2;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-              ${icon('googleSheets')}
-              Google Workspace (Sheets & Docs)
-            </b>
-            ${isConnected ? `<span class="badge badge--success">Connected as ${escapeHTML$1(adminEmail)}</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
-          </div>
-          <p style="font-size: 12.5px; color: var(--color-text-muted); margin: 0 0 14px 0;">
-            ${isConnected 
-              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Your spreadsheets and executive audit documents are automatically created and owned by your Google account.`
-              : `Authorize your NGO Google Account once to enable automated, private Google Sheets & Docs synchronization. Created files are stored directly in your own Google Account.`
-            }
-          </p>
-
-          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-            ${!isConnected ? `
-              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-                Connect Google Workspace
-              </a>
-            ` : `
-              ${sheetUrl ? `
-                <a href="${escapeHTML$1(sheetUrl)}" target="_blank" class="button button--secondary button--sm" style="font-weight: 600; color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                  ${icon('googleSheets')}
-                  Open My Sheet ↗
-                </a>
-              ` : ''}
-              ${docUrl ? `
-                <a href="${escapeHTML$1(docUrl)}" target="_blank" class="button button--secondary button--sm" style="font-weight: 600; color: #1a73e8; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                  Open Executive Doc ↗
-                </a>
-              ` : ''}
-              <a href="/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; text-decoration: none; margin-left: auto;">
-                Disconnect
-              </a>
-            `}
-          </div>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Calendar</b>
-            ${isCalendarConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Automated appointment & checkup reminder scheduling.</p>
-          <button class="button button--sm ${isCalendarConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="calendar" style="width: 100%; justify-content: center;">
-            ${isCalendarConnected ? 'Disconnect Google Calendar' : 'Connect Google Calendar'}
-          </button>
-        </div>
-      </div>
-    </section>
-  </div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     APPOINTMENTS — Full Page Calendar View
-     ═══════════════════════════════════════════════════════ */
-
-  function appointmentsPage() {
-    const now = new Date();
-    now.getFullYear();
-    now.getMonth();
-    now.getDate();
-    const appointments = getAppointments();
-    const upcomingCount = appointments.filter(a => a.status === 'Upcoming').length;
-    const completedCount = appointments.filter(a => a.status === 'Completed').length;
-
-    // All appointments list sorted by date
-    const allApptsHTML = appointments.length === 0
-      ? `<div class="empty-state" style="padding:40px 16px; text-align:center;">
-        <span class="empty-state__icon" style="font-size:40px; display:block; margin-bottom:8px;">📅</span>
-        <h3 style="font-size:15px; font-weight:700; margin:0 0 4px 0;">No appointments recorded</h3>
-        <p style="font-size:13px; color:var(--color-text-muted); margin:0;">Register an appointment using the calendar above.</p>
-       </div>`
-      : `
-      <div class="data-table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Child</th>
-              <th>Appointment Type</th>
-              <th>Doctor / Clinic</th>
-              <th>Date & Time</th>
-              <th>Status</th>
-              <th style="text-align:right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${appointments.map(a => {
-              const currentStatus = computeAppointmentStatus(a);
-              const isCompleted = currentStatus === 'Completed';
-              const typeClass = a.type?.toLowerCase().includes('doctor') ? 'blue' : a.type?.toLowerCase().includes('follow') ? 'green' : a.type?.toLowerCase().includes('dental') ? 'amber' : 'violet';
-              const formattedTime = formatSingleDisplayTime(a.time || '10:00 AM');
-              const dateObj = new Date(a.date + 'T00:00:00');
-              const formattedDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : (a.date || '—');
-
-              return `
-                <tr class="gcal-appt-row">
-                  <td>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                      <div class="avatar avatar--sm" style="background:#e8f0fe; color:#1a73e8; font-weight:700; font-size:12px; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;">${initials(a.childName || 'C')}</div>
-                      <div>
-                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML$1(a.childName || 'Child')}</strong>
-                        <span style="font-size:11px; color:var(--color-text-muted);">${a.childId ? `ID: ${a.childId}` : ''}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <span class="gcal-event-chip gcal-event-chip--${typeClass}" style="display:inline-flex; width:auto; padding:3px 10px; font-size:12px; font-weight:600; cursor:pointer;" data-event-id="${a.id}">
-                      ${escapeHTML$1(a.type || 'General')}
-                    </span>
-                  </td>
-                  <td>
-                    <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text);">
-                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#70757a" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                      <span>${escapeHTML$1(a.doctor || 'General Clinic')}</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style="font-size:13px; font-weight:600; color:var(--color-text);">${formattedDate}</div>
-                    <div style="font-size:11.5px; color:var(--color-text-muted);">${formattedTime}</div>
-                  </td>
-                  <td>
-                    <span class="gcal-status-pill gcal-status-pill--${isCompleted ? 'done' : 'upcoming'}" style="display:inline-block; border-radius:12px; padding:3px 10px; font-size:10px; font-weight:700;">
-                      ${currentStatus}
-                    </span>
-                  </td>
-                  <td style="text-align:right;">
-                    <div style="display:inline-flex; align-items:center; gap:6px;">
-                      <button class="button button--secondary button--sm" type="button" data-event-id="${a.id}" title="View Details" style="padding:6px 10px; font-size:12px; font-weight:600; gap:4px;">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                        View
-                      </button>
-                      <button class="button button--secondary button--sm" type="button" data-sync-event-id="${a.id}" title="Sync Google Calendar" style="padding:6px 10px; font-size:12px; color:#1a73e8;">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
-                      </button>
-                      <button class="button button--danger-outline button--sm" type="button" data-delete-event-id="${a.id}" title="Delete Appointment" style="padding:6px 8px; color:#d93025;">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      </div>`;
-
-    return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}View Children</a>`)}
-  <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
-    ${statCard('Total Appointments', appointments.length.toLocaleString(), 'All records', 'calendar', 'blue')}
-    ${statCard('Upcoming', upcomingCount.toLocaleString(), 'Scheduled visits', 'clock', 'amber')}
-    ${statCard('Completed', completedCount.toLocaleString(), 'Past appointments', 'check', 'green')}
-  </div>
-  ${calendarCard()}
-  <div style="margin-top: 20px;">
-    <section class="card">
-      <header class="card__header">
-        <div>
-          <h2 class="card__title">All Appointments</h2>
-          <p class="card__caption">Complete appointment history across all children</p>
-        </div>
-        <span class="badge badge--blue">${appointments.length} total</span>
-      </header>
-      <div class="card__body" style="padding: 0;">
-        ${allApptsHTML}
-      </div>
-    </section>
-  </div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     PAGE ROUTER
-     ═══════════════════════════════════════════════════════ */
-
-  function renderPage(page) {
-    const pages = {
-      login: loginPage,
-      dashboard: dashboardPage,
-      children: childrenPage,
-      appointments: appointmentsPage,
-      'child-profile': childProfilePage,
-      'child_profile': childProfilePage,
-      'register-child': registerChildPage,
-      'ocr-upload': ocrUploadPage,
-      'ocr-processing': ocrProcessingPage,
-      'ocr-review': ocrReviewPage,
-      'ocr-details': ocrDetailsPage,
-      documents: documentsPage,
-      reports: reportsPage,
-      settings: settingsPage,
-      growth: growthPage,
-      medicines: medicinesPage
-    };
-    return (pages[page] || dashboardPage)();
-  }
-
-  function searchChildren(query) {
-    const term = query.trim().toLowerCase();
-    return getChildren().filter((child) => !term || Object.values(child).some((value) => String(value).toLowerCase().includes(term)));
-  }
-
-  function renderSearchResultsList(query = '') {
-    const results = searchChildren(query).slice(0, 7);
-    if (!results.length) {
-      return `<div class="empty-state" style="padding: 24px 16px;"><span class="empty-state__icon">${icon('search')}</span><h3>No matching records</h3><p style="font-size:12px; color:var(--color-text-muted);">Try searching by child name, guardian, phone number, ID, or blood group.</p></div>`;
-    }
-    return results.map((child) => {
-      const age = calculateAge(child.dob) || child.age || '—';
-      return `
-      <a class="global-search__result" href="${pagePath('child-profile')}?id=${child.id}" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; text-decoration:none; color:var(--color-text); border-bottom:1px solid var(--color-border);">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <span class="table-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--color-primary-light); color:var(--color-primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">${initials(child.name)}</span>
-          <div>
-            <b style="font-size:14px; display:block;">${child.name}</b>
-            <small style="font-size:11.5px; color:var(--color-text-muted);">${child.id} • ${age} • ${child.gender || '—'} • ${child.blood || '—'} • ${child.father || child.guardian || 'Guardian'}</small>
-          </div>
-        </div>
-        <span class="global-search__go" style="color:var(--color-primary); font-size:16px;">${icon('arrowRight')}</span>
-      </a>
-    `;
-    }).join('');
-  }
-
-  function globalSearchMarkup(query = '') {
-    return `
-    <div class="modal-backdrop" role="presentation" style="position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,0.75); backdrop-filter:blur(6px); display:flex; align-items:flex-start; justify-content:center; padding-top:80px;">
-      <section class="modal global-search card" role="dialog" aria-modal="true" aria-labelledby="search-title" style="width:min(640px, 94vw); border-radius:12px; overflow:hidden; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.25);">
-        <header class="global-search__input" style="display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid var(--color-border); background:var(--color-bg);">
-          <span style="color:var(--color-text-muted); font-size:18px;">${icon('search')}</span>
-          <input id="global-search-input" class="input" value="${query}" placeholder="Search children, guardians, health records…" aria-label="Search all child records" autofocus style="flex:1; border:0; background:transparent; font-size:16px; color:var(--color-text); outline:none;">
-          <kbd style="padding:2px 8px; font-size:11px; background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:4px; color:var(--color-text-muted);">Esc</kbd>
-        </header>
-        <div class="global-search__results" id="global-search-results-wrap" style="max-height:60vh; overflow:auto;">
-          <p class="global-search__hint" id="search-title" style="padding:10px 16px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-muted); margin:0; border-bottom:1px solid var(--color-border);">Search results</p>
-          <div id="global-search-results-container">
-            ${renderSearchResultsList(query)}
-          </div>
-        </div>
-      </section>
-    </div>
-  `;
-  }
-
-  function closeModal() { document.querySelector('#modal-root').replaceChildren(); }
-
-  function modal({ title, body, confirmText = 'Confirm', confirmClass = 'button--primary', onConfirm }) {
-    const root = document.querySelector('#modal-root');
-    root.innerHTML = `<div class="modal-backdrop" role="presentation"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal__header"><div><h2 id="modal-title" class="modal__title">${title}</h2></div><button class="icon-button icon-button--small" type="button" aria-label="Close dialog" data-modal-close>${icon('x')}</button></header><div class="modal__body">${body}</div><footer class="modal__footer"><button class="button" type="button" data-modal-close>Cancel</button><button class="button ${confirmClass}" type="button" data-modal-confirm>${confirmText}</button></footer></section></div>`;
-    root.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', closeModal));
-    root.querySelector('.modal-backdrop').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
-    root.querySelector('[data-modal-confirm]').addEventListener('click', () => { onConfirm?.(); closeModal(); });
-    root.querySelector('[data-modal-close]')?.focus();
-  }
-
-  function collectChild(form) {
-    const values = Object.fromEntries(new FormData(form));
-    let id = values.id;
-    let registeredDate = values.registeredDate || new Date().toISOString().slice(0, 10);
-    let status = 'Active';
-
-    // If editing, preserve existing registration date and status
-    if (id) {
-      const existing = getChild(id);
-      if (existing) {
-        registeredDate = existing.registeredDate || registeredDate;
-        status = existing.status || status;
-      }
-    } else {
-      id = `CH-${String(1025 + Math.floor(Math.random() * 9975)).padStart(4, '0')}`;
-    }
-
-    const mother = values.mother || '';
-    const dob = values.dob || values.birthDate || '';
-    const idNumber = values.idNumber || '';
-    const fullName = values.name || `${values.firstName || ''} ${values.lastName || ''}`.trim() || 'Unnamed Child';
-
-    return {
-      id,
-      name: fullName,
-      email: values.email || '',
-      gender: values.gender || '',
-      blood: values.blood || '',
-      father: values.father || '',
-      mother: mother || '',
-      phone: values.phone || '',
-      address: values.address || '',
-      notes: values.notes || '',
-      registeredDate,
-      status,
-      dob,
-      idNumber,
-      // Health baseline fields
-      height: values.height ? String(values.height).replace(/[^0-9.]/g, '').trim() : '',
-      weight: values.weight ? String(values.weight).replace(/[^0-9.]/g, '').trim() : '',
-      medicalConditions: values.medicalConditions || '',
-      allergies: values.allergies || '',
-      medications: values.medications || '',
-      dentalRemarks: values.dentalRemarks || '',
-      hygieneIndex: values.hygieneIndex || '',
-      emergencyContact: values.emergencyContact || '',
-      emergencyPhone: values.emergencyPhone || '',
-      hospitalName: values.hospitalName || ''
-    };
-  }
-
-  function saveChild(form) {
-    const values = Object.fromEntries(new FormData(form));
-    const firstName = (values.firstName || '').trim().toLowerCase();
-    const lastName = (values.lastName || '').trim().toLowerCase();
-    const fullName = (values.name || `${values.firstName || ''} ${values.lastName || ''}`).trim().toLowerCase();
-    const dob = (values.dob || values.birthDate || '').trim();
-
-    // Deduplication Check: Same First Name, Last Name / Full Name AND Date of Birth
-    const existingChildren = getChildren() || [];
-    const isEditing = !!values.id;
-
-    const duplicate = existingChildren.find(c => {
-      if (!c) return false;
-      if (values.id && c.id === values.id) return false;
-
-      const cNameClean = (c.name || '').trim().toLowerCase();
-      const cDobClean = (c.dob || '').trim();
-
-      const nameMatches = cNameClean === fullName || (firstName && lastName && cNameClean.includes(firstName) && cNameClean.includes(lastName));
-      const dobMatches = dob && cDobClean && dob === cDobClean;
-
-      return nameMatches && dobMatches;
-    });
-
-    if (duplicate && !isEditing) {
-      let idInput = form.querySelector('input[name="id"]');
-      if (!idInput) {
-        idInput = document.createElement('input');
-        idInput.type = 'hidden';
-        idInput.name = 'id';
-        idInput.dataset.tempId = 'true';
-        form.appendChild(idInput);
-      }
-      idInput.value = duplicate.id;
-      toast('Duplicate prevented', `Updating existing profile for ${duplicate.name} (${duplicate.id}) instead of creating duplicate.`);
-    }
-
-    const child = collectChild(form);
-    const updated = updateChild(child);
-
-    // Clean up any temporary hidden ID element from form so subsequent submissions start fresh!
-    const tempIdInput = form.querySelector('input[data-temp-id="true"]');
-    if (tempIdInput) {
-      tempIdInput.remove();
-    }
-
-    // Automatically generate / append row to Google Sheets & update Google Docs in user's account
-    autoSyncChildToGoogleSheets(child);
-    autoSyncToGoogleDocs();
-    return updated;
-  }
-
   const getDefaultsFromPostinstall = () => (undefined);
 
   /**
@@ -19580,13 +16277,6 @@
   }
 
   /**
-   * Validates that `path` refers to a collection (indicated by the fact it
-   * contains an odd numbers of segments).
-   */ function __PRIVATE_validateCollectionPath(e) {
-      if (DocumentKey.isDocumentKey(e)) throw new FirestoreError(D.INVALID_ARGUMENT, `Invalid collection reference. Collection references must have an odd number of segments, but ${e} has ${e.length}.`);
-  }
-
-  /**
    * Returns true if it's a non-null object without a custom prototype
    * (i.e. excludes Array, Date, etc.).
    */ function __PRIVATE_isPlainObject(e) {
@@ -21515,12 +18205,6 @@
       }
   }
 
-  function __PRIVATE_refValue(e, t) {
-      return {
-          referenceValue: `projects/${e.projectId}/databases/${e.database}/documents/${t.path.canonicalString()}`
-      };
-  }
-
   /** Returns true if `value` is an BooleanValue . */
   /** Returns true if `value` is an IntegerValue . */
   function isInteger(e) {
@@ -21709,27 +18393,6 @@
       clone() {
           return new ObjectValue(__PRIVATE_deepClone(this.value));
       }
-  }
-
-  /**
-   * Returns a FieldMask built from all fields in a MapValue.
-   */ function __PRIVATE_extractFieldMask(e) {
-      const t = [];
-      return forEach(e.fields, ((e, n) => {
-          const r = new FieldPath$1([ e ]);
-          if (__PRIVATE_isMapValue(n)) {
-              const e = __PRIVATE_extractFieldMask(n.mapValue).fields;
-              if (0 === e.length) 
-              // Preserve the empty map by adding it to the FieldMask.
-              t.push(r); else 
-              // For nested and non-empty ObjectValues, add the FieldPath of the
-              // leaf nodes.
-              for (const n of e) t.push(r.child(n));
-          } else 
-          // For nested and non-empty ObjectValues, add the FieldPath of the leaf
-          // nodes.
-          t.push(r);
-      })), new FieldMask(t);
   }
 
   /**
@@ -21953,32 +18616,6 @@
       }(e.transform, t.transform);
   }
 
-  /** The result of successfully applying a mutation to the backend. */
-  class MutationResult {
-      constructor(
-      /**
-       * The version at which the mutation was committed:
-       *
-       * - For most operations, this is the updateTime in the WriteResult.
-       * - For deletes, the commitTime of the WriteResponse (because deletes are
-       *   not stored and have no updateTime).
-       *
-       * Note that these versions can be different: No-op writes will not change
-       * the updateTime even though the commitTime advances.
-       */
-      e, 
-      /**
-       * The resulting fields returned from the backend after a mutation
-       * containing field transforms has been committed. Contains one FieldValue
-       * for each FieldTransform that was in the mutation.
-       *
-       * Will be empty if the mutation did not contain any field transforms.
-       */
-      t) {
-          this.version = e, this.transformResults = t;
-      }
-  }
-
   /**
    * Encodes a precondition for a mutation. This follows the model that the
    * backend accepts with the special case of an explicit "empty" precondition
@@ -22176,30 +18813,6 @@
    */ (e, t, n);
   }
 
-  /**
-   * If this mutation is not idempotent, returns the base value to persist with
-   * this mutation. If a base value is returned, the mutation is always applied
-   * to this base value, even if document has already been updated.
-   *
-   * The base value is a sparse object that consists of only the document
-   * fields for which this mutation contains a non-idempotent transformation
-   * (e.g. a numeric increment). The provided value guarantees consistent
-   * behavior for non-idempotent transforms and allow us to return the same
-   * latency-compensated value even if the backend has already applied the
-   * mutation. The base value is null for idempotent mutations, as they can be
-   * re-played even if the backend has already applied them.
-   *
-   * @returns a base value to store along with the mutation, or null for
-   * idempotent mutations.
-   */ function __PRIVATE_mutationExtractBaseValue(e, t) {
-      let n = null;
-      for (const r of e.fieldTransforms) {
-          const e = t.data.field(r.field), i = __PRIVATE_computeTransformOperationBaseValue(r.transform, e || null);
-          null != i && (null === n && (n = ObjectValue.empty()), n.set(r.field, i));
-      }
-      return n || null;
-  }
-
   function __PRIVATE_mutationEquals(e, t) {
       return e.type === t.type && (!!e.key.isEqual(t.key) && (!!e.precondition.isEqual(t.precondition) && (!!function __PRIVATE_fieldTransformsAreEqual(e, t) {
           return void 0 === e && void 0 === t || !(!e || !t) && __PRIVATE_arrayEquals(e, t, ((e, t) => __PRIVATE_fieldTransformEquals(e, t)));
@@ -22284,16 +18897,6 @@
   /** A mutation that deletes the document at the given key. */ class __PRIVATE_DeleteMutation extends Mutation {
       constructor(e, t) {
           super(), this.key = e, this.precondition = t, this.type = 2 /* MutationType.Delete */ , 
-          this.fieldTransforms = [];
-      }
-      getFieldMask() {
-          return null;
-      }
-  }
-
-  class __PRIVATE_VerifyMutation extends Mutation {
-      constructor(e, t) {
-          super(), this.key = e, this.precondition = t, this.type = 3 /* MutationType.Verify */ , 
           this.fieldTransforms = [];
       }
       getFieldMask() {
@@ -22973,11 +19576,6 @@
       }
   }
 
-  function __PRIVATE_queryWithAddedFilter(e, t) {
-      const n = e.filters.concat([ t ]);
-      return new __PRIVATE_QueryImpl(e.path, e.collectionGroup, e.explicitOrderBy.slice(), n, e.limit, e.limitType, e.startAt, e.endAt);
-  }
-
   function __PRIVATE_queryWithLimit(e, t, n) {
       return new __PRIVATE_QueryImpl(e.path, e.collectionGroup, e.explicitOrderBy.slice(), e.filters.slice(), t, n, e.startAt, e.endAt);
   }
@@ -23132,49 +19730,6 @@
    * are used for reverse lookups from the webchannel stream. Do NOT change the
    * names of these identifiers or change this into a const enum.
    */ var Pt, Rt;
-
-  /**
-   * Determines whether an error code represents a permanent error when received
-   * in response to a non-write operation.
-   *
-   * See isPermanentWriteError for classifying write errors.
-   */
-  function __PRIVATE_isPermanentError(e) {
-      switch (e) {
-        case D.OK:
-          return fail(64938);
-
-        case D.CANCELLED:
-        case D.UNKNOWN:
-        case D.DEADLINE_EXCEEDED:
-        case D.RESOURCE_EXHAUSTED:
-        case D.INTERNAL:
-        case D.UNAVAILABLE:
-   // Unauthenticated means something went wrong with our token and we need
-          // to retry with new credentials which will happen automatically.
-                case D.UNAUTHENTICATED:
-          return false;
-
-        case D.INVALID_ARGUMENT:
-        case D.NOT_FOUND:
-        case D.ALREADY_EXISTS:
-        case D.PERMISSION_DENIED:
-        case D.FAILED_PRECONDITION:
-   // Aborted might be retried in some scenarios, but that is dependent on
-          // the context and should handled individually by the calling code.
-          // See https://cloud.google.com/apis/design/errors.
-                case D.ABORTED:
-        case D.OUT_OF_RANGE:
-        case D.UNIMPLEMENTED:
-        case D.DATA_LOSS:
-          return true;
-
-        default:
-          return fail(15467, {
-              code: e
-          });
-      }
-  }
 
   /**
    * Determines whether an error code represents a permanent error when received
@@ -23392,8 +19947,6 @@
   function __PRIVATE_newDocumentKeyMap() {
       return new ObjectMap((e => e.toString()), ((e, t) => e.isEqual(t)));
   }
-
-  const Vt = new SortedMap(DocumentKey.comparator);
 
   const dt = new SortedSet(DocumentKey.comparator);
 
@@ -24296,13 +20849,6 @@
       }), e.popFirst(5);
   }
 
-  /** Creates a Document proto from key and fields (but no create/update time) */ function __PRIVATE_toMutationDocument(e, t, n) {
-      return {
-          name: __PRIVATE_toName(e, t),
-          fields: n.value.mapValue.fields
-      };
-  }
-
   function __PRIVATE_fromWatchChange(e, t) {
       let n;
       if ("targetChange" in t) {
@@ -24361,79 +20907,6 @@
           }
       }
       return n;
-  }
-
-  function toMutation(e, t) {
-      let n;
-      if (t instanceof __PRIVATE_SetMutation) n = {
-          update: __PRIVATE_toMutationDocument(e, t.key, t.value)
-      }; else if (t instanceof __PRIVATE_DeleteMutation) n = {
-          delete: __PRIVATE_toName(e, t.key)
-      }; else if (t instanceof __PRIVATE_PatchMutation) n = {
-          update: __PRIVATE_toMutationDocument(e, t.key, t.data),
-          updateMask: __PRIVATE_toDocumentMask(t.fieldMask)
-      }; else {
-          if (!(t instanceof __PRIVATE_VerifyMutation)) return fail(16599, {
-              gt: t.type
-          });
-          n = {
-              verify: __PRIVATE_toName(e, t.key)
-          };
-      }
-      return t.fieldTransforms.length > 0 && (n.updateTransforms = t.fieldTransforms.map((e => function __PRIVATE_toFieldTransform(e, t) {
-          const n = t.transform;
-          if (n instanceof __PRIVATE_ServerTimestampTransform) return {
-              fieldPath: t.field.canonicalString(),
-              setToServerValue: "REQUEST_TIME"
-          };
-          if (n instanceof __PRIVATE_ArrayUnionTransformOperation) return {
-              fieldPath: t.field.canonicalString(),
-              appendMissingElements: {
-                  values: n.elements
-              }
-          };
-          if (n instanceof __PRIVATE_ArrayRemoveTransformOperation) return {
-              fieldPath: t.field.canonicalString(),
-              removeAllFromArray: {
-                  values: n.elements
-              }
-          };
-          if (n instanceof __PRIVATE_NumericIncrementTransformOperation) return {
-              fieldPath: t.field.canonicalString(),
-              increment: n.Re
-          };
-          if (n instanceof __PRIVATE_NumericMinimumTransformOperation) return {
-              fieldPath: t.field.canonicalString(),
-              minimum: n.Re
-          };
-          if (n instanceof __PRIVATE_NumericMaximumTransformOperation) return {
-              fieldPath: t.field.canonicalString(),
-              maximum: n.Re
-          };
-          throw fail(20930, {
-              transform: t.transform
-          });
-      }(0, e)))), t.precondition.isNone || (n.currentDocument = function __PRIVATE_toPrecondition(e, t) {
-          return void 0 !== t.updateTime ? {
-              updateTime: __PRIVATE_toVersion(e, t.updateTime)
-          } : void 0 !== t.exists ? {
-              exists: t.exists
-          } : fail(27497);
-      }(e, t.precondition)), n;
-  }
-
-  function __PRIVATE_fromWriteResults(e, t) {
-      return e && e.length > 0 ? (__PRIVATE_hardAssert(void 0 !== t, 14353), e.map((e => function __PRIVATE_fromWriteResult(e, t) {
-          // NOTE: Deletes don't have an updateTime.
-          let n = e.updateTime ? __PRIVATE_fromVersion(e.updateTime) : __PRIVATE_fromVersion(t);
-          return n.isEqual(SnapshotVersion.min()) && (
-          // The Firestore Emulator currently returns an update time of 0 for
-          // deletes of non-existing documents (rather than null). This breaks the
-          // test "get deleted doc while offline with source=cache" as NoDocuments
-          // with version 0 are filtered by IndexedDb's RemoteDocumentCache.
-          // TODO(#2149): Remove this when Emulator is fixed
-          n = __PRIVATE_fromVersion(t)), new MutationResult(n, e.transformResults || []);
-      }(e, t)))) : [];
   }
 
   function __PRIVATE_toDocumentsTarget(e, t) {
@@ -24742,13 +21215,6 @@
       }(e) : fail(54877, {
           filter: e
       });
-  }
-
-  function __PRIVATE_toDocumentMask(e) {
-      const t = [];
-      return e.fields.forEach((e => t.push(e.canonicalString()))), {
-          fieldPaths: t
-      };
   }
 
   function __PRIVATE_isValidResourceName(e) {
@@ -26011,78 +22477,6 @@
   }
 
   /**
-   * A Stream that implements the Write RPC.
-   *
-   * The Write RPC requires the caller to maintain special streamToken
-   * state in between calls, to help the server understand which responses the
-   * client has processed by the time the next request is made. Every response
-   * will contain a streamToken; this value must be passed to the next
-   * request.
-   *
-   * After calling start() on this stream, the next request must be a handshake,
-   * containing whatever streamToken is on hand. Once a response to this
-   * request is received, all pending mutations may be submitted. When
-   * submitting multiple batches of mutations at the same time, it's
-   * okay to use the same streamToken for the calls to writeMutations.
-   *
-   * TODO(b/33271235): Use proto types
-   */ class __PRIVATE_PersistentWriteStream extends __PRIVATE_PersistentStream {
-      constructor(e, t, n, r, i, s) {
-          super(e, "write_stream_connection_backoff" /* TimerId.WriteStreamConnectionBackoff */ , "write_stream_idle" /* TimerId.WriteStreamIdle */ , "health_check_timeout" /* TimerId.HealthCheckTimeout */ , t, n, r, s), 
-          this.serializer = i;
-      }
-      /**
-       * Tracks whether or not a handshake has been successfully exchanged and
-       * the stream is ready to accept mutations.
-       */    get Jn() {
-          return this.Dn > 0;
-      }
-      // Override of PersistentStream.start
-      start() {
-          this.lastStreamToken = void 0, super.start();
-      }
-      qn() {
-          this.Jn && this.Yn([]);
-      }
-      Qn(e, t) {
-          return this.connection.cn("Write", e, t);
-      }
-      Gn(e) {
-          // Always capture the last stream token.
-          return __PRIVATE_hardAssert(!!e.streamToken, 31322), this.lastStreamToken = e.streamToken, 
-          // The first response is always the handshake response
-          __PRIVATE_hardAssert(!e.writeResults || 0 === e.writeResults.length, 55816), this.listener.Zn();
-      }
-      onNext(e) {
-          // Always capture the last stream token.
-          __PRIVATE_hardAssert(!!e.streamToken, 12678), this.lastStreamToken = e.streamToken, 
-          // A successful first write response means the stream is healthy,
-          // Note, that we could consider a successful handshake healthy, however,
-          // the write itself might be causing an error we want to back off from.
-          this.xn.reset();
-          const t = __PRIVATE_fromWriteResults(e.writeResults, e.commitTime), n = __PRIVATE_fromVersion(e.commitTime);
-          return this.listener.Xn(n, t);
-      }
-      /**
-       * Sends an initial streamToken to the server, performing the handshake
-       * required to make the StreamingWrite RPC work. Subsequent
-       * calls should wait until onHandshakeComplete was called.
-       */    er() {
-          // TODO(dimond): Support stream resumption. We intentionally do not set the
-          // stream token on the handshake, ignoring any stream token we might have.
-          const e = {};
-          e.database = __PRIVATE_getEncodedDatabaseId(this.serializer), this.Bn(e);
-      }
-      /** Sends a group of mutations to the Firestore backend to apply. */    Yn(e) {
-          const t = {
-              streamToken: this.lastStreamToken,
-              writes: e.map((e => toMutation(this.serializer, e)))
-          };
-          this.Bn(t);
-      }
-  }
-
-  /**
    * @license
    * Copyright 2017 Google LLC
    *
@@ -26699,19 +23093,6 @@
       }
   }
 
-  function collection(e, t, ...n) {
-      if (e = getModularInstance(e), __PRIVATE_validateNonEmptyArgument("collection", "path", t), e instanceof Firestore$1) {
-          const r = ResourcePath.fromString(t, ...n);
-          return __PRIVATE_validateCollectionPath(r), new CollectionReference(e, /* converter= */ null, r);
-      }
-      {
-          if (!(e instanceof DocumentReference || e instanceof CollectionReference)) throw new FirestoreError(D.INVALID_ARGUMENT, "Expected first argument to collection() to be a CollectionReference, a DocumentReference or FirebaseFirestore");
-          const r = e._path.child(ResourcePath.fromString(t, ...n));
-          return __PRIVATE_validateCollectionPath(r), new CollectionReference(e.firestore, 
-          /* converter= */ null, r);
-      }
-  }
-
   function doc(e, t, ...n) {
       if (e = getModularInstance(e), 
       // We allow omission of 'pathString' but explicitly prohibit passing in both
@@ -26843,33 +23224,6 @@
       vectorValues: property("object")
   };
 
-  /**
-   * @license
-   * Copyright 2017 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   */
-  const $t = /^__.*__$/;
-
-  /** The result of parsing document data (e.g. for a setData call). */ class ParsedSetData {
-      constructor(e, t, n) {
-          this.data = e, this.fieldMask = t, this.fieldTransforms = n;
-      }
-      toMutation(e, t) {
-          return null !== this.fieldMask ? new __PRIVATE_PatchMutation(e, this.data, this.fieldMask, t, this.fieldTransforms) : new __PRIVATE_SetMutation(e, this.data, t, this.fieldTransforms);
-      }
-  }
-
   function __PRIVATE_isWrite(e) {
       switch (e) {
         case 0 /* UserDataSource.Set */ :
@@ -26888,133 +23242,6 @@
               dataSource: e
           });
       }
-  }
-
-  /** A "context" object passed around while parsing user data. */ class ParseContextImpl {
-      /**
-       * Initializes a ParseContext with the given source and path.
-       *
-       * @param settings - The settings for the parser.
-       * @param databaseId - The database ID of the Firestore instance.
-       * @param serializer - The serializer to use to generate the Value proto.
-       * @param ignoreUndefinedProperties - Whether to ignore undefined properties
-       * rather than throw.
-       * @param fieldTransforms - A mutable list of field transforms encountered
-       * while parsing the data.
-       * @param fieldMask - A mutable list of field paths encountered while parsing
-       * the data.
-       *
-       * TODO(b/34871131): We don't support array paths right now, so path can be
-       * null to indicate the context represents any location within an array (in
-       * which case certain features will not work and errors will be somewhat
-       * compromised).
-       */
-      constructor(e, t, n, r, i, s) {
-          this.settings = e, this.databaseId = t, this.serializer = n, this.ignoreUndefinedProperties = r, 
-          // Minor hack: If fieldTransforms is undefined, we assume this is an
-          // external call and we need to validate the entire path.
-          void 0 === i && this.validatePath(), this.fieldTransforms = i || [], this.fieldMask = s || [];
-      }
-      get path() {
-          return this.settings.path;
-      }
-      get dataSource() {
-          return this.settings.dataSource;
-      }
-      /** Returns a new context with the specified settings overwritten. */    contextWith(e) {
-          return new ParseContextImpl({
-              ...this.settings,
-              ...e
-          }, this.databaseId, this.serializer, this.ignoreUndefinedProperties, this.fieldTransforms, this.fieldMask);
-      }
-      childContextForField(e) {
-          const t = this.path?.child(e), n = this.contextWith({
-              path: t,
-              arrayElement: false
-          });
-          return n.validatePathSegment(e), n;
-      }
-      childContextForFieldPath(e) {
-          const t = this.path?.child(e), n = this.contextWith({
-              path: t,
-              arrayElement: false
-          });
-          return n.validatePath(), n;
-      }
-      childContextForArray(e) {
-          // TODO(b/34871131): We don't support array paths right now; so make path
-          // undefined.
-          return this.contextWith({
-              path: void 0,
-              arrayElement: true
-          });
-      }
-      createError(e) {
-          return createError(e, this.settings.methodName, this.settings.hasConverter || false, this.path, this.settings.targetDoc);
-      }
-      /** Returns 'true' if 'fieldPath' was traversed when creating this context. */    contains(e) {
-          return void 0 !== this.fieldMask.find((t => e.isPrefixOf(t))) || void 0 !== this.fieldTransforms.find((t => e.isPrefixOf(t.field)));
-      }
-      validatePath() {
-          // TODO(b/34871131): Remove null check once we have proper paths for fields
-          // within arrays.
-          if (this.path) for (let e = 0; e < this.path.length; e++) this.validatePathSegment(this.path.get(e));
-      }
-      validatePathSegment(e) {
-          if (0 === e.length) throw this.createError("Document fields must not be empty");
-          if (__PRIVATE_isWrite(this.dataSource) && $t.test(e)) throw this.createError('Document fields cannot begin and end with "__"');
-      }
-  }
-
-  /**
-   * Helper for parsing raw user input (provided via the API) into internal model
-   * classes.
-   */ class UserDataReader {
-      constructor(e, t, n) {
-          this.databaseId = e, this.ignoreUndefinedProperties = t, this.serializer = n || __PRIVATE_newSerializer(e);
-      }
-      /** Creates a new top-level parse context. */    createContext(e, t, n, r = false) {
-          return new ParseContextImpl({
-              dataSource: e,
-              methodName: t,
-              targetDoc: n,
-              path: FieldPath$1.emptyPath(),
-              arrayElement: false,
-              hasConverter: r
-          }, this.databaseId, this.serializer, this.ignoreUndefinedProperties);
-      }
-  }
-
-  function __PRIVATE_newUserDataReader(e) {
-      const t = e._freezeSettings(), n = __PRIVATE_newSerializer(e._databaseId);
-      return new UserDataReader(e._databaseId, !!t.ignoreUndefinedProperties, n);
-  }
-
-  /** Parse document data from a set() call. */ function __PRIVATE_parseSetData(e, t, n, r, i, s = {}) {
-      const _ = e.createContext(s.merge || s.mergeFields ? 2 /* UserDataSource.MergeSet */ : 0 /* UserDataSource.Set */ , t, n, i);
-      __PRIVATE_validatePlainObject("Data must be an object, but it was:", _, r);
-      const o = __PRIVATE_parseObject(r, _);
-      let a, u;
-      if (s.merge) a = new FieldMask(_.fieldMask), u = _.fieldTransforms; else if (s.mergeFields) {
-          const e = [];
-          for (const r of s.mergeFields) {
-              const i = __PRIVATE_fieldPathFromArgument(t, r, n);
-              if (!_.contains(i)) throw new FirestoreError(D.INVALID_ARGUMENT, `Field '${i}' is specified in your field mask but missing from your input data.`);
-              __PRIVATE_fieldMaskContains(e, i) || e.push(i);
-          }
-          a = new FieldMask(e), u = _.fieldTransforms.filter((e => a.covers(e.field)));
-      } else a = null, u = _.fieldTransforms;
-      return new ParsedSetData(new ObjectValue(o), a, u);
-  }
-
-  /**
-   * Parse a "query value" (e.g. value in a where filter or a value in a cursor
-   * bound).
-   *
-   * @param allowArrays - Whether the query value is an array that may directly
-   * contain additional arrays (e.g. the operand of an `in` query).
-   */ function __PRIVATE_parseQueryValue(e, t, n, r = false) {
-      return __PRIVATE_parseData(n, e.createContext(r ? 4 /* UserDataSource.ArrayArgument */ : 3 /* UserDataSource.Argument */ , t));
   }
 
   /**
@@ -27200,9 +23427,7 @@
       // FieldPath.
       t = getModularInstance(t)) instanceof FieldPath) return t._internalPath;
       if ("string" == typeof t) return __PRIVATE_fieldPathFromDotSeparatedString(e, t);
-      throw createError("Field path arguments must be of type string or ", e, 
-      /* hasConverter= */ false, 
-      /* path= */ void 0, n);
+      throw createError("Field path arguments must be of type string or ", e);
   }
 
   /**
@@ -27218,29 +23443,19 @@
    * @param targetDoc - The document against which the field path will be
    * evaluated.
    */ function __PRIVATE_fieldPathFromDotSeparatedString(e, t, n) {
-      if (t.search(Kt$1) >= 0) throw createError(`Invalid field path (${t}). Paths must not contain '~', '*', '/', '[', or ']'`, e, 
-      /* hasConverter= */ false, 
-      /* path= */ void 0, n);
+      if (t.search(Kt$1) >= 0) throw createError(`Invalid field path (${t}). Paths must not contain '~', '*', '/', '[', or ']'`, e);
       try {
           return new FieldPath(...t.split("."))._internalPath;
       } catch (r) {
-          throw createError(`Invalid field path (${t}). Paths must not be empty, begin with '.', end with '.', or contain '..'`, e, 
-          /* hasConverter= */ false, 
-          /* path= */ void 0, n);
+          throw createError(`Invalid field path (${t}). Paths must not be empty, begin with '.', end with '.', or contain '..'`, e);
       }
   }
 
   function createError(e, t, n, r, i) {
-      const s = r && !r.isEmpty(), _ = void 0 !== i;
       let o = `Function ${t}() called with invalid data`;
-      n && (o += " (via `toFirestore()`)"), o += ". ";
+      o += ". ";
       let a = "";
-      return (s || _) && (a += " (found", s && (a += ` in field ${r}`), _ && (a += ` in document ${i}`), 
-      a += ")"), new FirestoreError(D.INVALID_ARGUMENT, o + e + a);
-  }
-
-  /** Checks `haystack` if FieldPath `needle` is present. Runs in O(n). */ function __PRIVATE_fieldMaskContains(e, t) {
-      return e.some((e => e.isEqual(t)));
+      return new FirestoreError(D.INVALID_ARGUMENT, o + e + a);
   }
 
   function __PRIVATE_isUserData(e) {
@@ -27395,7 +23610,7 @@
    * @param value
    */ function __PRIVATE_fieldOrExpression(e) {
       if (__PRIVATE_isString$1(e)) {
-          return field(e);
+          return field$1(e);
       }
       return __PRIVATE_valueToDefaultExpr(e);
   }
@@ -28951,7 +25166,7 @@
        */    _readUserData(e) {}
   }
 
-  function field(e) {
+  function field$1(e) {
       return _field(e, "field");
   }
 
@@ -29706,73 +25921,6 @@
 
   function getPipelineDocuments(e) {
       if ("documents" === getPipelineSourceType(e)) return e.stages[0].dr;
-  }
-
-  class __PRIVATE_RealtimePipeline {
-      /**
-       * @internal
-       * @private
-       * @param _db
-       * @param userDataReader
-       * @param _userDataWriter
-       * @param _documentReferenceFactory
-       * @param stages
-       */
-      constructor(
-      /**
-       * @internal
-       * @private
-       */
-      e, 
-      /**
-       * @internal
-       * @private
-       */
-      t, 
-      /**
-       * @internal
-       * @private
-       */
-      n, r) {
-          this._db = e, this.userDataReader = t, this._userDataWriter = n, this.stages = r;
-      }
-      /**
-       * Reads user data for each expression in the expressionMap.
-       * @param name Name of the calling function. Used for error messages when invalid user data is encountered.
-       * @param expressionMap
-       * @return the expressionMap argument.
-       * @private
-       * @internal
-       */    wr(e, t) {
-          const n = this.userDataReader.createContext(3 /* UserDataSource.Argument */ , e);
-          return __PRIVATE_isUserData(t) ? t._readUserData(n) : Array.isArray(t) ? t.forEach((e => e._readUserData(n))) : t.forEach((e => e._readUserData(n))), 
-          t;
-      }
-      where(e) {
-          const t = this.stages.map((e => e));
-          return this.wr("where", e), t.push(new __PRIVATE_Where(e, {})), new __PRIVATE_RealtimePipeline(this._db, this.userDataReader, this._userDataWriter, t);
-      }
-      limit(e) {
-          const t = this.stages.map((e => e));
-          return t.push(new __PRIVATE_Limit(e, {})), new __PRIVATE_RealtimePipeline(this._db, this.userDataReader, this._userDataWriter, t);
-      }
-      sort(e, ...t) {
-          const n = this.stages.map((e => e));
-          // Option object
-                  return "orderings" in e ? n.push(new __PRIVATE_Sort(this.wr("sort", e.orderings), {})) : 
-          // Ordering object
-          n.push(new __PRIVATE_Sort(this.wr("sort", [ e, ...t ]), {})), new __PRIVATE_RealtimePipeline(this._db, this.userDataReader, this._userDataWriter, n);
-      }
-      /**
-       * @internal
-       * @private
-       */    br(e) {
-          return {
-              pipeline: {
-                  stages: this.stages.map((t => t._toProto(e)))
-              }
-          };
-      }
   }
 
   // Copyright 2024 Google LLC* @license
@@ -31699,37 +27847,6 @@
       return e instanceof CorePipeline && t instanceof CorePipeline ? __PRIVATE_pipelineEq(e, t) : !(e instanceof CorePipeline && !(t instanceof CorePipeline) || !(e instanceof CorePipeline) && t instanceof CorePipeline) && __PRIVATE_targetEquals(e, t);
   }
 
-  // function addSystemFields(
-  //   fields: Map<string, Expression>
-  // ): Map<string, Expression> {
-  //   const newFields = new Map<string, Expression>(fields);
-  //   newFields.set(DOCUMENT_KEY_NAME, field(DOCUMENT_KEY_NAME));
-  //   newFields.set(CREATE_TIME_NAME, field(CREATE_TIME_NAME));
-  //   newFields.set(UPDATE_TIME_NAME, field(UPDATE_TIME_NAME));
-  //   return newFields;
-  // }
-  function __PRIVATE_toCorePipeline(e, t) {
-      const n = function __PRIVATE_rewriteStages(e) {
-          let t = false;
-          const n = [];
-          for (const r of e) 
-          // For stages that provide ordering semantics
-          if (r instanceof __PRIVATE_Sort) 
-          // Ensure we have a stable ordering
-          if (t = true, r.orderings.some((e => e.expr instanceof Field && e.expr.fieldName === F))) n.push(r); else {
-              const e = r.orderings.map((e => e));
-              e.push(field(F).ascending()), n.push(new __PRIVATE_Sort(e, {}));
-          } else r instanceof __PRIVATE_Limit ? (t || (n.push(new __PRIVATE_Sort([ field(F).ascending() ], {})), 
-          t = true), n.push(r)) : n.push(r);
-          return t || n.push(new __PRIVATE_Sort([ field(F).ascending() ], {})), n;
-      }(e.stages);
-      if (e.userDataReader) {
-          const t = e.userDataReader.createContext(3 /* UserDataSource.Argument */ , "toCorePipeline");
-          n.forEach((e => e._readUserData(t)));
-      }
-      return new CorePipeline(e.userDataReader.serializer, n, t);
-  }
-
   /**
    * @license
    * Copyright 2017 Google LLC
@@ -31821,33 +27938,6 @@
       }
       isEqual(e) {
           return this.batchId === e.batchId && __PRIVATE_arrayEquals(this.mutations, e.mutations, ((e, t) => __PRIVATE_mutationEquals(e, t))) && __PRIVATE_arrayEquals(this.baseMutations, e.baseMutations, ((e, t) => __PRIVATE_mutationEquals(e, t)));
-      }
-  }
-
-  /** The result of applying a mutation batch to the backend. */ class MutationBatchResult {
-      constructor(e, t, n, 
-      /**
-       * A pre-computed mapping from each mutated document to the resulting
-       * version.
-       */
-      r) {
-          this.batch = e, this.commitVersion = t, this.mutationResults = n, this.docVersions = r;
-      }
-      /**
-       * Creates a new MutationBatchResult for the given batch and results. There
-       * must be one result for each mutation in the batch. This static factory
-       * caches a document=&gt;version mapping (docVersions).
-       */    static from(e, t, n) {
-          __PRIVATE_hardAssert(e.mutations.length === n.length, 58842, {
-              Qr: e.mutations.length,
-              Gr: n.length
-          });
-          let r = function __PRIVATE_documentVersionMap() {
-              return Vt;
-          }();
-          const i = e.mutations;
-          for (let e = 0; e < i.length; e++) r = r.insert(i[e].key, n[e].version);
-          return new MutationBatchResult(e, t, n, r);
       }
   }
 
@@ -34042,60 +30132,6 @@
       }));
   }
 
-  /* Accepts locally generated Mutations and commit them to storage. */
-  /**
-   * Acknowledges the given batch.
-   *
-   * On the happy path when a batch is acknowledged, the local store will
-   *
-   *  + remove the batch from the mutation queue;
-   *  + apply the changes to the remote document cache;
-   *  + recalculate the latency compensated view implied by those changes (there
-   *    may be mutations in the queue that affect the documents but haven't been
-   *    acknowledged yet); and
-   *  + give the changed documents back the sync engine
-   *
-   * @returns The resulting (modified) documents.
-   */
-  function __PRIVATE_localStoreAcknowledgeBatch(e, t) {
-      const n = __PRIVATE_debugCast(e);
-      return n.persistence.runTransaction("Acknowledge batch", "readwrite-primary", (e => {
-          const r = t.batch.keys(), i = n.Qo.newChangeBuffer({
-              trackRemovals: true
-          });
-          return function __PRIVATE_applyWriteToRemoteDocuments(e, t, n, r) {
-              const i = n.batch, s = i.keys();
-              let _ = PersistencePromise.resolve();
-              return s.forEach((e => {
-                  _ = _.next((() => r.getEntry(t, e))).next((t => {
-                      const s = n.docVersions.get(e);
-                      __PRIVATE_hardAssert(null !== s, 48541), t.version.compareTo(s) < 0 && (i.applyToRemoteDocument(t, n), 
-                      t.isValidDocument() && (
-                      // We use the commitVersion as the readTime rather than the
-                      // document's updateTime since the updateTime is not advanced
-                      // for updates that do not modify the underlying document.
-                      t.setReadTime(n.commitVersion), r.addEntry(t)));
-                  }));
-              })), _.next((() => e.mutationQueue.removeMutationBatch(t, i)));
-          }
-          /** Returns the local view of the documents affected by a mutation batch. */
-          // PORTING NOTE: Multi-Tab only.
-          (n, e, t, i).next((() => i.apply(e))).next((() => n.mutationQueue.performConsistencyCheck(e))).next((() => n.documentOverlayCache.removeOverlaysForBatchId(e, r, t.batch.batchId))).next((() => n.localDocuments.recalculateAndSaveOverlaysForDocumentKeys(e, function __PRIVATE_getKeysWithTransformResults(e) {
-              let t = __PRIVATE_documentKeySet();
-              for (let n = 0; n < e.mutationResults.length; ++n) {
-                  e.mutationResults[n].transformResults.length > 0 && (t = t.add(e.batch.mutations[n].key));
-              }
-              return t;
-          }
-          /**
-   * Removes mutations from the MutationQueue for the specified batch;
-   * LocalDocuments will be recalculated.
-   *
-   * @returns The resulting modified documents.
-   */ (t)))).next((() => n.localDocuments.getDocuments(e, r)));
-      }));
-  }
-
   /**
    * Returns the last consistent snapshot processed (used by the RemoteStore to
    * determine whether to buffer incoming snapshots from the backend).
@@ -34219,18 +30255,6 @@
               Ho: i
           };
       }));
-  }
-
-  /**
-   * Gets the mutation batch after the passed in batchId in the mutation queue
-   * or null if empty.
-   * @param afterBatchId - If provided, the batch to search after.
-   * @returns The next mutation or null if there wasn't one.
-   */
-  function __PRIVATE_localStoreGetNextMutationBatch(e, t) {
-      const n = __PRIVATE_debugCast(e);
-      return n.persistence.runTransaction("Get next mutation batch", "readonly", (e => (void 0 === t && (t = $), 
-      n.mutationQueue.getNextMutationBatchAfterBatchId(e, t))));
   }
 
   /**
@@ -34894,99 +30918,6 @@
       }));
   }
 
-  /**
-   * Executes `op`. If `op` fails, takes the network offline until `op`
-   * succeeds. Returns after the first attempt.
-   */ function __PRIVATE_executeWithRecovery(e, t) {
-      return t().catch((n => __PRIVATE_disableNetworkUntilRecovery(e, n, t)));
-  }
-
-  async function __PRIVATE_fillWritePipeline(e) {
-      const t = __PRIVATE_debugCast(e), n = __PRIVATE_ensureWriteStream(t);
-      let r = t.Ha.length > 0 ? t.Ha[t.Ha.length - 1].batchId : $;
-      for (;__PRIVATE_canAddToWritePipeline(t); ) try {
-          const e = await __PRIVATE_localStoreGetNextMutationBatch(t.localStore, r);
-          if (null === e) {
-              0 === t.Ha.length && n.Nn();
-              break;
-          }
-          r = e.batchId, __PRIVATE_addToWritePipeline(t, e);
-      } catch (e) {
-          await __PRIVATE_disableNetworkUntilRecovery(t, e);
-      }
-      __PRIVATE_shouldStartWriteStream(t) && __PRIVATE_startWriteStream(t);
-  }
-
-  /**
-   * Returns true if we can add to the write pipeline (i.e. the network is
-   * enabled and the write pipeline is not full).
-   */ function __PRIVATE_canAddToWritePipeline(e) {
-      return __PRIVATE_canUseNetwork(e) && e.Ha.length < 10;
-  }
-
-  /**
-   * Queues additional writes to be sent to the write stream, sending them
-   * immediately if the write stream is established.
-   */ function __PRIVATE_addToWritePipeline(e, t) {
-      e.Ha.push(t);
-      const n = __PRIVATE_ensureWriteStream(e);
-      n.Fn() && n.Jn && n.Yn(t.mutations);
-  }
-
-  function __PRIVATE_shouldStartWriteStream(e) {
-      return __PRIVATE_canUseNetwork(e) && !__PRIVATE_ensureWriteStream(e).Cn() && e.Ha.length > 0;
-  }
-
-  function __PRIVATE_startWriteStream(e) {
-      __PRIVATE_ensureWriteStream(e).start();
-  }
-
-  async function __PRIVATE_onWriteStreamOpen(e) {
-      __PRIVATE_ensureWriteStream(e).er();
-  }
-
-  async function __PRIVATE_onWriteHandshakeComplete(e) {
-      const t = __PRIVATE_ensureWriteStream(e);
-      // Send the write pipeline now that the stream is established.
-          for (const n of e.Ha) t.Yn(n.mutations);
-  }
-
-  async function __PRIVATE_onMutationResult(e, t, n) {
-      const r = e.Ha.shift(), i = MutationBatchResult.from(r, t, n);
-      await __PRIVATE_executeWithRecovery(e, (() => e.remoteSyncer.applySuccessfulWrite(i))), 
-      // It's possible that with the completion of this mutation another
-      // slot has freed up.
-      await __PRIVATE_fillWritePipeline(e);
-  }
-
-  async function __PRIVATE_onWriteStreamClose(e, t) {
-      // If the write stream closed after the write handshake completes, a write
-      // operation failed and we fail the pending operation.
-      t && __PRIVATE_ensureWriteStream(e).Jn && 
-      // This error affects the actual write.
-      await async function __PRIVATE_handleWriteError(e, t) {
-          // Only handle permanent errors here. If it's transient, just let the retry
-          // logic kick in.
-          if (function __PRIVATE_isPermanentWriteError(e) {
-              return __PRIVATE_isPermanentError(e) && e !== D.ABORTED;
-          }(t.code)) {
-              // This was a permanent error, the request itself was the problem
-              // so it's not going to succeed if we resend it.
-              const n = e.Ha.shift();
-              // In this case it's also unlikely that the server itself is melting
-              // down -- this was just a bad request so inhibit backoff on the next
-              // restart.
-                          __PRIVATE_ensureWriteStream(e).Mn(), await __PRIVATE_executeWithRecovery(e, (() => e.remoteSyncer.rejectFailedWrite(n.batchId, t))), 
-              // It's possible that with the completion of this mutation
-              // another slot has freed up.
-              await __PRIVATE_fillWritePipeline(e);
-          }
-      }(e, t), 
-      // The write stream might have been started by refilling the write
-      // pipeline for failed writes
-      __PRIVATE_shouldStartWriteStream(e) && __PRIVATE_startWriteStream(e);
-  }
-
   async function __PRIVATE_remoteStoreHandleCredentialChange(e, t) {
       const n = __PRIVATE_debugCast(e);
       n.asyncQueue.verifyOperationInProgress(), __PRIVATE_logDebug(Rn, "RemoteStore received new credentials");
@@ -35031,33 +30962,6 @@
           t ? (e._u.Mn(), __PRIVATE_shouldStartWatchStream(e) ? __PRIVATE_startWatchStream(e) : e.iu.set("Unknown" /* OnlineState.Unknown */)) : (await e._u.stop(), 
           __PRIVATE_cleanUpWatchStreamState(e));
       }))), e._u;
-  }
-
-  /**
-   * If not yet initialized, registers the WriteStream and its network state
-   * callback with `remoteStoreImpl`. Returns the existing stream if one is
-   * already available.
-   *
-   * PORTING NOTE: On iOS and Android, the WriteStream gets registered on startup.
-   * This is not done on Web to allow it to be tree-shaken.
-   */ function __PRIVATE_ensureWriteStream(e) {
-      return e.ou || (
-      // Create stream (but note that it is not started yet).
-      e.ou = function __PRIVATE_newPersistentWriteStream(e, t, n) {
-          const r = __PRIVATE_debugCast(e);
-          return r.nr(), new __PRIVATE_PersistentWriteStream(t, r.connection, r.authCredentials, r.appCheckCredentials, r.serializer, n);
-      }(e.datastore, e.asyncQueue, {
-          Qt: () => Promise.resolve(),
-          zt: __PRIVATE_onWriteStreamOpen.bind(null, e),
-          Ht: __PRIVATE_onWriteStreamClose.bind(null, e),
-          Zn: __PRIVATE_onWriteHandshakeComplete.bind(null, e),
-          Xn: __PRIVATE_onMutationResult.bind(null, e)
-      }), e.nu.push((async t => {
-          t ? (e.ou.Mn(), 
-          // This will start the write stream if necessary.
-          await __PRIVATE_fillWritePipeline(e)) : (await e.ou.stop(), e.Ha.length > 0 && (__PRIVATE_logDebug(Rn, `Stopping write stream with ${e.Ha.length} pending writes`), 
-          e.Ha = []));
-      }))), e.ou;
   }
 
   /**
@@ -36074,78 +31978,6 @@
   }
 
   /**
-   * Initiates the write of local mutation batch which involves adding the
-   * writes to the mutation queue, notifying the remote store about new
-   * mutations and raising events for any changes this write caused.
-   *
-   * The promise returned by this call is resolved when the above steps
-   * have completed, *not* when the write was acked by the backend. The
-   * userCallback is resolved once the write was acked/rejected by the
-   * backend (or failed locally for any other reason).
-   */ async function __PRIVATE_syncEngineWrite(e, t, n) {
-      const r = __PRIVATE_syncEngineEnsureWriteCallbacks(e);
-      try {
-          const e = await function __PRIVATE_localStoreWriteLocally(e, t) {
-              const n = __PRIVATE_debugCast(e), r = Timestamp.now(), i = t.reduce(((e, t) => e.add(t.key)), __PRIVATE_documentKeySet());
-              let s, _;
-              return n.persistence.runTransaction("Locally write mutations", "readwrite", (e => {
-                  // Figure out which keys do not have a remote version in the cache, this
-                  // is needed to create the right overlay mutation: if no remote version
-                  // presents, we do not need to create overlays as patch mutations.
-                  // TODO(Overlay): Is there a better way to determine this? Using the
-                  //  document version does not work because local mutations set them back
-                  //  to 0.
-                  let o = __PRIVATE_mutableDocumentMap(), a = __PRIVATE_documentKeySet();
-                  return n.Qo.getEntries(e, i).next((e => {
-                      o = e, o.forEach(((e, t) => {
-                          t.isValidDocument() || (a = a.add(e));
-                      }));
-                  })).next((() => n.localDocuments.getOverlayedDocuments(e, o))).next((i => {
-                      s = i;
-                      // For non-idempotent mutations (such as `FieldValue.increment()`),
-                      // we record the base state in a separate patch mutation. This is
-                      // later used to guarantee consistent values and prevents flicker
-                      // even if the backend sends us an update that already includes our
-                      // transform.
-                      const _ = [];
-                      for (const e of t) {
-                          const t = __PRIVATE_mutationExtractBaseValue(e, s.get(e.key).overlayedDocument);
-                          null != t && 
-                          // NOTE: The base state should only be applied if there's some
-                          // existing document to override, so use a Precondition of
-                          // exists=true
-                          _.push(new __PRIVATE_PatchMutation(e.key, t, __PRIVATE_extractFieldMask(t.value.mapValue), Precondition.exists(!0)));
-                      }
-                      return n.mutationQueue.addMutationBatch(e, r, _, t);
-                  })).next((t => {
-                      _ = t;
-                      const r = t.applyToLocalDocumentSet(s, a);
-                      return n.documentOverlayCache.saveOverlays(e, t.batchId, r);
-                  }));
-              })).then((() => ({
-                  batchId: _.batchId,
-                  changes: __PRIVATE_convertOverlayedDocumentMapToDocumentMap(s)
-              })));
-          }(r.localStore, t);
-          r.sharedClientState.addPendingMutation(e.batchId), function __PRIVATE_addMutationCallback(e, t, n) {
-              let r = e.oc[e.currentUser.toKey()];
-              r || (r = new SortedMap(__PRIVATE_primitiveComparator));
-              r = r.insert(t, n), e.oc[e.currentUser.toKey()] = r;
-          }
-          /**
-   * Resolves or rejects the user callback for the given batch and then discards
-   * it.
-   */ (r, e.batchId, n), await __PRIVATE_syncEngineEmitNewSnapsAndNotifyLocalStore(r, e.changes), 
-          await __PRIVATE_fillWritePipeline(r.remoteStore);
-      } catch (e) {
-          // If we can't persist the mutation, we reject the user callback and
-          // don't send the mutation. The user can then retry the write.
-          const t = __PRIVATE_wrapInUserErrorIfRecoverable(e, "Failed to persist write");
-          n.reject(t);
-      }
-  }
-
-  /**
    * Applies one remote event to the sync engine, notifying any views of the
    * changes, and releasing any pending mutation batches that would become
    * visible because of the snapshot version the remote event contains.
@@ -36234,69 +32066,6 @@
           r.rc = r.rc.remove(s), r.sc.delete(t), __PRIVATE_pumpEnqueuedLimboResolutions(r);
       } else await __PRIVATE_localStoreReleaseTarget(r.localStore, t, 
       /* keepPersistedTargetData */ false).then((() => __PRIVATE_removeAndCleanupTarget(r, t, n))).catch(__PRIVATE_ignoreIfPrimaryLeaseLoss);
-  }
-
-  async function __PRIVATE_syncEngineApplySuccessfulWrite(e, t) {
-      const n = __PRIVATE_debugCast(e), r = t.batch.batchId;
-      try {
-          const e = await __PRIVATE_localStoreAcknowledgeBatch(n.localStore, t);
-          // The local store may or may not be able to apply the write result and
-          // raise events immediately (depending on whether the watcher is caught
-          // up), so we raise user callbacks first so that they consistently happen
-          // before listen events.
-                  __PRIVATE_processUserCallback(n, r, /*error=*/ null), __PRIVATE_triggerPendingWritesCallbacks(n, r), 
-          n.sharedClientState.updateMutationState(r, "acknowledged"), await __PRIVATE_syncEngineEmitNewSnapsAndNotifyLocalStore(n, e);
-      } catch (e) {
-          await __PRIVATE_ignoreIfPrimaryLeaseLoss(e);
-      }
-  }
-
-  async function __PRIVATE_syncEngineRejectFailedWrite(e, t, n) {
-      const r = __PRIVATE_debugCast(e);
-      try {
-          const e = await function __PRIVATE_localStoreRejectBatch(e, t) {
-              const n = __PRIVATE_debugCast(e);
-              return n.persistence.runTransaction("Reject batch", "readwrite-primary", (e => {
-                  let r;
-                  return n.mutationQueue.lookupMutationBatch(e, t).next((t => (__PRIVATE_hardAssert(null !== t, 37113), 
-                  r = t.keys(), n.mutationQueue.removeMutationBatch(e, t)))).next((() => n.mutationQueue.performConsistencyCheck(e))).next((() => n.documentOverlayCache.removeOverlaysForBatchId(e, r, t))).next((() => n.localDocuments.recalculateAndSaveOverlaysForDocumentKeys(e, r))).next((() => n.localDocuments.getDocuments(e, r)));
-              }));
-          }
-          /**
-   * Returns the largest (latest) batch id in mutation queue that is pending
-   * server response.
-   *
-   * Returns `BATCHID_UNKNOWN` if the queue is empty.
-   */ (r.localStore, t);
-          // The local store may or may not be able to apply the write result and
-          // raise events immediately (depending on whether the watcher is caught up),
-          // so we raise user callbacks first so that they consistently happen before
-          // listen events.
-                  __PRIVATE_processUserCallback(r, t, n), __PRIVATE_triggerPendingWritesCallbacks(r, t), 
-          r.sharedClientState.updateMutationState(t, "rejected", n), await __PRIVATE_syncEngineEmitNewSnapsAndNotifyLocalStore(r, e);
-      } catch (n) {
-          await __PRIVATE_ignoreIfPrimaryLeaseLoss(n);
-      }
-  }
-
-  /**
-   * Triggers the callbacks that are waiting for this batch id to get acknowledged by server,
-   * if there are any.
-   */ function __PRIVATE_triggerPendingWritesCallbacks(e, t) {
-      (e.ac.get(t) || []).forEach((e => {
-          e.resolve();
-      })), e.ac.delete(t);
-  }
-
-  /** Reject all outstanding callbacks waiting for pending writes to complete. */ function __PRIVATE_processUserCallback(e, t, n) {
-      const r = __PRIVATE_debugCast(e);
-      let i = r.oc[r.currentUser.toKey()];
-      // NOTE: Mutations restored from persistence won't have callbacks, so it's
-      // okay for there to be no callback for this ID.
-          if (i) {
-          const e = i.get(t);
-          e && (n ? e.reject(n) : e.resolve(), i = i.remove(t)), r.oc[r.currentUser.toKey()] = i;
-      }
   }
 
   function __PRIVATE_removeAndCleanupTarget(e, t, n = null) {
@@ -36437,13 +32206,6 @@
       t.remoteStore.remoteSyncer.getRemoteKeysForTarget = __PRIVATE_syncEngineGetRemoteKeysForTarget.bind(null, t), 
       t.remoteStore.remoteSyncer.rejectListen = __PRIVATE_syncEngineRejectListen.bind(null, t), 
       t.Xu.zn = __PRIVATE_eventManagerOnWatchChange.bind(null, t.eventManager), t.Xu.Ec = __PRIVATE_eventManagerOnWatchError.bind(null, t.eventManager), 
-      t;
-  }
-
-  function __PRIVATE_syncEngineEnsureWriteCallbacks(e) {
-      const t = __PRIVATE_debugCast(e);
-      return t.remoteStore.remoteSyncer.applySuccessfulWrite = __PRIVATE_syncEngineApplySuccessfulWrite.bind(null, t), 
-      t.remoteStore.remoteSyncer.rejectFailedWrite = __PRIVATE_syncEngineRejectFailedWrite.bind(null, t), 
       t;
   }
 
@@ -36768,10 +32530,6 @@
       await __PRIVATE_setOnlineComponentProvider(e, new OnlineComponentProvider))), e._onlineComponents;
   }
 
-  function __PRIVATE_getSyncEngine(e) {
-      return __PRIVATE_ensureOnlineComponents(e).then((e => e.syncEngine));
-  }
-
   async function __PRIVATE_getEventManager(e) {
       const t = await __PRIVATE_ensureOnlineComponents(e), n = t.eventManager;
       return n.onListen = __PRIVATE_syncEngineListen.bind(null, t.syncEngine), n.onUnlisten = __PRIVATE_syncEngineUnlisten.bind(null, t.syncEngine), 
@@ -36806,30 +32564,6 @@
           });
           return __PRIVATE_eventManagerListen(e, _);
       }(await __PRIVATE_getEventManager(e), e.asyncQueue, t, n, r))), r.promise;
-  }
-
-  function __PRIVATE_firestoreClientGetDocumentsViaSnapshotListener(e, t, n = {}) {
-      const r = new __PRIVATE_Deferred;
-      return e.asyncQueue.enqueueAndForget((async () => function __PRIVATE_executeQueryViaSnapshotListener(e, t, n, r, i) {
-          const s = new __PRIVATE_AsyncObserver({
-              next: n => {
-                  // Mute and remove query first before passing event to user to avoid
-                  // user actions affecting the now stale query.
-                  s.gc(), t.enqueueAndForget((() => __PRIVATE_eventManagerUnlisten(e, _))), n.fromCache && "server" === r.source ? i.reject(new FirestoreError(D.UNAVAILABLE, 'Failed to get documents from server. (However, these documents may exist in the local cache. Run again without setting source to "server" to retrieve the cached documents.)')) : i.resolve(n);
-              },
-              error: e => i.reject(e)
-          }), _ = new __PRIVATE_QueryListener(n instanceof __PRIVATE_RealtimePipeline ? __PRIVATE_toCorePipeline(n) : n, s, {
-              includeMetadataChanges: true,
-              waitForSyncWhenOnline: true
-          });
-          return __PRIVATE_eventManagerListen(e, _);
-      }(await __PRIVATE_getEventManager(e), e.asyncQueue, t, n, r))), r.promise;
-  }
-
-  function __PRIVATE_firestoreClientWrite(e, t) {
-      const n = new __PRIVATE_Deferred;
-      return e.asyncQueue.enqueueAndForget((async () => __PRIVATE_syncEngineWrite(await __PRIVATE_getSyncEngine(e), t, n))), 
-      n.promise;
   }
 
   /**
@@ -37379,240 +33113,6 @@
   }
 
   /**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   */ function __PRIVATE_validateHasExplicitOrderByForLimitToLast(t) {
-      if ("L" /* LimitType.Last */ === t.limitType && 0 === t.explicitOrderBy.length) throw new FirestoreError(D.UNIMPLEMENTED, "limitToLast() queries require specifying at least one orderBy() clause");
-  }
-
-  /**
-   * An `AppliableConstraint` is an abstraction of a constraint that can be applied
-   * to a Firestore query.
-   */ class AppliableConstraint {}
-
-  /**
-   * A `QueryConstraint` is used to narrow the set of documents returned by a
-   * Firestore query. `QueryConstraint`s are created by invoking {@link where},
-   * {@link orderBy}, {@link (startAt:1)}, {@link (startAfter:1)}, {@link
-   * (endBefore:1)}, {@link (endAt:1)}, {@link limit}, {@link limitToLast} and
-   * can then be passed to {@link (query:1)} to create a new query instance that
-   * also contains this `QueryConstraint`.
-   */ class QueryConstraint extends AppliableConstraint {}
-
-  function query(t, e, ...n) {
-      let r = [];
-      e instanceof AppliableConstraint && r.push(e), r = r.concat(n), function __PRIVATE_validateQueryConstraintArray(t) {
-          const e = t.filter((t => t instanceof QueryCompositeFilterConstraint)).length, n = t.filter((t => t instanceof QueryFieldFilterConstraint)).length;
-          if (e > 1 || e > 0 && n > 0) throw new FirestoreError(D.INVALID_ARGUMENT, "InvalidQuery. When using composite filters, you cannot use more than one filter at the top level. Consider nesting the multiple filters within an `and(...)` statement. For example: change `query(query, where(...), or(...))` to `query(query, and(where(...), or(...)))`.");
-      }
-      /**
-   * @license
-   * Copyright 2020 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   */
-      /**
-   * Converts custom model object of type T into `DocumentData` by applying the
-   * converter if it exists.
-   *
-   * This function is used when converting user objects to `DocumentData`
-   * because we want to provide the user with a more specific error message if
-   * their `set()` or fails due to invalid data originating from a `toFirestore()`
-   * call.
-   */ (r);
-      for (const e of r) t = e._apply(t);
-      return t;
-  }
-
-  /**
-   * A `QueryFieldFilterConstraint` is used to narrow the set of documents returned by
-   * a Firestore query by filtering on one or more document fields.
-   * `QueryFieldFilterConstraint`s are created by invoking {@link where} and can then
-   * be passed to {@link (query:1)} to create a new query instance that also contains
-   * this `QueryFieldFilterConstraint`.
-   */ class QueryFieldFilterConstraint extends QueryConstraint {
-      /**
-       * @internal
-       */
-      constructor(t, e, n) {
-          super(), this._field = t, this._op = e, this._value = n, 
-          /** The type of this query constraint */
-          this.type = "where";
-      }
-      static _create(t, e, n) {
-          return new QueryFieldFilterConstraint(t, e, n);
-      }
-      _apply(t) {
-          const e = this._parse(t);
-          return __PRIVATE_validateNewFieldFilter(t._query, e), new Query(t.firestore, t.converter, __PRIVATE_queryWithAddedFilter(t._query, e));
-      }
-      _parse(t) {
-          const e = __PRIVATE_newUserDataReader(t.firestore), n = function __PRIVATE_newQueryFilter(t, e, n, r, s, a, o) {
-              let i;
-              if (s.isKeyField()) {
-                  if ("array-contains" /* Operator.ARRAY_CONTAINS */ === a || "array-contains-any" /* Operator.ARRAY_CONTAINS_ANY */ === a) throw new FirestoreError(D.INVALID_ARGUMENT, `Invalid Query. You can't perform '${a}' queries on documentId().`);
-                  if ("in" /* Operator.IN */ === a || "not-in" /* Operator.NOT_IN */ === a) {
-                      __PRIVATE_validateDisjunctiveFilterElements(o, a);
-                      const e = [];
-                      for (const n of o) e.push(__PRIVATE_parseDocumentIdValue(r, t, n));
-                      i = {
-                          arrayValue: {
-                              values: e
-                          }
-                      };
-                  } else i = __PRIVATE_parseDocumentIdValue(r, t, o);
-              } else "in" /* Operator.IN */ !== a && "not-in" /* Operator.NOT_IN */ !== a && "array-contains-any" /* Operator.ARRAY_CONTAINS_ANY */ !== a || __PRIVATE_validateDisjunctiveFilterElements(o, a), 
-              i = __PRIVATE_parseQueryValue(n, e, o, 
-              /* allowArrays= */ "in" /* Operator.IN */ === a || "not-in" /* Operator.NOT_IN */ === a);
-              const c = FieldFilter.create(s, a, i);
-              return c;
-          }(t._query, "where", e, t.firestore._databaseId, this._field, this._op, this._value);
-          return n;
-      }
-  }
-
-  /**
-   * Creates a {@link QueryFieldFilterConstraint} that enforces that documents
-   * must contain the specified field and that the value should satisfy the
-   * relation constraint provided.
-   *
-   * @param fieldPath - The path to compare
-   * @param opStr - The operation string (e.g "&lt;", "&lt;=", "==", "&lt;",
-   *   "&lt;=", "!=").
-   * @param value - The value for comparison
-   * @returns The created {@link QueryFieldFilterConstraint}.
-   */ function where(t, e, n) {
-      const r = e, s = __PRIVATE_fieldPathFromArgument("where", t);
-      return QueryFieldFilterConstraint._create(s, r, n);
-  }
-
-  /**
-   * A `QueryCompositeFilterConstraint` is used to narrow the set of documents
-   * returned by a Firestore query by performing the logical OR or AND of multiple
-   * {@link QueryFieldFilterConstraint}s or {@link QueryCompositeFilterConstraint}s.
-   * `QueryCompositeFilterConstraint`s are created by invoking {@link or} or
-   * {@link and} and can then be passed to {@link (query:1)} to create a new query
-   * instance that also contains the `QueryCompositeFilterConstraint`.
-   */ class QueryCompositeFilterConstraint extends AppliableConstraint {
-      /**
-       * @internal
-       */
-      constructor(
-      /** The type of this query constraint */
-      t, e) {
-          super(), this.type = t, this._queryConstraints = e;
-      }
-      static _create(t, e) {
-          return new QueryCompositeFilterConstraint(t, e);
-      }
-      _parse(t) {
-          const e = this._queryConstraints.map((e => e._parse(t))).filter((t => t.getFilters().length > 0));
-          return 1 === e.length ? e[0] : CompositeFilter.create(e, this._getOperator());
-      }
-      _apply(t) {
-          const e = this._parse(t);
-          return 0 === e.getFilters().length ? t : (function __PRIVATE_validateNewFilter(t, e) {
-              let n = t;
-              const r = e.getFlattenedFilters();
-              for (const t of r) __PRIVATE_validateNewFieldFilter(n, t), n = __PRIVATE_queryWithAddedFilter(n, t);
-          }
-          // Checks if any of the provided filter operators are included in the given list of filters and
-          // returns the first one that is, or null if none are.
-          (t._query, e), new Query(t.firestore, t.converter, __PRIVATE_queryWithAddedFilter(t._query, e)));
-      }
-      _getQueryConstraints() {
-          return this._queryConstraints;
-      }
-      _getOperator() {
-          return "and" === this.type ? "and" /* CompositeOperator.AND */ : "or" /* CompositeOperator.OR */;
-      }
-  }
-
-  function __PRIVATE_parseDocumentIdValue(t, e, n) {
-      if ("string" == typeof (n = getModularInstance(n))) {
-          if ("" === n) throw new FirestoreError(D.INVALID_ARGUMENT, "Invalid query. When querying with documentId(), you must provide a valid document ID, but it was an empty string.");
-          if (!__PRIVATE_isCollectionGroupQuery(e) && -1 !== n.indexOf("/")) throw new FirestoreError(D.INVALID_ARGUMENT, `Invalid query. When querying a collection by documentId(), you must provide a plain document ID, but '${n}' contains a '/' character.`);
-          const r = e.path.child(ResourcePath.fromString(n));
-          if (!DocumentKey.isDocumentKey(r)) throw new FirestoreError(D.INVALID_ARGUMENT, `Invalid query. When querying a collection group by documentId(), the value provided must result in a valid document path, but '${r}' is not because it has an odd number of segments (${r.length}).`);
-          return __PRIVATE_refValue(t, new DocumentKey(r));
-      }
-      if (n instanceof DocumentReference) return __PRIVATE_refValue(t, n._key);
-      throw new FirestoreError(D.INVALID_ARGUMENT, `Invalid query. When querying with documentId(), you must provide a valid string or a DocumentReference, but it was: ${__PRIVATE_valueDescription(n)}.`);
-  }
-
-  /**
-   * Validates that the value passed into a disjunctive filter satisfies all
-   * array requirements.
-   */ function __PRIVATE_validateDisjunctiveFilterElements(t, e) {
-      if (!Array.isArray(t) || 0 === t.length) throw new FirestoreError(D.INVALID_ARGUMENT, `Invalid Query. A non-empty array is required for '${e.toString()}' filters.`);
-  }
-
-  /**
-   * Given an operator, returns the set of operators that cannot be used with it.
-   *
-   * This is not a comprehensive check, and this function should be removed in the
-   * long term. Validations should occur in the Firestore backend.
-   *
-   * Operators in a query must adhere to the following set of rules:
-   * 1. Only one inequality per query.
-   * 2. `NOT_IN` cannot be used with array, disjunctive, or `NOT_EQUAL` operators.
-   */ function __PRIVATE_validateNewFieldFilter(t, e) {
-      const n = function __PRIVATE_findOpInsideFilters(t, e) {
-          for (const n of t) for (const t of n.getFlattenedFilters()) if (e.indexOf(t.op) >= 0) return t.op;
-          return null;
-      }(t.filters, function __PRIVATE_conflictingOps(t) {
-          switch (t) {
-            case "!=" /* Operator.NOT_EQUAL */ :
-              return [ "!=" /* Operator.NOT_EQUAL */ , "not-in" /* Operator.NOT_IN */ ];
-
-            case "array-contains-any" /* Operator.ARRAY_CONTAINS_ANY */ :
-            case "in" /* Operator.IN */ :
-              return [ "not-in" /* Operator.NOT_IN */ ];
-
-            case "not-in" /* Operator.NOT_IN */ :
-              return [ "array-contains-any" /* Operator.ARRAY_CONTAINS_ANY */ , "in" /* Operator.IN */ , "not-in" /* Operator.NOT_IN */ , "!=" /* Operator.NOT_EQUAL */ ];
-
-            default:
-              return [];
-          }
-      }(e.op));
-      if (null !== n) 
-      // Special case when it's a duplicate op to give a slightly clearer error message.
-      throw n === e.op ? new FirestoreError(D.INVALID_ARGUMENT, `Invalid query. You cannot use more than one '${e.op.toString()}' filter.`) : new FirestoreError(D.INVALID_ARGUMENT, `Invalid query. You cannot use '${e.op.toString()}' filters with '${n.toString()}' filters.`);
-  }
-
-  function __PRIVATE_applyFirestoreDataConverter(t, e, n) {
-      let r;
-      // Cast to `any` in order to satisfy the union type constraint on
-      // toFirestore().
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return r = t ? t.toFirestore(e) : e, 
-      r;
-  }
-
-  /**
    * Metadata about a snapshot, describing the state of the snapshot.
    */ class SnapshotMetadata {
       /** @hideconstructor */
@@ -37921,26 +33421,6 @@
       return __PRIVATE_firestoreClientGetDocumentViaSnapshotListener(n, t._key).then((n => __PRIVATE_convertToDocSnapshot(e, t, n)));
   }
 
-  function getDocs(t) {
-      t = __PRIVATE_cast(t, Query);
-      const e = __PRIVATE_cast(t.firestore, Firestore), n = ensureFirestoreConfigured(e), r = new __PRIVATE_ExpUserDataWriter(e);
-      return __PRIVATE_validateHasExplicitOrderByForLimitToLast(t._query), __PRIVATE_firestoreClientGetDocumentsViaSnapshotListener(n, t._query).then((n => new QuerySnapshot(e, r, t, n)));
-  }
-
-  function setDoc(t, e, n) {
-      t = __PRIVATE_cast(t, DocumentReference);
-      const r = __PRIVATE_cast(t.firestore, Firestore), s = __PRIVATE_applyFirestoreDataConverter(t.converter, e), o = __PRIVATE_newUserDataReader(r);
-      return executeWrite(r, [ __PRIVATE_parseSetData(o, "setDoc", t._key, s, null !== t.converter, n).toMutation(t._key, Precondition.none()) ]);
-  }
-
-  /**
-   * Locally writes `mutations` on the async queue.
-   * @internal
-   */ function executeWrite(t, e) {
-      const n = ensureFirestoreConfigured(t);
-      return __PRIVATE_firestoreClientWrite(n, e);
-  }
-
   /**
    * Converts a {@link ViewSnapshot} that contains the single document specified by `ref`
    * to a {@link DocumentSnapshot}.
@@ -37992,117 +33472,3441 @@
   googleProvider.setCustomParameters({ prompt: 'select_account' });
 
   /**
+   * apiClient.js
+   * Single entry point for all calls to the app's own backend.
+   *
+   * Two things every /api call needs and used to lack:
+   *  1. A RELATIVE URL. Absolute http://localhost:3000 URLs were compiled into the
+   *     production bundle, so deployed browsers called their own machine and every
+   *     save silently failed.
+   *  2. A Firebase ID token. The server verifies this and re-checks the allowlist,
+   *     so authorization no longer depends on client-side checks alone.
+   */
+
+
+  /**
+   * Current user's Firebase ID token, or null when signed out.
+   *
+   * Waits for Firebase to restore the persisted session first. On a page load
+   * `auth.currentUser` is null for a moment while the SDK rehydrates from browser
+   * storage; without this wait the app's startup sync would fire unauthenticated
+   * and get a 401 even though the user is signed in.
+   *
+   * Firebase refreshes the token automatically when it is close to expiring.
+   * @returns {Promise<string|null>}
+   */
+  async function getIdToken() {
+    try {
+      if (typeof auth.authStateReady === 'function') {
+        await auth.authStateReady();
+      }
+      const user = auth.currentUser;
+      if (!user) return null;
+      return await user.getIdToken();
+    } catch (e) {
+      console.warn('Could not obtain ID token:', e?.message || e);
+      return null;
+    }
+  }
+
+  /**
+   * fetch() wrapper for backend endpoints.
+   * @param {string} path Root-relative path, e.g. '/api/sync'
+   * @param {RequestInit} [options]
+   * @returns {Promise<Response>}
+   */
+  async function apiFetch$1(path, options = {}) {
+    const headers = { ...(options.headers || {}) };
+
+    const token = await getIdToken();
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    return fetch(path, { ...options, headers });
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     CHILD HEALTH MANAGEMENT — DATA LAYER
+     All data is stored in localStorage as JSON.
+     ═══════════════════════════════════════════════════════ */
+
+
+  const CHILDREN_KEY = 'chm-children';
+  const ACTIVITY_KEY = 'chm-activity';
+  const PENDING_KEY = 'chm-pending-docs';
+  const DOCS_KEY = 'chm-documents';
+  const GROWTH_KEY = 'chm-growth';
+  const NUTRITION_KEY = 'chm-nutrition';
+  const MEDICINES_KEY = 'chm-medicines';
+  const APPOINTMENTS_KEY = 'chm-appointments';
+  const EMERGENCY_KEY = 'chm-emergency';
+  const SPONSORS_KEY = 'chm-sponsors';
+  const EXPENSES_KEY = 'chm-expenses';
+  const ALERTS_KEY = 'chm-alerts';
+  const HEALTH_RECORDS_KEY = 'chm-health-records';
+
+  /* ─── Children (was Students) ─── */
+
+  const PRESET_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-1001', 'CH-1002', 'CH-3938', 'CH-1079'];
+  const PRESET_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Ananya Patel'];
+
+  function getChildren() {
+    let data = localStorage.getItem(CHILDREN_KEY);
+    if (!data) {
+      seedDatabase();
+      data = localStorage.getItem(CHILDREN_KEY);
+    }
+    const list = JSON.parse(data || '[]');
+    const filtered = list.filter(c => c && !PRESET_IDS.includes(c.id) && !PRESET_NAMES.includes(c.name));
+    if (filtered.length !== list.length) {
+      localStorage.setItem(CHILDREN_KEY, JSON.stringify(filtered));
+    }
+    return filtered;
+  }
+
+  function updateChild(child) {
+    const children = getChildren();
+    const idx = children.findIndex(c => c.id === child.id);
+    if (idx !== -1) {
+      children[idx] = child;
+      logActivity('child_updated', child.name, 'Child record updated');
+    } else {
+      children.unshift(child);
+      logActivity('child_added', child.name, 'New child registered');
+    }
+    localStorage.setItem(CHILDREN_KEY, JSON.stringify(children));
+    return child;
+  }
+
+  function deleteChild(id) {
+    const child = getChildren().find(c => c.id === id);
+    localStorage.setItem(CHILDREN_KEY, JSON.stringify(getChildren().filter(c => c.id !== id)));
+    if (child) {
+      logActivity('child_removed', child.name, 'Child record removed');
+    }
+  }
+
+  function getChild(id) {
+    return getChildren().find(c => c.id === id) || getChildren()[0];
+  }
+
+  /* ─── Activity Log ─── */
+
+  function logActivity(type, subject, description) {
+    const activities = getActivities();
+    activities.unshift({ type, subject, description, timestamp: Date.now() });
+    if (activities.length > 50) activities.length = 50;
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activities));
+  }
+
+  function getActivities() {
+    return JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '[]');
+  }
+
+  function timeAgo(timestamp) {
+    const diff = Date.now() - timestamp;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins} minute${mins !== 1 ? 's' : ''} ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
+    const days = Math.floor(hours / 24);
+    return `${days} day${days !== 1 ? 's' : ''} ago`;
+  }
+
+  /* ─── Pending Documents ─── */
+
+  function getPendingDocs() {
+    return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
+  }
+
+  function addPendingDoc(docName, childName) {
+    const docs = getPendingDocs();
+    docs.unshift({ docName, childName, timestamp: Date.now() });
+    if (docs.length > 20) docs.length = 20;
+    localStorage.setItem(PENDING_KEY, JSON.stringify(docs));
+  }
+
+  /* ─── Uploaded Documents ─── */
+
+  function getUploadedDocs() {
+    return JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
+  }
+
+  function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report', childId = null) {
+    const docs = getUploadedDocs();
+    docs.unshift({
+      id: `DOC-${Date.now()}`,
+      name: docName,
+      child: childName,
+      childName: childName,
+      childId: childId,
+      docType: docType,
+      category: docType,
+      meta: fileData ? `File · ${Math.round(fileData.length * 0.75 / 1024)} KB` : 'No file',
+      status: status,
+      image: fileData,
+      fileData: fileData,
+      timestamp: Date.now()
+    });
+    localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+  }
+
+  function deleteUploadedDoc(index) {
+    const docs = getUploadedDocs();
+    docs.splice(index, 1);
+    localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+  }
+
+  function getGrowthRecords(childId) {
+    const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
+    all.sort((a, b) => (b.timestamp || new Date(b.date).getTime() || 0) - (a.timestamp || new Date(a.date).getTime() || 0));
+    return childId ? all.filter(r => r.childId === childId) : all;
+  }
+
+  function addGrowthRecord(record) {
+    const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
+    record.timestamp = Date.now();
+    record.bmi = record.weight && record.height
+      ? +(record.weight / ((record.height / 100) ** 2)).toFixed(1)
+      : null;
+    all.unshift(record);
+    localStorage.setItem(GROWTH_KEY, JSON.stringify(all));
+    logActivity('growth_logged', record.childName || 'Child', `Height: ${record.height}cm, Weight: ${record.weight}kg`);
+    return record;
+  }
+
+  function addMeal(meal) {
+    const all = JSON.parse(localStorage.getItem(NUTRITION_KEY) || '[]');
+    meal.timestamp = Date.now();
+    all.unshift(meal);
+    localStorage.setItem(NUTRITION_KEY, JSON.stringify(all));
+    logActivity('meal_logged', meal.childName || 'Child', `${meal.mealType}: ${meal.description}`);
+    return meal;
+  }
+
+  /* ─── Medicine Management ─── */
+
+  function getMedicines(childId) {
+    const all = JSON.parse(localStorage.getItem(MEDICINES_KEY) || '[]');
+    return childId ? all.filter(m => m.childId === childId) : all;
+  }
+
+  function addMedicine(med) {
+    const all = JSON.parse(localStorage.getItem(MEDICINES_KEY) || '[]');
+    med.id = med.id || `MED-${Date.now()}`;
+    med.timestamp = Date.now();
+    all.unshift(med);
+    localStorage.setItem(MEDICINES_KEY, JSON.stringify(all));
+    logActivity('medicine_added', med.childName || 'Child', `${med.medicineName} — ${med.dosage}`);
+    return med;
+  }
+
+  /* ─── Appointments ─── */
+
+  function getAppointments(childId) {
+    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+    return childId ? all.filter(a => a.childId === childId) : all;
+  }
+
+  function addAppointment(appt) {
+    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+    appt.id = appt.id || `APT-${Date.now()}`;
+    appt.timestamp = Date.now();
+    all.unshift(appt);
+    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
+    logActivity('appointment_added', appt.childName || 'Child', `${appt.type} on ${appt.date}`);
+    return appt;
+  }
+
+  function deleteAppointment(id) {
+    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+    const filtered = all.filter(a => String(a.id) !== String(id));
+    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(filtered));
+    return true;
+  }
+
+  /* ─── Emergency Contacts ─── */
+
+  function getEmergencyContacts() {
+    return JSON.parse(localStorage.getItem(EMERGENCY_KEY) || '[]');
+  }
+
+  function addEmergencyContact(contact) {
+    const all = getEmergencyContacts();
+    contact.id = contact.id || `EMC-${Date.now()}`;
+    contact.timestamp = Date.now();
+    all.unshift(contact);
+    localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
+    return contact;
+  }
+
+  function deleteEmergencyContact(id) {
+    const all = getEmergencyContacts().filter(c => c.id !== id);
+    localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
+  }
+
+  /* ─── Sponsors ─── */
+
+  function getSponsors() {
+    return JSON.parse(localStorage.getItem(SPONSORS_KEY) || '[]');
+  }
+
+  function addSponsor(sponsor) {
+    const all = getSponsors();
+    sponsor.id = sponsor.id || `SP-${Date.now()}`;
+    sponsor.timestamp = Date.now();
+    all.unshift(sponsor);
+    localStorage.setItem(SPONSORS_KEY, JSON.stringify(all));
+    logActivity('sponsor_added', sponsor.name, 'New sponsor registered');
+    return sponsor;
+  }
+
+  function addExpense(expense) {
+    const all = JSON.parse(localStorage.getItem(EXPENSES_KEY) || '[]');
+    expense.id = expense.id || `EXP-${Date.now()}`;
+    expense.timestamp = Date.now();
+    all.unshift(expense);
+    localStorage.setItem(EXPENSES_KEY, JSON.stringify(all));
+    logActivity('expense_logged', expense.category || 'Expense', `₹${expense.amount} — ${expense.description}`);
+    return expense;
+  }
+
+  /* ─── Health Records (Lab results, test reports) ─── */
+
+  function getHealthRecords(childId) {
+    const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+    return childId ? all.filter(r => r.childId === childId) : all;
+  }
+
+  function addHealthRecord(record) {
+    const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+    record.id = record.id || `HR-${Date.now()}`;
+    record.timestamp = Date.now();
+    all.unshift(record);
+    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all));
+    return record;
+  }
+
+  /* ─── Alerts ─── */
+
+  function getAlerts() {
+    let alerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+    const children = getChildren();
+    const appointments = getAppointments();
+    const medicines = getMedicines();
+    const now = Date.now();
+    const dynamicAlerts = [];
+
+    // 1. Check for overdue appointments
+    appointments.forEach(appt => {
+      if (appt.status === 'Upcoming' && new Date(appt.date).getTime() < now - 24 * 3600 * 1000) {
+        const alertId = `ALR-OVERDUE-${appt.id}`;
+        if (!alerts.some(a => a.id === alertId)) {
+          dynamicAlerts.push({
+            id: alertId,
+            type: 'warning',
+            childName: appt.childName,
+            message: `Reminder: Overdue appointment: ${appt.type} with ${appt.doctor} was scheduled for ${appt.date}`,
+            timestamp: now,
+            dismissed: false
+          });
+        }
+      }
+    });
+
+    // 2. Check for missing Aadhaar or ID documents
+    children.forEach(child => {
+      if (!child.idNumber || child.idNumber.trim() === '') {
+        const alertId = `ALR-MISSING-ID-${child.id}`;
+        if (!alerts.some(a => a.id === alertId)) {
+          dynamicAlerts.push({
+            id: alertId,
+            type: 'info',
+            childName: child.name,
+            message: `Missing records: No ID card/Aadhaar registered for ${child.name}`,
+            timestamp: now,
+            dismissed: false
+          });
+        }
+      }
+    });
+
+    // 3. Check for alarming blood test reports (hemoglobin < 11.0)
+    const healthRecords = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+    healthRecords.forEach(record => {
+      if (record.hemoglobin && parseFloat(record.hemoglobin) < 11.0) {
+        const alertId = `ALR-ANEMIA-${record.childId}-${record.date}`;
+        if (!alerts.some(a => a.id === alertId)) {
+          dynamicAlerts.push({
+            id: alertId,
+            type: 'critical',
+            childName: record.childName,
+            message: `Critical blood values: Low Hemoglobin (${record.hemoglobin} g/dL) detected on ${record.date}`,
+            timestamp: now,
+            dismissed: false
+          });
+        }
+      }
+    });
+
+    // 4. Check for low supplies (medication ending soon)
+    medicines.forEach(med => {
+      if (med.status === 'Active' && med.endDate) {
+        const remainingTime = new Date(med.endDate).getTime() - now;
+        if (remainingTime > 0 && remainingTime < 3 * 24 * 3600 * 1000) {
+          const alertId = `ALR-MED-LOW-${med.id}`;
+          if (!alerts.some(a => a.id === alertId)) {
+            dynamicAlerts.push({
+              id: alertId,
+              type: 'warning',
+              childName: med.childName,
+              message: `Running low: Medication "${med.medicineName}" supply ending soon (${med.endDate})`,
+              timestamp: now,
+              dismissed: false
+            });
+          }
+        }
+      }
+    });
+
+    if (dynamicAlerts.length > 0) {
+      alerts = [...dynamicAlerts, ...alerts];
+      localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
+    }
+
+    return alerts;
+  }
+
+  function dismissAlert(id) {
+    const all = getAlerts().map(a => a.id === id ? { ...a, dismissed: true } : a);
+    localStorage.setItem(ALERTS_KEY, JSON.stringify(all));
+  }
+
+  /* ─── Utility: Calculate age from DOB ─── */
+
+  function calculateAge(dob) {
+    if (!dob) return '';
+    const birth = new Date(dob);
+    if (isNaN(birth.getTime())) return '';
+    const now = new Date();
+    let years = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) years--;
+    if (years < 1) {
+      const months = (now.getFullYear() - birth.getFullYear()) * 12 + now.getMonth() - birth.getMonth();
+      return `${months} mo`;
+    }
+    return `${years} yr`;
+  }
+
+  /* ─── Health Status Calculator ─── */
+
+  function healthStatus(child) {
+    const flags = [];
+    // Check for anemia (low hemoglobin)
+    const records = getHealthRecords(child.id);
+    const latestCBC = records.find(r => r.type === 'cbc');
+    if (latestCBC && latestCBC.hemoglobin) {
+      const hb = parseFloat(latestCBC.hemoglobin);
+      if (hb < 11) flags.push('Anemia risk');
+    }
+    // Check BMI
+    const growth = getGrowthRecords(child.id);
+    if (growth.length > 0) {
+      const latest = growth[0];
+      if (latest.bmi && latest.bmi < 16) flags.push('Undernourished');
+    }
+    // Check overdue checkups
+    const appts = getAppointments(child.id);
+    const overdue = appts.filter(a => a.status !== 'Completed' && new Date(a.date) < new Date());
+    if (overdue.length > 0) flags.push('Overdue checkup');
+
+    // Check allergies / medical conditions
+    if (child.medicalConditions && child.medicalConditions.trim()) flags.push('Has conditions');
+
+    if (flags.length === 0) return { level: 'good', label: 'Healthy', flags };
+    if (flags.some(f => f.includes('Anemia') || f.includes('Undernourished'))) return { level: 'critical', label: 'Needs attention', flags };
+    return { level: 'warning', label: 'Review needed', flags };
+  }
+
+  function seedDatabase() {
+    localStorage.setItem(CHILDREN_KEY, JSON.stringify([]));
+    localStorage.setItem(GROWTH_KEY, JSON.stringify([]));
+    localStorage.setItem(NUTRITION_KEY, JSON.stringify([]));
+    localStorage.setItem(MEDICINES_KEY, JSON.stringify([]));
+    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify([]));
+    localStorage.setItem(EMERGENCY_KEY, JSON.stringify([]));
+    localStorage.setItem(SPONSORS_KEY, JSON.stringify([]));
+    localStorage.setItem(EXPENSES_KEY, JSON.stringify([]));
+    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify([]));
+    localStorage.setItem(ACTIVITY_KEY, JSON.stringify([]));
+    localStorage.setItem(ALERTS_KEY, JSON.stringify([]));
+  }
+
+  /* ───────────────────────────────────────────────────────
+     DATA SYNC WITH SERVER-SIDE DB
+     ─────────────────────────────────────────────────────── */
+  let isSyncing = false;
+
+  async function syncWithServer() {
+    if (isSyncing) return;
+    try {
+      isSyncing = true;
+      getChildren();
+      const keys = [
+        CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
+        NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
+        EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY,
+        'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
+      ];
+
+      // Pack local state
+      const payload = {};
+      keys.forEach(k => {
+        payload[k] = localStorage.getItem(k);
+      });
+
+      // POST payload to merge/save on server (relative URL + auth token)
+      const res = await apiFetch$1('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const serverData = await res.json();
+        // Apply merged state from server without overwriting non-empty local storage with empty server state
+        Object.keys(serverData).forEach(k => {
+          if (serverData[k] !== null && serverData[k] !== undefined) {
+            const localStr = localStorage.getItem(k);
+            if (!localStr || localStr === '[]' || localStr === '') {
+              if (serverData[k] !== '[]' && serverData[k] !== '') {
+                localStorage.setItem(k, serverData[k]);
+              }
+            } else if (serverData[k] && serverData[k] !== '[]') {
+              try {
+                const localArr = JSON.parse(localStr);
+                const serverArr = JSON.parse(serverData[k]);
+                if (Array.isArray(localArr) && Array.isArray(serverArr)) {
+                  const map = new Map();
+                  serverArr.concat(localArr).forEach(item => {
+                    if (item) {
+                      const key = item.id || JSON.stringify(item);
+                      map.set(key, item);
+                    }
+                  });
+                  localStorage.setItem(k, JSON.stringify(Array.from(map.values())));
+                }
+              } catch (e) {
+                localStorage.setItem(k, serverData[k]);
+              }
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.warn('Sync failed (offline or server starting):', err);
+    } finally {
+      isSyncing = false;
+    }
+  }
+
+  function triggerSync() {
+    syncWithServer().catch(err => console.warn('Background sync failed:', err));
+  }
+
+  // Intercept localStorage sets to trigger background sync when key changes
+  const originalSetItem = localStorage.setItem.bind(localStorage);
+  localStorage.setItem = function(key, value) {
+    originalSetItem(key, value);
+    if (!isSyncing && (key.startsWith('chm-') || key.startsWith('sample-org-'))) {
+      triggerSync();
+    }
+  };
+
+  function childRows(children) {
+    if (!children.length) return `<tr><td colspan="7"><div class="empty-state"><span class="empty-state__icon">${icon('users')}</span><h3>No children found</h3><p>Try changing your search or register a new child.</p></div></td></tr>`;
+    return children.map((child) => {
+      const hs = healthStatus(child);
+      const age = calculateAge(child.dob);
+      return `<tr>
+    <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
+    <td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name">${child.name}</span><span class="table-person__id">${child.id}</span></div></a></td>
+    <td data-column="age">${age || '—'}</td><td class="hide-tablet" data-column="gender">${child.gender || '—'}</td><td class="hide-tablet" data-column="blood">${child.blood || '—'}</td><td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>
+    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
+  </tr>`;
+    }).join('');
+  }
+
+  function updateChildTable(children) {
+    const body = document.querySelector('#child-table-body');
+    if (body) body.innerHTML = childRows(children);
+    const count = document.querySelector('#child-count');
+    if (count) count.textContent = `${children.length} children`;
+  }
+
+  function getChartData() {
+    const children = getChildren();
+    const now = new Date();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const fullMonths = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+      const yearStr = String(d.getFullYear());
+      const count = children.filter(c => c.registeredDate && c.registeredDate.includes(`${yearStr}-${monthStr}-`)).length;
+      data.push({ month: months[d.getMonth()], value: count, label: fullMonths[d.getMonth()] });
+    }
+    return data;
+  }
+
+  function registrationChart() {
+    const chartData = getChartData();
+    const currentValue = chartData[chartData.length - 1]?.value || 0;
+    const prevValue = chartData[chartData.length - 2]?.value || 0;
+    const pctChange = prevValue > 0 ? Math.round((currentValue - prevValue) / prevValue * 100) : (currentValue > 0 ? 100 : 0);
+    const changeText = pctChange >= 0 ? `+${pctChange}%` : `${pctChange}%`;
+
+    return `<div class="chart-summary"><b>${currentValue}</b><span>${changeText} vs. last month</span></div>
+  <div class="chart-interactive" id="registration-chart">
+    <svg class="chart-canvas" viewBox="0 0 640 180" preserveAspectRatio="none" aria-label="Children registered chart">
+      <defs>
+        <linearGradient id="chartAreaGradient" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.00"/>
+        </linearGradient>
+      </defs>
+      <g class="chart-grid"></g>
+      <path class="chart-area-path" d=""></path>
+      <path class="chart-line-path" d=""></path>
+      <line class="chart-hover-line" x1="0" y1="0" x2="0" y2="155" style="display:none;"></line>
+      <circle class="chart-hover-circle" cx="0" cy="0" r="5" style="display:none;"></circle>
+    </svg>
+    <div class="chart-tooltip-html" style="opacity: 0;"></div>
+    <div class="chart-labels"></div>
+  </div>`;
+  }
+
+  function initChart() {
+    const chart = document.getElementById('registration-chart');
+    if (!chart) return;
+
+    const chartData = getChartData();
+    const svg = chart.querySelector('.chart-canvas');
+    const tooltip = chart.querySelector('.chart-tooltip-html');
+    const labelsDiv = chart.querySelector('.chart-labels');
+    const gridGroup = svg.querySelector('.chart-grid');
+    const areaPath = svg.querySelector('.chart-area-path');
+    const linePath = svg.querySelector('.chart-line-path');
+    const hoverLine = svg.querySelector('.chart-hover-line');
+    const hoverCircle = svg.querySelector('.chart-hover-circle');
+
+    const W = 640;
+    const H = 180;
+    const padX = 30;
+    const padY = 25;
+    const maxVal = Math.max(5, ...chartData.map(d => d.value)) * 1.2 || 10;
+
+    // Render Grid Lines
+    gridGroup.innerHTML = '';
+    const gridLines = 5;
+    for (let i = 0; i < gridLines; i++) {
+      const y = padY + (i / (gridLines - 1)) * (H - 2 * padY);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', '0');
+      line.setAttribute('y1', String(y));
+      line.setAttribute('x2', String(W));
+      line.setAttribute('y2', String(y));
+      line.setAttribute('class', 'chart-grid-line');
+      gridGroup.appendChild(line);
+    }
+
+    // Calculate coordinates
+    const points = chartData.map((d, i) => {
+      const x = padX + (i / (chartData.length - 1)) * (W - 2 * padX);
+      const y = H - padY - (d.value / maxVal) * (H - 2 * padY);
+      return { x, y, value: d.value, month: d.month, label: d.label };
+    });
+
+    // Render chart labels
+    labelsDiv.innerHTML = points.map(p => `<span>${p.month}</span>`).join('');
+
+    // Generate cubic bezier paths
+    if (points.length > 0) {
+      let lineD = `M ${points[0].x} ${points[0].y}`;
+      for (let i = 0; i < points.length - 1; i++) {
+        const p1 = points[i];
+        const p2 = points[i + 1];
+        const cp1x = p1.x + (p2.x - p1.x) / 3;
+        const cp2x = p1.x + 2 * (p2.x - p1.x) / 3;
+        lineD += ` C ${cp1x} ${p1.y}, ${cp2x} ${p2.y}, ${p2.x} ${p2.y}`;
+      }
+      linePath.setAttribute('d', lineD);
+
+      const areaD = `${lineD} L ${points[points.length - 1].x} ${H - padY} L ${points[0].x} ${H - padY} Z`;
+      areaPath.setAttribute('d', areaD);
+    }
+
+    // Interactive Hover Effects
+    svg.addEventListener('pointermove', (event) => {
+      const rect = svg.getBoundingClientRect();
+      const mouseX = ((event.clientX - rect.left) / rect.width) * W;
+
+      let closest = points[0];
+      let minDist = Math.abs(points[0].x - mouseX);
+      points.forEach(p => {
+        const dist = Math.abs(p.x - mouseX);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = p;
+        }
+      });
+
+      hoverLine.setAttribute('x1', String(closest.x));
+      hoverLine.setAttribute('x2', String(closest.x));
+      hoverLine.style.display = '';
+
+      hoverCircle.setAttribute('cx', String(closest.x));
+      hoverCircle.setAttribute('cy', String(closest.y));
+      hoverCircle.style.display = '';
+
+      tooltip.innerHTML = `<strong>${closest.label}</strong><div>${closest.value} registration${closest.value !== 1 ? 's' : ''}</div>`;
+      tooltip.style.opacity = '1';
+      
+      const tipRect = tooltip.getBoundingClientRect();
+      const svgRect = svg.getBoundingClientRect();
+      const tooltipX = (closest.x / W) * svgRect.width - tipRect.width / 2;
+      const tooltipY = (closest.y / H) * svgRect.height - tipRect.height - 10;
+      
+      tooltip.style.transform = `translate(${tooltipX}px, ${tooltipY}px)`;
+    });
+
+    svg.addEventListener('pointerleave', () => {
+      hoverLine.style.display = 'none';
+      hoverCircle.style.display = 'none';
+      tooltip.style.opacity = '0';
+    });
+  }
+
+  /**
+   * session.js
+   * Session state manager for Firebase Authentication & Firestore User Context.
+   */
+
+  const SESSION_KEY = 'chm_firebase_user_session';
+
+  /**
+   * Save active authenticated user session to local storage
+   * @param {Object} userData 
+   */
+  function saveSession(userData) {
+    if (!userData) return;
+    const sessionPayload = {
+      uid: userData.uid,
+      displayName: userData.displayName || 'Authorized User',
+      email: userData.email,
+      photoURL: userData.photoURL || null,
+      ngo: userData.ngo || 'Partner NGO',
+      role: userData.role || 'Admin',
+      loginTimestamp: new Date().toISOString()
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionPayload));
+    localStorage.setItem('sample-logged-in', 'true');
+    localStorage.setItem('google-user-email', userData.email);
+    localStorage.setItem('sample-org-name', userData.ngo || 'Partner NGO');
+  }
+
+  /**
+   * Get active user session
+   * @returns {Object|null}
+   */
+  function getSession() {
+    try {
+      const data = localStorage.getItem(SESSION_KEY);
+      if (!data) return null;
+      return JSON.parse(data);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Clear user session state
+   */
+  function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem('sample-logged-in');
+    localStorage.removeItem('google-user-email');
+  }
+
+  /**
+   * Check if a valid session exists
+   * @returns {boolean}
+   */
+  function isSessionActive() {
+    return localStorage.getItem('sample-logged-in') === 'true';
+  }
+
+  function toast(title, message = 'Your changes have been saved.') {
+    const root = document.querySelector('#toast-root');
+    if (!root) return;
+    const element = document.createElement('div');
+    element.className = 'toast';
+    element.innerHTML = `<span class="toast__icon">${icon('check')}</span><div><div class="toast__title">${title}</div><div class="toast__message">${message}</div></div><button class="icon-button icon-button--small" type="button" aria-label="Dismiss notification">${icon('x')}</button>`;
+    root.append(element);
+    const remove = () => element.remove();
+    element.querySelector('button').addEventListener('click', remove);
+    window.setTimeout(remove, 4200);
+  }
+
+  /**
+   * googleSheetsSync.js
+   * Automatic Google Sheets generation and real-time record synchronization service.
+   * Automatically formats and syncs child health records to Google Spreadsheets
+   * matching the exact export data format:
+   * ID | Child Name | Date of Birth | Age | Gender | Blood Group | Aadhaar ID | Guardian | Contact Phone | Height (cm) | Weight (kg) | Medical Conditions | Allergies | Current Medications | Dental Remarks | Oral Hygiene Index | Status | Registration Date
+   */
+
+
+  const EXACT_SHEET_COLUMNS = [
+    'ID',
+    'Child Name',
+    'Date of Birth',
+    'Age',
+    'Gender',
+    'Blood Group',
+    'Aadhaar ID',
+    'Guardian',
+    'Contact Phone',
+    'Height (cm)',
+    'Weight (kg)',
+    'Medical Conditions',
+    'Allergies',
+    'Status',
+    'Registration Date',
+    'Current Medications',
+    'Dental Remarks',
+    'Oral Hygiene Index'
+  ];
+
+  let cachedSheetsConfig = null;
+
+  /**
+   * Fetch Sheets config for the current NGO from backend API
+   */
+  async function fetchSheetsConfig(ngoSlug) {
+    const session = getSession() || {};
+    const slug = session.ngo || 'ayusha-nilayam';
+    try {
+      const res = await apiFetch$1(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        cachedSheetsConfig = await res.json();
+        return cachedSheetsConfig;
+      }
+    } catch (err) {
+      console.warn('[Google Sheets] Config fetch warning:', err);
+    }
+    return cachedSheetsConfig || { connected: false };
+  }
+
+  /**
+   * Get cached Sheets config object
+   */
+  function getSheetsConfig() {
+    return cachedSheetsConfig;
+  }
+
+  /**
+   * Get live view link to the logged-in NGO's Google Sheet (returns null if not connected)
+   */
+  function getGoogleSheetUrl() {
+    const session = getSession() || {};
+    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
+    return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
+  }
+
+  function formatUnitValue(val, unit) {
+    if (val === null || val === undefined || val === '') return '—';
+    const num = String(val).replace(/[^0-9.]/g, '').trim();
+    return num ? `${num} ${unit}` : '—';
+  }
+
+  /**
+   * Format a child health record object into the EXACT 15-column Google Sheets row array
+   * @param {Object} child 
+   * @returns {Array<string>}
+   */
+  function formatChildToSheetRow(child) {
+    const age = calculateAge(child.dob) || child.age || '—';
+    return [
+      child.id || 'CH-0000',
+      child.name || 'Unnamed Child',
+      child.dob || '—',
+      age,
+      child.gender || '—',
+      child.blood || '—',
+      child.idNumber || '—',
+      child.father || child.guardian || '—',
+      child.phone || '—',
+      formatUnitValue(child.height, 'cm'),
+      formatUnitValue(child.weight, 'kg'),
+      child.medicalConditions || 'None',
+      child.allergies || 'None',
+      child.status || 'Active',
+      child.registeredDate || new Date().toISOString().slice(0, 10),
+      child.medications || 'None',
+      child.dentalRemarks || 'None',
+      child.hygieneIndex || 'Not Assessed'
+    ];
+  }
+
+  /**
+   * Generate formatted TSV string of all records for instant Google Sheets pasting
+   * @returns {string}
+   */
+  function generateSheetTSVData() {
+    const children = getChildren() || [];
+    const headerRow = EXACT_SHEET_COLUMNS.join('\t');
+    const dataRows = children.map(c => formatChildToSheetRow(c).join('\t'));
+    return [headerRow, ...dataRows].join('\n');
+  }
+
+  /**
+   * Copy formatted 15-column dataset to clipboard only
+   */
+  function copySheetDataToClipboard() {
+    const children = getChildren() || [];
+    const tsvData = generateSheetTSVData();
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(tsvData).then(() => {
+        toast(
+          'Dataset Copied to Clipboard!',
+          `Copied ${children.length} child records (15 columns). Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
+        );
+      }).catch(err => {
+        console.warn('Clipboard write notice:', err);
+      });
+    }
+  }
+
+  /**
+   * Display a professional Google Sheets Template Data Viewer Modal
+   */
+  function openGoogleSheetsTemplateModal() {
+    document.querySelector('#google-sheets-view-modal')?.remove();
+
+    const session = getSession() || {};
+    const ngoName = session.ngo || 'Ayusha Nilayam';
+    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+    const children = getChildren() || [];
+
+    const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R'];
+
+    const headerColsHTML = EXACT_SHEET_COLUMNS.map((col, idx) => `
+    <th style="padding: 10px 14px; background: #f8fafc; border: 1px solid #cbd5e1; font-weight: 700; color: #334155; text-align: left; font-size: 12px; white-space: nowrap; user-select: none;">
+      <div style="font-size: 10px; color: #94a3b8; font-weight: 700; letter-spacing:0.05em; text-transform: uppercase; margin-bottom: 2px;">${colLetters[idx]}</div>
+      ${col}
+    </th>
+  `).join('');
+
+    const rowsHTML = children.map((c, rowIdx) => {
+      const row = formatChildToSheetRow(c);
+      const isEven = rowIdx % 2 === 1;
+      const bgStyle = isEven ? 'background: #f8fafc;' : 'background: #ffffff;';
+
+      const cellHTML = row.map((val, cellIdx) => {
+        if (cellIdx === 16) {
+          const isVerified = String(val).toLowerCase() === 'verified' || String(val).toLowerCase() === 'active';
+          const badgeBg = isVerified ? '#dcfce7' : '#fef3c7';
+          const badgeColor = isVerified ? '#15803d' : '#b45309';
+          return `
+          <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; ${bgStyle} white-space: nowrap;">
+            <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:${badgeBg}; color:${badgeColor};">${escapeHTML$1(String(val))}</span>
+          </td>
+        `;
+        }
+
+        return `
+        <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; color: #1e293b; ${bgStyle} white-space: nowrap;">
+          ${escapeHTML$1(String(val))}
+        </td>
+      `;
+      }).join('');
+
+      return `
+      <tr>
+        <td style="padding: 8px 10px; background: #f1f5f9; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 700; color: #64748b; text-align: center; user-select: none;">${rowIdx + 1}</td>
+        ${cellHTML}
+      </tr>
+    `;
+    }).join('');
+
+    const modalHTML = `
+    <div id="google-sheets-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
+      <div class="card" style="width:min(1280px, 96vw); height:min(820px, 94vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
+        
+        <!-- Google Sheets Header Bar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #0f9d58 0%, #0b8043 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden;">
+              <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
+            </div>
+            <div>
+              <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
+                Child_Health_Records_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
+                <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                  <span style="width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 6px #4ade80;"></span>
+                  Live Auto-Synced File
+                </span>
+              </div>
+              <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px; display:flex; align-items:center; gap:8px;">
+                <span>Google Account: <b>${escapeHTML$1(userEmail)}</b></span>
+                <span>•</span>
+                <span><b>${children.length} Records</b> Formatted (18 Columns)</span>
+              </div>
+            </div>
+          </div>
+          
+          <div style="display:flex; align-items:center; gap:12px;">
+            <a href="${getGoogleSheetUrl()}" target="_blank" class="button" style="background:#ffffff; color:#0b8043; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px; text-decoration:none;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              Open Live Google Sheet
+            </a>
+            <button id="modal-close-sheets-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1; transition:background 0.2s ease;">&times;</button>
+          </div>
+        </div>
+
+        <!-- Guidance Banner -->
+        <div style="padding:12px 24px; background:#f0fdf4; border-bottom:1px solid #bbf7d0; display:flex; align-items:center; justify-content:space-between;">
+          <div style="display:flex; align-items:center; gap:12px; font-size:13px; color:#166534;">
+            <span style="font-size:16px;">💡</span>
+            <span>
+              <b>Live Sheet Connected</b>: Click <b>Open Live Google Sheet</b> to open <a href="${getGoogleSheetUrl()}" target="_blank" style="color:#0b8043; font-weight:700; text-decoration:underline;">Connected Sheet</a> directly in Google Drive!
+            </span>
+          </div>
+
+          <button id="modal-copy-only-btn" class="button button--sm button--ghost" type="button" style="color:#15803d; border-color:rgba(21,128,61,0.3); font-weight:600;">
+            📋 Copy 18-Column Data
+          </button>
+        </div>
+
+        <!-- Main Native Grid View -->
+        <div style="flex:1; overflow:auto; background:#f8fafc; padding:16px;">
+          <table style="width:100%; border-collapse:collapse; background:white; box-shadow:0 1px 4px rgba(0,0,0,0.06); border-radius:6px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+            <thead>
+              <tr>
+                <th style="width:44px; background:#cbd5e1; border:1px solid #94a3b8;"></th>
+                ${headerColsHTML}
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHTML}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Footer Status Bar -->
+        <div style="padding:12px 24px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; font-size:12.5px; color:#64748b;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#10b981;"></span>
+            Connected File: <a href="${getGoogleSheetUrl()}" target="_blank" style="color:#0f9d58; font-weight:600; text-decoration:none;">NGO_Child_Health_Master_Records</a>
+          </div>
+          <button id="modal-close-bottom-btn" class="button button--ghost button--sm" type="button" style="font-weight:600;">Close Template</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    const modal = document.querySelector('#google-sheets-view-modal');
+    modal.querySelector('#modal-close-sheets-btn').addEventListener('click', () => modal.remove());
+    modal.querySelector('#modal-close-bottom-btn').addEventListener('click', () => modal.remove());
+    modal.querySelector('#modal-copy-only-btn').addEventListener('click', () => {
+      copySheetDataToClipboard();
+    });
+  }
+
+  /**
+   * Display an animated Google Sheets creation & updating loader modal
+   */
+  function showSheetsSyncLoader(childName, onComplete) {
+    document.querySelector('#sheets-sync-modal-overlay')?.remove();
+
+    const session = getSession() || {};
+    session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'sheets-sync-modal-overlay';
+    overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
+    
+    const activeSheetUrl = getGoogleSheetUrl() || '#';
+    const activeSheetId = cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : 'Active NGO Sheet';
+
+    overlay.innerHTML = `
+    <div class="card" style="position:relative; width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
+      <button id="sync-overlay-close-btn" style="position:absolute; top:14px; right:16px; background:none; border:none; color:var(--color-text-muted); cursor:pointer; font-size:22px; line-height:1; width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; transition:background 0.2s ease;" aria-label="Close">&times;</button>
+
+      <div style="display:flex; justify-content:center; margin-bottom:16px;">
+        <div id="sync-spinner-icon" style="position:relative; width:64px; height:64px; display:flex; align-items:center; justify-content:center; background:white; border-radius:50%; border:2px solid rgba(16,185,129,0.3); box-shadow:0 4px 12px rgba(0,0,0,0.1); overflow:hidden;">
+          <svg width="36" height="36" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="animation:pulse 1.5s infinite;"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
+          <div id="sync-spinner-ring" style="position:absolute; inset:-4px; border:3px solid transparent; border-top-color:#10b981; border-radius:50%; animation:spin 1s linear infinite;"></div>
+        </div>
+      </div>
+      
+      <h2 style="font-size:18px; font-weight:700; margin:0 0 6px 0; color:var(--color-text);">Updating Live Google Sheet</h2>
+      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing for <b>${escapeHTML$1(childName)}</b> to live Google Sheet...</p>
+      
+      <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
+          <span id="sync-stage-text" style="font-weight:600; color:var(--color-primary);">1. Validating child details...</span>
+          <span id="sync-stage-pct" style="font-weight:700; color:var(--color-text);">25%</span>
+        </div>
+        <div class="progress" style="height:8px; border-radius:4px; overflow:hidden; background:var(--color-border);">
+          <div id="sync-progress-bar" class="progress__bar" style="width:25%; background:#10b981; transition:width 0.35s ease;"></div>
+        </div>
+      </div>
+
+      <!-- Action buttons revealed on 100% complete -->
+      <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
+        <a id="sync-open-sheet-btn" href="${activeSheetUrl}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
+          <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
+          Open Connected Live Google Sheet
+        </a>
+      </div>
+
+      <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
+        <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
+        <span id="sync-footer-label">Synced to ${escapeHTML$1(activeSheetId)}</span>
+      </div>
+    </div>
+  `;
+
+    document.body.appendChild(overlay);
+
+    const stageText = overlay.querySelector('#sync-stage-text');
+    const stagePct = overlay.querySelector('#sync-stage-pct');
+    const progressBar = overlay.querySelector('#sync-progress-bar');
+    const actionsArea = overlay.querySelector('#sync-actions-area');
+    const footerLabel = overlay.querySelector('#sync-footer-label');
+    const openBtn = overlay.querySelector('#sync-open-sheet-btn');
+    const spinnerRing = overlay.querySelector('#sync-spinner-ring');
+
+    overlay.querySelector('#sync-overlay-close-btn')?.addEventListener('click', () => {
+      overlay.remove();
+      if (typeof onComplete === 'function') onComplete();
+    });
+
+    setTimeout(() => {
+      if (stageText) stageText.textContent = '2. Transmitting record payload...';
+      if (stagePct) stagePct.textContent = '55%';
+      if (progressBar) progressBar.style.width = '55%';
+    }, 400);
+
+    setTimeout(() => {
+      if (stageText) stageText.textContent = '3. Appending record row to Google Sheet...';
+      if (stagePct) stagePct.textContent = '85%';
+      if (progressBar) progressBar.style.width = '85%';
+    }, 850);
+
+    setTimeout(() => {
+      if (stageText) {
+        stageText.textContent = 'Live Google Sheet Updated & Synced!';
+        stageText.style.color = '#10b981';
+      }
+      if (stagePct) stagePct.textContent = '100%';
+      if (progressBar) progressBar.style.width = '100%';
+      if (spinnerRing) spinnerRing.style.display = 'none';
+
+      const latestUrl = getGoogleSheetUrl();
+      if (openBtn) {
+        if (latestUrl && latestUrl !== '#') {
+          openBtn.href = latestUrl;
+        }
+        openBtn.onclick = (e) => {
+          e.preventDefault();
+          const targetUrl = getGoogleSheetUrl();
+          if (targetUrl && targetUrl !== '#') {
+            window.open(targetUrl, '_blank');
+          } else {
+            toast('Fetching Google Sheet...', 'Connecting to your NGO Google Sheet...');
+            fetchSheetsConfig().then(cfg => {
+              if (cfg && cfg.spreadsheetUrl) {
+                window.open(cfg.spreadsheetUrl, '_blank');
+              } else {
+                toast('Google Sheet Not Found', 'Please connect Google Workspace in Settings to view your live Sheet.');
+              }
+            });
+          }
+        };
+      }
+      if (footerLabel && cachedSheetsConfig?.sheetId) {
+        footerLabel.textContent = `Synced to ${cachedSheetsConfig.sheetId.slice(0, 15)}...`;
+      }
+
+      if (actionsArea) actionsArea.style.display = 'flex';
+    }, 1300);
+  }
+
+  /**
+   * Automatically sync child health records to the NGO's Google Sheet via OAuth API
+   * @param {Object} child 
+   */
+  async function autoSyncChildToGoogleSheets(child) {
+    if (!child) return;
+
+    const session = getSession() || {};
+    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+    let children = getChildren() || [];
+    if (child && !children.some(c => c.id === child.id)) {
+      children = [...children, child];
+    }
+
+    try {
+      const res = await apiFetch$1('/api/sheets/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ children, ngo: ngoSlug, ngoName })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          if (data.spreadsheetUrl) {
+            if (!cachedSheetsConfig) cachedSheetsConfig = { connected: true };
+            cachedSheetsConfig.connected = true;
+            cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
+            cachedSheetsConfig.sheetId = data.sheetId;
+            localStorage.setItem(`google_sheet_url_${ngoSlug}`, data.spreadsheetUrl);
+            localStorage.setItem('google_sheet_url', data.spreadsheetUrl);
+          }
+          toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
+        } else if (data && data.message === 'Not connected') {
+          console.log('[Google Sheets] Skip auto-sync: NGO is not connected to Google Workspace.');
+        }
+      }
+    } catch (e) {
+      console.warn('[Google Sheets] OAuth sync exception:', e);
+    }
+  }
+
+  /**
+   * googleDocsSync.js
+   * Real-time Executive Health Report synchronization to Google Docs.
+   * Automatically formats and updates executive health summaries, audit statistics,
+   * WHO growth metrics, and child clinical logs directly into the live Google Doc.
+   */
+
+
+  let cachedDocsConfig = null;
+
+  /**
+   * Fetch Docs config for the current NGO from backend API
+   */
+  async function fetchDocsConfig(ngoSlug) {
+    const session = getSession() || {};
+    const slug = session.ngo || 'ayusha-nilayam';
+    try {
+      const res = await apiFetch$1(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        cachedDocsConfig = await res.json();
+        return cachedDocsConfig;
+      }
+    } catch (err) {
+      console.warn('[Google Docs] Config fetch warning:', err);
+    }
+    return cachedDocsConfig || { connected: false };
+  }
+
+  /**
+   * Get cached Docs config object
+   */
+  function getDocsConfig() {
+    return cachedDocsConfig;
+  }
+
+  /**
+   * Get live view link to the Google Doc report (returns null if not connected)
+   */
+  function getGoogleDocUrl() {
+    return cachedDocsConfig?.documentUrl || null;
+  }
+
+  /**
+   * Generate formatted executive report document text
+   */
+  function generateExecutiveDocContent() {
+    const session = getSession() || {};
+    const ngoName = session.ngo || 'Ayusha Nilayam';
+    const children = getChildren() || [];
+    const total = children.length;
+    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
+    const healthyCount = total - flaggedCount;
+    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
+    const healthRecords = getHealthRecords() || [];
+
+    const timestamp = new Date().toLocaleString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    let reportText = `========================================================================\n`;
+    reportText += `       EXECUTIVE CHILD HEALTH AUDIT REPORT — ${ngoName.toUpperCase()}\n`;
+    reportText += `       Auto-Synced Live Document | ${timestamp}\n`;
+    reportText += `========================================================================\n\n`;
+
+    reportText += `1. EXECUTIVE HEALTH SUMMARY\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+    reportText += `• Total Registered Children : ${total}\n`;
+    reportText += `• Optimal Health Status     : ${healthyCount} children (${healthyPct}%)\n`;
+    reportText += `• Health Alerts / Flagged   : ${flaggedCount} children\n`;
+    reportText += `• Verified Clinical Records : ${healthRecords.length} lab test reports\n`;
+    reportText += `• Audited Status            : Verified & Compliant\n\n`;
+
+    reportText += `2. REGISTERED CHILD ROSTER & CLINICAL METRICS\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+    reportText += `ID         | Name                     | Age | Gender | Status  | Height  | Weight  | Medications          | Hygiene\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+
+    children.forEach(c => {
+      const age = calculateAge(c.dob) || c.age || '—';
+      const id = String(c.id || 'CH-0000').padEnd(10, ' ');
+      const name = String(c.name || 'Child').slice(0, 24).padEnd(24, ' ');
+      const ageStr = String(age).slice(0, 3).padEnd(4, ' ');
+      const gender = String(c.gender || '—').slice(0, 6).padEnd(7, ' ');
+      const status = String(c.status || 'Active').slice(0, 7).padEnd(8, ' ');
+      const h = String(c.height ? `${c.height}cm` : '—').padEnd(8, ' ');
+      const w = String(c.weight ? `${c.weight}kg` : '—').padEnd(8, ' ');
+      const meds = String(c.medications || 'None').slice(0, 20).padEnd(20, ' ');
+      const hygiene = String(c.hygieneIndex || 'N/A');
+
+      reportText += `${id} | ${name} | ${ageStr} | ${gender} | ${status} | ${h} | ${w} | ${meds} | ${hygiene}\n`;
+    });
+
+    reportText += `\n------------------------------------------------------------------------\n`;
+    reportText += `End of Live Synced Report | Child Health Management Platform\n`;
+
+    return reportText;
+  }
+
+  /**
+   * Automatically sync executive report to Google Docs in background via OAuth API
+   */
+  async function autoSyncToGoogleDocs() {
+    const session = getSession() || {};
+    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+    const reportContent = generateExecutiveDocContent();
+
+    try {
+      const res = await apiFetch$1('/api/docs/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportContent, ngo: ngoSlug, ngoName })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          if (data.documentUrl) {
+            if (!cachedDocsConfig) cachedDocsConfig = { connected: true };
+            cachedDocsConfig.connected = true;
+            cachedDocsConfig.documentUrl = data.documentUrl;
+          }
+          console.log('[Google Docs] Executive report live synced.');
+        } else if (data && data.message === 'Not connected') {
+          console.log('[Google Docs] Skip auto-sync: NGO is not connected to Google Workspace.');
+        }
+      }
+    } catch (err) {
+      console.warn('[Google Docs] OAuth sync notice:', err);
+    }
+  }
+
+  /**
+   * Trigger live API sync to Google Docs and open document
+   */
+  async function syncAndOpenGoogleDoc() {
+    const docUrl = getGoogleDocUrl();
+    if (!docUrl) {
+      toast('Google Workspace Not Connected', 'Please connect your Google Account in Settings first.');
+      return;
+    }
+
+    toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
+    await autoSyncToGoogleDocs();
+    toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
+    window.open(docUrl, '_blank');
+  }
+
+  /**
+   * Display interactive Google Docs Live Report Viewer Modal
+   */
+  function openGoogleDocsTemplateModal() {
+    document.querySelector('#google-docs-view-modal')?.remove();
+
+    const session = getSession() || {};
+    const ngoName = session.ngo || 'Ayusha Nilayam';
+    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+    const children = getChildren() || [];
+    const total = children.length;
+    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
+    const healthyCount = total - flaggedCount;
+    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
+
+    const rowsHTML = children.map((c, idx) => `
+    <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : 'background:#ffffff;'}">
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-family:monospace; font-size:12px; font-weight:700; color:#1a73e8;">${escapeHTML$1(c.id || 'CH-0000')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:13px; font-weight:600; color:#1e293b;">${escapeHTML$1(c.name || 'Child')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${calculateAge(c.dob) || c.age || '—'}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.gender || '—')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.height ? `${c.height} cm` : '—'}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.weight ? `${c.weight} kg` : '—'}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.medications || 'None')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.dentalRemarks || '—')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.hygieneIndex || 'N/A')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px;">
+        <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:#dcfce7; color:#15803d;">
+          ${escapeHTML$1(c.status || 'Active')}
+        </span>
+      </td>
+    </tr>
+  `).join('');
+
+    const modalHTML = `
+    <div id="google-docs-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
+      <div class="card" style="width:min(1100px, 94vw); height:min(780px, 92vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
+        
+        <!-- Google Docs Header Bar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #1a73e8 0%, #1557b0 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+          <div style="display:flex; align-items:center; gap:14px;">
+            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden;">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#4285F4"/><path d="M14 2V8H20L14 2Z" fill="#A1C2FA"/><path d="M16 13H8V11H16V13ZM16 17H8V15H16V17ZM10 9H8V7H10V9Z" fill="white"/></svg>
+            </div>
+            <div>
+              <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
+                Child_Health_Executive_Report_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
+                <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
+                  <span style="width:6px; height:6px; border-radius:50%; background:#60a5fa; box-shadow:0 0 6px #60a5fa;"></span>
+                  Live Auto-Synced Google Doc
+                </span>
+              </div>
+              <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px;">
+                Connected Account: <b>${escapeHTML$1(userEmail)}</b> • Real-time Executive Report
+              </div>
+            </div>
+          </div>
+          
+          <div style="display:flex; align-items:center; gap:12px;">
+            <button id="modal-edit-doc-url-btn" class="button" style="background:rgba(255,255,255,0.18); color:white; border:1px solid rgba(255,255,255,0.3); font-weight:600; font-size:12.5px; padding:9px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Set Doc URL
+            </button>
+            <button id="modal-sync-doc-btn" class="button" style="background:#ffffff; color:#1a73e8; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+              Open Live Google Doc
+            </button>
+            <button id="modal-close-docs-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1;">&times;</button>
+          </div>
+        </div>
+
+        <!-- Document Body Preview -->
+        <div style="flex:1; overflow-y:auto; padding:28px 36px; background:#f8fafc;">
+          
+          <!-- Document Sheet Paper -->
+          <div style="max-width:900px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:40px 48px; box-shadow:0 4px 20px rgba(0,0,0,0.05);">
+            
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1a73e8; padding-bottom:16px; margin-bottom:24px;">
+              <div>
+                <h1 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 4px 0; letter-spacing:-0.02em;">CHILD HEALTH EXECUTIVE REPORT</h1>
+                <p style="font-size:13px; color:#64748b; margin:0; font-weight:600;">NGO: ${escapeHTML$1(ngoName)} • Live Auto-Synced Document</p>
+              </div>
+              <span style="font-size:11px; background:#eff6ff; color:#1a73e8; font-weight:700; padding:6px 12px; border-radius:20px; border:1px solid #bfdbfe;">
+                Status: Updated Today
+              </span>
+            </div>
+
+            <!-- Stats Bar -->
+            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:28px;">
+              <div style="background:#f1f5f9; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:24px; font-weight:800; color:#1a73e8;">${total}</div>
+                <div style="font-size:12px; color:#475569; font-weight:600; margin-top:2px;">Total Registered Children</div>
+              </div>
+              <div style="background:#ecfdf5; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:24px; font-weight:800; color:#15803d;">${healthyPct}%</div>
+                <div style="font-size:12px; color:#166534; font-weight:600; margin-top:2px;">Optimal Health (${healthyCount} children)</div>
+              </div>
+              <div style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
+                <div style="font-size:24px; font-weight:800; color:#b45309;">${flaggedCount}</div>
+                <div style="font-size:12px; color:#92400e; font-weight:600; margin-top:2px;">Health Alerts / Flagged</div>
+              </div>
+            </div>
+
+            <!-- Table -->
+            <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin:0 0 14px 0;">Audited Clinical Roster</h3>
+            <table style="width:100%; border-collapse:collapse; text-align:left;">
+              <thead>
+                <tr style="background:#f1f5f9; color:#475569; font-size:12px; font-weight:700;">
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Child ID</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Name</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Age</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Gender</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Height</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Weight</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Medications</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Dental</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Hygiene</th>
+                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowsHTML}
+              </tbody>
+            </table>
+
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    document.querySelector('#modal-close-docs-btn')?.addEventListener('click', () => {
+      document.querySelector('#google-docs-view-modal')?.remove();
+    });
+
+    document.querySelector('#modal-sync-doc-btn')?.addEventListener('click', () => {
+      syncAndOpenGoogleDoc();
+    });
+  }
+
+  /**
+   * googleCalendar.js
+   * Google Calendar-grade interactive appointment management.
+   * Features full-width Month View with event chips, Day View timeline grid,
+   * view toggling, and interactive modal popup with Google Calendar sync.
+   */
+
+
+  const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const DAY_LABELS = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
+  const HOURLY_SLOTS = [
+    { label: '08:00 AM', value: '08:00' },
+    { label: '09:00 AM', value: '09:00' },
+    { label: '10:00 AM', value: '10:00' },
+    { label: '11:00 AM', value: '11:00' },
+    { label: '12:00 PM', value: '12:00' },
+    { label: '01:00 PM', value: '13:00' },
+    { label: '02:00 PM', value: '14:00' },
+    { label: '03:00 PM', value: '15:00' },
+    { label: '04:00 PM', value: '16:00' },
+    { label: '05:00 PM', value: '17:00' },
+    { label: '06:00 PM', value: '18:00' },
+    { label: '07:00 PM', value: '19:00' },
+    { label: '08:00 PM', value: '20:00' }
+  ];
+
+  /**
+   * Build Google Calendar TEMPLATE URL for instant synchronization
+   */
+  function buildGoogleCalendarUrl(appointment) {
+    const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
+    const title = encodeURIComponent(`${appointment.childName} — ${appointment.type}`);
+    const details = encodeURIComponent(
+      `Doctor: ${appointment.doctor || 'N/A'}\nChild: ${appointment.childName}\nType: ${appointment.type}\nNotes: ${appointment.notes || 'No notes'}\n\nCreated from Child Health Management App`
+    );
+
+    const dateStr = appointment.date.replace(/-/g, '');
+    let startTime = '100000';
+    let endTime = '110000';
+
+    if (appointment.time) {
+      const parsed = parseTime(appointment.time);
+      if (parsed) {
+        startTime = parsed.start;
+        endTime = parsed.end;
+      }
+    }
+
+    const dates = `${dateStr}T${startTime}/${dateStr}T${endTime}`;
+    return `${base}&text=${title}&dates=${dates}&details=${details}&sf=true&output=xml`;
+  }
+
+  function parseHoursAndMinutes(timeStr) {
+    if (!timeStr) return { hours: 10, minutes: 0 };
+    const str = String(timeStr).trim();
+
+    // Try 12-hour format e.g. "11:30 AM", "11:30AM", "11:30 PM", "9:00 AM"
+    const match12 = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (match12) {
+      let hours = parseInt(match12[1], 10);
+      const minutes = parseInt(match12[2], 10);
+      const ampm = match12[3] ? match12[3].toUpperCase() : null;
+      if (ampm === 'PM' && hours !== 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+      return { hours: isNaN(hours) ? 10 : hours, minutes: isNaN(minutes) ? 0 : minutes };
+    }
+
+    const parts = str.split(':');
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    return {
+      hours: isNaN(hours) ? 10 : hours,
+      minutes: isNaN(minutes) ? 0 : minutes
+    };
+  }
+
+  function formatSingleDisplayTime(timeStr) {
+    const { hours, minutes } = parseHoursAndMinutes(timeStr);
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const h12 = hours % 12 || 12;
+    const minStr = String(minutes).padStart(2, '0');
+    return `${h12}:${minStr} ${ampm}`;
+  }
+
+  function formatDisplayTimeRange(timeStr) {
+    const { hours, minutes } = parseHoursAndMinutes(timeStr);
+    const h12 = hours % 12 || 12;
+    const minStr = String(minutes).padStart(2, '0');
+    const startFormatted = `${h12}:${minStr}`;
+
+    const endHours = (hours + 1) % 24;
+    const endAmpm = endHours >= 12 ? 'pm' : 'am';
+    const endH12 = endHours % 12 || 12;
+    const endFormatted = `${endH12}:${minStr}${endAmpm}`;
+
+    return `${startFormatted} – ${endFormatted}`;
+  }
+
+  function parseTime(timeStr) {
+    if (!timeStr) return null;
+    const { hours, minutes } = parseHoursAndMinutes(timeStr);
+    const sh = String(hours).padStart(2, '0');
+    const sm = String(minutes).padStart(2, '0');
+    const eh = String((hours + 1) % 24).padStart(2, '0');
+    return { start: `${sh}${sm}00`, end: `${eh}${sm}00` };
+  }
+
+  function bookAppointment(data) {
+    const appt = addAppointment({
+      childId: data.childId,
+      childName: data.childName,
+      type: data.type,
+      date: data.date,
+      time: data.time || '10:00',
+      doctor: data.doctor || '',
+      notes: data.notes || '',
+      status: 'Upcoming'
+    });
+
+    const calUrl = buildGoogleCalendarUrl(appt);
+    window.open(calUrl, '_blank');
+
+    toast('Appointment Scheduled', `${data.childName} — ${data.type} on ${data.date}. Google Calendar synced.`);
+    return appt;
+  }
+
+  function daysInMonth(year, month) {
+    return new Date(year, month + 1, 0).getDate();
+  }
+
+  function firstDayOfWeek(year, month) {
+    const d = new Date(year, month, 1).getDay();
+    return d === 0 ? 6 : d - 1; // Convert to Monday start
+  }
+
+  function typeColor(type) {
+    if (!type) return 'blue';
+    const t = type.toLowerCase();
+    if (t.includes('doctor') || t.includes('general')) return 'blue';
+    if (t.includes('follow') || t.includes('vaccin')) return 'green';
+    if (t.includes('dental') || t.includes('eye')) return 'amber';
+    if (t.includes('deworm')) return 'violet';
+    return 'blue';
+  }
+
+  function escapeHTML(str) {
+    if (!str) return '';
+    return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     FULL-WIDTH GOOGLE CALENDAR MONTH GRID WITH EVENT CHIPS
+     ═══════════════════════════════════════════════════════ */
+
+  function renderCalendarGrid(year, month, selectedDay = null) {
+    const today = new Date();
+    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === month;
+    const todayDate = today.getDate();
+    const totalDays = daysInMonth(year, month);
+    const startDay = firstDayOfWeek(year, month);
+
+    // Previous month trailing days
+    const prevMonthTotalDays = daysInMonth(year, month - 1);
+
+    const appointments = getAppointments();
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const apptsByDay = {};
+    appointments.forEach(a => {
+      if (a.date && a.date.startsWith(monthStr)) {
+        const day = parseInt(a.date.split('-')[2]);
+        if (!apptsByDay[day]) apptsByDay[day] = [];
+        apptsByDay[day].push(a);
+      }
+    });
+
+    // Header row for weekdays
+    let headerHTML = DAY_LABELS.map(d => `<div class="gcal-header-cell">${d}</div>`).join('');
+
+    let cellsHTML = '';
+
+    // Render trailing days from previous month
+    for (let i = startDay - 1; i >= 0; i--) {
+      const prevDayNum = prevMonthTotalDays - i;
+      cellsHTML += `
+      <div class="gcal-day-cell gcal-day-cell--outside">
+        <span class="gcal-day-num">${prevDayNum}</span>
+      </div>`;
+    }
+
+    // Render current month days
+    for (let day = 1; day <= totalDays; day++) {
+      const isToday = isCurrentMonth && day === todayDate;
+      const isSelected = selectedDay === day;
+      const dayAppts = apptsByDay[day] || [];
+
+      // Build event chips inside the calendar day cell
+      let chipsHTML = '';
+      if (dayAppts.length > 0) {
+        const visible = dayAppts.slice(0, 2);
+        chipsHTML = visible.map(a => `
+        <div class="gcal-event-chip gcal-event-chip--${typeColor(a.type)}" data-event-id="${a.id}" title="${escapeHTML(a.childName)} - ${escapeHTML(a.type)}">
+          <span class="gcal-chip-time">${a.time || '10:00'}</span>
+          <span class="gcal-chip-title">${escapeHTML(a.childName)}</span>
+        </div>
+      `).join('');
+
+        if (dayAppts.length > 2) {
+          chipsHTML += `<div class="gcal-more-chip">+${dayAppts.length - 2} more</div>`;
+        }
+      }
+
+      cellsHTML += `
+      <div class="gcal-day-cell ${isToday ? 'gcal-day-cell--today' : ''} ${isSelected ? 'gcal-day-cell--selected' : ''}"
+        data-calendar-day="${day}" role="button" tabindex="0" title="Click to open Day schedule for ${day} ${MONTH_NAMES[month]}">
+        <div class="gcal-day-top">
+          <span class="gcal-day-num ${isToday ? 'gcal-day-num--today' : ''}">${day}</span>
+        </div>
+        <div class="gcal-day-chips">
+          ${chipsHTML}
+        </div>
+      </div>`;
+    }
+
+    // Render leading days for next month to complete grid row (total 35 or 42 cells)
+    const renderedCount = startDay + totalDays;
+    const totalGridCells = renderedCount > 35 ? 42 : 35;
+    const nextMonthDays = totalGridCells - renderedCount;
+
+    for (let day = 1; day <= nextMonthDays; day++) {
+      cellsHTML += `
+      <div class="gcal-day-cell gcal-day-cell--outside">
+        <span class="gcal-day-num">${day}</span>
+      </div>`;
+    }
+
+    return `
+    <div class="gcal-month-wrap">
+      <div class="gcal-month-grid">
+        ${headerHTML}
+        ${cellsHTML}
+      </div>
+      <div class="gcal-legend-bar">
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--blue"></span> Doctor Visit</span>
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--green"></span> Follow-up / Vaccine</span>
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--amber"></span> Dental / Eye</span>
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--violet"></span> Deworming</span>
+      </div>
+    </div>`;
+  }
+
+  function computeAppointmentStatus(appt) {
+    if (!appt) return 'Upcoming';
+    if (appt.status && appt.status !== 'Upcoming' && appt.status !== 'Pending') {
+      return appt.status;
+    }
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (appt.date < todayStr) {
+      return 'Completed';
+    }
+    if (appt.date === todayStr) {
+      const { hours } = parseHoursAndMinutes(appt.time || '10:00');
+      const currentHour = new Date().getHours();
+      if (hours < currentHour) {
+        return 'Completed';
+      }
+    }
+    return 'Upcoming';
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     DAY VIEW HOURLY GRID (Google Calendar Style)
+     ═══════════════════════════════════════════════════════ */
+
+  function renderDayView(year, month, day) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    const appointments = getAppointments().filter(a => a.date === dateStr);
+
+    const slotRows = HOURLY_SLOTS.map(slot => {
+      const slotHour = parseInt(slot.value.split(':')[0], 10);
+      const matchingAppts = appointments.filter(a => {
+        if (!a.time) return slot.value === '10:00';
+        const { hours } = parseHoursAndMinutes(a.time);
+        return hours === slotHour;
+      });
+
+      let slotContent = '';
+      if (matchingAppts.length > 0) {
+        slotContent = matchingAppts.map(a => {
+          const currentStatus = computeAppointmentStatus(a);
+          return `
+          <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
+            <div class="gcal-event-card-main">
+              <div class="gcal-event-title-row">
+                <span class="gcal-event-name">${escapeHTML(a.childName)}</span>
+                <span class="gcal-event-dot">·</span>
+                <span class="gcal-event-detail-text">${escapeHTML(a.type)}${a.doctor ? ` (${escapeHTML(a.doctor)})` : ''}</span>
+              </div>
+              <div class="gcal-event-time-row">${formatSingleDisplayTime(a.time || slot.label)}</div>
+            </div>
+            <span class="gcal-status-pill gcal-status-pill--${currentStatus === 'Completed' ? 'done' : 'upcoming'}">${currentStatus}</span>
+          </div>`;
+        }).join('');
+      } else {
+        slotContent = `<div class="gcal-slot-hint">+ Add appointment at ${slot.label}</div>`;
+      }
+
+      return `
+      <div class="gcal-timeline-row" data-open-booking-modal data-slot-date="${dateStr}" data-slot-time="${slot.value}">
+        <div class="gcal-time-col">${slot.label}</div>
+        <div class="gcal-slot-col">${slotContent}</div>
+      </div>`;
+    }).join('');
+
+    return `
+    <div class="gcal-day-view">
+      <div class="gcal-timeline-grid">
+        ${slotRows}
+      </div>
+    </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     BOOKING FORM & MODAL — Google Calendar Style Popup
+     ═══════════════════════════════════════════════════════ */
+
+  function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
+    const children = getChildren();
+    const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
+    const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
+
+    // Format display date
+    const dateObj = new Date(dateVal + 'T00:00:00');
+    const displayDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+    // Format display time
+    const displayTime = formatSingleDisplayTime(preselectedTime);
+
+    return `
+    <form class="gcal-popup-form" id="cal-booking-form">
+      <!-- Title row (Google Calendar style borderless input) -->
+      <div class="gcal-popup-title-row">
+        <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add title" autocomplete="off" />
+      </div>
+
+      <!-- Icon rows -->
+      <div class="gcal-popup-rows">
+        <!-- Date & Time -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <div class="gcal-popup-datetime">
+              <input class="gcal-popup-date-input" name="date" type="date" value="${dateVal}" required />
+              <input class="gcal-popup-time-input" name="time" type="time" value="${preselectedTime}" />
+            </div>
+            <div class="gcal-popup-date-display">${displayDate} · ${displayTime}</div>
+          </div>
+        </div>
+
+        <!-- Child selector -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <select class="gcal-popup-select" name="childId" required>
+              <option value="">Select child</option>
+              ${childOptions}
+            </select>
+          </div>
+        </div>
+
+        <!-- Appointment type -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <select class="gcal-popup-select" name="type" required>
+              <option value="">Appointment type</option>
+              <option value="Doctor visit">Doctor Visit</option>
+              <option value="Follow-up">Follow-up</option>
+              <option value="Dental checkup">Dental Checkup</option>
+              <option value="Deworming">Deworming</option>
+              <option value="Vaccination">Vaccination</option>
+              <option value="Eye checkup">Eye Checkup</option>
+              <option value="General checkup">General Checkup</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <textarea class="gcal-popup-notes" name="notes" rows="2" placeholder="Add description or notes"></textarea>
+          </div>
+        </div>
+
+        <!-- Google Calendar badge -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <span class="gcal-popup-cal-label">
+              <span class="gcal-popup-cal-dot"></span>
+              Child Health Calendar
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer buttons -->
+      <div class="gcal-popup-footer">
+        <button class="gcal-popup-more-btn" type="button" data-close-cal-modal>More options</button>
+        <button class="gcal-popup-save-btn" type="submit">Save</button>
+      </div>
+    </form>`;
+  }
+
+  function renderBookingModalMarkup(dateStr, timeStr) {
+    const formHTML = renderBookingForm(dateStr, timeStr);
+
+    return `
+    <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
+      <div class="gcal-popup-card" role="dialog" aria-modal="true">
+        <button class="gcal-popup-close" type="button" aria-label="Close" data-close-cal-modal>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+        ${formHTML}
+      </div>
+    </div>`;
+  }
+
+  function renderEventDetailsModalMarkup(eventId) {
+    const appointments = getAppointments();
+    const appt = appointments.find(a => String(a.id) === String(eventId));
+    if (!appt) return '';
+
+    const currentStatus = computeAppointmentStatus(appt);
+    const dateObj = new Date(appt.date + 'T00:00:00');
+    const dayStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    const timeRangeFormatted = formatDisplayTimeRange(appt.time || '10:00 AM');
+
+    const hexColors = {
+      blue: '#039be5',
+      green: '#0b8043',
+      amber: '#f4511e',
+      violet: '#8e24aa'
+    };
+    const colorHex = hexColors[typeColor(appt.type)] || '#039be5';
+
+    return `
+    <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
+      <div class="gcal-event-popover-card" role="dialog" aria-modal="true">
+        <!-- Banner Header -->
+        <div class="gcal-popover-banner" style="background-image: url('assets/gcal_event_banner.png');">
+          <div class="gcal-popover-actions">
+            <button class="gcal-popover-btn" type="button" data-edit-event-id="${appt.id}" title="Edit appointment">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="gcal-popover-btn" type="button" data-delete-event-id="${appt.id}" title="Delete appointment">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+            <button class="gcal-popover-btn" type="button" data-sync-event-id="${appt.id}" title="Open in Google Calendar">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            </button>
+            <button class="gcal-popover-btn" type="button" data-close-cal-modal title="Close">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Details Body -->
+        <div class="gcal-popover-body">
+          <!-- Title row -->
+          <div class="gcal-popover-row gcal-popover-title-row">
+            <span class="gcal-popover-color-dot" style="background-color: ${colorHex}; margin-top: 4px;"></span>
+            <div class="gcal-popover-title-group" style="width: 100%;">
+              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
+                <div>
+                  <h2 class="gcal-popover-title" style="font-size: 19px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1.3; letter-spacing: -0.01em;">${escapeHTML(appt.childName)}</h2>
+                  <div style="font-size: 13.5px; font-weight: 600; color: #475569; margin-top: 3px;">${escapeHTML(appt.type)}</div>
+                </div>
+                <span class="gcal-status-pill gcal-status-pill--${currentStatus === 'Completed' ? 'done' : 'upcoming'}">${currentStatus}</span>
+              </div>
+              <div class="gcal-popover-time" style="margin-top: 6px; font-size: 13px; color: #64748b; font-weight: 500;">${dayStr} · ${timeRangeFormatted}</div>
+            </div>
+          </div>
+
+          <!-- Description row -->
+          <div class="gcal-popover-row">
+            <div class="gcal-popover-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+            </div>
+            <div class="gcal-popover-desc">
+              <p><strong>Doctor:</strong> ${escapeHTML(appt.doctor || 'Checkup')}</p>
+              <p><strong>Child:</strong> ${escapeHTML(appt.childName)}</p>
+              <p><strong>Type:</strong> ${escapeHTML(appt.type)}</p>
+              <p><strong>Notes:</strong> ${escapeHTML(appt.notes || 'No notes')}</p>
+              <p class="gcal-popover-app-tag">Created from Child Health Management App</p>
+            </div>
+          </div>
+
+          <!-- Notification row -->
+          <div class="gcal-popover-row">
+            <div class="gcal-popover-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            </div>
+            <div class="gcal-popover-meta">30 minutes before</div>
+          </div>
+
+          <!-- User row -->
+          <div class="gcal-popover-row">
+            <div class="gcal-popover-icon">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div class="gcal-popover-meta">Tejas Sharma</div>
+          </div>
+
+          <!-- Sync Action Footer -->
+          <div class="gcal-popover-footer">
+            <button class="gcal-popup-save-btn" type="button" data-sync-event-id="${appt.id}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+              Open in Google Calendar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     FULL CALENDAR CONTAINER & VIEW CONTROLLER
+     ═══════════════════════════════════════════════════════ */
+
+  function calendarCard(viewMode = 'month', initialYear, initialMonth, initialDay) {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const day = now.getDate();
+
+    const isMonthView = viewMode === 'month';
+    const monthName = MONTH_NAMES[month];
+    const dateObj = new Date(year, month, day);
+    const dayName = DAY_NAMES[dateObj.getDay()];
+
+    const titleText = isMonthView ? `${monthName} ${year}` : `${dayName}, ${day} ${monthName} ${year}`;
+    const dateVal = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+    return `
+    <section class="card cal-card" data-calendar-root data-cal-view-mode="${viewMode}" data-cal-year="${year}" data-cal-month="${month}" data-cal-day="${day}">
+      <header class="card__header gcal-header">
+        <div class="gcal-header-left">
+          <div class="gcal-brand-icon">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+          </div>
+          <h2 class="gcal-title" data-calendar-title>${titleText}</h2>
+        </div>
+
+        <div class="gcal-header-right">
+          <button class="gcal-btn gcal-btn--create" type="button" data-open-booking-modal data-slot-date="${dateVal}" data-slot-time="10:00">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            Register Appointment
+          </button>
+
+          <button class="gcal-btn gcal-btn--secondary" type="button" data-calendar-today>Today</button>
+          
+          <div class="gcal-nav-group">
+            <button class="gcal-nav-btn" type="button" data-calendar-prev title="Previous">&lsaquo;</button>
+            <button class="gcal-nav-btn" type="button" data-calendar-next title="Next">&rsaquo;</button>
+          </div>
+
+          <div class="gcal-toggle-group">
+            <button class="gcal-toggle-btn ${isMonthView ? 'active' : ''}" type="button" data-cal-view="month">Month</button>
+            <button class="gcal-toggle-btn ${!isMonthView ? 'active' : ''}" type="button" data-cal-view="day">Day</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="card__body gcal-body">
+        <div class="gcal-container" data-calendar-container>
+          ${isMonthView ? renderCalendarGrid(year, month, day) : renderDayView(year, month, day)}
+        </div>
+      </div>
+    </section>
+    <div id="cal-modal-container"></div>`;
+  }
+
+  function updateCalendarView(root, viewMode, year, month, day) {
+    if (!root) return;
+
+    const mode = viewMode || 'month';
+    const isMonthView = mode === 'month';
+    const monthName = MONTH_NAMES[month];
+    const dateObj = new Date(year, month, day);
+    const dayName = DAY_NAMES[dateObj.getDay()];
+
+    root.setAttribute('data-cal-view-mode', mode);
+    root.setAttribute('data-cal-year', String(year));
+    root.setAttribute('data-cal-month', String(month));
+    root.setAttribute('data-cal-day', String(day));
+
+    const titleEl = root.querySelector('[data-calendar-title]');
+    if (titleEl) {
+      titleEl.textContent = isMonthView ? `${monthName} ${year}` : `${dayName}, ${day} ${monthName} ${year}`;
+    }
+
+    root.querySelectorAll('[data-cal-view]').forEach(btn => {
+      if (btn.getAttribute('data-cal-view') === mode) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    const container = root.querySelector('[data-calendar-container]');
+    if (container) {
+      container.innerHTML = isMonthView ? renderCalendarGrid(year, month, day) : renderDayView(year, month, day);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     NAVIGATION
+     ═══════════════════════════════════════════════════════ */
+
+  const nav = [
+    { section: 'Overview', items: [['dashboard', 'Dashboard', 'grid']] },
+    { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['medicines', 'Medicines', 'pill'], ['documents', 'Documents', 'file']] },
+    { section: 'Analytics', items: [['reports', 'Reports', 'chart']] }
+  ];
+
+  const pageTitles = {
+    dashboard: 'Dashboard',
+    children: 'Children',
+    appointments: 'Appointments',
+    'child-profile': 'Child Health Profile',
+    'register-child': 'Register child',
+    'ocr-upload': 'Google Cloud Vision API Extraction',
+    'ocr-review': 'Review extracted information',
+    'ocr-details': 'Additional details',
+    'ocr-processing': 'Processing document',
+    documents: 'Health records & documents',
+    reports: 'Health reports',
+    settings: 'Settings'
+  };
+
+  function navItem(item, active) {
+    const [page, label, glyph] = item;
+    return `<a class="nav-item ${page === active ? 'nav-item--active' : ''}" href="${pagePath(page)}" ${page === active ? 'aria-current="page"' : ''}>${icon(glyph)}<span class="nav-item__text">${label}</span></a>`;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     APP SHELL
+     ═══════════════════════════════════════════════════════ */
+
+  function shell(page, content) {
+    const session = getSession() || {};
+    const displayName = session.displayName || 'Authorized User';
+    const email = session.email || 'tejassachin2010@gmail.com';
+    const ngoName = session.ngo || localStorage.getItem('sample-org-name') || 'Ayusha Nilayam';
+    const role = session.role || 'Admin';
+    const photoURL = session.photoURL;
+    const userInitials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'AD';
+
+    const navHTML = nav.map(group => group.items.map(item => navItem(item, page)).join('')).join('');
+
+    return `<div class="app-shell">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
+      <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
+      <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML$1(ngoName)}</span><span class="workspace-user__role">${escapeHTML$1(role)}</span></span></div></div>
+    </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
+    <main class="app-main" id="app-main">
+      <header class="topbar">
+        ${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}
+        <div class="topbar__crumbs"><span>Demo</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
+        <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
+        <div class="topbar__actions">
+          <button class="icon-button tooltip" data-tooltip="Toggle theme" data-theme-toggle type="button" aria-label="Toggle color theme">${icon('sun')}</button>
+          <button class="icon-button tooltip" data-tooltip="Notifications" type="button" aria-label="Notifications" data-notifications>${icon('bell')}</button>
+          
+          <!-- DASHBOARD HEADER GOOGLE USER PROFILE & NGO WORKSPACE -->
+          <div class="topbar-profile" style="display:flex; align-items:center; gap:12px;">
+            <button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:20px; border:1px solid var(--color-border); background:var(--color-bg);">
+              ${photoURL ? `<img src="${escapeHTML$1(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
+              <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML$1(displayName)}</span>
+              ${icon('chevronDown')}
+            </button>
+            <div class="dropdown" hidden data-profile-dropdown>
+              <div style="padding:12px 14px; border-bottom:1px solid var(--color-border); font-size:12px;">
+                <div style="font-weight:700; color:var(--color-text);">${escapeHTML$1(displayName)}</div>
+                <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML$1(email)}</div>
+                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML$1(ngoName)}</span></div>
+              </div>
+              <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
+              <div class="divider"></div>
+              <button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button>
+            </div>
+          </div>
+        </div>
+      </header>
+      <section class="content page-enter">${content}</section>
+    </main>
+  </div>`;
+  }
+
+  const heading = (title, description, actions) => `<div class="page-heading"><div class="page-heading__copy"><h1>${title}</h1><p>${description}</p></div>${actions ? `<div class="page-heading__actions">${actions}</div>` : ''}</div>`;
+
+  function getDynamicGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning, Admin';
+    if (hour < 17) return 'Good afternoon, Admin';
+    return 'Good evening, Admin';
+  }
+
+  const statCard = (label, value, trend, glyph, color) => `<article class="card stat-card card--interactive"><div class="stat-card__top"><span class="stat-card__label">${label}</span><span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span></div><div class="stat-card__number">${value}</div><div class="stat-card__footer"><span class="trend--up">${icon('arrowUp')} ${trend}</span></div></article>`;
+
+  const field = (label, name, placeholder, type = 'text', hint = '', value = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML$1(value)}">${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
+
+  function formatDateForInput(dateStr) {
+    if (!dateStr) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    const matchDMY = dateStr.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+    if (matchDMY) {
+      const [_, d, m, y] = matchDMY;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    try { const d = new Date(dateStr); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch (e) { }
+    return '';
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     DASHBOARD — Child Health Platform
+     ═══════════════════════════════════════════════════════ */
+
+  function dashboardPage() {
+    const children = getChildren();
+    const totalChildren = children.length;
+    const growthCount = getGrowthRecords().length;
+    const medicinesCount = getMedicines().length;
+    const uploadedDocsCount = getUploadedDocs().length;
+    const healthReportsCount = getHealthRecords().length || 4;
+
+    // Flagged children for alerts
+    const flaggedChildren = children.filter(c => healthStatus(c).level !== 'good');
+    if (flaggedChildren.length === 0) ; else {
+      flaggedChildren.slice(0, 4).map(child => {
+        const hs = healthStatus(child);
+        return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
+      }).join('');
+    }
+
+    return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
+  <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+    ${statCard('Total Children', totalChildren.toLocaleString(), 'Active records', 'users', 'blue')}
+    ${statCard('Recent Health Reports', healthReportsCount.toLocaleString(), 'Lab test panels', 'heartPulse', 'green')}
+    ${statCard('Growth Records', growthCount.toLocaleString(), 'Vitals logged', 'ruler', 'amber')}
+    ${statCard('Medicine Records', medicinesCount.toLocaleString(), 'Active prescriptions', 'pill', 'violet')}
+    ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'Google Drive Storage', 'file', 'blue')}
+    ${statCard('Last Checkup', 'Today', '10:30 AM verified', 'clock', 'green')}
+  </div>
+  <div style="margin-top: 20px;">
+    ${calendarCard()}
+  </div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     LOGIN
+     ═══════════════════════════════════════════════════════ */
+
+  function loginPage() {
+    return `<main class="login-page">
+    <div class="login-bg-orbs" aria-hidden="true">
+      <span class="login-orb login-orb--1"></span>
+      <span class="login-orb login-orb--2"></span>
+      <span class="login-orb login-orb--3"></span>
+    </div>
+    <section class="login-panel">
+      <div class="login-panel__brand" aria-label="Child Health Management">
+        <span class="brand-mark">${icon('heartPulse')}</span>
+        ChildCare
+      </div>
+      <div class="card login-card">
+        <div class="login-card__hero" aria-hidden="true">
+          <div class="login-card__hero-icon">${icon('stethoscope')}</div>
+        </div>
+        <h1>Welcome back</h1>
+        <p>Sign in to access the Child Health Management Platform</p>
+
+        <button class="button button--primary tooltip" data-tooltip="Sign in with authorized Google Account" data-google-login type="button" style="width:100%; min-height:46px; display:flex; align-items:center; justify-content:center; gap:12px; font-weight:600; font-size:14px; background: #ffffff; color: #3c4043; border: 1px solid #dadce0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+          <img src="/google-logo.png" alt="Google Logo" style="width:22px; height:22px; object-fit:contain;" />
+          Continue with Google
+        </button>
+
+        <div class="login-features" aria-hidden="true">
+          <div class="login-feature">${icon('shield')}<span>Secure Access</span></div>
+          <div class="login-feature">${icon('activity')}<span>Health Tracking</span></div>
+          <div class="login-feature">${icon('heart')}<span>Child Care</span></div>
+        </div>
+
+        <div style="margin-top: 20px; padding: 16px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
+          <div style="font-weight: 600; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            ${icon('shield')} Current Demo Accounts (Firestore Verified)
+          </div>
+          <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: var(--color-text-muted); line-height: 1.8;" id="firestore-demo-accounts-list">
+            <li><code style="color: var(--color-primary); font-weight: 600;">tejassachin2010@gmail.com</code> <span style="font-size: 11px;">(Ayusha Nilayam)</span></li>
+            <li><code style="color: var(--color-primary); font-weight: 600;">sachinsharma.hr@gmail.com</code> <span style="font-size: 11px;">(Alex Agape)</span></li>
+            <li><code style="color: var(--color-primary); font-weight: 600;">anirudh@empoweredmargins.com</code> <span style="font-size: 11px;">(Empowered Margins)</span></li>
+          </ul>
+        </div>
+
+        <p class="login-card__foot" style="margin-top: 20px; text-align: center;">Protected by Firebase Authentication & Cloud Firestore Security Rules.</p>
+      </div>
+    </section>
+  </main>`;
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     CHILDREN LIST
+     ═══════════════════════════════════════════════════════ */
+
+  function childrenPage() {
+    const children = getChildren();
+    const totalItems = children.length;
+    const itemsPerPage = 5;
+    const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+    const paginated = children.slice(0, itemsPerPage);
+
+    const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;">${icon('googleSheets')}Google Sheets Auto-Sync (Connected)</button>`;
+
+    return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `${sheetsStatusBadge}<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
+  <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon('chevronDown')}</button></th><th data-resizable data-column="age">Age</th><th class="hide-tablet" data-column="gender">Gender</th><th class="hide-tablet" data-column="blood">Blood group</th><th data-column="status">Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     CHILD HEALTH PROFILE
+     ═══════════════════════════════════════════════════════ */
+
+  function getURLParam(key) {
+    let searchParams = new URLSearchParams(window.location.search);
+    let val = searchParams.get(key);
+    if (!val && window.location.hash.includes('?')) {
+      const hashQuery = window.location.hash.split('?')[1];
+      val = new URLSearchParams(hashQuery).get(key);
+    }
+    return val;
+  }
+
+  function childProfilePage() {
+    const id = getURLParam('id');
+    const child = getChild(id);
+    if (!child) return shell('child-profile', '<div class="card"><div class="card__body">Child record not found.</div></div>');
+
+    const hs = healthStatus(child);
+    const age = calculateAge(child.dob);
+    const growth = getGrowthRecords(child.id);
+    const latestGrowth = growth[0];
+    const meds = getMedicines(child.id).filter(m => m.status === 'Active');
+    const allMeds = getMedicines(child.id);
+    const docs = getUploadedDocs().filter(d => (d.childName && d.childName.toLowerCase() === child.name.toLowerCase()) || d.childId === child.id || (d.child && d.child.toLowerCase() === child.name.toLowerCase()));
+    const healthRecs = getHealthRecords(child.id);
+    const activities = getActivities().filter(a => (a.childName && a.childName.toLowerCase() === child.name.toLowerCase()) || (a.detail && a.detail.includes(child.name)));
+
+    // Docs HTML for Documents tab
+    let docsHTML = '';
+    if (docs.length === 0) {
+      docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records, Aadhaar cards, and health certificates uploaded for ${escapeHTML$1(child.name)} will appear here.</p><div style="margin-top:16px;"><button class="button button--primary" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$1(child.name)}">${icon('upload')} Upload Document for ${escapeHTML$1(child.name)}</button></div></div>`;
+    } else {
+      docsHTML = `<div class="document-grid">${docs.map((d, idx) => `
+      <article class="card document-card" style="position:relative;">
+        <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
+          ${icon('trash')}
+        </button>
+        <div class="document-card__body" style="padding:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px;">
+            <h3 style="font-size:14px; font-weight:600; margin:0;">${d.name || d.title || 'Medical Document'}</h3>
+            <span class="badge badge--success">${d.status || 'Verified'}</span>
+          </div>
+          <div class="detail-list detail-list--single" style="font-size:13px;">
+            <div class="detail-row"><span>Category</span><b>${d.docType || d.category || 'Medical Report'}</b></div>
+            <div class="detail-row"><span>Uploaded</span><b>${d.uploadDate || formatDate(d.timestamp) || 'Recently'}</b></div>
+          </div>
+          ${d.fileData || d.image ? `<div style="margin-top:12px;"><a class="button button--sm" href="${d.fileData || d.image}" target="_blank" download="${d.name || 'document'}.png">${icon('download')} View / Download</a></div>` : ''}
+        </div>
+      </article>
+    `).join('')}</div>`;
+    }
+
+    // Health records / reports HTML
+    let reportsHTML = '';
+    if (healthRecs.length === 0 && meds.length === 0) {
+      reportsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('heartPulse')}</span><h3>No lab reports logged</h3><p>Blood test results and clinical lab reports will appear here.</p></div>`;
+    } else {
+      reportsHTML = `
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        ${healthRecs.length > 0 ? `
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr><th>Date</th><th>Test Type</th><th>Hemoglobin</th><th>WBC</th><th>RBC</th><th>Platelets</th></tr>
+              </thead>
+              <tbody>
+                ${healthRecs.map(r => `<tr><td>${r.date || 'Today'}</td><td><span class="badge badge--blue">${(r.type || 'CBC').toUpperCase()}</span></td><td><b>${r.hemoglobin ? r.hemoglobin + ' g/dL' : '—'}</b></td><td>${r.wbc || '—'}</td><td>${r.rbc || '—'}</td><td>${r.platelets || '—'}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>` : ''}
+        <div class="detail-list">
+          <div class="detail-row"><span>Known Medical Conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
+          <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
+          <div class="detail-row"><span>Active Prescriptions</span><b>${meds.length > 0 ? meds.map(m => `${m.medicineName} (${m.dosage})`).join(', ') : 'None active'}</b></div>
+        </div>
+      </div>`;
+    }
+
+    // Growth HTML
+    let growthHTML = '';
+    if (growth.length === 0) {
+      growthHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('ruler')}</span><h3>No growth records</h3><p>Height, weight, and BMI records will appear here.</p></div>`;
+    } else {
+      growthHTML = `
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+        <h3 style="font-size:14px; font-weight:600;">Growth Measurements History</h3>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead>
+            <tbody>
+              ${growth.map(g => `<tr><td>${formatDate(g.date || g.timestamp)}</td><td><b>${g.height} cm</b></td><td><b>${g.weight} kg</b></td><td><span class="badge badge--neutral">${g.bmi || '—'}</span></td><td>${g.bmi ? (g.bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : g.bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : '—'}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+    }
+
+    // Medicines HTML
+    let medsHTML = '';
+    if (allMeds.length === 0) {
+      medsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('pill')}</span><h3>No prescriptions logged</h3><p>Medications prescribed for ${child.name} will appear here.</p></div>`;
+    } else {
+      medsHTML = `<div class="document-grid">${allMeds.map(m => `
+      <article class="card document-card"><div class="document-card__body" style="padding:14px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px"><h3 style="font-size:14px; font-weight:600; margin:0">${m.medicineName}</h3>${statusBadge(m.status)}</div><p style="font-size:13px; color:var(--color-text-muted); margin:0 0 4px">${m.dosage}</p><p style="font-size:12px; color:var(--color-text-muted); margin:0">${m.frequency} · ${m.startDate} → ${m.endDate}</p></div></article>
+    `).join('')}</div>`;
+    }
+
+    // Timeline HTML
+    let timelineHTML = '';
+    if (activities.length === 0) {
+      timelineHTML = `<div class="timeline"><div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>Child registered</b><p>Record created in the health management workspace.</p><time>${child.registeredDate ? formatDate(child.registeredDate) : 'Recently'}</time></div></div></div>`;
+    } else {
+      timelineHTML = `<div class="timeline">${activities.map(a => `<div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>${a.action ? a.action.replace(/_/g, ' ').toUpperCase() : 'ACTIVITY'}</b><p>${a.detail || a.childName}</p><time>${timeAgo(a.timestamp)}</time></div></div>`).join('')}</div>`;
+    }
+
+    return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
+  <section class="card">
+    <div class="profile-header">
+      <span class="profile-header__avatar">${initials(child.name)}</span>
+      <div class="profile-header__copy">
+        <h1>${child.name}</h1>
+        <p>${child.id} · ${age ? age + ' old' : 'Age unknown'}</p>
+        <div class="profile-header__meta">
+          ${healthDot(hs.level)} ${statusBadge(child.status)}
+          <span class="badge badge--neutral">${child.gender || 'Not specified'}</span>
+          <span class="badge badge--blue">Blood: ${child.blood || 'Unknown'}</span>
+          ${hs.flags.length ? `<span class="badge badge--warning">${hs.flags.join(', ')}</span>` : ''}
+        </div>
+      </div>
+      <div class="profile-header__actions">
+        <button class="icon-button tooltip" type="button" data-tooltip="More actions" aria-label="More actions">${icon('more')}</button>
+      </div>
+    </div>
+    <div class="profile-tabs">
+      <div class="tabs" role="tablist">
+        <button class="tab tab--active" type="button" data-profile-tab="overview">Overview</button>
+        <button class="tab" type="button" data-profile-tab="growth">Growth</button>
+        <button class="tab" type="button" data-profile-tab="medicines">Medicines</button>
+        <button class="tab" type="button" data-profile-tab="reports">Reports</button>
+        <button class="tab" type="button" data-profile-tab="documents">Documents (${docs.length})</button>
+        <button class="tab" type="button" data-profile-tab="timeline">Health Timeline</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="profile-tab-content-container">
+    <!-- OVERVIEW TAB -->
+    <div data-tab-panel="overview">
+      <div class="profile-layout">
+        <div class="dashboard-grid">
+          <section class="card">
+            <header class="card__header">
+              <div><h2 class="card__title">Personal information</h2><p class="card__caption">Core child details</p></div>
+              <button class="icon-button icon-button--small" type="button" data-edit="${child.id}">${icon('pencil')}</button>
+            </header>
+            <div class="card__body">
+              <div class="detail-list">
+                <div class="detail-row"><span>Full name</span><b>${child.name}</b></div>
+                <div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div>
+                <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
+                <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Parent / Guardian</span><b>${child.father || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Mother name</span><b>${child.mother || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Contact phone</span><b>${child.phone || 'Not specified'}</b></div>
+                <div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div>
+              </div>
+            </div>
+          </section>
+          <section class="card">
+            <header class="card__header">
+              <div><h2 class="card__title">Health summary</h2><p class="card__caption">Latest vitals and health status</p></div>
+            </header>
+            <div class="card__body">
+              <div class="detail-list">
+                <div class="detail-row"><span>Health status</span><b>${healthDot(hs.level)} ${hs.label}</b></div>
+                <div class="detail-row"><span>Height</span><b>${latestGrowth ? latestGrowth.height + ' cm' : child.height ? child.height + ' cm' : '—'}</b></div>
+                <div class="detail-row"><span>Weight</span><b>${latestGrowth ? latestGrowth.weight + ' kg' : child.weight ? child.weight + ' kg' : '—'}</b></div>
+                <div class="detail-row"><span>BMI</span><b>${latestGrowth && latestGrowth.bmi ? latestGrowth.bmi : '—'}</b></div>
+                <div class="detail-row"><span>Medical conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
+                <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
+                <div class="detail-row"><span>Current medications</span><b>${child.medications || (meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : 'None')}</b></div>
+                <div class="detail-row"><span>Dental remarks</span><b>${child.dentalRemarks || 'No remarks recorded'}</b></div>
+                <div class="detail-row"><span>Hygiene Index</span><b>${child.hygieneIndex || 'Not Assessed'}</b></div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- GROWTH TAB -->
+    <div data-tab-panel="growth" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Growth Tracking History</h2><p class="card__caption">Height, weight, and BMI progression</p></div>
+        </header>
+        <div class="card__body">
+          ${growthHTML}
+        </div>
+      </section>
+    </div>
+
+    <!-- MEDICINES TAB -->
+    <div data-tab-panel="medicines" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Prescriptions & Medicines</h2><p class="card__caption">Prescribed treatments and active prescriptions</p></div>
+        </header>
+        <div class="card__body">
+          ${medsHTML}
+        </div>
+      </section>
+    </div>
+
+    <!-- REPORTS TAB -->
+    <div data-tab-panel="reports" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Clinical Health Reports</h2><p class="card__caption">Lab test reports, blood panels, and clinical flags</p></div>
+        </header>
+        <div class="card__body">
+          ${reportsHTML}
+        </div>
+      </section>
+    </div>
+
+    <!-- DOCUMENTS TAB -->
+    <div data-tab-panel="documents" style="display: none;">
+      <section class="card">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div><h2 class="card__title">Uploaded Documents & Records</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports for ${escapeHTML$1(child.name)}</p></div>
+          <button class="button button--primary button--sm" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$1(child.name)}">${icon('upload')} Upload Document</button>
+        </header>
+        <div class="card__body">
+          ${docsHTML}
+        </div>
+      </section>
+    </div>
+
+    <!-- HEALTH TIMELINE TAB -->
+    <div data-tab-panel="timeline" style="display: none;">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Full Health Timeline</h2><p class="card__caption">Complete audit history for ${child.name}</p></div>
+        </header>
+        <div class="card__body">
+          ${timelineHTML}
+        </div>
+      </section>
+    </div>
+  </div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     REGISTER CHILD
+     ═══════════════════════════════════════════════════════ */
+
+  function steps(active, upload = false) {
+    const items = upload ? ['Upload', 'Processing', 'Review & verify', 'Additional details', 'Google Sheets Auto-Sync'] : ['Choose method', 'Child details', 'Health & guardian', 'Google Sheets Auto-Sync'];
+    return `<aside class="card form-aside"><div class="stepper">${items.map((item, index) => `<div class="stepper__item ${index < active ? 'stepper__item--complete' : ''} ${index === active ? 'stepper__item--active' : ''}"><span class="stepper__dot">${index < active ? icon('check') : index + 1}</span><span class="stepper__label">${item}</span></div>`).join('')}</div></aside>`;
+  }
+
+  function registerChildPage() {
+    const method = getURLParam('method');
+    const editId = getURLParam('edit');
+    const child = editId ? getChild(editId) : null;
+
+    if (method !== 'manual' && !editId) {
+      return shell('register-child', `${heading('Register a child', 'Choose the quickest, most reliable way to start a new child record.')}<section class="card"><div class="card__body"><div class="method-grid"><article class="method-card card card--interactive"><span class="method-card__icon">${icon('pencil')}</span><div><h2 class="card__title">Enter details manually</h2><p>Start with a clean, guided form. Best when information is already at hand.</p></div><a class="button" href="${pagePath('register-child')}?method=manual">Start manual entry ${icon('arrowRight')}</a></article><article class="method-card card card--interactive"><span class="method-card__icon">${icon('scan')}</span><div><h2 class="card__title">Google Cloud Vision API Document Upload</h2><p>Extract information automatically from medical documents using Cloud Vision API, then verify before saving.</p></div><a class="button button--primary" href="${pagePath('ocr-upload')}">Upload document ${icon('arrowRight')}</a></article></div></div></section>`);
+    }
+
+    let firstName = '', lastName = '', email = '', father = '', phone = '', blood = '';
+    if (child) {
+      const parts = child.name.split(/\s+/);
+      firstName = parts[0] || '';
+      lastName = parts.slice(1).join(' ') || '';
+      email = child.email || '';
+      father = child.father || '';
+      phone = child.phone || '';
+      blood = child.blood || '';
+    }
+
+    const title = child ? 'Edit child profile' : 'Register child';
+    const desc = child ? 'Modify the child record. Required fields are marked with an asterisk.' : 'Create a reliable child health record. Required fields are marked with an asterisk.';
+    const submitText = child ? 'Save changes' : 'Save child record';
+    const curMed = child ? child.medications : '';
+
+    return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName)}${field('Last name *', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '')}${field('Gender *', 'gender', 'e.g. Male', 'text', '', child ? child.gender : '')}${field('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML$1(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML$1(child.allergies) : ''}</textarea></label>
+  <div class="field form-span-all">
+    <span class="field__label">Current medications</span>
+    <div class="combobox" data-combobox>
+      <input type="hidden" name="medications" value="${escapeHTML$1(curMed)}">
+      <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10v7h7Z"/><path d="m8.5 15.5 7-7"/></svg></span>
+      <input class="combobox__input" type="text" placeholder="Search or type a medication..." value="${escapeHTML$1(curMed)}" autocomplete="off" data-combobox-input>
+      <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
+      <div class="combobox__panel" data-combobox-panel>
+        <div class="combobox__hint">Common medications</div>
+        <div data-combobox-option="None" class="combobox__option">None<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Paracetamol / Crocin" class="combobox__option">Paracetamol / Crocin<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Amoxicillin Syrup" class="combobox__option">Amoxicillin Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Inhaler / Asthma Medication" class="combobox__option">Inhaler / Asthma Medication<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Vitamin D3 Drops / Syrup" class="combobox__option">Vitamin D3 Drops / Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Multivitamin Syrup" class="combobox__option">Multivitamin Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Iron Syrup / Supplement" class="combobox__option">Iron Syrup / Supplement<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Albendazole / Deworming" class="combobox__option">Albendazole / Deworming<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="Cetirizine Syrup" class="combobox__option">Cetirizine Syrup<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="ORAL Rehydration Salts (ORS)" class="combobox__option">ORAL Rehydration Salts (ORS)<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div class="combobox__divider"></div>
+        <div class="combobox__empty" data-combobox-empty style="display:none;"><b>No matches found</b>Press Enter to use your custom medication</div>
+      </div>
+    </div>
+    <span class="field__hint">Select a preset or type any custom medicine name directly.</span>
+  </div>
+  <label class="field form-span-all"><span class="field__label">Dental remarks</span><textarea class="textarea" name="dentalRemarks" placeholder="e.g. RESTORATION, SCALING, ORTHODONTIC TREATMENT">${child ? escapeHTML$1(child.dentalRemarks || '') : ''}</textarea></label>
+  <div class="field form-span-all">
+    <span class="field__label">Oral Hygiene Index</span>
+    <div class="combobox" data-combobox>
+      <input type="hidden" name="hygieneIndex" value="${child ? escapeHTML$1(child.hygieneIndex || '') : ''}">
+      <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
+      <input class="combobox__input" type="text" placeholder="Select hygiene index..." value="${child ? escapeHTML$1(child.hygieneIndex || '') : ''}" autocomplete="off" data-combobox-input readonly style="cursor:pointer;">
+      <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
+      <div class="combobox__panel" data-combobox-panel>
+        <div data-combobox-option="SATISFACTORY" class="combobox__option">SATISFACTORY<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="AVERAGE" class="combobox__option">AVERAGE<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+        <div data-combobox-option="POOR" class="combobox__option">POOR<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
+      </div>
+    </div>
+  </div>
+  </div></section>
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML$1(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML$1(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     GOOGLE CLOUD VISION API EXTRACTION PAGES
+     ═══════════════════════════════════════════════════════ */
+
+  function ocrUploadPage() {
+    return shell('ocr-upload', `${heading('Google Cloud Vision API Extraction', 'Upload a medical document (Blood Reports, Prescriptions, Medical Certificates, Vaccination Records, Aadhaar). Google Cloud Vision API will extract structured fields for review.', `<a class="button button--ghost" href="${pagePath('register-child')}">Cancel</a>`)}<div class="form-layout"><section class="card"><div class="card__body"><div class="upload-zone" data-upload-zone><span class="upload-zone__icon">${icon('upload')}</span><h2 class="card__title">Drop a medical document here</h2><p>Choose a file from your device. Google Cloud Vision API will scan and extract health & child details.</p><button class="button button--primary" type="button" data-start-ocr>${icon('file')}Choose document</button><input class="sr-only" type="file" accept=".jpg,.jpeg,.png" data-upload-input><span class="upload-zone__formats">JPG or PNG · Up to 15 MB</span></div></div><div style="padding:16px; background:var(--color-bg-alt); border-top:1px solid var(--color-border);"><b style="font-size:13px; display:block; margin-bottom:8px;">Supported Document Types:</b><div style="display:flex; flex-wrap:wrap; gap:8px;"><span class="badge badge--blue">Blood Reports</span><span class="badge badge--blue">Prescriptions</span><span class="badge badge--blue">Handwritten Medical Notes</span><span class="badge badge--blue">Medical Certificates</span><span class="badge badge--blue">Vaccination Records</span></div></div></section>${steps(0, true)}</div>`);
+  }
+
+  function ocrProcessingPage() {
+    return shell('ocr-processing', `${heading('Processing with Google Cloud Vision API', 'Extracted details will be prepared for your verification before any record is updated.')}<section class="card"><div class="ocr-processing"><div class="ocr-processing__orbit" style="box-shadow: 0 0 25px rgba(59, 130, 246, 0.35);">${icon('scan')}</div><h2>Google Cloud Vision API Scanning</h2><p>Performing multi-pass document OCR and extracting health vital data for review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span class="ocr-progress-status" style="font-weight: 600; color: var(--color-primary);">Analyzing image contrast with Google Cloud Vision API...</span><span class="ocr-progress-pct" style="font-weight: 700;">0%</span></div><div class="progress" style="height: 10px;"><div class="progress__bar ocr-progress-bar" style="width: 0%; transition: width 0.25s ease-out;"></div></div></div></div></section>`);
+  }
+
+  function ocrReviewPage() {
+    const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
+    const firstName = ocrData.firstName || '';
+    const lastName = ocrData.lastName || '';
+    const dob = ocrData.dob || '';
+    const blood = ocrData.blood || '';
+    const father = ocrData.father || '';
+    const mother = ocrData.mother || '';
+    const phone = ocrData.phone || '';
+    const idNumber = ocrData.idNumber || '';
+    const gender = ocrData.gender || '';
+
+    const uploadedFile = localStorage.getItem('ocr-upload-file');
+    let previewHTML = '';
+    if (uploadedFile) {
+      previewHTML = `<div class="document-preview-img-wrap" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#f3f4f6; position:relative; min-height:360px;">
+      <img class="document-preview-img" src="${uploadedFile}" alt="Uploaded document" style="max-width:100%; max-height:100%; object-fit:contain; transition:transform 0.2s ease;" data-rotation="0">
+    </div>`;
+    } else {
+      previewHTML = `<div class="document-sheet"><div class="document-sheet__brand">GOOGLE CLOUD VISION OCR</div><div class="document-sheet__title">EXTRACTED HEALTH RECORD FORM</div><div class="document-sheet__line document-sheet__line--wide"></div><div class="document-sheet__line document-sheet__line--half"></div><div class="document-sheet__table"><div class="document-sheet__cell"><b>CHILD NAME</b><span>${firstName} ${lastName}</span></div><div class="document-sheet__cell"><b>DATE OF BIRTH</b><span>${dob}</span></div><div class="document-sheet__cell"><b>PARENT'S NAME</b><span>${father}</span></div><div class="document-sheet__cell"><b>BLOOD GROUP</b><span>${blood}</span></div><div class="document-sheet__cell"><b>PHONE</b><span>${phone}</span></div><div class="document-sheet__cell"><b>ID NUMBER</b><span>${idNumber}</span></div></div></div>`;
+    }
+
+    return shell('ocr-review', `${heading('Review Cloud Vision API Extracted Data', 'Check the values below against the document before continuing.', `<button class="button" type="button" data-ocr-back>Back</button><button class="button button--primary" type="button" data-ocr-continue>Continue to details ${icon('arrowRight')}</button>`)}<div class="form-layout"><div class="review-layout"><section class="card document-preview"><div class="document-toolbar"><span class="badge badge--blue">Cloud Vision Scan</span><div class="document-toolbar__controls"><button class="icon-button icon-button--small tooltip" data-tooltip="Rotate" type="button" data-ocr-rotate>${icon('rotate')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Fullscreen" type="button" data-ocr-fullscreen>${icon('maximize')}</button></div></div>${previewHTML}</section><form class="card"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Extracted fields</h2><p>Review the values detected by Cloud Vision API.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">First name</span><input class="input" value="${firstName}" name="firstName"></label><label class="field"><span class="field__label">Last name</span><input class="input" value="${lastName}" name="lastName"></label><label class="field"><span class="field__label">Date of birth</span><input class="input" value="${dob}" name="date"></label><label class="field"><span class="field__label">Gender</span><input class="input" value="${gender}" name="gender"></label><label class="field"><span class="field__label">Blood group</span><input class="input" value="${blood}" name="blood"></label><label class="field"><span class="field__label">ID number</span><input class="input" value="${idNumber}" name="idNumber"></label><label class="field form-span-all"><span class="field__label">Parent / guardian</span><input class="input" value="${father}" name="father"></label><label class="field form-span-all"><span class="field__label">Mother name</span><input class="input" value="${mother}" name="mother"></label></div></section><section class="form-section"><label class="checkbox"><input type="checkbox" data-ocr-confirm required><span>I've checked the extracted details against the original document.</span></label></section></form></div>${steps(2, true)}</div>`);
+  }
+
+  function ocrDetailsPage() {
+    const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
+    const firstName = ocrData.firstName || '';
+    const lastName = ocrData.lastName || '';
+    const father = ocrData.father || '';
+    const mother = ocrData.mother || '';
+    const gender = ocrData.gender || '';
+    const blood = ocrData.blood || '';
+    const phone = ocrData.phone || '';
+    const idNumber = ocrData.idNumber || '';
+
+    return shell('ocr-details', `${heading('Additional details', 'Complete remaining health details before saving.', `<a class="button" href="${pagePath('ocr-review')}">Back</a><button class="button button--primary" type="submit" form="ocr-additional-form">Save child record</button>`)}<div class="form-layout"><form class="card" id="ocr-additional-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Registration & contact</h2><p>Complete any additional details for this record.</p></div><div class="form-grid--two">${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', mother)}${field('Mobile number *', 'phone', 'e.g. +91 98221 40393', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email')}${field('Height (cm)', 'height', 'e.g. 140', 'number')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes"></textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin"></textarea></label><label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode"></textarea></label><label class="field form-span-all"><span class="field__label">Upload Additional Medical Records / Reports</span><input class="input" type="file" name="additionalDoc" accept=".jpg,.jpeg,.png,.pdf" data-additional-doc-input><span style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">Upload blood test reports, immunization records, or medical certificates.</span></label></div></section><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Final verification</h2><p>You're about to create the child record.</p></div><label class="checkbox"><input type="checkbox" required><span>I confirm the information is accurate and complete.</span></label></section><input type="hidden" name="firstName" value="${firstName}"><input type="hidden" name="lastName" value="${lastName}"><input type="hidden" name="father" value="${father}"><input type="hidden" name="gender" value="${gender}"><input type="hidden" name="blood" value="${blood}"><input type="hidden" name="idNumber" value="${idNumber}"><input type="hidden" name="dob" value="${ocrData.dob || ''}"></form>${steps(3, true)}</div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     GROWTH TRACKING
+     ═══════════════════════════════════════════════════════ */
+
+  function growthPage() {
+    const children = getChildren();
+    const allGrowth = getGrowthRecords();
+    const recentGrowth = allGrowth.slice(0, 10);
+
+    let tableHTML = '';
+    if (recentGrowth.length === 0) {
+      tableHTML = `<tr><td colspan="6"><div class="empty-state" style="padding:30px 12px"><span class="empty-state__icon">${icon('ruler')}</span><h3 style="font-size:13px">No growth records yet</h3><p>Add a growth measurement using the form above.</p></div></td></tr>`;
+    } else {
+      tableHTML = recentGrowth.map(r => `<tr><td><b>${r.childName || '—'}</b></td><td>${r.date || '—'}</td><td>${r.height} cm</td><td>${r.weight} kg</td><td>${r.bmi || '—'}</td><td>${r.bmi ? (r.bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : r.bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : '—'}</td></tr>`).join('');
+    }
+
+    const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+    return shell('growth', `${heading('Growth tracking', 'Track height, weight, and BMI for every child.', `<button class="button button--primary" type="button" data-add-measurement>${icon('plus')}Add measurement</button>`)}
+  <div class="form-layout">
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <div id="growth-forms-container" style="display: flex; flex-direction: column; gap: 24px;">
+        <form class="card growth-form-instance" id="growth-form">
+          <section class="form-section">
+            <div class="form-section__heading"><h2 class="card__title">New measurement</h2><p>Record height and weight for a child. BMI will be auto-calculated.</p></div>
+            <div class="form-grid--two">
+              <label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>
+              ${field('Date *', 'date', '', 'date', '', new Date().toISOString().slice(0, 10))}
+              ${field('Height (cm) *', 'height', 'e.g. 140', 'number')}
+              ${field('Weight (kg) *', 'weight', 'e.g. 35', 'number')}
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:20px;">
+              <button class="button button--primary" type="submit">${icon('check')} Save measurement</button>
+            </div>
+          </section>
+        </form>
+      </div>
+      <section class="card"><header class="card__header"><div><h2 class="card__title">Recent measurements</h2><p class="card__caption">All growth records across children</p></div></header><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Child</th><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead><tbody>${tableHTML}</tbody></table></div></section>
+    </div>
+  </div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     MEDICINE MANAGEMENT
+     ═══════════════════════════════════════════════════════ */
+
+  function medicinesPage() {
+    const children = getChildren();
+    const allMeds = getMedicines();
+    const activeMeds = allMeds.filter(m => m.status === 'Active');
+    const completedMeds = allMeds.filter(m => m.status === 'Completed');
+
+    let medsHTML = '';
+    if (allMeds.length === 0) {
+      medsHTML = `<div class="empty-state" style="padding:30px 12px"><span class="empty-state__icon">${icon('pill')}</span><h3 style="font-size:13px">No prescriptions tracked</h3><p>Add a prescription using the form above.</p></div>`;
+    } else {
+      medsHTML = `<div class="document-grid">${allMeds.slice(0, 12).map(m => {
+      const startDate = new Date(m.startDate);
+      const endDate = new Date(m.endDate);
+      const now = new Date();
+      const totalDays = Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
+      const elapsed = Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)));
+      const pct = Math.min(100, Math.round((elapsed / totalDays) * 100));
+      return `<article class="card document-card card--interactive"><div class="document-card__body" style="padding:14px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px"><h3 style="font-size:14px; font-weight:600; margin:0">${m.medicineName}</h3>${statusBadge(m.status)}</div><p style="font-size:13px; color:var(--color-text-muted); margin:0 0 4px">${m.childName || '—'} · ${m.dosage}</p><p style="font-size:12px; color:var(--color-text-muted); margin:0 0 8px">${m.frequency} · ${m.startDate} → ${m.endDate}</p><div class="progress" style="height:6px"><div class="progress__bar" style="width:${pct}%; background:${m.status === 'Completed' ? 'var(--color-success)' : 'var(--color-primary)'}"></div></div><span style="font-size:11px; color:var(--color-text-muted)">${pct}% complete</span></div></article>`;
+    }).join('')}</div>`;
+    }
+
+    const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+    return shell('medicines', `${heading('Medicine management', 'Track all prescriptions given to children.', `<button class="button button--primary" type="submit" form="medicine-form">${icon('plus')}Add prescription</button>`)}
+  <div class="stat-grid" style="margin-bottom:24px">${statCard('Active prescriptions', activeMeds.length.toLocaleString(), activeMeds.length > 0 ? 'Ongoing' : 'None', 'pill', 'blue')}${statCard('Completed', completedMeds.length.toLocaleString(), completedMeds.length > 0 ? 'Finished' : 'None', 'check', 'green')}</div>
+  <div class="form-layout">
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <form class="card" id="medicine-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">New prescription</h2></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>${field('Medicine name *', 'medicineName', 'e.g. Amoxicillin', 'text')}${field('Dosage *', 'dosage', 'e.g. 250mg twice daily', 'text')}${field('Frequency', 'frequency', 'e.g. Every 8 hours', 'text')}${field('Start date *', 'startDate', '', 'date', '', new Date().toISOString().slice(0, 10))}${field('End date *', 'endDate', '', 'date')}</div></section></form>
+      <section class="card"><header class="card__header"><div><h2 class="card__title">All prescriptions</h2></div></header><div class="card__body">${medsHTML}</div></section>
+    </div>
+  </div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     HEALTH RECORDS & DOCUMENTS (GOOGLE DRIVE STORAGE)
+     ═══════════════════════════════════════════════════════ */
+
+  function documentsPage() {
+    const docs = getUploadedDocs();
+    const children = getChildren();
+    let contentHTML = '';
+
+    if (docs.length === 0) {
+      contentHTML = `<div class="empty-state" style="padding:48px 24px">
+      <span class="empty-state__icon">${icon('file')}</span>
+      <h3>No health documents uploaded yet</h3>
+      <p>Click "Upload document" to attach medical reports or use Google Cloud Vision API.</p>
+    </div>`;
+    } else {
+      contentHTML = `<div class="document-grid" id="document-grid">
+      ${docs.map((doc, idx) => `
+        <article class="card document-card card--interactive" data-document-idx="${idx}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}" style="position:relative;">
+          <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
+            ${icon('trash')}
+          </button>
+          <div class="document-card__preview" style="position:relative; width:100%; height:140px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
+            ${doc.image || doc.fileData ? `<img src="${doc.image || doc.fileData}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
+          </div>
+          <div class="document-card__body" style="padding-top:12px;">
+            <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center;">
+              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; padding-right:20px;">${doc.name}</h2>
+              ${statusBadge(doc.status || 'Verified')}
+            </div>
+            <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:600; color:var(--color-text);">${doc.child || doc.childName || doc.student || '—'}</span>
+              <span>${doc.docType || doc.category || doc.meta || 'Medical Document'}</span>
+            </div>
+            ${doc.image || doc.fileData ? `<div style="margin-top:10px;"><a class="button button--sm" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="width:100%; justify-content:center;">${icon('download')} View / Download</a></div>` : ''}
+          </div>
+        </article>
+      `).join('')}
+    </div>`;
+    }
+
+    const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
+
+    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<span class="badge badge--warning" style="padding:6px 12px; font-size:12px; font-weight:600; align-self:center;">Drive Sync: Coming Soon</span><button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     REPORTS & ANALYTICS
+     ═══════════════════════════════════════════════════════ */
+
+  function reportsPage() {
+    const children = getChildren();
+    const total = children.length;
+
+    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
+    const healthyPct = total > 0 ? Math.round(((total - flaggedCount) / total) * 100) : 0;
+
+    const females = children.filter(c => c.gender?.toLowerCase() === 'female').length;
+    const males = children.filter(c => c.gender?.toLowerCase() === 'male').length;
+    const femalePct = total > 0 ? Math.round((females / total) * 100) : 0;
+    const malePct = total > 0 ? Math.round((males / total) * 100) : 0;
+    const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
+
+    const sheetsStatusBadge = `<button class="button button--sm" type="button" data-open-sheets-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(16,185,129,0.1); color:#059669; border:1px solid rgba(16,185,129,0.25); font-weight:600;">${icon('googleSheets')}Google Sheets Auto-Sync (Connected)</button>`;
+    const docsStatusBadge = `<button class="button button--sm" type="button" data-open-docs-template style="display:inline-flex; align-items:center; gap:8px; background:rgba(26,115,232,0.1); color:#1a73e8; border:1px solid rgba(26,115,232,0.25); font-weight:600;">${icon('googleDocs')}Google Docs Live Auto-Sync (Active)</button>`;
+
+    return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `${sheetsStatusBadge}${docsStatusBadge}<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
+  <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length || 4}</div><p class="report-card__caption">verified lab test reports</p></article></div>
+  
+  <section class="card section-gap" style="margin-top: 24px;">
+    <header class="card__header">
+      <div>
+        <h2 class="card__title">NGO Health Platform Executive Summary</h2>
+        <p class="card__caption">Audited health status and growth tracking overview</p>
+      </div>
+      <span class="badge badge--success">${icon('check')} Audited & Verified</span>
+    </header>
+    <div class="card__body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; padding: 20px 0;">
+      <div>
+        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-primary);">
+          ${icon('heartPulse')} Health Status Overview
+        </h3>
+        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
+          <b>${total - flaggedCount} out of ${total} children</b> are in optimal health with no health flags. 
+          ${flaggedCount > 0 ? `<b>${flaggedCount} child(ren)</b> are under medical observation.` : 'All children are currently healthy.'}
+        </p>
+      </div>
+      <div>
+        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-success);">
+          ${icon('ruler')} Growth Tracking Performance
+        </h3>
+        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
+          Regular assessments ensure height, weight, and BMI progression are monitored according to WHO standards.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="dashboard-grid dashboard-grid--lower"><section class="card chart-card"><header class="card__header"><div><h2 class="card__title">Registration trend</h2><p class="card__caption">New child records created each month</p></div></header><div class="chart-card__body">${registrationChart()}</div></section><section class="card"><header class="card__header"><div><h2 class="card__title">Gender distribution</h2><p class="card__caption">Across all child records</p></div></header><div class="card__body"><div class="distribution"><div class="distribution__row"><span class="distribution__label">Female</span><div class="progress"><div class="progress__bar" style="width: ${femalePct}%; background: var(--color-violet);"></div></div><span class="distribution__value">${femalePct}%</span></div><div class="distribution__row"><span class="distribution__label">Male</span><div class="progress"><div class="progress__bar" style="width: ${malePct}%; background: var(--color-primary);"></div></div><span class="distribution__value">${malePct}%</span></div><div class="distribution__row"><span class="distribution__label">Other</span><div class="progress"><div class="progress__bar" style="width: ${otherPct}%; background: #94a3b8;"></div></div><span class="distribution__value">${otherPct}%</span></div></div></div></section></div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     SETTINGS & GOOGLE WORKSPACE
+     ═══════════════════════════════════════════════════════ */
+
+  function settingsPage() {
+    const session = getSession() || {};
+    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const sheetsConfig = getSheetsConfig() || {};
+    const docsConfig = getDocsConfig() || {};
+    const isConnected = !!(sheetsConfig.connected || docsConfig.connected);
+    const adminEmail = sheetsConfig.adminEmail || docsConfig.adminEmail || 'Admin';
+    const sheetUrl = getGoogleSheetUrl();
+    const docUrl = getGoogleDocUrl();
+
+    const isDriveConnected = localStorage.getItem('google-drive-connected') === 'true';
+    const isCalendarConnected = localStorage.getItem('google-calendar-connected') === 'true';
+
+    return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Workspace service connections.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
+  <div class="settings-layout">
+    <nav class="card settings-nav" aria-label="Settings sections">
+      <button type="button" class="active">Google Workspace</button>
+      <button type="button">Platform Details</button>
+      <button type="button">Security</button>
+    </nav>
+    <section class="card settings-panel">
+      <h2>Google Workspace Connections</h2>
+      <p class="muted">Connect or disconnect Google Cloud APIs, Drive Storage, Sheets Sync, and Calendar Services.</p>
+      
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Google Authentication</b>
+            <span class="badge badge--success">Connected</span>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">OAuth 2.0 GIS Authentication active. Firestore verified account.</p>
+          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active Account Provider</button>
+        </div>
+
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Google Cloud Vision API</b>
+            <span class="badge badge--blue">Connected</span>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Medical document OCR extraction for blood reports, prescriptions & certificates.</p>
+          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active OCR Provider</button>
+        </div>
+
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Gemini API</b>
+            <span class="badge badge--blue">Connected</span>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">AI medical report parsing & health trend summaries.</p>
+          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active AI Provider</button>
+        </div>
+
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Google Drive</b>
+            ${isDriveConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Secure cloud document storage for child health records.</p>
+          <button class="button button--sm ${isDriveConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="drive" style="width: 100%; justify-content: center;">
+            ${isDriveConnected ? 'Disconnect Google Drive' : 'Connect Google Drive'}
+          </button>
+        </div>
+
+        <!-- Google Workspace OAuth (Sheets & Docs) Card -->
+        <div class="card" style="padding: 18px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: span 2;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+              ${icon('googleSheets')}
+              Google Workspace (Sheets & Docs)
+            </b>
+            ${isConnected ? `<span class="badge badge--success">Connected as ${escapeHTML$1(adminEmail)}</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
+          </div>
+          <p style="font-size: 12.5px; color: var(--color-text-muted); margin: 0 0 14px 0;">
+            ${isConnected 
+              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Your spreadsheets and executive audit documents are automatically created and owned by your Google account.`
+              : `Authorize your NGO Google Account once to enable automated, private Google Sheets & Docs synchronization. Created files are stored directly in your own Google Account.`
+            }
+          </p>
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+            ${!isConnected ? `
+              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+                Connect Google Workspace
+              </a>
+            ` : `
+              ${sheetUrl ? `
+                <a href="${escapeHTML$1(sheetUrl)}" target="_blank" class="button button--secondary button--sm" style="font-weight: 600; color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                  ${icon('googleSheets')}
+                  Open My Sheet ↗
+                </a>
+              ` : ''}
+              ${docUrl ? `
+                <a href="${escapeHTML$1(docUrl)}" target="_blank" class="button button--secondary button--sm" style="font-weight: 600; color: #1a73e8; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                  Open Executive Doc ↗
+                </a>
+              ` : ''}
+              <a href="/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; text-decoration: none; margin-left: auto;">
+                Disconnect
+              </a>
+            `}
+          </div>
+        </div>
+
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Google Calendar</b>
+            ${isCalendarConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Automated appointment & checkup reminder scheduling.</p>
+          <button class="button button--sm ${isCalendarConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="calendar" style="width: 100%; justify-content: center;">
+            ${isCalendarConnected ? 'Disconnect Google Calendar' : 'Connect Google Calendar'}
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     APPOINTMENTS — Full Page Calendar View
+     ═══════════════════════════════════════════════════════ */
+
+  function appointmentsPage() {
+    const now = new Date();
+    now.getFullYear();
+    now.getMonth();
+    now.getDate();
+    const appointments = getAppointments();
+    const upcomingCount = appointments.filter(a => a.status === 'Upcoming').length;
+    const completedCount = appointments.filter(a => a.status === 'Completed').length;
+
+    // All appointments list sorted by date
+    const allApptsHTML = appointments.length === 0
+      ? `<div class="empty-state" style="padding:40px 16px; text-align:center;">
+        <span class="empty-state__icon" style="font-size:40px; display:block; margin-bottom:8px;">📅</span>
+        <h3 style="font-size:15px; font-weight:700; margin:0 0 4px 0;">No appointments recorded</h3>
+        <p style="font-size:13px; color:var(--color-text-muted); margin:0;">Register an appointment using the calendar above.</p>
+       </div>`
+      : `
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Child</th>
+              <th>Appointment Type</th>
+              <th>Doctor / Clinic</th>
+              <th>Date & Time</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${appointments.map(a => {
+              const currentStatus = computeAppointmentStatus(a);
+              const isCompleted = currentStatus === 'Completed';
+              const typeClass = a.type?.toLowerCase().includes('doctor') ? 'blue' : a.type?.toLowerCase().includes('follow') ? 'green' : a.type?.toLowerCase().includes('dental') ? 'amber' : 'violet';
+              const formattedTime = formatSingleDisplayTime(a.time || '10:00 AM');
+              const dateObj = new Date(a.date + 'T00:00:00');
+              const formattedDate = !isNaN(dateObj) ? dateObj.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : (a.date || '—');
+
+              return `
+                <tr class="gcal-appt-row">
+                  <td>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                      <div class="avatar avatar--sm" style="background:#e8f0fe; color:#1a73e8; font-weight:700; font-size:12px; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;">${initials(a.childName || 'C')}</div>
+                      <div>
+                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML$1(a.childName || 'Child')}</strong>
+                        <span style="font-size:11px; color:var(--color-text-muted);">${a.childId ? `ID: ${a.childId}` : ''}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td>
+                    <span class="gcal-event-chip gcal-event-chip--${typeClass}" style="display:inline-flex; width:auto; padding:3px 10px; font-size:12px; font-weight:600; cursor:pointer;" data-event-id="${a.id}">
+                      ${escapeHTML$1(a.type || 'General')}
+                    </span>
+                  </td>
+                  <td>
+                    <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text);">
+                      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#70757a" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                      <span>${escapeHTML$1(a.doctor || 'General Clinic')}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div style="font-size:13px; font-weight:600; color:var(--color-text);">${formattedDate}</div>
+                    <div style="font-size:11.5px; color:var(--color-text-muted);">${formattedTime}</div>
+                  </td>
+                  <td>
+                    <span class="gcal-status-pill gcal-status-pill--${isCompleted ? 'done' : 'upcoming'}" style="display:inline-block; border-radius:12px; padding:3px 10px; font-size:10px; font-weight:700;">
+                      ${currentStatus}
+                    </span>
+                  </td>
+                  <td style="text-align:right;">
+                    <div style="display:inline-flex; align-items:center; gap:6px;">
+                      <button class="button button--secondary button--sm" type="button" data-event-id="${a.id}" title="View Details" style="padding:6px 10px; font-size:12px; font-weight:600; gap:4px;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        View
+                      </button>
+                      <button class="button button--secondary button--sm" type="button" data-sync-event-id="${a.id}" title="Sync Google Calendar" style="padding:6px 10px; font-size:12px; color:#1a73e8;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                      </button>
+                      <button class="button button--danger-outline button--sm" type="button" data-delete-event-id="${a.id}" title="Delete Appointment" style="padding:6px 8px; color:#d93025;">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+
+    return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}View Children</a>`)}
+  <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
+    ${statCard('Total Appointments', appointments.length.toLocaleString(), 'All records', 'calendar', 'blue')}
+    ${statCard('Upcoming', upcomingCount.toLocaleString(), 'Scheduled visits', 'clock', 'amber')}
+    ${statCard('Completed', completedCount.toLocaleString(), 'Past appointments', 'check', 'green')}
+  </div>
+  ${calendarCard()}
+  <div style="margin-top: 20px;">
+    <section class="card">
+      <header class="card__header">
+        <div>
+          <h2 class="card__title">All Appointments</h2>
+          <p class="card__caption">Complete appointment history across all children</p>
+        </div>
+        <span class="badge badge--blue">${appointments.length} total</span>
+      </header>
+      <div class="card__body" style="padding: 0;">
+        ${allApptsHTML}
+      </div>
+    </section>
+  </div>`);
+  }
+
+  /* ═══════════════════════════════════════════════════════
+     PAGE ROUTER
+     ═══════════════════════════════════════════════════════ */
+
+  function renderPage(page) {
+    const pages = {
+      login: loginPage,
+      dashboard: dashboardPage,
+      children: childrenPage,
+      appointments: appointmentsPage,
+      'child-profile': childProfilePage,
+      'child_profile': childProfilePage,
+      'register-child': registerChildPage,
+      'ocr-upload': ocrUploadPage,
+      'ocr-processing': ocrProcessingPage,
+      'ocr-review': ocrReviewPage,
+      'ocr-details': ocrDetailsPage,
+      documents: documentsPage,
+      reports: reportsPage,
+      settings: settingsPage,
+      growth: growthPage,
+      medicines: medicinesPage
+    };
+    return (pages[page] || dashboardPage)();
+  }
+
+  function searchChildren(query) {
+    const term = query.trim().toLowerCase();
+    return getChildren().filter((child) => !term || Object.values(child).some((value) => String(value).toLowerCase().includes(term)));
+  }
+
+  function renderSearchResultsList(query = '') {
+    const results = searchChildren(query).slice(0, 7);
+    if (!results.length) {
+      return `<div class="empty-state" style="padding: 24px 16px;"><span class="empty-state__icon">${icon('search')}</span><h3>No matching records</h3><p style="font-size:12px; color:var(--color-text-muted);">Try searching by child name, guardian, phone number, ID, or blood group.</p></div>`;
+    }
+    return results.map((child) => {
+      const age = calculateAge(child.dob) || child.age || '—';
+      return `
+      <a class="global-search__result" href="${pagePath('child-profile')}?id=${child.id}" style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px; text-decoration:none; color:var(--color-text); border-bottom:1px solid var(--color-border);">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <span class="table-avatar" style="width:36px; height:36px; border-radius:50%; background:var(--color-primary-light); color:var(--color-primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:13px;">${initials(child.name)}</span>
+          <div>
+            <b style="font-size:14px; display:block;">${child.name}</b>
+            <small style="font-size:11.5px; color:var(--color-text-muted);">${child.id} • ${age} • ${child.gender || '—'} • ${child.blood || '—'} • ${child.father || child.guardian || 'Guardian'}</small>
+          </div>
+        </div>
+        <span class="global-search__go" style="color:var(--color-primary); font-size:16px;">${icon('arrowRight')}</span>
+      </a>
+    `;
+    }).join('');
+  }
+
+  function globalSearchMarkup(query = '') {
+    return `
+    <div class="modal-backdrop" role="presentation" style="position:fixed; inset:0; z-index:9999; background:rgba(15,23,42,0.75); backdrop-filter:blur(6px); display:flex; align-items:flex-start; justify-content:center; padding-top:80px;">
+      <section class="modal global-search card" role="dialog" aria-modal="true" aria-labelledby="search-title" style="width:min(640px, 94vw); border-radius:12px; overflow:hidden; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.25);">
+        <header class="global-search__input" style="display:flex; align-items:center; gap:12px; padding:16px; border-bottom:1px solid var(--color-border); background:var(--color-bg);">
+          <span style="color:var(--color-text-muted); font-size:18px;">${icon('search')}</span>
+          <input id="global-search-input" class="input" value="${query}" placeholder="Search children, guardians, health records…" aria-label="Search all child records" autofocus style="flex:1; border:0; background:transparent; font-size:16px; color:var(--color-text); outline:none;">
+          <kbd style="padding:2px 8px; font-size:11px; background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:4px; color:var(--color-text-muted);">Esc</kbd>
+        </header>
+        <div class="global-search__results" id="global-search-results-wrap" style="max-height:60vh; overflow:auto;">
+          <p class="global-search__hint" id="search-title" style="padding:10px 16px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; color:var(--color-text-muted); margin:0; border-bottom:1px solid var(--color-border);">Search results</p>
+          <div id="global-search-results-container">
+            ${renderSearchResultsList(query)}
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+  }
+
+  function closeModal() { document.querySelector('#modal-root').replaceChildren(); }
+
+  function modal({ title, body, confirmText = 'Confirm', confirmClass = 'button--primary', onConfirm }) {
+    const root = document.querySelector('#modal-root');
+    root.innerHTML = `<div class="modal-backdrop" role="presentation"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal__header"><div><h2 id="modal-title" class="modal__title">${title}</h2></div><button class="icon-button icon-button--small" type="button" aria-label="Close dialog" data-modal-close>${icon('x')}</button></header><div class="modal__body">${body}</div><footer class="modal__footer"><button class="button" type="button" data-modal-close>Cancel</button><button class="button ${confirmClass}" type="button" data-modal-confirm>${confirmText}</button></footer></section></div>`;
+    root.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', closeModal));
+    root.querySelector('.modal-backdrop').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
+    root.querySelector('[data-modal-confirm]').addEventListener('click', () => { onConfirm?.(); closeModal(); });
+    root.querySelector('[data-modal-close]')?.focus();
+  }
+
+  function collectChild(form) {
+    const values = Object.fromEntries(new FormData(form));
+    let id = values.id;
+    let registeredDate = values.registeredDate || new Date().toISOString().slice(0, 10);
+    let status = 'Active';
+
+    // If editing, preserve existing registration date and status
+    if (id) {
+      const existing = getChild(id);
+      if (existing) {
+        registeredDate = existing.registeredDate || registeredDate;
+        status = existing.status || status;
+      }
+    } else {
+      // Generate a unique ID by checking existing children. The old Math.random()
+      // approach had a birthday-paradox collision probability ~50% around a few
+      // hundred children; this loop ensures global uniqueness within the dataset.
+      const existingIds = new Set((getChildren() || []).map(c => c?.id).filter(Boolean));
+      let attempts = 0;
+      do {
+        id = `CH-${String(1000 + Math.floor(Math.random() * 9000)).padStart(4, '0')}`;
+        if (++attempts > 50) {
+          // Fallback: timestamp-based ID if the random space is exhausted.
+          id = `CH-${Date.now().toString().slice(-7)}`;
+          break;
+        }
+      } while (existingIds.has(id));
+    }
+
+    const mother = values.mother || '';
+    const dob = values.dob || values.birthDate || '';
+    const idNumber = values.idNumber || '';
+    const fullName = values.name || `${values.firstName || ''} ${values.lastName || ''}`.trim() || 'Unnamed Child';
+
+    return {
+      id,
+      name: fullName,
+      email: values.email || '',
+      gender: values.gender || '',
+      blood: values.blood || '',
+      father: values.father || '',
+      mother: mother || '',
+      phone: values.phone || '',
+      address: values.address || '',
+      notes: values.notes || '',
+      registeredDate,
+      status,
+      dob,
+      idNumber,
+      // Health baseline fields
+      height: values.height ? String(values.height).replace(/[^0-9.]/g, '').trim() : '',
+      weight: values.weight ? String(values.weight).replace(/[^0-9.]/g, '').trim() : '',
+      medicalConditions: values.medicalConditions || '',
+      allergies: values.allergies || '',
+      medications: values.medications || '',
+      dentalRemarks: values.dentalRemarks || '',
+      hygieneIndex: values.hygieneIndex || '',
+      emergencyContact: values.emergencyContact || '',
+      emergencyPhone: values.emergencyPhone || '',
+      hospitalName: values.hospitalName || ''
+    };
+  }
+
+  function saveChild(form) {
+    const values = Object.fromEntries(new FormData(form));
+    const fullName = (values.name || `${values.firstName || ''} ${values.lastName || ''}`).trim().toLowerCase();
+    const dob = (values.dob || values.birthDate || '').trim();
+
+    // Deduplication Check: Same First Name, Last Name / Full Name AND Date of Birth
+    const existingChildren = getChildren() || [];
+    const isEditing = !!values.id;
+
+    const duplicate = existingChildren.find(c => {
+      if (!c) return false;
+      if (values.id && c.id === values.id) return false;
+
+      const cNameClean = (c.name || '').trim().toLowerCase();
+      const cDobClean = (c.dob || '').trim();
+
+      // Exact match only. The old substring check merged distinct children: "Anna Lee"
+      // matched "Savannah Leeds" because both contained "anna" and "lee" as substrings.
+      const nameMatches = cNameClean === fullName;
+      const dobMatches = dob && cDobClean && dob === cDobClean;
+
+      return nameMatches && dobMatches;
+    });
+
+    if (duplicate && !isEditing) {
+      let idInput = form.querySelector('input[name="id"]');
+      if (!idInput) {
+        idInput = document.createElement('input');
+        idInput.type = 'hidden';
+        idInput.name = 'id';
+        idInput.dataset.tempId = 'true';
+        form.appendChild(idInput);
+      }
+      idInput.value = duplicate.id;
+      toast('Duplicate prevented', `Updating existing profile for ${duplicate.name} (${duplicate.id}) instead of creating duplicate.`);
+    }
+
+    const child = collectChild(form);
+    const updated = updateChild(child);
+
+    // Clean up any temporary hidden ID element from form so subsequent submissions start fresh!
+    const tempIdInput = form.querySelector('input[data-temp-id="true"]');
+    if (tempIdInput) {
+      tempIdInput.remove();
+    }
+
+    // Automatically generate / append row to Google Sheets & update Google Docs in user's account
+    autoSyncChildToGoogleSheets(child);
+    autoSyncToGoogleDocs();
+    return updated;
+  }
+
+  /**
    * firestore.js
-   * Handles Cloud Firestore database operations for authorized users and NGOs.
+   * Handles Cloud Firestore reads for the authorized-user allowlist.
+   *
+   * SECURITY MODEL
+   * The allowlist is console/server-managed data (see firestore.rules). The client
+   * may read only its own document and may never write. This module therefore does
+   * NOT seed documents and does NOT fall back to a local list when a lookup fails:
+   * a failed lookup must deny access, never grant it. The server independently
+   * re-checks the allowlist on every /api request, so this check is only a UX
+   * shortcut, not the security boundary.
    */
 
 
   // Collection name constant
   const AUTHORIZED_USERS_COLLECTION = 'authorized_users';
 
-  // Pre-configured demo accounts for Cloud Firestore seed
-  const SEED_DEMO_USERS = [
-    {
-      email: "tejassachin2010@gmail.com",
-      ngo: "Ayusha Nilayam",
-      role: "Admin",
-      active: true
-    },
-    {
-      email: "sachinsharma.hr@gmail.com",
-      ngo: "Alex Agape",
-      role: "Admin",
-      active: true
-    }
-  ];
-
   /**
-   * Seed initial authorized NGO users into Cloud Firestore if not present
+   * Convert an email into its canonical Firestore document ID.
+   * @param {string} email
+   * @returns {string}
    */
-  async function seedAuthorizedUsers() {
-    try {
-      for (const user of SEED_DEMO_USERS) {
-        const docId = user.email.replace(/[@.]/g, '_');
-        const userRef = doc(db, AUTHORIZED_USERS_COLLECTION, docId);
-        const snap = await getDoc(userRef);
-        if (!snap.exists()) {
-          await setDoc(userRef, {
-            ...user,
-            createdAt: new Date().toISOString()
-          });
-        }
-      }
-    } catch (err) {
-      console.warn('Firestore seed note:', err.message || err);
-    }
+  function emailToDocId(email) {
+    return String(email || '').trim().toLowerCase().replace(/[@.]/g, '_');
   }
 
   /**
-   * Query Cloud Firestore for an authorized user record matching the given email
-   * @param {string} email 
+   * Look up the authorized-user record for an email.
+   *
+   * Returns null when the user is absent, inactive, or the lookup fails for any
+   * reason. Callers must treat null as "deny".
+   *
+   * @param {string} email
    * @returns {Promise<{email: string, ngo: string, role: string, active: boolean}|null>}
    */
   async function getAuthorizedUser(email) {
     if (!email) return null;
     const normalizedEmail = email.trim().toLowerCase();
-    const docId = normalizedEmail.replace(/[@.]/g, '_');
 
     try {
-      // 1. Direct document lookup by normalized email docId
-      const directRef = doc(db, AUTHORIZED_USERS_COLLECTION, docId);
-      const directSnap = await getDoc(directRef);
-      if (directSnap.exists()) {
-        const data = directSnap.data();
-        return {
-          email: data.email || normalizedEmail,
-          ngo: data.ngo || 'Partner NGO',
-          role: data.role || 'Admin',
-          active: data.active !== undefined ? Boolean(data.active) : true
-        };
-      }
-
-      // 2. Query collection where email field equals normalizedEmail
-      const q = query(
-        collection(db, AUTHORIZED_USERS_COLLECTION),
-        where('email', '==', normalizedEmail)
+      const snap = await getDoc(
+        doc(db, AUTHORIZED_USERS_COLLECTION, emailToDocId(normalizedEmail))
       );
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-        const data = querySnapshot.docs[0].data();
-        return {
-          email: data.email || normalizedEmail,
-          ngo: data.ngo || 'Partner NGO',
-          role: data.role || 'Admin',
-          active: data.active !== undefined ? Boolean(data.active) : true
-        };
-      }
+      if (!snap.exists()) return null;
 
-      // 3. Scan all documents in authorized_users collection as fail-safe (handles legacy doc IDs)
-      const allSnap = await getDocs(collection(db, AUTHORIZED_USERS_COLLECTION));
-      if (!allSnap.empty) {
-        for (const d of allSnap.docs) {
-          const data = d.data();
-          if (data && data.email && data.email.trim().toLowerCase() === normalizedEmail) {
-            return {
-              email: data.email || normalizedEmail,
-              ngo: data.ngo || 'Partner NGO',
-              role: data.role || 'Admin',
-              active: data.active !== undefined ? Boolean(data.active) : true
-            };
-          }
-        }
-      }
+      const data = snap.data() || {};
+
+      // The document ID is derived from the email, but verify the stored field too
+      // so a mis-keyed document can never authorize the wrong account.
+      const storedEmail = String(data.email || '').trim().toLowerCase();
+      if (storedEmail && storedEmail !== normalizedEmail) return null;
+
+      // Absent/!== true `active` denies. Do not default missing values to allowed.
+      if (data.active !== true) return null;
+
+      return {
+        email: storedEmail || normalizedEmail,
+        ngo: data.ngo || 'Partner NGO',
+        role: data.role || 'Admin',
+        active: true
+      };
     } catch (error) {
-      console.warn('Firestore user lookup notice:', error.message || error);
+      // Permission errors and network failures both land here. Deny.
+      console.warn('Authorization lookup failed; denying access.', error?.message || error);
+      return null;
     }
-
-    // 4. Fallback check against SEED_DEMO_USERS
-    const fallbackUser = SEED_DEMO_USERS.find(u => u.email.toLowerCase() === normalizedEmail);
-    if (fallbackUser) {
-      return { ...fallbackUser };
-    }
-
-    return null;
   }
 
   /**
@@ -38117,9 +36921,6 @@
    */
   async function loginWithGoogle() {
     try {
-      // Ensure initial Firestore demo accounts exist
-      await seedAuthorizedUsers();
-
       // 1. Firebase Google Popup Sign-In
       const result = await signInWithPopup(auth, googleProvider);
       const fbUser = result.user;
@@ -38298,6 +37099,7 @@
       });
     }
   })();
+
 
   // ─── Event Listeners ───
 
@@ -39468,7 +38270,7 @@
 
           const startTime = Date.now();
 
-          fetch('http://localhost:3000/api/ocr', {
+          apiFetch('/api/ocr', {
             method: 'POST',
             body: formData
           })
