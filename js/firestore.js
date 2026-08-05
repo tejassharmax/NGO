@@ -1,133 +1,69 @@
 /**
  * firestore.js
- * Handles Cloud Firestore database operations for authorized users and NGOs.
+ * Handles Cloud Firestore reads for the authorized-user allowlist.
+ *
+ * SECURITY MODEL
+ * The allowlist is console/server-managed data (see firestore.rules). The client
+ * may read only its own document and may never write. This module therefore does
+ * NOT seed documents and does NOT fall back to a local list when a lookup fails:
+ * a failed lookup must deny access, never grant it. The server independently
+ * re-checks the allowlist on every /api request, so this check is only a UX
+ * shortcut, not the security boundary.
  */
 
 import { db } from './firebase-config.js';
-import { collection, query, where, getDocs, doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 
 // Collection name constant
 export const AUTHORIZED_USERS_COLLECTION = 'authorized_users';
 
-// Pre-configured demo accounts for Cloud Firestore seed
-const SEED_DEMO_USERS = [
-  {
-    email: "tejassachin2010@gmail.com",
-    ngo: "Ayusha Nilayam",
-    role: "Admin",
-    active: true
-  },
-  {
-    email: "sachinsharma.hr@gmail.com",
-    ngo: "Alex Agape",
-    role: "Admin",
-    active: true
-  }
-];
-
 /**
- * Seed initial authorized NGO users into Cloud Firestore if not present
+ * Convert an email into its canonical Firestore document ID.
+ * @param {string} email
+ * @returns {string}
  */
-export async function seedAuthorizedUsers() {
-  try {
-    for (const user of SEED_DEMO_USERS) {
-      const docId = user.email.replace(/[@.]/g, '_');
-      const userRef = doc(db, AUTHORIZED_USERS_COLLECTION, docId);
-      const snap = await getDoc(userRef);
-      if (!snap.exists()) {
-        await setDoc(userRef, {
-          ...user,
-          createdAt: new Date().toISOString()
-        });
-      }
-    }
-  } catch (err) {
-    console.warn('Firestore seed note:', err.message || err);
-  }
+export function emailToDocId(email) {
+  return String(email || '').trim().toLowerCase().replace(/[@.]/g, '_');
 }
 
 /**
- * Query Cloud Firestore for an authorized user record matching the given email
- * @param {string} email 
+ * Look up the authorized-user record for an email.
+ *
+ * Returns null when the user is absent, inactive, or the lookup fails for any
+ * reason. Callers must treat null as "deny".
+ *
+ * @param {string} email
  * @returns {Promise<{email: string, ngo: string, role: string, active: boolean}|null>}
  */
 export async function getAuthorizedUser(email) {
   if (!email) return null;
   const normalizedEmail = email.trim().toLowerCase();
-  const docId = normalizedEmail.replace(/[@.]/g, '_');
 
   try {
-    // 1. Direct document lookup by normalized email docId
-    const directRef = doc(db, AUTHORIZED_USERS_COLLECTION, docId);
-    const directSnap = await getDoc(directRef);
-    if (directSnap.exists()) {
-      const data = directSnap.data();
-      return {
-        email: data.email || normalizedEmail,
-        ngo: data.ngo || 'Partner NGO',
-        role: data.role || 'Admin',
-        active: data.active !== undefined ? Boolean(data.active) : true
-      };
-    }
-
-    // 2. Query collection where email field equals normalizedEmail
-    const q = query(
-      collection(db, AUTHORIZED_USERS_COLLECTION),
-      where('email', '==', normalizedEmail)
+    const snap = await getDoc(
+      doc(db, AUTHORIZED_USERS_COLLECTION, emailToDocId(normalizedEmail))
     );
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      const data = querySnapshot.docs[0].data();
-      return {
-        email: data.email || normalizedEmail,
-        ngo: data.ngo || 'Partner NGO',
-        role: data.role || 'Admin',
-        active: data.active !== undefined ? Boolean(data.active) : true
-      };
-    }
+    if (!snap.exists()) return null;
 
-    // 3. Scan all documents in authorized_users collection as fail-safe (handles legacy doc IDs)
-    const allSnap = await getDocs(collection(db, AUTHORIZED_USERS_COLLECTION));
-    if (!allSnap.empty) {
-      for (const d of allSnap.docs) {
-        const data = d.data();
-        if (data && data.email && data.email.trim().toLowerCase() === normalizedEmail) {
-          return {
-            email: data.email || normalizedEmail,
-            ngo: data.ngo || 'Partner NGO',
-            role: data.role || 'Admin',
-            active: data.active !== undefined ? Boolean(data.active) : true
-          };
-        }
-      }
-    }
+    const data = snap.data() || {};
+
+    // The document ID is derived from the email, but verify the stored field too
+    // so a mis-keyed document can never authorize the wrong account.
+    const storedEmail = String(data.email || '').trim().toLowerCase();
+    if (storedEmail && storedEmail !== normalizedEmail) return null;
+
+    // Absent/!== true `active` denies. Do not default missing values to allowed.
+    if (data.active !== true) return null;
+
+    return {
+      email: storedEmail || normalizedEmail,
+      ngo: data.ngo || 'Partner NGO',
+      role: data.role || 'Admin',
+      active: true
+    };
   } catch (error) {
-    console.warn('Firestore user lookup notice:', error.message || error);
+    // Permission errors and network failures both land here. Deny.
+    console.warn('Authorization lookup failed; denying access.', error?.message || error);
+    return null;
   }
-
-  // 4. Fallback check against SEED_DEMO_USERS
-  const fallbackUser = SEED_DEMO_USERS.find(u => u.email.toLowerCase() === normalizedEmail);
-  if (fallbackUser) {
-    return { ...fallbackUser };
-  }
-
-  return null;
-}
-
-/**
- * Fetch all authorized NGO users from Cloud Firestore to dynamically render demo account info cards
- * @returns {Promise<Array<{email: string, ngo: string, role: string, active: boolean}>>}
- */
-export async function getAuthorizedUsersList() {
-  try {
-    const q = query(collection(db, AUTHORIZED_USERS_COLLECTION), where('active', '==', true));
-    const querySnapshot = await getDocs(q);
-    if (!querySnapshot.empty) {
-      return querySnapshot.docs.map(d => d.data());
-    }
-  } catch (error) {
-    console.warn('Firestore list query fallback:', error.message || error);
-  }
-
-  return [...SEED_DEMO_USERS];
 }

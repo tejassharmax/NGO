@@ -17,7 +17,19 @@ export function collectChild(form) {
       status = existing.status || status;
     }
   } else {
-    id = `CH-${String(1025 + Math.floor(Math.random() * 9975)).padStart(4, '0')}`;
+    // Generate a unique ID by checking existing children. The old Math.random()
+    // approach had a birthday-paradox collision probability ~50% around a few
+    // hundred children; this loop ensures global uniqueness within the dataset.
+    const existingIds = new Set((getChildren() || []).map(c => c?.id).filter(Boolean));
+    let attempts = 0;
+    do {
+      id = `CH-${String(1000 + Math.floor(Math.random() * 9000)).padStart(4, '0')}`;
+      if (++attempts > 50) {
+        // Fallback: timestamp-based ID if the random space is exhausted.
+        id = `CH-${Date.now().toString().slice(-7)}`;
+        break;
+      }
+    } while (existingIds.has(id));
   }
 
   const mother = values.mother || '';
@@ -56,8 +68,6 @@ export function collectChild(form) {
 
 export function saveChild(form) {
   const values = Object.fromEntries(new FormData(form));
-  const firstName = (values.firstName || '').trim().toLowerCase();
-  const lastName = (values.lastName || '').trim().toLowerCase();
   const fullName = (values.name || `${values.firstName || ''} ${values.lastName || ''}`).trim().toLowerCase();
   const dob = (values.dob || values.birthDate || '').trim();
 
@@ -72,7 +82,9 @@ export function saveChild(form) {
     const cNameClean = (c.name || '').trim().toLowerCase();
     const cDobClean = (c.dob || '').trim();
 
-    const nameMatches = cNameClean === fullName || (firstName && lastName && cNameClean.includes(firstName) && cNameClean.includes(lastName));
+    // Exact match only. The old substring check merged distinct children: "Anna Lee"
+    // matched "Savannah Leeds" because both contained "anna" and "lee" as substrings.
+    const nameMatches = cNameClean === fullName;
     const dobMatches = dob && cDobClean && dob === cDobClean;
 
     return nameMatches && dobMatches;

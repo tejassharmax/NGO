@@ -9,6 +9,7 @@ import { getSession } from './session.js';
 import { toast } from './toast.js';
 import { getChildren, getHealthRecords, healthStatus, calculateAge } from './storage.js';
 import { escapeHTML } from './utils.js';
+import { apiFetch } from './apiClient.js';
 
 let cachedDocsConfig = null;
 
@@ -19,7 +20,7 @@ export async function fetchDocsConfig(ngoSlug) {
   const session = getSession() || {};
   const slug = ngoSlug || session.ngo || 'ayusha-nilayam';
   try {
-    const res = await fetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
+    const res = await apiFetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
     if (res.ok) {
       cachedDocsConfig = await res.json();
       return cachedDocsConfig;
@@ -115,7 +116,7 @@ export async function autoSyncToGoogleDocs() {
   const reportContent = generateExecutiveDocContent();
 
   try {
-    const res = await fetch('/api/docs/sync', {
+    const res = await apiFetch('/api/docs/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reportContent, ngo: ngoSlug, ngoName })

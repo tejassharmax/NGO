@@ -98,7 +98,14 @@ function buildOAuthClient(req = null) {
 /**
  * Generate OAuth consent URL for an NGO
  */
-function getAuthUrl(ngoSlug, req = null) {
+/**
+ * Generate OAuth consent URL for an NGO.
+ * @param {string} ngoSlug
+ * @param {object|null} req incoming request, used to detect the live host
+ * @param {string|null} state opaque CSRF state; defaults to the slug for
+ *        backwards compatibility, but callers should pass a signed nonce.
+ */
+function getAuthUrl(ngoSlug, req = null, state = null) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
   const oauthClient = buildOAuthClient(req);
 
@@ -106,11 +113,13 @@ function getAuthUrl(ngoSlug, req = null) {
     access_type: 'offline',
     prompt: 'consent',
     scope: [
+      'openid',
+      'email',
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/documents',
       'https://www.googleapis.com/auth/drive.file'
     ],
-    state: safeSlug
+    state: state || safeSlug
   });
 }
 
@@ -185,10 +194,11 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     return str;
   }
 
-  const PRESET_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-1001', 'CH-1002', 'CH-3938', 'CH-1079'];
-  const PRESET_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Ananya Patel'];
-
-  const cleanChildren = (children || []).filter(c => c && !PRESET_IDS.includes(c.id) && !PRESET_NAMES.includes(c.name));
+  // Every child record supplied by the client is synced. A previous version
+  // filtered out a hardcoded list of "preset" IDs and names (CH-1025, 'Aisha Khan',
+  // ...), which silently deleted real children who happened to have been assigned
+  // one of those IDs or to share a name with a demo record.
+  const cleanChildren = (children || []).filter(Boolean);
 
   const rows = cleanChildren.map(c => [
     cleanCell(c.id || 'CH-0000'),

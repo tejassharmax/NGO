@@ -24,6 +24,9 @@ const {
   syncExecutiveDocToGoogleDocs
 } = require('./js/server/googleOAuth');
 
+// Server-side authentication (Firebase ID token + email allowlist)
+const { requireAuth, ALLOWED_EMAILS } = require('./js/server/auth');
+
 // Initialize the Google Cloud Vision client
 const visionClient = new vision.ImageAnnotatorClient({
   keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
@@ -35,10 +38,21 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } }); // Max 15MB
 
 // CORS
+// Restricted to known origins. The previous '*' allowed any website on the
+// internet to call these endpoints with the user's browser.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
+  'https://ngo-4xde.onrender.com,http://localhost:3000,http://127.0.0.1:3000')
+  .split(',').map(o => o.trim()).filter(Boolean);
+
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -229,7 +243,7 @@ function countExtractedFields(parsed) {
    API ENDPOINT
    ═══════════════════════════════════════════════════════ */
 
-app.post('/api/ocr', upload.single('document'), async (req, res) => {
+app.post('/api/ocr', requireAuth, upload.single('document'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -726,7 +740,7 @@ if (!fs.existsSync(DB_DIR)) {
 }
 
 // GET /api/sync - Returns the entire database
-app.get('/api/sync', (req, res) => {
+app.get('/api/sync', requireAuth, (req, res) => {
   try {
     if (fs.existsSync(DB_FILE)) {
       const data = fs.readFileSync(DB_FILE, 'utf8');
@@ -739,42 +753,8 @@ app.get('/api/sync', (req, res) => {
   }
 });
 
-function mergeJSONArrays(clientJSON, serverJSON) {
-  if (!clientJSON && !serverJSON) return null;
-  if (!clientJSON) return serverJSON;
-  if (!serverJSON) return clientJSON;
-  try {
-    const clientArr = JSON.parse(clientJSON);
-    const serverArr = JSON.parse(serverJSON);
-    if (!Array.isArray(clientArr) || !Array.isArray(serverArr)) return clientJSON;
-    
-    const mergedMap = new Map();
-    serverArr.forEach(item => {
-      const key = item.id || JSON.stringify(item);
-      mergedMap.set(key, item);
-    });
-    clientArr.forEach(item => {
-      const key = item.id || JSON.stringify(item);
-      mergedMap.set(key, item);
-    });
-    
-    const clientIds = new Set(clientArr.map(item => item.id || JSON.stringify(item)));
-    const finalArr = Array.from(mergedMap.values());
-    finalArr.sort((a, b) => {
-      const aKey = a.id || JSON.stringify(a);
-      const bKey = b.id || JSON.stringify(b);
-      const aIsClient = clientIds.has(aKey);
-      const bIsClient = clientIds.has(bKey);
-      if (aIsClient && !bIsClient) return -1;
-      if (!aIsClient && bIsClient) return 1;
-      return 0;
-    });
-    
-    return JSON.stringify(finalArr);
-  } catch (e) {
-    return clientJSON;
-  }
-}
+// NOTE: mergeJSONArrays is defined once, further down, next to POST /api/sync.
+// A second, earlier definition used to shadow it silently.
 
 /* ═══════════════════════════════════════════════════════
    AUTOMATIC GOOGLE SHEETS SYNC SERVICE
@@ -947,7 +927,11 @@ async function syncChildrenToGoogleSheets(children) {
    PER-NGO GOOGLE WORKSPACE OAUTH ROUTES & ENDPOINTS
    ═══════════════════════════════════════════════════════ */
 
-// GET /api/google/connect?ngo=<slug> -> Redirect to OAuth consent screen
+// GET /api/google/connect?ngo=<slug> -> Start OAuth flow
+// This is an `<a href>` navigation, so it can't send an auth header. Instead, we
+// require the user to be signed in *to the callback*, where we verify the email
+// from Google's id_token matches an allowlisted admin before storing the refresh
+// token. This stops random visitors from binding their Google account to your NGO.
 app.get('/api/google/connect', (req, res) => {
   const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
   const authUrl = getAuthUrl(ngoSlug, req);
@@ -974,6 +958,15 @@ app.get('/auth/google/callback', async (req, res) => {
       } catch (e) {}
     }
 
+    // Only an allowlisted admin may bind a Google account to this NGO. Without
+    // this check any visitor could complete the consent flow and point the NGO's
+    // Sheets/Docs sync at their own Drive, exfiltrating child medical records.
+    const connectingEmail = String(adminEmail || '').trim().toLowerCase();
+    if (!ALLOWED_EMAILS.has(connectingEmail)) {
+      console.warn(`[oauth] Refused workspace connect from non-allowlisted account: ${connectingEmail}`);
+      return res.redirect('/index.html?google_error=unauthorized#/settings');
+    }
+
     const existing = getNgoIntegration(ngoSlug);
     const updated = {
       ...existing,
@@ -991,7 +984,7 @@ app.get('/auth/google/callback', async (req, res) => {
 });
 
 // GET & POST /api/google/disconnect?ngo=<slug> -> Clear stored tokens for NGO
-app.all('/api/google/disconnect', (req, res) => {
+app.all('/api/google/disconnect', requireAuth, (req, res) => {
   const ngoSlug = (req.query.ngo || req.body?.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
   const existing = getNgoIntegration(ngoSlug);
   delete existing.refresh_token;
@@ -1010,7 +1003,7 @@ app.all('/api/google/disconnect', (req, res) => {
 });
 
 // GET /api/sheets/config?ngo=...
-app.get('/api/sheets/config', (req, res) => {
+app.get('/api/sheets/config', requireAuth, (req, res) => {
   const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
   const integration = getNgoIntegration(ngoSlug);
   const connected = !!(integration && integration.refresh_token);
@@ -1023,7 +1016,7 @@ app.get('/api/sheets/config', (req, res) => {
 });
 
 // POST /api/sheets/sync
-app.post('/api/sheets/sync', async (req, res) => {
+app.post('/api/sheets/sync', requireAuth, async (req, res) => {
   try {
     const { children, ngo, ngoName } = req.body || {};
     const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
@@ -1036,7 +1029,7 @@ app.post('/api/sheets/sync', async (req, res) => {
 });
 
 // GET /api/docs/config?ngo=...
-app.get('/api/docs/config', (req, res) => {
+app.get('/api/docs/config', requireAuth, (req, res) => {
   const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
   const integration = getNgoIntegration(ngoSlug);
   const connected = !!(integration && integration.refresh_token);
@@ -1049,7 +1042,7 @@ app.get('/api/docs/config', (req, res) => {
 });
 
 // POST /api/docs/sync
-app.post('/api/docs/sync', async (req, res) => {
+app.post('/api/docs/sync', requireAuth, async (req, res) => {
   try {
     const { reportContent, ngo, ngoName } = req.body || {};
     const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
@@ -1086,7 +1079,7 @@ function mergeJSONArrays(clientJSON, serverJSON) {
 }
 
 // POST /api/sync - Merges and saves the database
-app.post('/api/sync', (req, res) => {
+app.post('/api/sync', requireAuth, (req, res) => {
   try {
     let serverData = {};
     let currentDBString = '';
@@ -1141,37 +1134,9 @@ app.post('/api/sync', (req, res) => {
   }
 });
 
-// GET /api/sheets/config - Get Google Sheets config and sync status
-app.get('/api/sheets/config', (req, res) => {
-  const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
-  const integration = getNgoIntegration(ngoSlug);
-  const isConnected = !!(integration && integration.refresh_token);
-  res.json({
-    connected: isConnected,
-    adminEmail: integration?.adminEmail || null,
-    sheetId: integration?.sheetId || null,
-    spreadsheetUrl: integration?.spreadsheetUrl || null
-  });
-});
-
-// POST /api/sheets/sync - Manual trigger endpoint for Google Sheets sync
-app.post('/api/sheets/sync', async (req, res) => {
-  try {
-    let children = req.body.children;
-    const ngoSlug = req.body?.ngo || 'ayusha-nilayam';
-    const ngoName = req.body?.ngoName || 'Ayusha Nilayam';
-    if (!children && fs.existsSync(DB_FILE)) {
-      const db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
-      if (db['chm-children']) children = JSON.parse(db['chm-children']);
-    }
-    if (!children) return res.status(400).json({ error: 'No child records found to sync' });
-
-    const result = await syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// NOTE: /api/sheets/config and /api/sheets/sync are defined earlier in this file.
+// Duplicate definitions previously sat here; Express only ever matches the first
+// registration, so they were dead code and have been removed.
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
