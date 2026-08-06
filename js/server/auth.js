@@ -28,7 +28,7 @@ const PROJECT_ID = (process.env.FIREBASE_PROJECT_ID || 'anirudh-449ca').trim();
 // This is deliberately independent of Firestore so that a misconfigured or
 // compromised database cannot by itself grant API access.
 const ALLOWED_EMAILS = new Set(
-  (process.env.AUTHORIZED_EMAILS || 'tejassachin2010@gmail.com,sachinsharma.hr@gmail.com,anirudh@empoweredmargins.com')
+  (process.env.AUTHORIZED_EMAILS || 'tejassachin2010@gmail.com,sachinsharma.hr@gmail.com,ayushahome@gmail.com')
     .split(',')
     .map(e => e.trim().toLowerCase())
     .filter(Boolean)
