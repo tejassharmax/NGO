@@ -614,8 +614,13 @@ export async function syncWithServer() {
   }
 }
 
+let syncDebounceTimer = null;
+
 function triggerSync() {
-  syncWithServer().catch(err => console.warn('Background sync failed:', err));
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
+    syncWithServer().catch(err => console.warn('Background sync failed:', err));
+  }, 1500);
 }
 
 // Intercept localStorage sets to trigger background sync when key changes

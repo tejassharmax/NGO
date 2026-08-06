@@ -446,7 +446,7 @@ document.addEventListener('click', (event) => {
           addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
           logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
           toast('Document uploaded', `${title} linked to ${childName}'s profile.`);
-          render();
+          window.setTimeout(() => { window.location.reload(); }, 500);
         };
         reader.readAsDataURL(file);
       }
@@ -493,7 +493,7 @@ document.addEventListener('click', (event) => {
 
     const sheetInput = document.querySelector('#admin-google-sheet-input')?.value.trim();
     if (sheetInput) {
-      setGoogleSheetUrl(sheetInput);
+      localStorage.setItem('google_sheet_url', sheetInput);
     }
 
     localStorage.setItem('sample-org-name', orgNameInput);
@@ -1191,17 +1191,32 @@ function initFormListeners() {
     window.setTimeout(() => window.location.reload(), 500);
   });
 
-  // Login form
+  // Login form (triggers Google Auth flow)
   document.querySelector('[data-login-form]')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    const adminIdInput = event.target.querySelector('[data-admin-id-input]')?.value.trim();
-    if (adminIdInput === 'admin-ngo') {
-      localStorage.setItem('sample-logged-in', 'true');
-      toast('Login Successful', 'Welcome to the Child Health Management workspace.');
-      window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
-    } else {
-      toast('Access Denied', 'Incorrect Admin User ID. Please check the demo credentials.', 'danger');
-    }
+    toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
+    loginWithGoogle().then((res) => {
+      if (res.success) {
+        toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
+        window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
+      } else if (res.errorCode === 'ACCESS_DENIED') {
+        modal({
+          title: 'Access Denied',
+          body: `<div style="text-align:center; padding:16px 8px;">
+              <div style="font-size:44px; margin-bottom:8px;">🚫</div>
+              <h3 style="color:var(--color-danger); margin:0 0 8px 0; font-size:18px; font-weight:700;">Access Denied</h3>
+              <p style="font-size:14px; color:var(--color-text); margin:0 0 12px 0; font-weight:600;">This Google account is not authorized.</p>
+              <div style="padding:10px; background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:6px; font-size:12px; font-weight:500;">
+                Tried account: <code>${res.email || 'Unauthorized Account'}</code>
+              </div>
+            </div>`,
+          confirmText: 'Try Authorized Account',
+          onConfirm: () => { window.location.reload(); }
+        });
+      } else {
+        toast('Authentication Info', res.message || 'Google Sign-In popup closed.');
+      }
+    });
   });
 }
 
