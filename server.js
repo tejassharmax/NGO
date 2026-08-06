@@ -11,6 +11,7 @@ const multer = require('multer');
 const Tesseract = require('tesseract.js');
 const sharp = require('sharp');
 const vision = require('@google-cloud/vision');
+const { google } = require('googleapis');
 require('dotenv').config();
 
 // Per-NGO OAuth Integration Module
