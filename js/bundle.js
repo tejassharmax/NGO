@@ -35769,10 +35769,6 @@
       <span class="login-orb login-orb--3"></span>
     </div>
     <section class="login-panel">
-      <div class="login-panel__brand" aria-label="Child Health Management">
-        <span class="brand-mark">${icon('heartPulse')}</span>
-        ChildCare
-      </div>
       <div class="card login-card">
         <div class="login-card__hero" aria-hidden="true">
           <div class="login-card__hero-icon">${icon('stethoscope')}</div>
@@ -35790,19 +35786,6 @@
           <div class="login-feature">${icon('activity')}<span>Health Tracking</span></div>
           <div class="login-feature">${icon('heart')}<span>Child Care</span></div>
         </div>
-
-        <div style="margin-top: 20px; padding: 16px; background: var(--color-bg-alt); border-radius: 8px; border: 1px solid var(--color-border);">
-          <div style="font-weight: 600; font-size: 12px; color: var(--color-text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
-            ${icon('shield')} Current Demo Accounts (Firestore Verified)
-          </div>
-          <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: var(--color-text-muted); line-height: 1.8;" id="firestore-demo-accounts-list">
-            <li><code style="color: var(--color-primary); font-weight: 600;">tejassachin2010@gmail.com</code> <span style="font-size: 11px;">(Ayusha Nilayam)</span></li>
-            <li><code style="color: var(--color-primary); font-weight: 600;">sachinsharma.hr@gmail.com</code> <span style="font-size: 11px;">(Alex Agape)</span></li>
-            <li><code style="color: var(--color-primary); font-weight: 600;">ayushahome@gmail.com</code> <span style="font-size: 11px;">(Ayusha Nilayam)</span></li>
-          </ul>
-        </div>
-
-        <p class="login-card__foot" style="margin-top: 20px; text-align: center;">Protected by Firebase Authentication & Cloud Firestore Security Rules.</p>
       </div>
     </section>
   </main>`;
