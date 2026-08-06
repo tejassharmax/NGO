@@ -1063,13 +1063,11 @@ function mergeJSONArrays(clientJSON, serverJSON) {
   if (!Array.isArray(serverArr)) serverArr = [];
 
   const map = new Map();
-  const PRESET_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-1001', 'CH-1002', 'CH-3938', 'CH-1079'];
-  const PRESET_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Ananya Patel'];
-
+  // Merge server and client arrays, using ID as the deduplication key.
+  // The old version filtered out a hardcoded PRESET_IDS/PRESET_NAMES list here,
+  // which silently deleted real children who happened to match those values.
   serverArr.concat(clientArr).forEach(item => {
     if (item && typeof item === 'object') {
-      if (item.id && PRESET_IDS.includes(item.id)) return;
-      if (item.name && PRESET_NAMES.includes(item.name)) return;
       const key = item.id || JSON.stringify(item);
       map.set(key, item);
     }

@@ -21,21 +21,13 @@ const HEALTH_RECORDS_KEY = 'chm-health-records';
 
 /* ─── Children (was Students) ─── */
 
-const PRESET_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-1001', 'CH-1002', 'CH-3938', 'CH-1079'];
-const PRESET_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Ananya Patel'];
-
 export function getChildren() {
   let data = localStorage.getItem(CHILDREN_KEY);
   if (!data) {
     seedDatabase();
     data = localStorage.getItem(CHILDREN_KEY);
   }
-  const list = JSON.parse(data || '[]');
-  const filtered = list.filter(c => c && !PRESET_IDS.includes(c.id) && !PRESET_NAMES.includes(c.name));
-  if (filtered.length !== list.length) {
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(filtered));
-  }
-  return filtered;
+  return JSON.parse(data || '[]');
 }
 
 export function addChild(child) {
