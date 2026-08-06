@@ -198,7 +198,7 @@ export function loginPage() {
           <ul style="margin: 0; padding-left: 18px; font-size: 12px; color: var(--color-text-muted); line-height: 1.8;" id="firestore-demo-accounts-list">
             <li><code style="color: var(--color-primary); font-weight: 600;">tejassachin2010@gmail.com</code> <span style="font-size: 11px;">(Ayusha Nilayam)</span></li>
             <li><code style="color: var(--color-primary); font-weight: 600;">sachinsharma.hr@gmail.com</code> <span style="font-size: 11px;">(Alex Agape)</span></li>
-            <li><code style="color: var(--color-primary); font-weight: 600;">anirudh@empoweredmargins.com</code> <span style="font-size: 11px;">(Empowered Margins)</span></li>
+            <li><code style="color: var(--color-primary); font-weight: 600;">ayushahome@gmail.com</code> <span style="font-size: 11px;">(Ayusha Nilayam)</span></li>
           </ul>
         </div>
 
