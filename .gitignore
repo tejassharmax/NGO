@@ -3,6 +3,9 @@ node_modules/
 
 # Environment & secrets
 .env
+.env.production
+.env.local
+!.env.example
 *.json
 !package.json
 !package-lock.json
