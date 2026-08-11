@@ -368,6 +368,22 @@ app.get('/auth/google/callback', async (req, res) => {
     };
     saveNgoIntegration(ngoSlug, updated);
 
+    // Immediately create Google Spreadsheet in user's Drive and populate records
+    let children = [];
+    if (fs.existsSync(DB_FILE)) {
+      try {
+        const serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
+        if (serverData['chm-children']) children = JSON.parse(serverData['chm-children']);
+      } catch (e) {}
+    }
+
+    try {
+      console.log(`[OAuth Callback] Auto-creating Google Spreadsheet in Drive for ${connectingEmail}...`);
+      await oauthSyncSheets(children, ngoSlug, 'Ayusha Nilayam');
+    } catch (e) {
+      console.warn('[OAuth Callback] Google Spreadsheet auto-creation warning:', e.message);
+    }
+
     res.redirect('/index.html?google_connected=true#/settings');
   } catch (err) {
     console.error('OAuth Callback Error:', err);
