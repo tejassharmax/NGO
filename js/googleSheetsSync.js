@@ -328,7 +328,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a id="sync-open-sheet-btn" href="${activeSheetUrl}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
+        <a id="sync-open-sheet-btn" href="javascript:void(0)" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
           Open Connected Live Google Sheet
         </a>
@@ -336,7 +336,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        <span id="sync-footer-label">Synced to ${escapeHTML(activeSheetId)}</span>
+        <span id="sync-footer-label">Synced to Live NGO Sheet</span>
       </div>
     </div>
   `;
@@ -379,21 +379,35 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
     const latestUrl = getGoogleSheetUrl();
     if (openBtn) {
-      if (latestUrl && latestUrl !== '#') {
+      if (latestUrl && latestUrl !== '#' && latestUrl !== 'javascript:void(0)') {
         openBtn.href = latestUrl;
       }
       openBtn.onclick = (e) => {
         e.preventDefault();
         const targetUrl = getGoogleSheetUrl();
-        if (targetUrl && targetUrl !== '#') {
+        if (targetUrl && targetUrl !== '#' && targetUrl !== 'javascript:void(0)') {
           window.open(targetUrl, '_blank');
         } else {
           toast('Fetching Google Sheet...', 'Connecting to your NGO Google Sheet...');
           fetchSheetsConfig().then(cfg => {
-            if (cfg && cfg.spreadsheetUrl) {
+            if (cfg && cfg.spreadsheetUrl && cfg.spreadsheetUrl !== '#') {
               window.open(cfg.spreadsheetUrl, '_blank');
             } else {
-              toast('Google Sheet Not Found', 'Please connect Google Workspace in Settings to view your live Sheet.');
+              modal({
+                title: 'Google Workspace Not Connected',
+                body: `<div style="text-align:center; padding:16px 8px;">
+                  <div style="font-size:44px; margin-bottom:8px;">📊</div>
+                  <h3 style="color:var(--color-primary); margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
+                  <p style="font-size:13px; color:var(--color-text); margin:0 0 16px 0; line-height:1.5;">
+                    To view and open your live Google Sheet in real-time, please click <b>Connect Google Sheets Sync</b> once under <b>Settings</b>.
+                  </p>
+                </div>`,
+                confirmText: 'Go to Settings',
+                onConfirm: () => {
+                  overlay.remove();
+                  window.location.hash = '#/settings';
+                }
+              });
             }
           });
         }

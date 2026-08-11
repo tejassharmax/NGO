@@ -34542,8 +34542,8 @@
     overlay.id = 'sheets-sync-modal-overlay';
     overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
     
-    const activeSheetUrl = getGoogleSheetUrl() || '#';
-    const activeSheetId = cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : 'Active NGO Sheet';
+    getGoogleSheetUrl() || '#';
+    cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : 'Active NGO Sheet';
 
     overlay.innerHTML = `
     <div class="card" style="position:relative; width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
@@ -34571,7 +34571,7 @@
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a id="sync-open-sheet-btn" href="${activeSheetUrl}" target="_blank" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
+        <a id="sync-open-sheet-btn" href="javascript:void(0)" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
           Open Connected Live Google Sheet
         </a>
@@ -34579,7 +34579,7 @@
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        <span id="sync-footer-label">Synced to ${escapeHTML$1(activeSheetId)}</span>
+        <span id="sync-footer-label">Synced to Live NGO Sheet</span>
       </div>
     </div>
   `;
@@ -34622,21 +34622,35 @@
 
       const latestUrl = getGoogleSheetUrl();
       if (openBtn) {
-        if (latestUrl && latestUrl !== '#') {
+        if (latestUrl && latestUrl !== '#' && latestUrl !== 'javascript:void(0)') {
           openBtn.href = latestUrl;
         }
         openBtn.onclick = (e) => {
           e.preventDefault();
           const targetUrl = getGoogleSheetUrl();
-          if (targetUrl && targetUrl !== '#') {
+          if (targetUrl && targetUrl !== '#' && targetUrl !== 'javascript:void(0)') {
             window.open(targetUrl, '_blank');
           } else {
             toast('Fetching Google Sheet...', 'Connecting to your NGO Google Sheet...');
             fetchSheetsConfig().then(cfg => {
-              if (cfg && cfg.spreadsheetUrl) {
+              if (cfg && cfg.spreadsheetUrl && cfg.spreadsheetUrl !== '#') {
                 window.open(cfg.spreadsheetUrl, '_blank');
               } else {
-                toast('Google Sheet Not Found', 'Please connect Google Workspace in Settings to view your live Sheet.');
+                modal({
+                  title: 'Google Workspace Not Connected',
+                  body: `<div style="text-align:center; padding:16px 8px;">
+                  <div style="font-size:44px; margin-bottom:8px;">📊</div>
+                  <h3 style="color:var(--color-primary); margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
+                  <p style="font-size:13px; color:var(--color-text); margin:0 0 16px 0; line-height:1.5;">
+                    To view and open your live Google Sheet in real-time, please click <b>Connect Google Sheets Sync</b> once under <b>Settings</b>.
+                  </p>
+                </div>`,
+                  confirmText: 'Go to Settings',
+                  onConfirm: () => {
+                    overlay.remove();
+                    window.location.hash = '#/settings';
+                  }
+                });
               }
             });
           }
@@ -36649,7 +36663,7 @@
 
   function closeModal() { document.querySelector('#modal-root').replaceChildren(); }
 
-  function modal({ title, body, confirmText = 'Confirm', confirmClass = 'button--primary', onConfirm }) {
+  function modal$1({ title, body, confirmText = 'Confirm', confirmClass = 'button--primary', onConfirm }) {
     const root = document.querySelector('#modal-root');
     const safeTitle = escapeHTML$1(title);
     root.innerHTML = `<div class="modal-backdrop" role="presentation"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal__header"><div><h2 id="modal-title" class="modal__title">${safeTitle}</h2></div><button class="icon-button icon-button--small" type="button" aria-label="Close dialog" data-modal-close>${icon('x')}</button></header><div class="modal__body">${body}</div><footer class="modal__footer"><button class="button" type="button" data-modal-close>Cancel</button><button class="button ${confirmClass}" type="button" data-modal-confirm>${confirmText}</button></footer></section></div>`;
@@ -37194,7 +37208,7 @@
           toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
           window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
         } else if (res.errorCode === 'ACCESS_DENIED') {
-          modal({
+          modal$1({
             title: 'Access Denied',
             body: `<div style="text-align:center; padding:16px 8px;">
               <div style="font-size:44px; margin-bottom:8px;">🚫</div>
@@ -37409,7 +37423,7 @@
           <span>${col.label}</span>
         </label>
       `).join('');
-      modal({
+      modal$1({
         title: 'Configure columns',
         body: `<div style="display:flex; flex-direction:column; gap:4px; padding: 10px 0;">
           <p style="margin-bottom:12px; font-size:12px; color:var(--color-text-muted);">Toggle columns to customize your data table view.</p>
@@ -37432,7 +37446,7 @@
     if (target.matches('[data-delete]')) {
       const id = target.dataset.delete;
       const child = getChildren().find((item) => item.id === id);
-      modal({ title: `Remove ${child?.name || 'child'}?`, body: 'This removes the child record from this workspace. This action cannot be undone.', confirmText: 'Remove child', confirmClass: 'button--danger', onConfirm: () => { deleteChild(id); applyTableFilters(); toast('Child removed', 'The record has been removed from this workspace.'); } });
+      modal$1({ title: `Remove ${child?.name || 'child'}?`, body: 'This removes the child record from this workspace. This action cannot be undone.', confirmText: 'Remove child', confirmClass: 'button--danger', onConfirm: () => { deleteChild(id); applyTableFilters(); toast('Child removed', 'The record has been removed from this workspace.'); } });
     }
 
     if (target.matches('[data-edit]')) {
@@ -37466,7 +37480,7 @@
       const childId = uploadProfileBtn.dataset.uploadProfileDoc;
       const childName = uploadProfileBtn.dataset.childName || 'Child';
 
-      modal({
+      modal$1({
         title: `Upload Document for ${childName}`,
         body: `
         <form id="profile-doc-upload-form" class="form-layout" style="display:flex; flex-direction:column; gap:14px;">
@@ -37521,7 +37535,7 @@
       const docs = getUploadedDocs();
       const doc = docs[idx];
       if (doc) {
-        modal({
+        modal$1({
           title: `${doc.name} - ${doc.child || doc.student || '—'}`,
           body: doc.image
             ? `<div style="text-align:center; max-height: 70vh; overflow: auto;"><img src="${doc.image}" style="max-width:100%; max-height: 55vh; object-fit:contain; border-radius:6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>`
@@ -37703,7 +37717,7 @@
     // Delete emergency contact
     if (target.matches('[data-delete-contact]')) {
       const contactId = target.dataset.deleteContact;
-      modal({ title: 'Remove contact?', body: 'This will permanently remove this emergency contact.', confirmText: 'Remove', confirmClass: 'button--danger', onConfirm: () => { deleteEmergencyContact(contactId); toast('Contact removed', 'Emergency contact has been deleted.'); window.setTimeout(() => window.location.reload(), 500); } });
+      modal$1({ title: 'Remove contact?', body: 'This will permanently remove this emergency contact.', confirmText: 'Remove', confirmClass: 'button--danger', onConfirm: () => { deleteEmergencyContact(contactId); toast('Contact removed', 'Emergency contact has been deleted.'); window.setTimeout(() => window.location.reload(), 500); } });
     }
 
     // Dismiss health alert
@@ -37720,7 +37734,7 @@
       const selectedFilter = document.querySelector('[data-child-document-filter]')?.value || '';
       const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name} (${c.id})</option>`).join('');
 
-      modal({
+      modal$1({
         title: 'Upload Document for Child',
         body: `
           <form id="direct-doc-form" style="display:flex; flex-direction:column; gap:14px;">
@@ -37782,7 +37796,7 @@
     // Delete uploaded document
     if (target.closest('[data-delete-doc-idx]')) {
       const idx = parseInt(target.closest('[data-delete-doc-idx]').dataset.deleteDocIdx, 10);
-      modal({
+      modal$1({
         title: 'Delete Document?',
         body: 'Are you sure you want to delete this uploaded document?',
         confirmText: 'Delete',
@@ -38152,7 +38166,7 @@
           toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
           window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
         } else if (res.errorCode === 'ACCESS_DENIED') {
-          modal({
+          modal$1({
             title: 'Access Denied',
             body: `<div style="text-align:center; padding:16px 8px;">
               <div style="font-size:44px; margin-bottom:8px;">🚫</div>
@@ -38254,7 +38268,7 @@
               console.error('Live OCR failed:', err);
               localStorage.removeItem('ocr-parsed-data');
 
-              modal({
+              modal$1({
                 title: 'Extraction Failed',
                 body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
                 confirmText: 'Try Again',
