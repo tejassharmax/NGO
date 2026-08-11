@@ -800,25 +800,18 @@ export function settingsPage() {
   const session = getSession() || {};
   const ngoSlug = session.ngo || 'ayusha-nilayam';
   const sheetsConfig = getSheetsConfig() || {};
-  const docsConfig = getDocsConfig() || {};
-  const isConnected = !!(sheetsConfig.connected || docsConfig.connected);
-  const adminEmail = sheetsConfig.adminEmail || docsConfig.adminEmail || 'Admin';
+  const isConnected = !!sheetsConfig.connected;
+  const adminEmail = sheetsConfig.adminEmail || 'Admin';
   const sheetUrl = getGoogleSheetUrl();
-  const docUrl = getGoogleDocUrl();
 
-  const isDriveConnected = localStorage.getItem('google-drive-connected') === 'true';
-  const isCalendarConnected = localStorage.getItem('google-calendar-connected') === 'true';
-
-  return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Workspace service connections.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
+  return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
   <div class="settings-layout">
     <nav class="card settings-nav" aria-label="Settings sections">
       <button type="button" class="active">Google Workspace</button>
-      <button type="button">Platform Details</button>
-      <button type="button">Security</button>
     </nav>
     <section class="card settings-panel">
       <h2>Google Workspace Connections</h2>
-      <p class="muted">Connect or disconnect Google Cloud APIs, Drive Storage, Sheets Sync, and Calendar Services.</p>
+      <p class="muted">Manage real-time Google Sheets Live Synchronization for child health records.</p>
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
@@ -839,58 +832,33 @@ export function settingsPage() {
           <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active OCR Provider</button>
         </div>
 
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Gemini API</b>
-            <span class="badge badge--blue">Connected</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">AI medical report parsing & health trend summaries.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active AI Provider</button>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Drive</b>
-            ${isDriveConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Secure cloud document storage for child health records.</p>
-          <button class="button button--sm ${isDriveConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="drive" style="width: 100%; justify-content: center;">
-            ${isDriveConnected ? 'Disconnect Google Drive' : 'Connect Google Drive'}
-          </button>
-        </div>
-
-        <!-- Google Workspace OAuth (Sheets & Docs) Card -->
-        <div class="card" style="padding: 18px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: span 2;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <!-- Google Sheets Live Sync Highlight Card -->
+        <div class="card" style="padding: 20px; border: 2px solid #0F9D58; background: var(--color-bg); grid-column: 1 / -1; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 157, 88, 0.08);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <b style="font-size: 16px; font-weight: 700; color: #0F9D58; display: flex; align-items: center; gap: 10px;">
               ${icon('googleSheets')}
-              Google Workspace (Sheets & Docs)
+              Google Sheets Live Sync
             </b>
             ${isConnected ? `<span class="badge badge--success">Connected as ${escapeHTML(adminEmail)}</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
-          <p style="font-size: 12.5px; color: var(--color-text-muted); margin: 0 0 14px 0;">
+          <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
             ${isConnected 
-              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML(adminEmail)}). Your spreadsheets and executive audit documents are automatically created and owned by your Google account.`
-              : `Authorize your NGO Google Account once to enable automated, private Google Sheets & Docs synchronization. Created files are stored directly in your own Google Account.`
+              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheet.`
+              : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records are stored directly in your own Google Spreadsheet.`
             }
           </p>
 
-          <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
             ${!isConnected ? `
-              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: #0F9D58; border-color: #0F9D58;">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-                Connect Google Workspace
+                Connect Google Sheets Sync
               </a>
             ` : `
               ${sheetUrl ? `
-                <a href="${escapeHTML(sheetUrl)}" target="_blank" class="button button--secondary button--sm" style="font-weight: 600; color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
+                <a href="${escapeHTML(sheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
                   ${icon('googleSheets')}
-                  Open My Sheet ↗
-                </a>
-              ` : ''}
-              ${docUrl ? `
-                <a href="${escapeHTML(docUrl)}" target="_blank" class="button button--secondary button--sm" style="font-weight: 600; color: #1a73e8; text-decoration: none; display: inline-flex; align-items: center; gap: 6px;">
-                  Open Executive Doc ↗
+                  Open Live Google Sheet ↗
                 </a>
               ` : ''}
               <a href="/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; text-decoration: none; margin-left: auto;">
@@ -898,17 +866,6 @@ export function settingsPage() {
               </a>
             `}
           </div>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Calendar</b>
-            ${isCalendarConnected ? `<span class="badge badge--success">Connected</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Automated appointment & checkup reminder scheduling.</p>
-          <button class="button button--sm ${isCalendarConnected ? 'button--ghost' : 'button--primary'}" type="button" data-toggle-google-service="calendar" style="width: 100%; justify-content: center;">
-            ${isCalendarConnected ? 'Disconnect Google Calendar' : 'Connect Google Calendar'}
-          </button>
         </div>
       </div>
     </section>
