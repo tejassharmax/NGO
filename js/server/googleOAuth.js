@@ -222,17 +222,28 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
   const tableData = [headerRow, ...rows];
 
   // Clear existing range and write new rows
-  await sheets.spreadsheets.values.clear({
-    spreadsheetId: sheetId,
-    range: 'Sheet1!A1:Z5000'
-  });
+  try {
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId: sheetId,
+      range: 'Sheet1!A1:Z5000'
+    });
 
-  await sheets.spreadsheets.values.update({
-    spreadsheetId: sheetId,
-    range: 'Sheet1!A1',
-    valueInputOption: 'USER_ENTERED',
-    requestBody: { values: tableData }
-  });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: 'Sheet1!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: tableData }
+    });
+  } catch (syncErr) {
+    if (syncErr.code === 404 || syncErr.status === 404 || (syncErr.message && syncErr.message.toLowerCase().includes('not found'))) {
+      console.log(`[Google OAuth] Sheet ${sheetId} was removed from Google Drive. Re-creating master spreadsheet...`);
+      delete integration.sheetId;
+      delete integration.spreadsheetUrl;
+      saveNgoIntegration(safeSlug, integration);
+      return syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
+    }
+    throw syncErr;
+  }
 
   console.log(`[Google OAuth] Successfully synced ${rows.length} rows to Sheet (${sheetId}) for NGO ${safeSlug}`);
 
