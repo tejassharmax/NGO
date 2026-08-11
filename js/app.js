@@ -24,6 +24,8 @@ let page = 'dashboard';
 // ─── Authentication Guard & Async App Start ───
 (async () => {
   localStorage.removeItem('sample-students');
+  localStorage.setItem('chm-documents', '[]');
+  localStorage.setItem('chm-pending-docs', '[]');
   const isLoggedIn = isSessionActive();
 
   function getActivePage() {
