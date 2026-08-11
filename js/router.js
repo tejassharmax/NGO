@@ -806,7 +806,7 @@ export function settingsPage() {
 
   return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
   <div class="settings-layout">
-    <nav class="card settings-nav" aria-label="Settings sections">
+    <nav class="card settings-nav" aria-label="Settings sections" style="align-self: flex-start; height: fit-content; min-height: auto; padding: 12px;">
       <button type="button" class="active">Google Workspace</button>
     </nav>
     <section class="card settings-panel">
@@ -814,25 +814,7 @@ export function settingsPage() {
       <p class="muted">Manage real-time Google Sheets Live Synchronization for child health records.</p>
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Authentication</b>
-            <span class="badge badge--success">Connected</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">OAuth 2.0 GIS Authentication active. Firestore verified account.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active Account Provider</button>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Cloud Vision API</b>
-            <span class="badge badge--blue">Connected</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Medical document OCR extraction for blood reports, prescriptions & certificates.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active OCR Provider</button>
-        </div>
-
-        <!-- Google Sheets Live Sync Highlight Card -->
+        <!-- Google Sheets Live Sync Highlight Card (TOP) -->
         <div class="card" style="padding: 20px; border: 2px solid #0F9D58; background: var(--color-bg); grid-column: 1 / -1; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 157, 88, 0.08);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <b style="font-size: 16px; font-weight: 700; color: #0F9D58; display: flex; align-items: center; gap: 10px;">
@@ -866,6 +848,24 @@ export function settingsPage() {
               </a>
             `}
           </div>
+        </div>
+
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Google Authentication</b>
+            <span class="badge badge--success">Connected</span>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">OAuth 2.0 GIS Authentication active. Firestore verified account.</p>
+          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active Account Provider</button>
+        </div>
+
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Google Cloud Vision API</b>
+            <span class="badge badge--blue">Connected</span>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Medical document OCR extraction for blood reports, prescriptions & certificates.</p>
+          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active OCR Provider</button>
         </div>
       </div>
     </section>
