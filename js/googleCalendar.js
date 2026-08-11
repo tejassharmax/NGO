@@ -453,7 +453,7 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
 
       <!-- Footer buttons -->
       <div class="gcal-popup-footer">
-        <button class="gcal-popup-more-btn" type="button" data-close-cal-modal>More options</button>
+        <button class="gcal-popup-more-btn" type="button" data-toggle-cal-more>More options</button>
         <button class="gcal-popup-save-btn" type="submit">Save</button>
       </div>
     </form>`;
