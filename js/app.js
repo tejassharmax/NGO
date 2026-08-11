@@ -93,7 +93,7 @@ let page = 'dashboard';
 
 // Document Clicks
 document.addEventListener('click', (event) => {
-  const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
+  const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
   if (!target) return;
 
   if (target.matches('[data-topbar-back]')) {
@@ -315,6 +315,20 @@ document.addEventListener('click', (event) => {
     if (modalRoot) modalRoot.replaceChildren();
     const calModal = document.querySelector('#cal-booking-modal');
     if (calModal) calModal.remove();
+    return;
+  }
+
+  // "More options" toggle in calendar booking modal
+  if (target.closest('[data-toggle-cal-more]')) {
+    const notesRow = document.querySelector('.gcal-popup-row textarea[name="notes"]');
+    if (notesRow) {
+      const section = notesRow.closest('.gcal-popup-row');
+      if (section) {
+        const isHidden = section.style.display === 'none';
+        section.style.display = isHidden ? '' : 'none';
+        target.textContent = isHidden ? 'Fewer options' : 'More options';
+      }
+    }
     return;
   }
 
