@@ -481,7 +481,13 @@ function mergeJSONArrays(clientJSON, serverJSON) {
     }
   });
 
-  return JSON.stringify(Array.from(map.values()));
+  let result = Array.from(map.values());
+  if (result.length > 100 && result[0] && typeof result[0] === 'object' && result[0].timestamp && result[0].type) {
+    result.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    result = result.slice(0, 100);
+  }
+
+  return JSON.stringify(result);
 }
 
 // POST /api/sync - Merges and saves the database

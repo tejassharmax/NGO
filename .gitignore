@@ -38,3 +38,11 @@ DESIGN_SYSTEM.md
 
 # Backup directories
 orbit-original/
+
+# Scratch & test scripts
+scratch/
+remove appointments, emergency, exp.txt
+*.png
+!assets/**/*.png
+!google-logo.png
+
