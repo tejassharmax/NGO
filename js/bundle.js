@@ -33578,7 +33578,8 @@
   }
 
   function getChild(id) {
-    return getChildren().find(c => c.id === id) || getChildren()[0];
+    if (!id) return null;
+    return getChildren().find(c => c.id === id) || null;
   }
 
   /* ─── Activity Log ─── */
