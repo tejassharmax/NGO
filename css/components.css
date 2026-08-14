@@ -86,66 +86,85 @@ select.input, .select {
 .data-table th:last-child, .data-table td:last-child { padding-right: 24px; }
 
 /* ─── Drag Handle ─── */
-.drag-handle-th { width: 32px; min-width: 32px; max-width: 32px; padding: 0 4px 0 12px !important; }
-.drag-handle-cell { width: 32px; min-width: 32px; max-width: 32px; padding: 0 4px 0 12px !important; }
-.drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: #c4c8cd; cursor: grab; border-radius: 4px; transition: color 0.2s, background 0.2s, transform 0.15s; }
-.drag-handle:hover { color: #64748b; background: #f1f5f9; }
-.drag-handle:active { cursor: grabbing; color: #334155; transform: scale(1.15); }
+.drag-handle-th { width: 36px; min-width: 36px; max-width: 36px; padding: 0 4px 0 14px !important; }
+.drag-handle-cell { width: 36px; min-width: 36px; max-width: 36px; padding: 0 4px 0 14px !important; }
+.drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; color: #cbd5e1; cursor: grab; border-radius: 6px; transition: color 0.2s cubic-bezier(.2,.8,.32,1.2), background 0.2s, transform 0.2s cubic-bezier(.34,1.56,.64,1); }
+.drag-handle:hover { color: #6366f1; background: #eef2ff; transform: scale(1.1); }
+.drag-handle:active { cursor: grabbing; color: #4338ca; background: #e0e7ff; transform: scale(0.95); }
 .drag-handle svg { width: 16px; height: 16px; pointer-events: none; }
 
-/* ─── Apple-style Wiggle Animation ─── */
-@keyframes wiggle {
-  0%   { transform: rotate(0deg); }
-  20%  { transform: rotate(-1.2deg); }
-  40%  { transform: rotate(1.4deg); }
-  60%  { transform: rotate(-0.8deg); }
-  80%  { transform: rotate(1deg); }
-  100% { transform: rotate(0deg); }
+/* ─── Apple-style Organic Wiggle Animations ─── */
+@keyframes apple-wiggle-1 {
+  0%   { transform: rotate(0deg) translateY(0); }
+  25%  { transform: rotate(-1.4deg) translateY(-0.8px) scale(0.998); }
+  50%  { transform: rotate(1.6deg) translateY(0.6px) scale(1.002); }
+  75%  { transform: rotate(-0.9deg) translateY(-0.4px); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+
+@keyframes apple-wiggle-2 {
+  0%   { transform: rotate(0deg) translateY(0); }
+  25%  { transform: rotate(1.5deg) translateY(0.7px) scale(1.002); }
+  50%  { transform: rotate(-1.5deg) translateY(-0.7px) scale(0.998); }
+  75%  { transform: rotate(1.1deg) translateY(0.3px); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+
+@keyframes apple-wiggle-3 {
+  0%   { transform: rotate(0deg) translateY(0); }
+  30%  { transform: rotate(-1.6deg) translateY(-0.5px); }
+  65%  { transform: rotate(1.3deg) translateY(0.8px); }
+  100% { transform: rotate(0deg) translateY(0); }
 }
 
 /* Row being dragged */
 .data-table tbody tr.dragging {
-  opacity: 0.45;
-  background: #eef2ff;
-  transform: scale(0.98);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  opacity: 0.55;
+  background: rgba(238, 242, 255, 0.9) !important;
+  transform: scale(0.985) translateY(-2px);
+  box-shadow: 0 14px 30px -6px rgba(99, 102, 241, 0.22);
 }
 
 /* All sibling rows wiggle when a drag is active */
 .data-table tbody.drag-active tr:not(.dragging):not(.drag-settled) {
-  animation: wiggle 0.35s ease-in-out infinite;
+  animation: apple-wiggle-1 0.34s ease-in-out infinite;
 }
 .data-table tbody.drag-active tr:nth-child(even):not(.dragging):not(.drag-settled) {
-  animation-delay: 0.05s;
+  animation: apple-wiggle-2 0.36s ease-in-out infinite;
+  animation-delay: 0.04s;
 }
 .data-table tbody.drag-active tr:nth-child(3n):not(.dragging):not(.drag-settled) {
-  animation-delay: 0.1s;
+  animation: apple-wiggle-3 0.38s ease-in-out infinite;
+  animation-delay: 0.09s;
 }
 
-/* Drop target indicator */
+/* Glowing drop target indicators with gradient line */
 .data-table tbody tr.drag-over-top {
-  box-shadow: inset 0 3px 0 0 #6366f1;
+  box-shadow: inset 0 3px 0 0 #6366f1, 0 0 12px rgba(99, 102, 241, 0.4);
+  background: rgba(238, 242, 255, 0.5);
 }
 .data-table tbody tr.drag-over-bottom {
-  box-shadow: inset 0 -3px 0 0 #6366f1;
+  box-shadow: inset 0 -3px 0 0 #6366f1, 0 0 12px rgba(99, 102, 241, 0.4);
+  background: rgba(238, 242, 255, 0.5);
 }
 
-/* Settled state after drop — no wiggle, gentle spring back */
+/* Settled state after drop — Apple spring physics */
 .data-table tbody tr.drag-settled {
   animation: none !important;
-  transition: transform 0.4s cubic-bezier(.2,.8,.32,1.2), background 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.35s ease, box-shadow 0.35s ease;
   transform: scale(1);
 }
 .data-table tbody tr.drag-flash {
-  background: #eef2ff;
-  box-shadow: 0 0 0 2px rgba(99,102,241,0.25);
+  background: #eef2ff !important;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35), 0 4px 16px rgba(99, 102, 241, 0.15);
+  transition: background 0.6s ease, box-shadow 0.6s ease;
 }
 
 /* ─── Column Drag & Drop (Apple-style) ─── */
 .th-content {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   width: 100%;
   position: relative;
 }
@@ -153,7 +172,10 @@ select.input, .select {
   cursor: grab;
   user-select: none;
   position: relative;
-  transition: transform 0.25s cubic-bezier(.2,.8,.32,1.2), background 0.2s, box-shadow 0.2s, opacity 0.2s;
+  transition: transform 0.3s cubic-bezier(.34,1.56,.64,1), background 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+.col-draggable:hover {
+  background: #f8fafc;
 }
 .col-draggable:active {
   cursor: grabbing;
@@ -162,72 +184,89 @@ select.input, .select {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   color: #cbd5e1;
-  opacity: 0.5;
-  transition: opacity 0.2s, color 0.2s;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s, color 0.2s, background 0.2s, transform 0.2s cubic-bezier(.34,1.56,.64,1);
   flex-shrink: 0;
   margin-left: auto;
 }
 .col-draggable:hover .col-drag-grip {
   opacity: 1;
-  color: #64748b;
+  color: #6366f1;
+  background: rgba(99, 102, 241, 0.08);
+  transform: scale(1.1);
 }
 .col-drag-grip svg {
-  width: 13px;
-  height: 13px;
+  width: 14px;
+  height: 14px;
   pointer-events: none;
 }
 
-/* Apple-style Column Header Wiggle Animation */
-@keyframes col-wiggle {
+/* Apple-style Column Header Wiggle */
+@keyframes col-wiggle-1 {
   0%   { transform: rotate(0deg) translateY(0); }
-  25%  { transform: rotate(-1.5deg) translateY(-1px); }
+  25%  { transform: rotate(-1.6deg) translateY(-1px); }
   50%  { transform: rotate(1.8deg) translateY(1px); }
   75%  { transform: rotate(-1deg) translateY(-0.5px); }
   100% { transform: rotate(0deg) translateY(0); }
 }
 
+@keyframes col-wiggle-2 {
+  0%   { transform: rotate(0deg) translateY(0); }
+  25%  { transform: rotate(1.7deg) translateY(0.8px); }
+  50%  { transform: rotate(-1.4deg) translateY(-0.8px); }
+  75%  { transform: rotate(1.2deg) translateY(0.4px); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+
 /* When column drag is active, all draggable headers wiggle */
 .data-table.col-drag-active th.col-draggable:not(.col-dragging):not(.col-drag-settled) {
-  animation: col-wiggle 0.32s ease-in-out infinite;
+  animation: col-wiggle-1 0.32s ease-in-out infinite;
   background: #f8fafc;
 }
 .data-table.col-drag-active th.col-draggable:nth-child(even):not(.col-dragging):not(.col-drag-settled) {
-  animation-delay: 0.06s;
+  animation: col-wiggle-2 0.34s ease-in-out infinite;
+  animation-delay: 0.05s;
 }
 .data-table.col-drag-active th.col-draggable:nth-child(3n):not(.col-dragging):not(.col-drag-settled) {
-  animation-delay: 0.12s;
+  animation: col-wiggle-1 0.36s ease-in-out infinite;
+  animation-delay: 0.1s;
 }
 
-/* Dragged column header */
+/* Dragged column header & column cells */
 th.col-dragging {
-  opacity: 0.45;
+  opacity: 0.5;
   background: #eef2ff !important;
   transform: scale(0.96) !important;
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.22);
+}
+td.col-cells-dragging {
+  background: rgba(238, 242, 255, 0.4) !important;
 }
 
-/* Column drop indicators */
+/* Glowing column drop indicators */
 th.col-drag-over-left {
-  box-shadow: inset 3px 0 0 0 #6366f1;
+  box-shadow: inset 3px 0 0 0 #6366f1, 0 0 12px rgba(99, 102, 241, 0.45);
   background: #f1f5f9;
 }
 th.col-drag-over-right {
-  box-shadow: inset -3px 0 0 0 #6366f1;
+  box-shadow: inset -3px 0 0 0 #6366f1, 0 0 12px rgba(99, 102, 241, 0.45);
   background: #f1f5f9;
 }
 
-/* Settled state after column drop */
+/* Settled state after column drop — Apple spring physics */
 th.col-drag-settled, td.col-drag-settled {
   animation: none !important;
-  transition: transform 0.4s cubic-bezier(.2,.8,.32,1.2), background 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.35s ease, box-shadow 0.35s ease;
   transform: scale(1);
 }
 th.col-drag-flash, td.col-drag-flash {
   background: #eef2ff !important;
-  transition: background 0.6s ease;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  transition: background 0.6s ease, box-shadow 0.6s ease;
 }
 .sort-button { display: inline-flex; align-items: center; gap: 5px; padding: 0; color: inherit; background: none; border: 0; font: inherit; text-transform: inherit; }
 .sort-button svg { width: 14px; height: 14px; }

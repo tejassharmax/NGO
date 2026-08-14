@@ -422,8 +422,12 @@ document.addEventListener('click', (event) => {
     modal({
       title: 'Configure columns',
       body: `<div style="display:flex; flex-direction:column; gap:4px; padding: 10px 0;">
-          <p style="margin-bottom:12px; font-size:12px; color:var(--color-text-muted);">Toggle columns to customize your data table view.</p>
+          <p style="margin-bottom:12px; font-size:12px; color:var(--color-text-muted);">Toggle columns or reorder them by dragging column headers in the table.</p>
           ${formHTML}
+          <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--color-border); display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-size:11px; color:var(--color-text-muted);">Want default view?</span>
+            <button class="button button--ghost button--sm" type="button" id="btn-reset-columns-layout" style="font-size:12px; color:var(--color-primary);">Reset layout</button>
+          </div>
         </div>`,
       confirmText: 'Apply changes',
       onConfirm: () => {
@@ -437,6 +441,17 @@ document.addEventListener('click', (event) => {
         toast('View updated', 'Your custom columns have been applied.');
       }
     });
+
+    // Handle reset layout button inside modal
+    setTimeout(() => {
+      document.querySelector('#btn-reset-columns-layout')?.addEventListener('click', () => {
+        localStorage.removeItem('chm-col-order');
+        localStorage.removeItem('chm-col-visibility');
+        closeModal();
+        renderCurrentPage();
+        toast('Layout reset', 'Default column order and visibility restored.');
+      });
+    }, 50);
   }
 
   if (target.matches('[data-delete]')) {
@@ -899,7 +914,6 @@ function initDragReorder() {
   tbody.addEventListener('dragstart', (e) => {
     const tr = e.target.closest('tr[draggable]');
     if (!tr) return;
-    // Only allow drag from the handle
     const handle = e.target.closest('.drag-handle');
     if (!handle) { e.preventDefault(); return; }
 
@@ -909,7 +923,6 @@ function initDragReorder() {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', tr.dataset.childId);
 
-    // Use the row itself as the drag image
     try {
       const rect = tr.getBoundingClientRect();
       e.dataTransfer.setDragImage(tr, e.clientX - rect.left, e.clientY - rect.top);
@@ -922,12 +935,10 @@ function initDragReorder() {
     const tr = e.target.closest('tr[draggable]');
     if (!tr || tr === dragRow) return;
 
-    // Clear previous indicators
     tbody.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
       el.classList.remove('drag-over-top', 'drag-over-bottom');
     });
 
-    // Determine if cursor is in the top or bottom half of the row
     const rect = tr.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     if (e.clientY < midY) {
@@ -949,7 +960,6 @@ function initDragReorder() {
     const targetTr = e.target.closest('tr[draggable]');
     if (!targetTr || !dragRow || targetTr === dragRow) return;
 
-    // Determine insertion position
     const rect = targetTr.getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     const insertBefore = e.clientY < midY;
@@ -968,20 +978,21 @@ function initDragReorder() {
     // Flash the moved row
     dragRow.classList.add('drag-flash');
     setTimeout(() => dragRow.classList.remove('drag-flash'), 600);
+
+    toast('Row position updated', 'Saved child record order.');
+    syncWithServer().catch(() => {});
   });
 
   tbody.addEventListener('dragend', () => {
     if (dragRow) {
       dragRow.classList.remove('dragging');
     }
-    // Settle all rows: stop wiggle with a spring-back
     tbody.querySelectorAll('tr').forEach(tr => {
       tr.classList.remove('drag-over-top', 'drag-over-bottom');
       tr.classList.add('drag-settled');
     });
     tbody.classList.remove('drag-active');
 
-    // Remove settled class after animation completes
     setTimeout(() => {
       tbody.querySelectorAll('.drag-settled').forEach(tr => {
         tr.classList.remove('drag-settled');
@@ -1017,6 +1028,11 @@ function initColumnDragReorder() {
     table.classList.add('col-drag-active');
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', draggedColId);
+
+    // Soft highlight on all data cells in this column
+    tbody.querySelectorAll(`td[data-column="${draggedColId}"]`).forEach(td => {
+      td.classList.add('col-cells-dragging');
+    });
 
     try {
       e.dataTransfer.setDragImage(th, th.offsetWidth / 2, th.offsetHeight / 2);
@@ -1094,12 +1110,16 @@ function initColumnDragReorder() {
 
     applyColumnVisibility();
     enableColumnResize();
+    toast('Columns rearranged', 'Saved custom column layout.');
   });
 
   thead.addEventListener('dragend', () => {
     if (dragColTh) {
       dragColTh.classList.remove('col-dragging');
     }
+    tbody.querySelectorAll('.col-cells-dragging').forEach(td => {
+      td.classList.remove('col-cells-dragging');
+    });
     thead.querySelectorAll('th').forEach(th => {
       th.classList.remove('col-drag-over-left', 'col-drag-over-right');
       th.classList.add('col-drag-settled');
