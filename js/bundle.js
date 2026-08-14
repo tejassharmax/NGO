@@ -34032,16 +34032,63 @@
     }
   };
 
+  const DEFAULT_COLUMN_ORDER = ['child', 'age', 'gender', 'blood', 'status'];
+
+  function getColumnOrder() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('chm-col-order'));
+      if (Array.isArray(saved) && saved.length === DEFAULT_COLUMN_ORDER.length && DEFAULT_COLUMN_ORDER.every(c => saved.includes(c))) {
+        return saved;
+      }
+    } catch (_) {}
+    return [...DEFAULT_COLUMN_ORDER];
+  }
+
+  function setColumnOrder(order) {
+    localStorage.setItem('chm-col-order', JSON.stringify(order));
+  }
+
+  function childTableHeaders() {
+    const order = getColumnOrder();
+    const headerMap = {
+      child: `<th data-resizable data-column="child" class="col-draggable" draggable="true" title="Drag to reorder column"><div class="th-content"><button class="sort-button" type="button" data-sort="name">Child ${icon('chevronDown')}</button><span class="col-drag-grip" title="Drag column">${icon('gripVertical')}</span></div></th>`,
+      age: `<th data-resizable data-column="age" class="col-draggable" draggable="true" title="Drag to reorder column"><div class="th-content"><span>Age</span><span class="col-drag-grip" title="Drag column">${icon('gripVertical')}</span></div></th>`,
+      gender: `<th class="hide-tablet col-draggable" data-column="gender" draggable="true" title="Drag to reorder column"><div class="th-content"><span>Gender</span><span class="col-drag-grip" title="Drag column">${icon('gripVertical')}</span></div></th>`,
+      blood: `<th class="hide-tablet col-draggable" data-column="blood" draggable="true" title="Drag to reorder column"><div class="th-content"><span>Blood group</span><span class="col-drag-grip" title="Drag column">${icon('gripVertical')}</span></div></th>`,
+      status: `<th data-column="status" class="col-draggable" draggable="true" title="Drag to reorder column"><div class="th-content"><span>Status</span><span class="col-drag-grip" title="Drag column">${icon('gripVertical')}</span></div></th>`
+    };
+
+    const dynamicHeaders = order.map(col => headerMap[col] || '').join('');
+    return `<tr>
+    <th class="drag-handle-th"><span class="sr-only">Reorder</span></th>
+    <th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th>
+    ${dynamicHeaders}
+    <th><span class="sr-only">Actions</span></th>
+  </tr>`;
+  }
+
   function childRows(children) {
     if (!children.length) return `<tr><td colspan="8"><div class="empty-state"><span class="empty-state__icon">${icon('users')}</span><h3>No children found</h3><p>Try changing your search or register a new child.</p></div></td></tr>`;
+    
+    const order = getColumnOrder();
     return children.map((child, index) => {
       const hs = healthStatus(child);
       const age = calculateAge(child.dob);
+
+      const cellMap = {
+        child: `<td data-column="child"><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name" style="display:inline-flex; align-items:center; gap:6px;">${child.name}<button class="icon-button icon-button--small tooltip" data-tooltip="Open in Google Sheets" type="button" aria-label="Open ${child.name}'s Google Sheet" data-open-child-sheet="${child.id}" data-child-name="${child.name}" style="width:22px; height:22px; min-width:22px; padding:2px; border:none; background:transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.85; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">${icon('googleSheets')}</button></span><span class="table-person__id">${child.id}</span></div></a></td>`,
+        age: `<td data-column="age">${age || '—'}</td>`,
+        gender: `<td class="hide-tablet" data-column="gender">${child.gender || '—'}</td>`,
+        blood: `<td class="hide-tablet" data-column="blood">${child.blood || '—'}</td>`,
+        status: `<td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>`
+      };
+
+      const dynamicCells = order.map(col => cellMap[col] || '').join('');
+
       return `<tr draggable="true" data-child-id="${child.id}" data-index="${index}">
     <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">${icon('gripVertical')}</span></td>
     <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
-    <td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name" style="display:inline-flex; align-items:center; gap:6px;">${child.name}<button class="icon-button icon-button--small tooltip" data-tooltip="Open in Google Sheets" type="button" aria-label="Open ${child.name}'s Google Sheet" data-open-child-sheet="${child.id}" data-child-name="${child.name}" style="width:22px; height:22px; min-width:22px; padding:2px; border:none; background:transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.85; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">${icon('googleSheets')}</button></span><span class="table-person__id">${child.id}</span></div></a></td>
-    <td data-column="age">${age || '—'}</td><td class="hide-tablet" data-column="gender">${child.gender || '—'}</td><td class="hide-tablet" data-column="blood">${child.blood || '—'}</td><td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>
+    ${dynamicCells}
     <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
   </tr>`;
     }).join('');
@@ -35993,7 +36040,7 @@
     const paginated = children.slice(0, itemsPerPage);
 
     return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
-  <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead><tr><th class="drag-handle-th"><span class="sr-only">Reorder</span></th><th><label class="checkbox"><input id="select-all" type="checkbox" aria-label="Select all children"><span class="sr-only">Select all</span></label></th><th data-resizable><button class="sort-button" type="button" data-sort="name">Child ${icon('chevronDown')}</button></th><th data-resizable data-column="age">Age</th><th class="hide-tablet" data-column="gender">Gender</th><th class="hide-tablet" data-column="blood">Blood group</th><th data-column="status">Status</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
+  <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead>${childTableHeaders()}</thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -37344,7 +37391,10 @@
         applyColumnVisibility();
         initFormListeners();
         initOCRProcessing();
-        if (page === 'children') initDragReorder();
+        if (page === 'children') {
+          initDragReorder();
+          initColumnDragReorder();
+        }
       }
 
       if (page === 'dashboard' || page === 'reports') {
@@ -38236,6 +38286,131 @@
       }, 500);
 
       dragRow = null;
+    });
+  }
+
+  // ─── Drag-and-Drop Column Reorder (Apple-style) ───
+  function initColumnDragReorder() {
+    const table = document.querySelector('.data-table');
+    if (!table) return;
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('#child-table-body');
+    if (!thead || !tbody) return;
+
+    let dragColTh = null;
+    let draggedColId = null;
+
+    thead.addEventListener('dragstart', (e) => {
+      if (e.target.closest('.column-resizer')) {
+        e.preventDefault();
+        return;
+      }
+      const th = e.target.closest('th.col-draggable');
+      if (!th) return;
+
+      dragColTh = th;
+      draggedColId = th.dataset.column;
+      th.classList.add('col-dragging');
+      table.classList.add('col-drag-active');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedColId);
+
+      try {
+        e.dataTransfer.setDragImage(th, th.offsetWidth / 2, th.offsetHeight / 2);
+      } catch (_) {}
+    });
+
+    thead.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      const targetTh = e.target.closest('th.col-draggable');
+      if (!targetTh || targetTh === dragColTh) return;
+
+      thead.querySelectorAll('.col-drag-over-left, .col-drag-over-right').forEach(el => {
+        el.classList.remove('col-drag-over-left', 'col-drag-over-right');
+      });
+
+      const rect = targetTh.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      if (e.clientX < midX) {
+        targetTh.classList.add('col-drag-over-left');
+      } else {
+        targetTh.classList.add('col-drag-over-right');
+      }
+    });
+
+    thead.addEventListener('dragleave', (e) => {
+      const targetTh = e.target.closest('th.col-draggable');
+      if (targetTh) {
+        targetTh.classList.remove('col-drag-over-left', 'col-drag-over-right');
+      }
+    });
+
+    thead.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const targetTh = e.target.closest('th.col-draggable');
+      if (!targetTh || !dragColTh || targetTh === dragColTh) return;
+
+      const rect = targetTh.getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      const insertBefore = e.clientX < midX;
+
+      const theadRow = thead.querySelector('tr');
+      if (insertBefore) {
+        theadRow.insertBefore(dragColTh, targetTh);
+      } else {
+        theadRow.insertBefore(dragColTh, targetTh.nextSibling);
+      }
+
+      const targetColId = targetTh.dataset.column;
+      tbody.querySelectorAll('tr').forEach(row => {
+        const draggedTd = row.querySelector(`td[data-column="${draggedColId}"]`);
+        const targetTd = row.querySelector(`td[data-column="${targetColId}"]`);
+        if (draggedTd && targetTd) {
+          if (insertBefore) {
+            row.insertBefore(draggedTd, targetTd);
+          } else {
+            row.insertBefore(draggedTd, targetTd.nextSibling);
+          }
+        }
+      });
+
+      const newOrder = Array.from(thead.querySelectorAll('th[data-column]'))
+        .map(th => th.dataset.column);
+      setColumnOrder(newOrder);
+
+      dragColTh.classList.add('col-drag-flash');
+      tbody.querySelectorAll(`td[data-column="${draggedColId}"]`).forEach(td => {
+        td.classList.add('col-drag-flash');
+      });
+
+      setTimeout(() => {
+        dragColTh?.classList.remove('col-drag-flash');
+        tbody.querySelectorAll('.col-drag-flash').forEach(td => td.classList.remove('col-drag-flash'));
+      }, 600);
+
+      applyColumnVisibility();
+      enableColumnResize();
+    });
+
+    thead.addEventListener('dragend', () => {
+      if (dragColTh) {
+        dragColTh.classList.remove('col-dragging');
+      }
+      thead.querySelectorAll('th').forEach(th => {
+        th.classList.remove('col-drag-over-left', 'col-drag-over-right');
+        th.classList.add('col-drag-settled');
+      });
+      table.classList.remove('col-drag-active');
+
+      setTimeout(() => {
+        thead.querySelectorAll('.col-drag-settled').forEach(th => {
+          th.classList.remove('col-drag-settled');
+        });
+      }, 500);
+
+      dragColTh = null;
+      draggedColId = null;
     });
   }
 
