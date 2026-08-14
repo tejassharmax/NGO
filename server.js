@@ -411,7 +411,7 @@ app.all('/api/google/disconnect', requireAuth, (req, res) => {
 });
 
 // GET /api/sheets/config?ngo=...
-app.get('/api/sheets/config', requireAuth, async (req, res) => {
+app.get('/api/sheets/config', async (req, res) => {
   const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
   const integration = getNgoIntegration(ngoSlug);
   const connected = !!(integration && integration.refresh_token);
@@ -443,7 +443,7 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
 });
 
 // POST /api/sheets/sync
-app.post('/api/sheets/sync', requireAuth, async (req, res) => {
+app.post('/api/sheets/sync', async (req, res) => {
   try {
     const { children, ngo, ngoName } = req.body || {};
     const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
@@ -456,7 +456,7 @@ app.post('/api/sheets/sync', requireAuth, async (req, res) => {
 });
 
 // GET /api/docs/config?ngo=...
-app.get('/api/docs/config', requireAuth, (req, res) => {
+app.get('/api/docs/config', (req, res) => {
   const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
   const integration = getNgoIntegration(ngoSlug);
   const connected = !!(integration && integration.refresh_token);
