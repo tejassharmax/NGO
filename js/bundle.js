@@ -35633,7 +35633,7 @@
 
   const nav = [
     { section: 'Overview', items: [['dashboard', 'Dashboard', 'grid']] },
-    { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['medicines', 'Medicines', 'pill'], ['documents', 'Documents', 'file']] },
+    { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['medicines', 'Prescriptions', 'pill'], ['documents', 'Documents', 'file']] },
     { section: 'Analytics', items: [['reports', 'Reports', 'chart']] }
   ];
 
@@ -35763,7 +35763,7 @@
     ${statCard('Total Children', totalChildren.toLocaleString(), 'Active records', 'users', 'blue')}
     ${statCard('Recent Health Reports', healthReportsCount.toLocaleString(), 'Lab test panels', 'heartPulse', 'green')}
     ${statCard('Growth Records', growthCount.toLocaleString(), 'Vitals logged', 'ruler', 'amber')}
-    ${statCard('Medicine Records', medicinesCount.toLocaleString(), 'Active prescriptions', 'pill', 'violet')}
+    ${statCard('Prescriptions', medicinesCount.toLocaleString(), 'Active prescriptions', 'pill', 'violet')}
     ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'Google Drive Storage', 'file', 'blue')}
     ${statCard('Last Checkup', 'Today', '10:30 AM verified', 'clock', 'green')}
   </div>
@@ -35960,7 +35960,7 @@
       <div class="tabs" role="tablist">
         <button class="tab tab--active" type="button" data-profile-tab="overview">Overview</button>
         <button class="tab" type="button" data-profile-tab="growth">Growth</button>
-        <button class="tab" type="button" data-profile-tab="medicines">Medicines</button>
+        <button class="tab" type="button" data-profile-tab="medicines">Prescriptions</button>
         <button class="tab" type="button" data-profile-tab="reports">Reports</button>
         <button class="tab" type="button" data-profile-tab="documents">Documents (${docs.length})</button>
         <button class="tab" type="button" data-profile-tab="timeline">Health Timeline</button>
@@ -36031,7 +36031,7 @@
     <div data-tab-panel="medicines" style="display: none;">
       <section class="card">
         <header class="card__header">
-          <div><h2 class="card__title">Prescriptions & Medicines</h2><p class="card__caption">Prescribed treatments and active prescriptions</p></div>
+          <div><h2 class="card__title">Prescriptions</h2><p class="card__caption">Prescribed treatments and active prescriptions</p></div>
         </header>
         <div class="card__body">
           ${medsHTML}
@@ -36280,7 +36280,7 @@
 
     const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 
-    return shell('medicines', `${heading('Medicine management', 'Track all prescriptions given to children.', `<button class="button button--primary" type="submit" form="medicine-form">${icon('plus')}Add prescription</button>`)}
+    return shell('medicines', `${heading('Prescriptions', 'Track all prescriptions given to children.', `<button class="button button--primary" type="submit" form="medicine-form">${icon('plus')}Add prescription</button>`)}
   <div class="stat-grid" style="margin-bottom:24px">${statCard('Active prescriptions', activeMeds.length.toLocaleString(), activeMeds.length > 0 ? 'Ongoing' : 'None', 'pill', 'blue')}${statCard('Completed', completedMeds.length.toLocaleString(), completedMeds.length > 0 ? 'Finished' : 'None', 'check', 'green')}</div>
   <div class="form-layout">
     <div style="display: flex; flex-direction: column; gap: 24px;">
