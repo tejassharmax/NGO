@@ -35946,19 +35946,13 @@
     return 'Good evening, Admin';
   }
 
-  const statCard = (label, value, trend, glyph, color = 'blue') => `
+  const statCard = (label, value, glyph, color = 'blue') => `
   <article class="stat-card stat-card--${color}">
     <div class="stat-card__top">
       <span class="stat-card__label" title="${escapeHTML$1(label)}">${label}</span>
       <span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span>
     </div>
-    <div class="stat-card__bottom">
-      <div class="stat-card__number">${value}</div>
-      <span class="stat-pill stat-pill--${color}">
-        <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
-        ${trend}
-      </span>
-    </div>
+    <div class="stat-card__number">${value}</div>
   </article>
 `;
 
@@ -35998,11 +35992,11 @@
 
     return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <div class="stat-grid">
-    ${statCard('Total Children', totalChildren.toLocaleString(), 'Active records', 'users', 'blue')}
-    ${statCard('Growth Records', growthCount.toLocaleString(), 'Vitals logged', 'ruler', 'amber')}
-    ${statCard('Prescriptions', medicinesCount.toLocaleString(), 'Active prescriptions', 'pill', 'violet')}
-    ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'Google Drive', 'file', 'cyan')}
-    ${statCard('Last Checkup', 'Today', '10:30 AM verified', 'clock', 'rose')}
+    ${statCard('Total Children', totalChildren.toLocaleString(), 'users', 'blue')}
+    ${statCard('Growth Records', growthCount.toLocaleString(), 'ruler', 'amber')}
+    ${statCard('Prescriptions', medicinesCount.toLocaleString(), 'pill', 'violet')}
+    ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'file', 'cyan')}
+    ${statCard('Last Checkup', 'Today', 'clock', 'rose')}
   </div>
   <div style="margin-top: 20px;">
     ${calendarCard()}
@@ -36518,7 +36512,7 @@
     const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 
     return shell('medicines', `${heading('Prescriptions', 'Track all prescriptions given to children.', `<button class="button button--primary" type="submit" form="medicine-form">${icon('plus')}Add prescription</button>`)}
-  <div class="stat-grid" style="margin-bottom:24px">${statCard('Active prescriptions', activeMeds.length.toLocaleString(), activeMeds.length > 0 ? 'Ongoing' : 'None', 'pill', 'blue')}${statCard('Completed', completedMeds.length.toLocaleString(), completedMeds.length > 0 ? 'Finished' : 'None', 'check', 'green')}</div>
+  <div class="stat-grid" style="margin-bottom:24px">${statCard('Active prescriptions', activeMeds.length.toLocaleString(), activeMeds.length > 0 ? 'Ongoing' : 'None', 'pill')}${statCard('Completed', completedMeds.length.toLocaleString(), completedMeds.length > 0 ? 'Finished' : 'None', 'check')}</div>
   <div class="form-layout">
     <div style="display: flex; flex-direction: column; gap: 24px;">
       <form class="card" id="medicine-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">New prescription</h2></div><div class="form-grid--two"><label class="field"><span class="field__label">Child *</span><select class="select" name="childId" required><option value="">Select child</option>${childOptions}</select></label>${field('Medicine name *', 'medicineName', 'e.g. Amoxicillin', 'text')}${field('Dosage *', 'dosage', 'e.g. 250mg twice daily', 'text')}${field('Frequency', 'frequency', 'e.g. Every 8 hours', 'text')}${field('Start date *', 'startDate', '', 'date', '', new Date().toISOString().slice(0, 10))}${field('End date *', 'endDate', '', 'date')}</div></section></form>
@@ -36806,9 +36800,9 @@
 
     return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}View Children</a>`)}
   <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
-    ${statCard('Total Appointments', appointments.length.toLocaleString(), 'All records', 'calendar', 'blue')}
-    ${statCard('Upcoming', upcomingCount.toLocaleString(), 'Scheduled visits', 'clock', 'amber')}
-    ${statCard('Completed', completedCount.toLocaleString(), 'Past appointments', 'check', 'green')}
+    ${statCard('Total Appointments', appointments.length.toLocaleString(), 'calendar', 'blue')}
+    ${statCard('Upcoming', upcomingCount.toLocaleString(), 'clock', 'amber')}
+    ${statCard('Completed', completedCount.toLocaleString(), 'check', 'green')}
   </div>
   ${calendarCard()}
   <div style="margin-top: 20px;">
