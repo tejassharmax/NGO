@@ -35946,7 +35946,21 @@
     return 'Good evening, Admin';
   }
 
-  const statCard = (label, value, trend, glyph, color) => `<article class="card stat-card card--interactive"><div class="stat-card__top"><span class="stat-card__label">${label}</span><span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span></div><div class="stat-card__number">${value}</div><div class="stat-card__footer"><span class="trend--up">${icon('arrowUp')} ${trend}</span></div></article>`;
+  const statCard = (label, value, trend, glyph, color = 'blue') => `
+  <article class="stat-card stat-card--${color}">
+    <div class="stat-card__top">
+      <span class="stat-card__label">${label}</span>
+      <span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span>
+    </div>
+    <div class="stat-card__number">${value}</div>
+    <div class="stat-card__footer">
+      <span class="stat-pill stat-pill--${color}">
+        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+        ${trend}
+      </span>
+    </div>
+  </article>
+`;
 
   const field = (label, name, placeholder, type = 'text', hint = '', value = '', extra = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML$1(value)}" ${extra}>${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
 
@@ -35984,13 +35998,13 @@
     }
 
     return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
-  <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+  <div class="stat-grid">
     ${statCard('Total Children', totalChildren.toLocaleString(), 'Active records', 'users', 'blue')}
     ${statCard('Recent Health Reports', healthReportsCount.toLocaleString(), 'Lab test panels', 'heartPulse', 'green')}
     ${statCard('Growth Records', growthCount.toLocaleString(), 'Vitals logged', 'ruler', 'amber')}
     ${statCard('Prescriptions', medicinesCount.toLocaleString(), 'Active prescriptions', 'pill', 'violet')}
-    ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'Google Drive Storage', 'file', 'blue')}
-    ${statCard('Last Checkup', 'Today', '10:30 AM verified', 'clock', 'green')}
+    ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'Google Drive', 'file', 'cyan')}
+    ${statCard('Last Checkup', 'Today', '10:30 AM verified', 'clock', 'rose')}
   </div>
   <div style="margin-top: 20px;">
     ${calendarCard()}
