@@ -37265,8 +37265,35 @@
 
   (async () => {
     localStorage.removeItem('sample-students');
+    localStorage.removeItem('sample-children');
     localStorage.setItem('chm-documents', '[]');
     localStorage.setItem('chm-pending-docs', '[]');
+
+    // Purge legacy preset mock data completely
+    const MOCK_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Unnamed Child'];
+    const MOCK_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-1001', 'CH-1002', 'CH-1461'];
+
+    try {
+      const rawKids = localStorage.getItem('chm-children');
+      if (rawKids) {
+        const kids = JSON.parse(rawKids);
+        const cleanKids = (kids || []).filter(k => k && !MOCK_NAMES.includes(k.name) && !MOCK_IDS.includes(k.id));
+        localStorage.setItem('chm-children', JSON.stringify(cleanKids));
+      }
+    } catch (e) {}
+
+    ['chm-growth', 'chm-appointments', 'chm-medicines', 'chm-alerts', 'chm-health-records', 'chm-activity', 'chm-nutrition', 'chm-expenses'].forEach(key => {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            const clean = arr.filter(item => item && !MOCK_IDS.includes(item.childId) && !MOCK_NAMES.includes(item.childName || item.subject));
+            localStorage.setItem(key, JSON.stringify(clean));
+          }
+        }
+      } catch (e) {}
+    });
 
     function getActivePage() {
       const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
