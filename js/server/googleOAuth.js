@@ -277,9 +277,9 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
   let sheetId = integration.sheetId;
   const displayName = ngoName || safeSlug.replace(/-/g, ' ');
 
-  // Create Google Spreadsheet if not already created
+  // 1. File 1: Master Directory Spreadsheet ("Ayusha Nilayam — Child Health Records")
   if (!sheetId) {
-    console.log(`[Google OAuth] Creating Google Spreadsheet for NGO (${safeSlug})...`);
+    console.log(`[Google OAuth] Creating Master Google Spreadsheet for NGO (${safeSlug})...`);
     const createRes = await sheets.spreadsheets.create({
       requestBody: {
         properties: {
@@ -291,7 +291,35 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     integration.sheetId = sheetId;
     integration.spreadsheetUrl = createRes.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
     saveNgoIntegration(safeSlug, integration);
-    console.log(`[Google OAuth] Created Spreadsheet: ${integration.spreadsheetUrl}`);
+    console.log(`[Google OAuth] Created Master Spreadsheet: ${integration.spreadsheetUrl}`);
+  }
+
+  const cleanChildren = (children || []).filter(Boolean);
+
+  // 2. File 2: Dedicated Student Medical Records Spreadsheet (ONLY Child Tabs: VINAY, KALYAN, etc.)
+  let clinicalSheetId = integration.clinicalSheetId;
+  if (!clinicalSheetId) {
+    console.log(`[Google OAuth] Creating Student Medical Records Spreadsheet for NGO (${safeSlug})...`);
+    const firstTabTitle = cleanChildren.length > 0 ? sanitizeSheetTitle(cleanChildren[0].name) : 'Student Records';
+    const createRes = await sheets.spreadsheets.create({
+      requestBody: {
+        properties: {
+          title: `${displayName} — Student Medical Records`
+        },
+        sheets: [
+          {
+            properties: {
+              title: firstTabTitle
+            }
+          }
+        ]
+      }
+    });
+    clinicalSheetId = createRes.data.spreadsheetId;
+    integration.clinicalSheetId = clinicalSheetId;
+    integration.clinicalSpreadsheetUrl = createRes.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${clinicalSheetId}/edit`;
+    saveNgoIntegration(safeSlug, integration);
+    console.log(`[Google OAuth] Created Student Medical Records Spreadsheet: ${integration.clinicalSpreadsheetUrl}`);
   }
 
   // Load auxiliary data (growth, medicines, health records) from server DB
@@ -308,9 +336,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     } catch (e) {}
   }
 
-  const cleanChildren = (children || []).filter(Boolean);
-
-  // Master Overview header and rows
+  // Master Directory header and rows
   const overviewHeaders = [
     'ID', 'Child Name', 'Date of Birth', 'Age', 'Gender', 'Blood Group',
     'Aadhaar ID', 'Guardian', 'Contact Phone', 'Height (cm)', 'Weight (kg)',
@@ -341,127 +367,136 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
 
   const masterTableData = [overviewHeaders, ...overviewRows];
 
+  // A. Sync File 1: Master Directory Spreadsheet
   try {
-    // 1. Fetch spreadsheet metadata to check existing sheets/tabs
-    const metaRes = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
-    const existingSheets = metaRes.data.sheets || [];
-    const sheetMap = new Map();
-    existingSheets.forEach(s => sheetMap.set(s.properties.title, s.properties.sheetId));
-
-    const batchRequests = [];
-    let overviewSheetTitle = 'Master Overview';
-
-    // If 'Sheet1' is present, rename it to 'Master Overview'
-    if (sheetMap.has('Sheet1') && !sheetMap.has('Master Overview')) {
-      const sheet1Id = sheetMap.get('Sheet1');
-      batchRequests.push({
-        updateSheetProperties: {
-          properties: { sheetId: sheet1Id, title: 'Master Overview' },
-          fields: 'title'
-        }
-      });
-      sheetMap.set('Master Overview', sheet1Id);
-      sheetMap.delete('Sheet1');
-    } else if (!sheetMap.has('Master Overview') && !sheetMap.has('Sheet1')) {
-      batchRequests.push({
-        addSheet: { properties: { title: 'Master Overview' } }
-      });
-    }
-
-    // 2. Add individual child sheet tabs if missing
-    cleanChildren.forEach(c => {
-      const childTabTitle = sanitizeSheetTitle(c.name);
-      if (!sheetMap.has(childTabTitle)) {
-        batchRequests.push({
-          addSheet: { properties: { title: childTabTitle } }
-        });
-      }
-    });
-
-    // Execute structural batch update for new tabs
-    if (batchRequests.length > 0) {
-      const batchRes = await sheets.spreadsheets.batchUpdate({
-        spreadsheetId: sheetId,
-        requestBody: { requests: batchRequests }
-      });
-      
-      // Update sheetMap with newly created sheetIds (gids)
-      if (batchRes.data.replies) {
-        batchRes.data.replies.forEach(reply => {
-          if (reply.addSheet?.properties) {
-            sheetMap.set(reply.addSheet.properties.title, reply.addSheet.properties.sheetId);
-          }
-        });
-      }
-    }
-
-    // Map child IDs and names to their tab gids
-    const childSheetGids = {};
-    if (sheetMap.has('Master Overview')) {
-      childSheetGids['master'] = sheetMap.get('Master Overview');
-    }
-
-    // 3. Prepare data updates for Master Overview and all Child tabs
-    const dataUpdates = [
-      {
-        range: `'Master Overview'!A1`,
-        values: masterTableData
-      }
-    ];
-
-    cleanChildren.forEach(c => {
-      const childTabTitle = sanitizeSheetTitle(c.name);
-      const gid = sheetMap.get(childTabTitle);
-      if (gid !== undefined) {
-        childSheetGids[c.id] = gid;
-        childSheetGids[c.name] = gid;
-      }
-
-      const childGrowth = allGrowth.filter(g => g.childId === c.id || (g.childName && g.childName.toLowerCase() === (c.name || '').toLowerCase()));
-      const childMeds = allMedicines.filter(m => m.childId === c.id || (m.childName && m.childName.toLowerCase() === (c.name || '').toLowerCase()));
-      const childHealthRecs = allHealthRecords.filter(h => h.childId === c.id || (h.childName && h.childName.toLowerCase() === (c.name || '').toLowerCase()));
-
-      const childSheetData = buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName);
-      dataUpdates.push({
-        range: `'${childTabTitle}'!A1`,
-        values: childSheetData
-      });
-    });
-
-    // 4. Batch update all data in one efficient call
-    await sheets.spreadsheets.values.batchUpdate({
+    await sheets.spreadsheets.values.clear({
       spreadsheetId: sheetId,
-      requestBody: {
-        valueInputOption: 'USER_ENTERED',
-        data: dataUpdates
-      }
+      range: 'Sheet1!A1:Z5000'
     });
-
-    // Save gid map to integration config
-    integration.childSheetGids = childSheetGids;
-    saveNgoIntegration(safeSlug, integration);
-
-    console.log(`[Google OAuth] Successfully synced Master Overview + ${cleanChildren.length} Child Tabs to Sheet (${sheetId}) for NGO ${safeSlug}`);
-
-    return {
-      success: true,
-      sheetId,
-      spreadsheetUrl: integration.spreadsheetUrl,
-      childSheetGids,
-      count: cleanChildren.length
-    };
-
-  } catch (syncErr) {
-    if (syncErr.code === 404 || syncErr.status === 404 || (syncErr.message && syncErr.message.toLowerCase().includes('not found'))) {
-      console.log(`[Google OAuth] Sheet ${sheetId} was removed from Google Drive. Re-creating master spreadsheet...`);
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: sheetId,
+      range: 'Sheet1!A1',
+      valueInputOption: 'USER_ENTERED',
+      requestBody: { values: masterTableData }
+    });
+  } catch (err1) {
+    if (err1.code === 404 || err1.status === 404) {
       delete integration.sheetId;
       delete integration.spreadsheetUrl;
-      delete integration.childSheetGids;
       saveNgoIntegration(safeSlug, integration);
       return syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
     }
-    throw syncErr;
   }
+
+  // B. Sync File 2: Student Medical Records Spreadsheet (ONLY Child Tabs: VINAY, KALYAN, etc.)
+  const childSheetGids = {};
+  if (clinicalSheetId && cleanChildren.length > 0) {
+    try {
+      const metaRes = await sheets.spreadsheets.get({ spreadsheetId: clinicalSheetId });
+      const existingSheets = metaRes.data.sheets || [];
+      const sheetMap = new Map();
+      existingSheets.forEach(s => sheetMap.set(s.properties.title, s.properties.sheetId));
+
+      const batchRequests = [];
+
+      // If 'Sheet1' is present, rename it to the first child's name
+      const firstChildTabTitle = sanitizeSheetTitle(cleanChildren[0].name);
+      if (sheetMap.has('Sheet1') && !sheetMap.has(firstChildTabTitle)) {
+        const sheet1Id = sheetMap.get('Sheet1');
+        batchRequests.push({
+          updateSheetProperties: {
+            properties: { sheetId: sheet1Id, title: firstChildTabTitle },
+            fields: 'title'
+          }
+        });
+        sheetMap.set(firstChildTabTitle, sheet1Id);
+        sheetMap.delete('Sheet1');
+      }
+
+      // Add tabs for all remaining children
+      cleanChildren.forEach(c => {
+        const childTabTitle = sanitizeSheetTitle(c.name);
+        if (!sheetMap.has(childTabTitle)) {
+          batchRequests.push({
+            addSheet: { properties: { title: childTabTitle } }
+          });
+        }
+      });
+
+      if (batchRequests.length > 0) {
+        const batchRes = await sheets.spreadsheets.batchUpdate({
+          spreadsheetId: clinicalSheetId,
+          requestBody: { requests: batchRequests }
+        });
+
+        if (batchRes.data.replies) {
+          batchRes.data.replies.forEach(reply => {
+            if (reply.addSheet?.properties) {
+              sheetMap.set(reply.addSheet.properties.title, reply.addSheet.properties.sheetId);
+            }
+          });
+        }
+      }
+
+      // Prepare data updates for each child tab
+      const clinicalDataUpdates = [];
+      cleanChildren.forEach(c => {
+        const childTabTitle = sanitizeSheetTitle(c.name);
+        const gid = sheetMap.get(childTabTitle);
+        if (gid !== undefined) {
+          childSheetGids[c.id] = gid;
+          childSheetGids[c.name] = gid;
+          childSheetGids[childTabTitle] = gid;
+        }
+
+        const childGrowth = allGrowth.filter(g => g.childId === c.id || (g.childName && g.childName.toLowerCase() === (c.name || '').toLowerCase()));
+        const childMeds = allMedicines.filter(m => m.childId === c.id || (m.childName && m.childName.toLowerCase() === (c.name || '').toLowerCase()));
+        const childHealthRecs = allHealthRecords.filter(h => h.childId === c.id || (h.childName && h.childName.toLowerCase() === (c.name || '').toLowerCase()));
+
+        const childSheetData = buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName);
+        clinicalDataUpdates.push({
+          range: `'${childTabTitle}'!A1`,
+          values: childSheetData
+        });
+      });
+
+      if (clinicalDataUpdates.length > 0) {
+        await sheets.spreadsheets.values.batchUpdate({
+          spreadsheetId: clinicalSheetId,
+          requestBody: {
+            valueInputOption: 'USER_ENTERED',
+            data: clinicalDataUpdates
+          }
+        });
+      }
+
+      console.log(`[Google OAuth] Successfully synced ${cleanChildren.length} individual child tabs in Student Medical Records (${clinicalSheetId})`);
+
+    } catch (clinErr) {
+      console.warn('[Google OAuth] Student Medical Records sync notice:', clinErr.message);
+      if (clinErr.code === 404 || clinErr.status === 404) {
+        delete integration.clinicalSheetId;
+        delete integration.clinicalSpreadsheetUrl;
+        delete integration.childSheetGids;
+        saveNgoIntegration(safeSlug, integration);
+        return syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
+      }
+    }
+  }
+
+  // Save gid map and URLs to integration config
+  integration.childSheetGids = childSheetGids;
+  saveNgoIntegration(safeSlug, integration);
+
+  return {
+    success: true,
+    sheetId,
+    spreadsheetUrl: integration.spreadsheetUrl,
+    clinicalSheetId: integration.clinicalSheetId,
+    clinicalSpreadsheetUrl: integration.clinicalSpreadsheetUrl,
+    childSheetGids,
+    count: cleanChildren.length
+  };
 }
 
 /**
