@@ -35996,7 +35996,6 @@
     ${statCard('Growth Records', growthCount.toLocaleString(), 'ruler', 'amber')}
     ${statCard('Prescriptions', medicinesCount.toLocaleString(), 'pill', 'violet')}
     ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'file', 'cyan')}
-    ${statCard('Last Checkup', 'Today', 'clock', 'rose')}
   </div>
   <div style="margin-top: 20px;">
     ${calendarCard()}
