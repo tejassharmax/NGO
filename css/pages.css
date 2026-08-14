@@ -12,7 +12,7 @@
   background: var(--color-surface, #ffffff);
   border: 1px solid rgba(226, 232, 240, 0.85);
   border-radius: 14px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
@@ -20,7 +20,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: center;
 }
 
 /* Subtle soft ambient gradient background glow inside card */
@@ -85,10 +85,11 @@
 
 .stat-card__label {
   color: var(--color-text-muted, #64748b);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.01em;
-  line-height: 1.2;
+  line-height: 1;
+  margin: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -97,10 +98,10 @@
 /* Compact Dual-Tone Floating Glass Icon Pills */
 .stat-card__icon {
   display: grid;
-  width: 30px;
-  height: 30px;
-  flex: 0 0 30px;
-  border-radius: 9px;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 8px;
   place-items: center;
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -110,8 +111,8 @@
 }
 
 .stat-card__icon svg {
-  width: 15px;
-  height: 15px;
+  width: 14px;
+  height: 14px;
 }
 
 .stat-card__icon--blue {
@@ -151,10 +152,11 @@
   box-shadow: 0 2px 6px rgba(8, 145, 178, 0.08);
 }
 
-/* Stat Number Typography */
+/* Stat Number Typography - Equal Top & Bottom Symmetry */
 .stat-card__number {
-  margin-top: 10px;
-  font-size: 26px;
+  margin-top: 6px;
+  margin-bottom: 0;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.03em;
   line-height: 1;
