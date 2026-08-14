@@ -568,6 +568,17 @@ document.addEventListener('click', (event) => {
     exportChildrenToExcel();
   }
 
+  const reportTabBtn = target.closest('[data-report-tab]');
+  if (reportTabBtn) {
+    const tabId = reportTabBtn.dataset.reportTab;
+    if (tabId === 'summary') {
+      window.location.hash = '#/reports?tab=summary';
+    } else {
+      window.location.hash = `#/reports?child=${encodeURIComponent(tabId)}`;
+    }
+    return;
+  }
+
   if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
   if (target.matches('[data-report-print], [data-profile-print]')) window.print();
   if (target.matches('[data-apply-report]')) toast('Report updated', 'Your report now reflects the selected filters.');

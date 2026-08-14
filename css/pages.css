@@ -1310,4 +1310,191 @@ body.theme-dark .login-card__hero-icon {
   border-top: 1px solid var(--color-border, #e0e0e0);
 }
 
+/* ─── Google Sheets–Inspired Clinical Report Page ─── */
+.sheet-wrapper {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+  margin-top: 16px;
+}
+
+.sheet-tabbar {
+  display: flex;
+  align-items: center;
+  background: #f1f5f9;
+  border-bottom: 2px solid #0F9D58;
+  padding: 8px 12px 0 12px;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.sheet-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted, #64748b);
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.32, 1.2);
+  user-select: none;
+}
+
+.sheet-tab:hover {
+  background: #ffffff;
+  color: var(--color-text, #1e293b);
+}
+
+.sheet-tab.is-active {
+  background: #ffffff;
+  color: #0F9D58;
+  font-weight: 700;
+  border-color: #0F9D58;
+  border-bottom: 2px solid #ffffff;
+  margin-bottom: -2px;
+  box-shadow: 0 -3px 8px rgba(15, 157, 88, 0.08);
+}
+
+.sheet-tab__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sheet-tab__id {
+  font-size: 10px;
+  opacity: 0.75;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.sheet-banner-header {
+  padding: 18px 22px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.sheet-child-title {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #0f172a;
+  text-transform: uppercase;
+}
+
+.sheet-clinic-badge {
+  text-align: right;
+}
+
+.sheet-clinic-badge h4 {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 0.04em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.sheet-clinic-badge p {
+  font-size: 11px;
+  color: var(--color-text-muted, #64748b);
+  margin: 2px 0 0 0;
+}
+
+.sheet-section-banner {
+  background: #f8fafc;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sheet-section-banner h3 {
+  font-size: 12px;
+  font-weight: 800;
+  color: #334155;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheet-section-banner h3 svg {
+  width: 15px;
+  height: 15px;
+}
+
+.sheet-table-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.sheet-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: inherit;
+  min-width: 860px;
+  text-align: left;
+}
+
+.sheet-grid-table th {
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.sheet-grid-table td {
+  padding: 10px 14px;
+  border: 1px solid #f1f5f9;
+  color: #1e293b;
+  font-size: 12.5px;
+  background: #ffffff;
+  vertical-align: middle;
+}
+
+.sheet-grid-table tr:nth-child(even) td {
+  background: #fafafa;
+}
+
+.sheet-grid-table tr:hover td {
+  background: #f0fdf4;
+}
+
+.sheet-toolbar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #f8fafc;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+
 

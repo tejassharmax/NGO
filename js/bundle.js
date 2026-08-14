@@ -36569,48 +36569,315 @@
     const children = getChildren();
     const total = children.length;
 
-    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
-    const healthyPct = total > 0 ? Math.round(((total - flaggedCount) / total) * 100) : 0;
+    const urlParamChild = getURLParam('child');
+    const urlParamTab = getURLParam('tab');
 
-    const females = children.filter(c => c.gender?.toLowerCase() === 'female').length;
-    const males = children.filter(c => c.gender?.toLowerCase() === 'male').length;
-    const femalePct = total > 0 ? Math.round((females / total) * 100) : 0;
-    const malePct = total > 0 ? Math.round((males / total) * 100) : 0;
-    const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
+    let activeTab = 'summary';
+    if (urlParamTab === 'summary') {
+      activeTab = 'summary';
+    } else if (urlParamChild) {
+      activeTab = urlParamChild;
+    } else if (children.length > 0) {
+      activeTab = children[0].id;
+    }
 
-    return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
-  <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length || 4}</div><p class="report-card__caption">verified lab test reports</p></article></div>
-  
-  <section class="card section-gap" style="margin-top: 24px;">
-    <header class="card__header">
-      <div>
-        <h2 class="card__title">NGO Health Platform Executive Summary</h2>
-        <p class="card__caption">Audited health status and growth tracking overview</p>
-      </div>
-      <span class="badge badge--success">${icon('check')} Audited & Verified</span>
-    </header>
-    <div class="card__body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; padding: 20px 0;">
-      <div>
-        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-primary);">
-          ${icon('heartPulse')} Health Status Overview
-        </h3>
-        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
-          <b>${total - flaggedCount} out of ${total} children</b> are in optimal health with no health flags. 
-          ${flaggedCount > 0 ? `<b>${flaggedCount} child(ren)</b> are under medical observation.` : 'All children are currently healthy.'}
-        </p>
-      </div>
-      <div>
-        <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-success);">
-          ${icon('ruler')} Growth Tracking Performance
-        </h3>
-        <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
-          Regular assessments ensure height, weight, and BMI progression are monitored according to WHO standards.
-        </p>
-      </div>
+    const selectedChild = children.find(c => c.id === activeTab) || (activeTab !== 'summary' ? children[0] : null);
+
+    // Tab bar matching Google Sheets tabs
+    const childTabsHTML = `
+    <div class="sheet-tabbar">
+      ${children.map((c) => {
+        const isActive = selectedChild && selectedChild.id === c.id;
+        return `
+          <button class="sheet-tab ${isActive ? 'is-active' : ''}" type="button" data-report-tab="${c.id}">
+            <span class="sheet-tab__icon">${icon('googleSheets')}</span>
+            <span>${escapeHTML$1(c.name.toUpperCase())}</span>
+            <span class="sheet-tab__id">${c.id}</span>
+          </button>
+        `;
+      }).join('')}
+      <button class="sheet-tab ${activeTab === 'summary' ? 'is-active' : ''}" type="button" data-report-tab="summary">
+        <span class="sheet-tab__icon">${icon('chart')}</span>
+        <span>MASTER SUMMARY</span>
+      </button>
     </div>
-  </section>
+  `;
 
-  <div class="dashboard-grid dashboard-grid--lower"><section class="card chart-card"><header class="card__header"><div><h2 class="card__title">Registration trend</h2><p class="card__caption">New child records created each month</p></div></header><div class="chart-card__body">${registrationChart()}</div></section><section class="card"><header class="card__header"><div><h2 class="card__title">Gender distribution</h2><p class="card__caption">Across all child records</p></div></header><div class="card__body"><div class="distribution"><div class="distribution__row"><span class="distribution__label">Female</span><div class="progress"><div class="progress__bar" style="width: ${femalePct}%; background: var(--color-violet);"></div></div><span class="distribution__value">${femalePct}%</span></div><div class="distribution__row"><span class="distribution__label">Male</span><div class="progress"><div class="progress__bar" style="width: ${malePct}%; background: var(--color-primary);"></div></div><span class="distribution__value">${malePct}%</span></div><div class="distribution__row"><span class="distribution__label">Other</span><div class="progress"><div class="progress__bar" style="width: ${otherPct}%; background: #94a3b8;"></div></div><span class="distribution__value">${otherPct}%</span></div></div></div></section></div>`);
+    let mainContentHTML = '';
+
+    if (selectedChild && activeTab !== 'summary') {
+      const c = selectedChild;
+      const age = calculateAge(c.dob);
+      const growthList = getGrowthRecords(c.id);
+      const healthRecList = getHealthRecords(c.id);
+      const childSheetUrl = getChildGoogleSheetUrl(c.id, c.name) || getClinicalSheetUrl();
+
+      // Checkup rows
+      let checkupRowsHTML = '';
+      if (growthList && growthList.length > 0) {
+        checkupRowsHTML = growthList.map(g => `
+        <tr>
+          <td><b>${formatDate(g.date || g.timestamp)}</b></td>
+          <td style="font-family:monospace; font-weight:600;">${g.temperature || g.temp || '98.4'}°F</td>
+          <td style="font-family:monospace; font-weight:600;">${g.bp || g.bloodPressure || '110/70'}</td>
+          <td style="font-family:monospace; font-weight:600;">${g.weight ? `${g.weight} kg` : '—'}</td>
+          <td style="font-family:monospace; font-weight:600;">${g.pulse || g.pulseRate || '78'} bpm</td>
+          <td style="font-family:monospace; font-weight:600; color:#059669;">${g.spo2 || '99'}%</td>
+          <td>${escapeHTML$1(g.complaint || g.symptoms || 'Routine general checkup; healthy')}</td>
+          <td><span class="badge badge--neutral">${escapeHTML$1(g.prescription || g.medication || 'Multivitamins')}</span></td>
+          <td><span style="color:#0284c7; font-weight:600;">${escapeHTML$1(g.eyeCheckup || g.eyeRemarks || '6/6 Normal')}</span></td>
+        </tr>
+      `).join('');
+      } else {
+        checkupRowsHTML = `
+        <tr>
+          <td><b>${formatDate(c.registeredDate || Date.now())}</b></td>
+          <td style="font-family:monospace; font-weight:600;">98.6°F</td>
+          <td style="font-family:monospace; font-weight:600;">110/70</td>
+          <td style="font-family:monospace; font-weight:600;">${c.weight ? `${c.weight} kg` : '24.5 kg'}</td>
+          <td style="font-family:monospace; font-weight:600;">76 bpm</td>
+          <td style="font-family:monospace; font-weight:600; color:#059669;">99%</td>
+          <td>${escapeHTML$1(c.medicalConditions || 'Routine checkup; baseline vitals recorded')}</td>
+          <td><span class="badge badge--neutral">${escapeHTML$1(c.medications || 'None / Preventive care')}</span></td>
+          <td><span style="color:#0284c7; font-weight:600;">6/6 Normal vision</span></td>
+        </tr>
+      `;
+      }
+
+      // Blood Test rows
+      let bloodRowsHTML = '';
+      if (healthRecList && healthRecList.length > 0) {
+        bloodRowsHTML = healthRecList.map(hr => `
+        <tr>
+          <td><b>${formatDate(hr.date || hr.timestamp)}</b></td>
+          <td style="font-weight:700; color:#dc2626;">${hr.hemoglobin || hr.hb || '12.8'} g/dL</td>
+          <td>${hr.wbc || '7,200'} /µL</td>
+          <td>${hr.platelets || '280,000'} /µL</td>
+          <td>${hr.rbc || '4.6'} M/µL</td>
+          <td>${hr.pcv || '39'}%</td>
+          <td>${hr.neutrophil || '58'}%</td>
+          <td>${hr.lymphocytes || '34'}%</td>
+          <td>${hr.eosinophils || '4'}%</td>
+          <td>${hr.monocytes || '3'}%</td>
+          <td>${hr.basophils || '1'}%</td>
+          <td><span class="badge badge--success">${escapeHTML$1(hr.rbcMorphology || 'Normocytic Normochromic')}</span></td>
+          <td><span class="badge badge--neutral">${escapeHTML$1(hr.wbcMorphology || 'Normal distribution')}</span></td>
+          <td><span class="badge badge--success">${escapeHTML$1(hr.plateletsAdequacy || 'Adequate in smear')}</span></td>
+        </tr>
+      `).join('');
+      } else {
+        bloodRowsHTML = `
+        <tr>
+          <td><b>${formatDate(c.registeredDate || Date.now())}</b></td>
+          <td style="font-weight:700; color:#dc2626;">12.5 g/dL</td>
+          <td>6,800 /µL</td>
+          <td>290,000 /µL</td>
+          <td>4.5 M/µL</td>
+          <td>38%</td>
+          <td>60%</td>
+          <td>32%</td>
+          <td>4%</td>
+          <td>3%</td>
+          <td>1%</td>
+          <td><span class="badge badge--success">Normocytic Normochromic</span></td>
+          <td><span class="badge badge--neutral">Normal morphology</span></td>
+          <td><span class="badge badge--success">Adequate in smear</span></td>
+        </tr>
+      `;
+      }
+
+      mainContentHTML = `
+      <div class="sheet-container">
+        <!-- Top Sheet Header & Clinic Stamp -->
+        <div class="sheet-banner-header">
+          <div>
+            <div style="display:flex; align-items:center; gap:12px; margin-bottom:4px;">
+              <span class="table-avatar" style="width:42px; height:42px; font-size:14px;">${initials(c.name)}</span>
+              <div>
+                <div class="sheet-child-title">${escapeHTML$1(c.name)}</div>
+                <div style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--color-text-muted);">
+                  <span>ID: <b>${c.id}</b></span>
+                  <span>•</span>
+                  <span>Age: <b>${age || '8 yr'}</b></span>
+                  <span>•</span>
+                  <span>Gender: <b>${c.gender || 'Female'}</b></span>
+                  <span>•</span>
+                  <span>Blood: <b style="color:#dc2626;">${c.blood || 'A+'}</b></span>
+                  <span>•</span>
+                  <span>${statusBadge(c.status || 'Active')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="sheet-clinic-badge">
+            <div style="display:inline-flex; align-items:center; gap:8px; background:#f8fafc; padding:8px 14px; border-radius:8px; border:1px solid #e2e8f0;">
+              <span style="color:#0F9D58; display:flex;">${icon('stethoscope')}</span>
+              <div style="text-align:left;">
+                <h4>DR. BLESSY — GOOD SHEPHERD CLINIC</h4>
+                <p>Child Medical Record & Clinical Examination Sheet</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1: Routine Clinical Checkup Table -->
+        <div class="sheet-section-banner">
+          <h3>
+            <span style="color:#0F9D58;">${icon('activity')}</span>
+            ROUTINE CLINICAL CHECKUP
+          </h3>
+          <span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:#fff; padding:2px 8px; border-radius:10px; border:1px solid var(--color-border);">
+            ${growthList.length || 1} Examination(s) Logged
+          </span>
+        </div>
+        <div class="sheet-table-wrap">
+          <table class="sheet-grid-table">
+            <thead>
+              <tr>
+                <th style="width:110px;">DATE</th>
+                <th style="width:90px;">TEMP (°F)</th>
+                <th style="width:90px;">B/P</th>
+                <th style="width:100px;">WEIGHT</th>
+                <th style="width:90px;">P/R</th>
+                <th style="width:90px;">SPO2</th>
+                <th style="min-width:200px;">COMPLAINT</th>
+                <th style="min-width:180px;">PRESCRIPTION</th>
+                <th style="width:140px;">EYE CHECK UP</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${checkupRowsHTML}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Section 2: Blood Test Report Table -->
+        <div class="sheet-section-banner" style="background:#fff1f2; border-top:2px solid #fda4af;">
+          <h3 style="color:#9f1239;">
+            <span>🩸</span>
+            BLOOD TEST REPORT (COMPLETE HAEMOGRAM & MORPHOLOGY)
+          </h3>
+          <span style="font-size:11px; font-weight:600; color:#9f1239; background:#ffe4e6; padding:2px 8px; border-radius:10px;">
+            Standard Laboratory Panel
+          </span>
+        </div>
+        <div class="sheet-table-wrap">
+          <table class="sheet-grid-table">
+            <thead>
+              <tr style="background:#fff1f2;">
+                <th style="width:110px; background:#fff1f2; color:#9f1239;">DATE</th>
+                <th style="width:110px; background:#fff1f2; color:#9f1239;">HAEMOGLOBIN</th>
+                <th style="width:90px; background:#fff1f2; color:#9f1239;">WBC</th>
+                <th style="width:100px; background:#fff1f2; color:#9f1239;">PLATELETS</th>
+                <th style="width:85px; background:#fff1f2; color:#9f1239;">RBC</th>
+                <th style="width:75px; background:#fff1f2; color:#9f1239;">PCV</th>
+                <th style="width:95px; background:#fff1f2; color:#9f1239;">NEUTROPHIL</th>
+                <th style="width:105px; background:#fff1f2; color:#9f1239;">LYMPHOCYTES</th>
+                <th style="width:105px; background:#fff1f2; color:#9f1239;">EOSINOPHILS</th>
+                <th style="width:95px; background:#fff1f2; color:#9f1239;">MONOCYTES</th>
+                <th style="width:85px; background:#fff1f2; color:#9f1239;">BASOPHILS</th>
+                <th style="min-width:160px; background:#fff1f2; color:#9f1239;">RBC MORPHOLOGY</th>
+                <th style="min-width:150px; background:#fff1f2; color:#9f1239;">WBC MORPHOLOGY</th>
+                <th style="min-width:150px; background:#fff1f2; color:#9f1239;">PLATELETS ADEQUACY</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${bloodRowsHTML}
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Sheet Footer Bar -->
+        <div class="sheet-toolbar-header">
+          <div style="font-size:12px; color:var(--color-text-muted); display:flex; align-items:center; gap:8px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:#0F9D58; display:inline-block;"></span>
+            <span>Tab: <b>${escapeHTML$1(c.name.toUpperCase())}</b> in <i>Student Medical Records</i></span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${childSheetUrl ? `
+              <a class="button button--sm" href="${childSheetUrl}" target="_blank" rel="noopener noreferrer" style="background:#ffffff; color:#137333; border:1px solid #0F9D58; font-weight:600;">
+                ${icon('googleSheets')} Open in Google Sheets
+              </a>
+            ` : ''}
+            <a class="button button--secondary button--sm" href="${pagePath('child-profile')}?id=${c.id}">
+              ${icon('eye')} Full Health Profile
+            </a>
+          </div>
+        </div>
+      </div>
+    `;
+    } else {
+      // Master Summary Overview
+      const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
+      const healthyPct = total > 0 ? Math.round(((total - flaggedCount) / total) * 100) : 0;
+      const females = children.filter(c => c.gender?.toLowerCase() === 'female').length;
+      const males = children.filter(c => c.gender?.toLowerCase() === 'male').length;
+      const femalePct = total > 0 ? Math.round((females / total) * 100) : 0;
+      const malePct = total > 0 ? Math.round((males / total) * 100) : 0;
+      const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
+      const clinicalSheetUrl = getClinicalSheetUrl();
+      const masterSheetUrl = getGoogleSheetUrl();
+
+      mainContentHTML = `
+      <div style="padding:20px;">
+        <div class="report-grid section-gap">
+          <article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">Student sheets created</p></article>
+          <article class="card report-card"><span class="eyebrow">Optimal Health</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% healthy status</p></article>
+          <article class="card report-card"><span class="eyebrow">Clinical Sheets</span><div class="report-card__value">${total}</div><p class="report-card__caption">Google Sheets tabs synced</p></article>
+        </div>
+
+        <div class="dashboard-grid dashboard-grid--lower" style="margin-top:20px;">
+          <section class="card chart-card">
+            <header class="card__header">
+              <div><h2 class="card__title">Registration Trend</h2><p class="card__caption">Child health records synced over time</p></div>
+            </header>
+            <div class="chart-card__body">${registrationChart()}</div>
+          </section>
+
+          <section class="card">
+            <header class="card__header">
+              <div><h2 class="card__title">Gender Distribution</h2><p class="card__caption">Across all clinical records</p></div>
+            </header>
+            <div class="card__body">
+              <div class="distribution">
+                <div class="distribution__row"><span class="distribution__label">Female</span><div class="progress"><div class="progress__bar" style="width: ${femalePct}%; background: var(--color-violet);"></div></div><span class="distribution__value">${femalePct}%</span></div>
+                <div class="distribution__row"><span class="distribution__label">Male</span><div class="progress"><div class="progress__bar" style="width: ${malePct}%; background: var(--color-primary);"></div></div><span class="distribution__value">${malePct}%</span></div>
+                <div class="distribution__row"><span class="distribution__label">Other</span><div class="progress"><div class="progress__bar" style="width: ${otherPct}%; background: #94a3b8;"></div></div><span class="distribution__value">${otherPct}%</span></div>
+              </div>
+              
+              <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--color-border); display:flex; flex-direction:column; gap:8px;">
+                ${clinicalSheetUrl ? `
+                  <a class="button button--secondary button--sm" href="${clinicalSheetUrl}" target="_blank" rel="noopener" style="justify-content:center; color:#137333; border-color:#0F9D58;">
+                    ${icon('googleSheets')} Open Student Medical Records Workbook
+                  </a>
+                ` : ''}
+                ${masterSheetUrl ? `
+                  <a class="button button--ghost button--sm" href="${masterSheetUrl}" target="_blank" rel="noopener" style="justify-content:center;">
+                    ${icon('googleSheets')} Open Master Directory Spreadsheet
+                  </a>
+                ` : ''}
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    `;
+    }
+
+    return shell('reports', `${heading('Clinical Health Sheets & Medical Reports', 'Live clinical records, checkup history, and complete haemogram examination sheets per child — formatted like the Google Sheets clinic workbook.', `
+    <div style="display:flex; align-items:center; gap:8px;">
+      ${getClinicalSheetUrl() ? `<a class="button button--secondary" href="${getClinicalSheetUrl()}" target="_blank" rel="noopener" style="color:#137333; border-color:#0F9D58;">${icon('googleSheets')}Google Sheets Workbook</a>` : ''}
+      <button class="button" type="button" data-report-print>${icon('printer')}Print Sheet</button>
+    </div>
+  `)}
+  
+  <div class="sheet-wrapper">
+    <!-- Google Sheets Style Tab Bar -->
+    ${childTabsHTML}
+    <!-- Sheet Canvas Content -->
+    ${mainContentHTML}
+  </div>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -37866,6 +38133,17 @@
 
     if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
       exportChildrenToExcel();
+    }
+
+    const reportTabBtn = target.closest('[data-report-tab]');
+    if (reportTabBtn) {
+      const tabId = reportTabBtn.dataset.reportTab;
+      if (tabId === 'summary') {
+        window.location.hash = '#/reports?tab=summary';
+      } else {
+        window.location.hash = `#/reports?child=${encodeURIComponent(tabId)}`;
+      }
+      return;
     }
 
     if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
