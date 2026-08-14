@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, addSponsor } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, hydrateFromServer, addSponsor } from './storage.js';
 import { updateChildTable, childRows } from './table.js';
 import { searchChildren, globalSearchMarkup, renderSearchResultsList } from './search.js';
 import { toast } from './toast.js';
@@ -80,6 +80,14 @@ let renderCurrentPage = null;
       return;
     }
 
+    if (loggedIn && page !== 'login') {
+      await Promise.all([
+        hydrateFromServer().catch(() => {}),
+        fetchSheetsConfig().catch(() => {}),
+        fetchDocsConfig().catch(() => {})
+      ]);
+    }
+
     const app = document.querySelector('#app');
     if (app) {
       app.innerHTML = renderPage(page);
@@ -96,8 +104,6 @@ let renderCurrentPage = null;
 
     if (page !== 'login') {
       syncWithServer().catch(() => {});
-      fetchSheetsConfig().catch(() => {});
-      fetchDocsConfig().catch(() => {});
     }
   };
 
@@ -162,9 +168,11 @@ document.addEventListener('click', (event) => {
 
   if (target.closest('[data-google-login]')) {
     toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
-    loginWithGoogle().then((res) => {
+    loginWithGoogle().then(async (res) => {
       if (res.success) {
         toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
+        await hydrateFromServer().catch(() => {});
+        await fetchSheetsConfig().catch(() => {});
         window.location.hash = '#/';
         if (renderCurrentPage) renderCurrentPage();
       } else if (res.errorCode === 'ACCESS_DENIED') {

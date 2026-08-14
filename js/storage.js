@@ -552,11 +552,33 @@ function seedDatabase() {
    ─────────────────────────────────────────────────────── */
 let isSyncing = false;
 
+/**
+ * Hydrate state directly from server on fresh browser open / login
+ */
+export async function hydrateFromServer() {
+  try {
+    const res = await apiFetch('/api/sync');
+    if (res.ok) {
+      const serverData = await res.json();
+      if (serverData && typeof serverData === 'object') {
+        Object.keys(serverData).forEach(k => {
+          if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
+            localStorage.setItem(k, serverData[k]);
+          }
+        });
+        return true;
+      }
+    }
+  } catch (e) {
+    console.warn('[Storage] Hydration notice:', e);
+  }
+  return false;
+}
+
 export async function syncWithServer() {
   if (isSyncing) return;
   try {
     isSyncing = true;
-    getChildren();
     const keys = [
       CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
       NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
@@ -579,32 +601,10 @@ export async function syncWithServer() {
 
     if (res.ok) {
       const serverData = await res.json();
-      // Apply merged state from server without overwriting non-empty local storage with empty server state
+      // Apply merged state from server
       Object.keys(serverData).forEach(k => {
-        if (serverData[k] !== null && serverData[k] !== undefined) {
-          const localStr = localStorage.getItem(k);
-          if (!localStr || localStr === '[]' || localStr === '') {
-            if (serverData[k] !== '[]' && serverData[k] !== '') {
-              localStorage.setItem(k, serverData[k]);
-            }
-          } else if (serverData[k] && serverData[k] !== '[]') {
-            try {
-              const localArr = JSON.parse(localStr);
-              const serverArr = JSON.parse(serverData[k]);
-              if (Array.isArray(localArr) && Array.isArray(serverArr)) {
-                const map = new Map();
-                serverArr.concat(localArr).forEach(item => {
-                  if (item) {
-                    const key = item.id || JSON.stringify(item);
-                    map.set(key, item);
-                  }
-                });
-                localStorage.setItem(k, JSON.stringify(Array.from(map.values())));
-              }
-            } catch (e) {
-              localStorage.setItem(k, serverData[k]);
-            }
-          }
+        if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
+          localStorage.setItem(k, serverData[k]);
         }
       });
     }

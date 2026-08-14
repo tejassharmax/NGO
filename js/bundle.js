@@ -33941,11 +33941,33 @@
      ─────────────────────────────────────────────────────── */
   let isSyncing = false;
 
+  /**
+   * Hydrate state directly from server on fresh browser open / login
+   */
+  async function hydrateFromServer() {
+    try {
+      const res = await apiFetch$1('/api/sync');
+      if (res.ok) {
+        const serverData = await res.json();
+        if (serverData && typeof serverData === 'object') {
+          Object.keys(serverData).forEach(k => {
+            if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
+              localStorage.setItem(k, serverData[k]);
+            }
+          });
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('[Storage] Hydration notice:', e);
+    }
+    return false;
+  }
+
   async function syncWithServer() {
     if (isSyncing) return;
     try {
       isSyncing = true;
-      getChildren();
       const keys = [
         CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
         NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
@@ -33968,32 +33990,10 @@
 
       if (res.ok) {
         const serverData = await res.json();
-        // Apply merged state from server without overwriting non-empty local storage with empty server state
+        // Apply merged state from server
         Object.keys(serverData).forEach(k => {
-          if (serverData[k] !== null && serverData[k] !== undefined) {
-            const localStr = localStorage.getItem(k);
-            if (!localStr || localStr === '[]' || localStr === '') {
-              if (serverData[k] !== '[]' && serverData[k] !== '') {
-                localStorage.setItem(k, serverData[k]);
-              }
-            } else if (serverData[k] && serverData[k] !== '[]') {
-              try {
-                const localArr = JSON.parse(localStr);
-                const serverArr = JSON.parse(serverData[k]);
-                if (Array.isArray(localArr) && Array.isArray(serverArr)) {
-                  const map = new Map();
-                  serverArr.concat(localArr).forEach(item => {
-                    if (item) {
-                      const key = item.id || JSON.stringify(item);
-                      map.set(key, item);
-                    }
-                  });
-                  localStorage.setItem(k, JSON.stringify(Array.from(map.values())));
-                }
-              } catch (e) {
-                localStorage.setItem(k, serverData[k]);
-              }
-            }
+          if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
+            localStorage.setItem(k, serverData[k]);
           }
         });
       }
@@ -37319,6 +37319,14 @@
         return;
       }
 
+      if (loggedIn && page !== 'login') {
+        await Promise.all([
+          hydrateFromServer().catch(() => {}),
+          fetchSheetsConfig().catch(() => {}),
+          fetchDocsConfig().catch(() => {})
+        ]);
+      }
+
       const app = document.querySelector('#app');
       if (app) {
         app.innerHTML = renderPage(page);
@@ -37335,8 +37343,6 @@
 
       if (page !== 'login') {
         syncWithServer().catch(() => {});
-        fetchSheetsConfig().catch(() => {});
-        fetchDocsConfig().catch(() => {});
       }
     };
 
@@ -37401,9 +37407,11 @@
 
     if (target.closest('[data-google-login]')) {
       toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
-      loginWithGoogle().then((res) => {
+      loginWithGoogle().then(async (res) => {
         if (res.success) {
           toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
+          await hydrateFromServer().catch(() => {});
+          await fetchSheetsConfig().catch(() => {});
           window.location.hash = '#/';
           if (renderCurrentPage) renderCurrentPage();
         } else if (res.errorCode === 'ACCESS_DENIED') {
