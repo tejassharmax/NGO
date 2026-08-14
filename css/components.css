@@ -79,11 +79,67 @@ select.input, .select {
 .column-resizer { position: absolute; top: 10px; right: -2px; bottom: 10px; z-index: 3; width: 5px; padding: 0; cursor: col-resize; background: transparent; border: 0; border-radius: 3px; }
 .column-resizer:hover, .column-resizer:focus { background: var(--color-primary); }
 .data-table td { height: 66px; padding: 10px 16px; border-bottom: 1px solid #f1f2f4; font-size: 13px; vertical-align: middle; }
-.data-table tbody tr { transition: background var(--transition); }
+.data-table tbody tr { transition: background var(--transition), transform 0.3s cubic-bezier(.2,.8,.32,1.2), box-shadow 0.3s ease, opacity 0.3s ease; }
 .data-table tbody tr:hover { background: #fafafa; }
 .data-table tbody tr:last-child td { border-bottom: 0; }
 .data-table th:first-child, .data-table td:first-child { padding-left: 24px; }
 .data-table th:last-child, .data-table td:last-child { padding-right: 24px; }
+
+/* ─── Drag Handle ─── */
+.drag-handle-th { width: 32px; min-width: 32px; max-width: 32px; padding: 0 4px 0 12px !important; }
+.drag-handle-cell { width: 32px; min-width: 32px; max-width: 32px; padding: 0 4px 0 12px !important; }
+.drag-handle { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; color: #c4c8cd; cursor: grab; border-radius: 4px; transition: color 0.2s, background 0.2s, transform 0.15s; }
+.drag-handle:hover { color: #64748b; background: #f1f5f9; }
+.drag-handle:active { cursor: grabbing; color: #334155; transform: scale(1.15); }
+.drag-handle svg { width: 16px; height: 16px; pointer-events: none; }
+
+/* ─── Apple-style Wiggle Animation ─── */
+@keyframes wiggle {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(-1.2deg); }
+  40%  { transform: rotate(1.4deg); }
+  60%  { transform: rotate(-0.8deg); }
+  80%  { transform: rotate(1deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* Row being dragged */
+.data-table tbody tr.dragging {
+  opacity: 0.45;
+  background: #eef2ff;
+  transform: scale(0.98);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+}
+
+/* All sibling rows wiggle when a drag is active */
+.data-table tbody.drag-active tr:not(.dragging):not(.drag-settled) {
+  animation: wiggle 0.35s ease-in-out infinite;
+}
+.data-table tbody.drag-active tr:nth-child(even):not(.dragging):not(.drag-settled) {
+  animation-delay: 0.05s;
+}
+.data-table tbody.drag-active tr:nth-child(3n):not(.dragging):not(.drag-settled) {
+  animation-delay: 0.1s;
+}
+
+/* Drop target indicator */
+.data-table tbody tr.drag-over-top {
+  box-shadow: inset 0 3px 0 0 #6366f1;
+}
+.data-table tbody tr.drag-over-bottom {
+  box-shadow: inset 0 -3px 0 0 #6366f1;
+}
+
+/* Settled state after drop — no wiggle, gentle spring back */
+.data-table tbody tr.drag-settled {
+  animation: none !important;
+  transition: transform 0.4s cubic-bezier(.2,.8,.32,1.2), background 0.3s ease, box-shadow 0.3s ease;
+  transform: scale(1);
+}
+.data-table tbody tr.drag-flash {
+  background: #eef2ff;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.25);
+}
 .sort-button { display: inline-flex; align-items: center; gap: 5px; padding: 0; color: inherit; background: none; border: 0; font: inherit; text-transform: inherit; }
 .sort-button svg { width: 14px; height: 14px; }
 .table-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
