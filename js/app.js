@@ -1,6 +1,6 @@
 import { renderPage } from './router.js';
 import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
-import { updateChildTable, childRows } from './table.js';
+import { updateChildTable, childRows, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, renderSearchResultsList } from './search.js';
 import { toast } from './toast.js';
 import { modal, closeModal } from './modal.js';
@@ -94,7 +94,10 @@ let renderCurrentPage = null;
       applyColumnVisibility();
       initFormListeners();
       initOCRProcessing();
-      if (page === 'children') initDragReorder();
+      if (page === 'children') {
+        initDragReorder();
+        initColumnDragReorder();
+      }
     }
 
     if (page === 'dashboard' || page === 'reports') {
@@ -986,6 +989,131 @@ function initDragReorder() {
     }, 500);
 
     dragRow = null;
+  });
+}
+
+// ─── Drag-and-Drop Column Reorder (Apple-style) ───
+function initColumnDragReorder() {
+  const table = document.querySelector('.data-table');
+  if (!table) return;
+  const thead = table.querySelector('thead');
+  const tbody = table.querySelector('#child-table-body');
+  if (!thead || !tbody) return;
+
+  let dragColTh = null;
+  let draggedColId = null;
+
+  thead.addEventListener('dragstart', (e) => {
+    if (e.target.closest('.column-resizer')) {
+      e.preventDefault();
+      return;
+    }
+    const th = e.target.closest('th.col-draggable');
+    if (!th) return;
+
+    dragColTh = th;
+    draggedColId = th.dataset.column;
+    th.classList.add('col-dragging');
+    table.classList.add('col-drag-active');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', draggedColId);
+
+    try {
+      e.dataTransfer.setDragImage(th, th.offsetWidth / 2, th.offsetHeight / 2);
+    } catch (_) {}
+  });
+
+  thead.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const targetTh = e.target.closest('th.col-draggable');
+    if (!targetTh || targetTh === dragColTh) return;
+
+    thead.querySelectorAll('.col-drag-over-left, .col-drag-over-right').forEach(el => {
+      el.classList.remove('col-drag-over-left', 'col-drag-over-right');
+    });
+
+    const rect = targetTh.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    if (e.clientX < midX) {
+      targetTh.classList.add('col-drag-over-left');
+    } else {
+      targetTh.classList.add('col-drag-over-right');
+    }
+  });
+
+  thead.addEventListener('dragleave', (e) => {
+    const targetTh = e.target.closest('th.col-draggable');
+    if (targetTh) {
+      targetTh.classList.remove('col-drag-over-left', 'col-drag-over-right');
+    }
+  });
+
+  thead.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const targetTh = e.target.closest('th.col-draggable');
+    if (!targetTh || !dragColTh || targetTh === dragColTh) return;
+
+    const rect = targetTh.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const insertBefore = e.clientX < midX;
+
+    const theadRow = thead.querySelector('tr');
+    if (insertBefore) {
+      theadRow.insertBefore(dragColTh, targetTh);
+    } else {
+      theadRow.insertBefore(dragColTh, targetTh.nextSibling);
+    }
+
+    const targetColId = targetTh.dataset.column;
+    tbody.querySelectorAll('tr').forEach(row => {
+      const draggedTd = row.querySelector(`td[data-column="${draggedColId}"]`);
+      const targetTd = row.querySelector(`td[data-column="${targetColId}"]`);
+      if (draggedTd && targetTd) {
+        if (insertBefore) {
+          row.insertBefore(draggedTd, targetTd);
+        } else {
+          row.insertBefore(draggedTd, targetTd.nextSibling);
+        }
+      }
+    });
+
+    const newOrder = Array.from(thead.querySelectorAll('th[data-column]'))
+      .map(th => th.dataset.column);
+    setColumnOrder(newOrder);
+
+    dragColTh.classList.add('col-drag-flash');
+    tbody.querySelectorAll(`td[data-column="${draggedColId}"]`).forEach(td => {
+      td.classList.add('col-drag-flash');
+    });
+
+    setTimeout(() => {
+      dragColTh?.classList.remove('col-drag-flash');
+      tbody.querySelectorAll('.col-drag-flash').forEach(td => td.classList.remove('col-drag-flash'));
+    }, 600);
+
+    applyColumnVisibility();
+    enableColumnResize();
+  });
+
+  thead.addEventListener('dragend', () => {
+    if (dragColTh) {
+      dragColTh.classList.remove('col-dragging');
+    }
+    thead.querySelectorAll('th').forEach(th => {
+      th.classList.remove('col-drag-over-left', 'col-drag-over-right');
+      th.classList.add('col-drag-settled');
+    });
+    table.classList.remove('col-drag-active');
+
+    setTimeout(() => {
+      thead.querySelectorAll('.col-drag-settled').forEach(th => {
+        th.classList.remove('col-drag-settled');
+      });
+    }, 500);
+
+    dragColTh = null;
+    draggedColId = null;
   });
 }
 

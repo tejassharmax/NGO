@@ -140,6 +140,95 @@ select.input, .select {
   background: #eef2ff;
   box-shadow: 0 0 0 2px rgba(99,102,241,0.25);
 }
+
+/* ─── Column Drag & Drop (Apple-style) ─── */
+.th-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  position: relative;
+}
+.col-draggable {
+  cursor: grab;
+  user-select: none;
+  position: relative;
+  transition: transform 0.25s cubic-bezier(.2,.8,.32,1.2), background 0.2s, box-shadow 0.2s, opacity 0.2s;
+}
+.col-draggable:active {
+  cursor: grabbing;
+}
+.col-drag-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: #cbd5e1;
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.col-draggable:hover .col-drag-grip {
+  opacity: 1;
+  color: #64748b;
+}
+.col-drag-grip svg {
+  width: 13px;
+  height: 13px;
+  pointer-events: none;
+}
+
+/* Apple-style Column Header Wiggle Animation */
+@keyframes col-wiggle {
+  0%   { transform: rotate(0deg) translateY(0); }
+  25%  { transform: rotate(-1.5deg) translateY(-1px); }
+  50%  { transform: rotate(1.8deg) translateY(1px); }
+  75%  { transform: rotate(-1deg) translateY(-0.5px); }
+  100% { transform: rotate(0deg) translateY(0); }
+}
+
+/* When column drag is active, all draggable headers wiggle */
+.data-table.col-drag-active th.col-draggable:not(.col-dragging):not(.col-drag-settled) {
+  animation: col-wiggle 0.32s ease-in-out infinite;
+  background: #f8fafc;
+}
+.data-table.col-drag-active th.col-draggable:nth-child(even):not(.col-dragging):not(.col-drag-settled) {
+  animation-delay: 0.06s;
+}
+.data-table.col-drag-active th.col-draggable:nth-child(3n):not(.col-dragging):not(.col-drag-settled) {
+  animation-delay: 0.12s;
+}
+
+/* Dragged column header */
+th.col-dragging {
+  opacity: 0.45;
+  background: #eef2ff !important;
+  transform: scale(0.96) !important;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+}
+
+/* Column drop indicators */
+th.col-drag-over-left {
+  box-shadow: inset 3px 0 0 0 #6366f1;
+  background: #f1f5f9;
+}
+th.col-drag-over-right {
+  box-shadow: inset -3px 0 0 0 #6366f1;
+  background: #f1f5f9;
+}
+
+/* Settled state after column drop */
+th.col-drag-settled, td.col-drag-settled {
+  animation: none !important;
+  transition: transform 0.4s cubic-bezier(.2,.8,.32,1.2), background 0.3s ease, box-shadow 0.3s ease;
+  transform: scale(1);
+}
+th.col-drag-flash, td.col-drag-flash {
+  background: #eef2ff !important;
+  transition: background 0.6s ease;
+}
 .sort-button { display: inline-flex; align-items: center; gap: 5px; padding: 0; color: inherit; background: none; border: 0; font: inherit; text-transform: inherit; }
 .sort-button svg { width: 14px; height: 14px; }
 .table-person { display: flex; align-items: center; gap: 12px; min-width: 0; }
