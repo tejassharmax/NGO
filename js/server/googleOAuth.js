@@ -170,8 +170,8 @@ function sanitizeSheetTitle(name) {
 }
 
 function cleanCell(val) {
-  if (val === null || val === undefined || val === '') return '—';
-  const str = String(val);
+  if (val === null || val === undefined || val === '' || val === '—') return '';
+  const str = String(val).trim();
   if (str.startsWith('+') || str.startsWith('=')) {
     return "'" + str;
   }
@@ -179,55 +179,50 @@ function cleanCell(val) {
 }
 
 function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoName) {
-  const childName = (c.name || 'Unnamed Child').toUpperCase();
-  const clinicHeader = `DR.BLESSY — GOOD SHEPHERD CLINIC (${ngoName || 'NGO HEALTH'})`;
+  const childName = (c.name || 'CHILD').toUpperCase();
+  const clinicHeader = 'DR.BLESSY — GOOD SHEPHERD CLINIC';
 
   // Row 1: Child Name (Col A), Clinic Header (Col D)
   const row1 = [childName, '', '', clinicHeader];
   const row2 = [];
 
-  // Routine Clinical Checkup Table
-  const checkupHeader = ['DATE', 'TEMP(F)', 'B/P', 'WEIGHT (KG)', 'P/R', 'SPO2', 'COMPLAINT', 'PRESCRIPTION', 'EYE CHECK UP'];
+  // Row 3: Routine Clinical Checkup Table Headers
+  const checkupHeader = ['DATE', 'TEMP(F)', 'B/P', 'WEIGHT', 'P/R', 'SPO2', 'COMPLAINT', 'PRESCRIPTION', 'EYE CHECK UP'];
   
   const checkupRows = [];
 
-  // Baseline row from registration
-  const baselineDate = c.registeredDate || c.dob || new Date().toISOString().slice(0, 10);
-  const baselineMed = (medicinesList || []).map(m => m.medicineName || m.name).filter(Boolean).join(', ') || c.medications || 'NONE';
-  const baselineComplaint = c.medicalConditions || c.allergies || 'NONE';
-  const baselineEye = c.dentalRemarks || 'NORMAL';
-  const baselineWeight = c.weight || (growthList && growthList[0]?.weight) || '—';
-
-  checkupRows.push([
-    cleanCell(baselineDate),
-    '98.6',
-    '110/70',
-    cleanCell(baselineWeight),
-    '78',
-    '98',
-    cleanCell(baselineComplaint),
-    cleanCell(baselineMed),
-    cleanCell(baselineEye)
-  ]);
-
-  // Additional growth / checkup measurements
+  // Real growth / checkup measurements ONLY if they exist
   (growthList || []).forEach(g => {
-    if (g.date && g.date !== baselineDate) {
+    if (g.date || g.weight || g.temperature || g.bp) {
       checkupRows.push([
         cleanCell(g.date),
-        '98.6',
-        '110/70',
-        cleanCell(g.weight ? `${g.weight}` : '—'),
-        '80',
-        '98',
-        'NONE',
-        cleanCell(baselineMed),
-        'NORMAL'
+        cleanCell(g.temperature || g.temp),
+        cleanCell(g.bp || g.bloodPressure),
+        cleanCell(g.weight),
+        cleanCell(g.pulse || g.pulseRate),
+        cleanCell(g.spo2),
+        cleanCell(g.complaint || g.symptoms),
+        cleanCell(g.prescription || g.medication),
+        cleanCell(g.eyeCheckup || g.eyeRemarks)
       ]);
     }
   });
 
+  // Keep 12 empty template rows if fewer checkups exist, so user can type directly into the sheet
+  while (checkupRows.length < 12) {
+    checkupRows.push(['', '', '', '', '', '', '', '', '']);
+  }
+
+  // Row 16: empty spacer
+  const spacerRow1 = [];
+
+  // Row 17: Blood Test Report Section Title
   const bloodReportTitleRow = ['BLOOD TEST REPORT'];
+
+  // Row 18: empty spacer
+  const spacerRow2 = [];
+
+  // Row 19: Blood Test Report Column Headers
   const bloodReportHeaderRow = [
     'DATE', 'HAEMOGLOBIN', 'WBC', 'PLATELETS', 'RBC', 'PCV',
     'NEUTROPHIL', 'LYMPHOCYTES', 'EOSINOPHILS', 'MONOCYTES', 'BASOPHILS',
@@ -236,43 +231,41 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
 
   const bloodRows = [];
   (healthRecList || []).forEach(hr => {
-    bloodRows.push([
-      cleanCell(hr.date || baselineDate),
-      cleanCell(hr.hemoglobin || '12.4'),
-      cleanCell(hr.wbc || '8400'),
-      cleanCell(hr.platelets || '2.12'),
-      cleanCell(hr.rbc || '4.8'),
-      cleanCell(hr.pcv || '42.2'),
-      cleanCell(hr.neutrophil || '60'),
-      cleanCell(hr.lymphocytes || '32'),
-      cleanCell(hr.eosinophils || '5'),
-      cleanCell(hr.monocytes || '3'),
-      cleanCell(hr.basophils || '0'),
-      cleanCell(hr.rbcMorphology || 'NORMOCYTIC NORMOCHROMIC'),
-      cleanCell(hr.wbcMorphology || 'NORMAL'),
-      cleanCell(hr.plateletsAdequacy || 'ADEQUATE')
-    ]);
+    if (hr.date || hr.hemoglobin || hr.wbc || hr.platelets) {
+      bloodRows.push([
+        cleanCell(hr.date),
+        cleanCell(hr.hemoglobin || hr.hb),
+        cleanCell(hr.wbc),
+        cleanCell(hr.platelets),
+        cleanCell(hr.rbc),
+        cleanCell(hr.pcv),
+        cleanCell(hr.neutrophil),
+        cleanCell(hr.lymphocytes),
+        cleanCell(hr.eosinophils),
+        cleanCell(hr.monocytes),
+        cleanCell(hr.basophils),
+        cleanCell(hr.rbcMorphology),
+        cleanCell(hr.wbcMorphology),
+        cleanCell(hr.plateletsAdequacy)
+      ]);
+    }
   });
 
-  if (bloodRows.length === 0) {
-    bloodRows.push([
-      cleanCell(baselineDate),
-      '12.4', '8400', '2.12', '4.8', '42.2', '60', '32', '5', '3', '0',
-      'NORMOCYTIC NORMOCHROMIC', 'NORMAL', 'ADEQUATE'
-    ]);
+  // Keep 8 empty template rows if fewer blood tests exist
+  while (bloodRows.length < 8) {
+    bloodRows.push(['', '', '', '', '', '', '', '', '', '', '', '', '', '']);
   }
 
   return [
-    row1,
-    row2,
-    checkupHeader,
-    ...checkupRows,
-    [],
-    [],
-    bloodReportTitleRow,
-    [],
-    bloodReportHeaderRow,
-    ...bloodRows
+    row1,                  // Row 1
+    row2,                  // Row 2
+    checkupHeader,         // Row 3
+    ...checkupRows,        // Rows 4 to 15
+    spacerRow1,            // Row 16
+    bloodReportTitleRow,   // Row 17
+    spacerRow2,            // Row 18
+    bloodReportHeaderRow,  // Row 19
+    ...bloodRows           // Rows 20 to 27
   ];
 }
 
@@ -484,6 +477,136 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
             data: clinicalDataUpdates
           }
         });
+
+        // Apply clean column widths, bold headers, and clean background
+        try {
+          const formatRequests = [];
+          cleanChildren.forEach(c => {
+            const childTabTitle = sanitizeSheetTitle(c.name);
+            const gid = sheetMap.get(childTabTitle);
+            if (gid === undefined) return;
+
+            // Set column widths (Col A - N)
+            const colWidths = [
+              { start: 0, end: 1, width: 110 }, // A: DATE / CHILD NAME
+              { start: 1, end: 2, width: 100 }, // B: TEMP(F) / HAEMOGLOBIN
+              { start: 2, end: 3, width: 100 }, // C: B/P / WBC
+              { start: 3, end: 4, width: 180 }, // D: WEIGHT / CLINIC NAME
+              { start: 4, end: 5, width: 85 },  // E: P/R / RBC
+              { start: 5, end: 6, width: 85 },  // F: SPO2 / PCV
+              { start: 6, end: 7, width: 140 }, // G: COMPLAINT / NEUTROPHIL
+              { start: 7, end: 8, width: 150 }, // H: PRESCRIPTION / LYMPHOCYTES
+              { start: 8, end: 9, width: 130 }, // I: EYE CHECK UP / EOSINOPHILS
+              { start: 9, end: 10, width: 110 },// J: MONOCYTES
+              { start: 10, end: 11, width: 100 },// K: BASOPHILS
+              { start: 11, end: 12, width: 160 },// L: RBC MORPHOLOGY
+              { start: 12, end: 13, width: 150 },// M: WBC MORPHOLOGY
+              { start: 13, end: 14, width: 160 } // N: PLATELETS ADEQUACY
+            ];
+
+            colWidths.forEach(cw => {
+              formatRequests.push({
+                updateDimensionProperties: {
+                  range: {
+                    sheetId: gid,
+                    dimension: 'COLUMNS',
+                    startIndex: cw.start,
+                    endIndex: cw.end
+                  },
+                  properties: { pixelSize: cw.width },
+                  fields: 'pixelSize'
+                }
+              });
+            });
+
+            // Bold Row 1 (A1:D1)
+            formatRequests.push({
+              repeatCell: {
+                range: {
+                  sheetId: gid,
+                  startRowIndex: 0,
+                  endRowIndex: 1,
+                  startColumnIndex: 0,
+                  endColumnIndex: 5
+                },
+                cell: {
+                  userEnteredFormat: {
+                    textFormat: { bold: true, fontSize: 11 }
+                  }
+                },
+                fields: 'userEnteredFormat.textFormat'
+              }
+            });
+
+            // Bold Row 3 (A3:I3) with subtle background
+            formatRequests.push({
+              repeatCell: {
+                range: {
+                  sheetId: gid,
+                  startRowIndex: 2,
+                  endRowIndex: 3,
+                  startColumnIndex: 0,
+                  endColumnIndex: 9
+                },
+                cell: {
+                  userEnteredFormat: {
+                    textFormat: { bold: true, fontSize: 10 },
+                    backgroundColor: { red: 0.95, green: 0.96, blue: 0.98 }
+                  }
+                },
+                fields: 'userEnteredFormat(textFormat,backgroundColor)'
+              }
+            });
+
+            // Bold Row 17 (BLOOD TEST REPORT)
+            formatRequests.push({
+              repeatCell: {
+                range: {
+                  sheetId: gid,
+                  startRowIndex: 16,
+                  endRowIndex: 17,
+                  startColumnIndex: 0,
+                  endColumnIndex: 4
+                },
+                cell: {
+                  userEnteredFormat: {
+                    textFormat: { bold: true, fontSize: 11 }
+                  }
+                },
+                fields: 'userEnteredFormat.textFormat'
+              }
+            });
+
+            // Bold Row 19 (A19:N19) with subtle background
+            formatRequests.push({
+              repeatCell: {
+                range: {
+                  sheetId: gid,
+                  startRowIndex: 18,
+                  endRowIndex: 19,
+                  startColumnIndex: 0,
+                  endColumnIndex: 14
+                },
+                cell: {
+                  userEnteredFormat: {
+                    textFormat: { bold: true, fontSize: 10 },
+                    backgroundColor: { red: 0.95, green: 0.96, blue: 0.98 }
+                  }
+                },
+                fields: 'userEnteredFormat(textFormat,backgroundColor)'
+              }
+            });
+          });
+
+          if (formatRequests.length > 0) {
+            await sheets.spreadsheets.batchUpdate({
+              spreadsheetId: clinicalSheetId,
+              requestBody: { requests: formatRequests }
+            });
+          }
+        } catch (fmtErr) {
+          console.warn('[Google OAuth] Sheet formatting notice:', fmtErr.message);
+        }
       }
 
       console.log(`[Google OAuth] Successfully synced ${cleanChildren.length} individual child tabs in Student Medical Records (${clinicalSheetId})`);

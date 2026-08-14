@@ -3,7 +3,7 @@ import { getChildren, getChild, getActivities, getPendingDocs, timeAgo, activity
 import { childRows } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
-import { getGoogleSheetUrl, getSheetsConfig } from './googleSheetsSync.js';
+import { getGoogleSheetUrl, getClinicalSheetUrl, getSheetsConfig, getNgoSlug } from './googleSheetsSync.js';
 import { getGoogleDocUrl, getDocsConfig } from './googleDocsSync.js';
 import { calendarCard, renderCalendarGrid, renderDayView, renderBookingForm, computeAppointmentStatus, formatSingleDisplayTime } from './googleCalendar.js';
 
@@ -793,11 +793,12 @@ export function reportsPage() {
 
 export function settingsPage() {
   const session = getSession() || {};
-  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const ngoSlug = getNgoSlug(session);
   const sheetsConfig = getSheetsConfig() || {};
   const isConnected = !!sheetsConfig.connected;
   const adminEmail = sheetsConfig.adminEmail || 'Admin';
-  const sheetUrl = getGoogleSheetUrl();
+  const masterSheetUrl = getGoogleSheetUrl();
+  const clinicalSheetUrl = getClinicalSheetUrl();
 
   return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
   <div class="settings-layout">
@@ -820,8 +821,8 @@ export function settingsPage() {
           </div>
           <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
             ${isConnected 
-              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheet.`
-              : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records are stored directly in your own Google Spreadsheet.`
+              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
+              : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
             }
           </p>
 
@@ -832,10 +833,15 @@ export function settingsPage() {
                 Connect Google Sheets Sync
               </a>
             ` : `
-              ${sheetUrl ? `
-                <a href="${escapeHTML(sheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
+              ${clinicalSheetUrl ? `
+                <a href="${escapeHTML(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
                   ${icon('googleSheets')}
-                  Open Live Google Sheet ↗
+                  Open Student Medical Records Workbook ↗
+                </a>
+              ` : ''}
+              ${masterSheetUrl ? `
+                <a href="${escapeHTML(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                  📄 Master Directory Sheet ↗
                 </a>
               ` : ''}
               <a href="/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; text-decoration: none; margin-left: auto;">

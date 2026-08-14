@@ -36,11 +36,20 @@ export const EXACT_SHEET_COLUMNS = [
 let cachedSheetsConfig = null;
 
 /**
+ * Helper to consistently get the sanitized lowercase NGO slug
+ */
+export function getNgoSlug(session) {
+  const sess = session || getSession() || {};
+  const raw = sess.ngoSlug || sess.ngo || 'ayusha-nilayam';
+  return String(raw).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
+}
+
+/**
  * Fetch Sheets config for the current NGO from backend API
  */
 export async function fetchSheetsConfig(ngoSlug) {
   const session = getSession() || {};
-  const slug = ngoSlug || session.ngo || 'ayusha-nilayam';
+  const slug = ngoSlug ? String(ngoSlug).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') : getNgoSlug(session);
   try {
     const res = await apiFetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
     if (res.ok) {
@@ -51,6 +60,10 @@ export async function fetchSheetsConfig(ngoSlug) {
       if (cachedSheetsConfig?.clinicalSpreadsheetUrl) {
         localStorage.setItem(`google_clinical_sheet_url_${slug}`, cachedSheetsConfig.clinicalSpreadsheetUrl);
         localStorage.setItem('google_clinical_sheet_url', cachedSheetsConfig.clinicalSpreadsheetUrl);
+      }
+      if (cachedSheetsConfig?.spreadsheetUrl) {
+        localStorage.setItem(`google_sheet_url_${slug}`, cachedSheetsConfig.spreadsheetUrl);
+        localStorage.setItem('google_sheet_url', cachedSheetsConfig.spreadsheetUrl);
       }
       return cachedSheetsConfig;
     }
@@ -68,22 +81,30 @@ export function getSheetsConfig() {
 }
 
 /**
- * Get live view link to the logged-in NGO's Google Sheet (returns null if not connected)
+ * Get live view link to the Master Directory Google Sheet ("Ayusha Nilayam — Child Health Records")
  */
 export function getGoogleSheetUrl() {
   const session = getSession() || {};
-  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const ngoSlug = getNgoSlug(session);
   const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
   return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
+}
+
+/**
+ * Get live view link to the dedicated Student Medical Records workbook ("Ayusha Nilayam — Student Medical Records")
+ */
+export function getClinicalSheetUrl() {
+  const session = getSession() || {};
+  const ngoSlug = getNgoSlug(session);
+  const savedUrl = localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
+  return cachedSheetsConfig?.clinicalSpreadsheetUrl || savedUrl || null;
 }
 
 /**
  * Get direct Google Sheet URL for a specific child tab inside Student Medical Records workbook
  */
 export function getChildGoogleSheetUrl(childId, childName) {
-  const session = getSession() || {};
-  const ngoSlug = session.ngo || 'ayusha-nilayam';
-  const clinicalUrl = cachedSheetsConfig?.clinicalSpreadsheetUrl || localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
+  const clinicalUrl = getClinicalSheetUrl();
   if (!clinicalUrl) return null;
 
   let gids = cachedSheetsConfig?.childSheetGids;
@@ -95,7 +116,8 @@ export function getChildGoogleSheetUrl(childId, childName) {
     }
   }
 
-  const gid = gids?.[childId] ?? gids?.[childName] ?? gids?.[(childName || '').toUpperCase()] ?? null;
+  const nameUpper = (childName || '').trim().toUpperCase();
+  const gid = gids?.[childId] ?? gids?.[childName] ?? gids?.[nameUpper] ?? null;
 
   const baseUrl = clinicalUrl.split('#')[0].replace(/\/edit.*$/, '/edit');
   if (gid !== null && gid !== undefined) {
@@ -120,7 +142,7 @@ export async function openChildGoogleSheet(childId, childName) {
   } catch (e) {}
 
   const session = getSession() || {};
-  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const ngoSlug = getNgoSlug(session);
   const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
   const children = getChildren() || [];
 
