@@ -38272,9 +38272,9 @@
         .map(row => row.dataset.childId);
       reorderChildren(orderedIds);
 
-      // Flash the moved row
+      // Flash the moved row with a smooth 2-second fade
       dragRow.classList.add('drag-flash');
-      setTimeout(() => dragRow.classList.remove('drag-flash'), 600);
+      setTimeout(() => dragRow?.classList.remove('drag-flash'), 2000);
 
       toast('Row position updated', 'Saved child record order.');
       syncWithServer().catch(() => {});
@@ -38395,6 +38395,7 @@
         .map(th => th.dataset.column);
       setColumnOrder(newOrder);
 
+      // Flash the moved column with a smooth 2-second fade
       dragColTh.classList.add('col-drag-flash');
       tbody.querySelectorAll(`td[data-column="${draggedColId}"]`).forEach(td => {
         td.classList.add('col-drag-flash');
@@ -38403,7 +38404,7 @@
       setTimeout(() => {
         dragColTh?.classList.remove('col-drag-flash');
         tbody.querySelectorAll('.col-drag-flash').forEach(td => td.classList.remove('col-drag-flash'));
-      }, 600);
+      }, 2000);
 
       applyColumnVisibility();
       enableColumnResize();
