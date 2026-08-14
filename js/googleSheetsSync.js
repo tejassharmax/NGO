@@ -78,12 +78,12 @@ export function getGoogleSheetUrl() {
 }
 
 /**
- * Get direct Google Sheet URL for a specific child tab
+ * Get direct Google Sheet URL for a specific child tab inside Student Medical Records workbook
  */
 export function getChildGoogleSheetUrl(childId, childName) {
   const session = getSession() || {};
   const ngoSlug = session.ngo || 'ayusha-nilayam';
-  const clinicalUrl = cachedSheetsConfig?.clinicalSpreadsheetUrl || localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url') || getGoogleSheetUrl();
+  const clinicalUrl = cachedSheetsConfig?.clinicalSpreadsheetUrl || localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
   if (!clinicalUrl) return null;
 
   let gids = cachedSheetsConfig?.childSheetGids;
@@ -108,17 +108,45 @@ export function getChildGoogleSheetUrl(childId, childName) {
  * Open a child's dedicated Google Sheet tab in a new browser window
  */
 export async function openChildGoogleSheet(childId, childName) {
-  toast('Opening Google Sheet...', `Connecting to ${childName || 'child'}'s sheet...`);
+  toast('Opening Google Sheet...', `Connecting to ${childName || 'student'}'s sheet...`);
   
+  const session = getSession() || {};
+  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+  const children = getChildren() || [];
+
   let targetUrl = getChildGoogleSheetUrl(childId, childName);
-  
-  if (!targetUrl) {
-    const cfg = await fetchSheetsConfig();
-    if (cfg && cfg.connected && cfg.spreadsheetUrl) {
-      if (cfg.childSheetGids) {
-        localStorage.setItem('chm_child_sheet_gids', JSON.stringify(cfg.childSheetGids));
+
+  // If Student Medical Records workbook or child GID is not ready, trigger a fast sync to create & fetch it
+  if (!targetUrl || !cachedSheetsConfig?.clinicalSpreadsheetUrl) {
+    try {
+      const res = await apiFetch('/api/sheets/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ children, ngo: ngoSlug, ngoName })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          if (!cachedSheetsConfig) cachedSheetsConfig = { connected: true };
+          cachedSheetsConfig.connected = true;
+          if (data.spreadsheetUrl) cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
+          if (data.clinicalSpreadsheetUrl) {
+            cachedSheetsConfig.clinicalSpreadsheetUrl = data.clinicalSpreadsheetUrl;
+            cachedSheetsConfig.clinicalSheetId = data.clinicalSheetId;
+            localStorage.setItem(`google_clinical_sheet_url_${ngoSlug}`, data.clinicalSpreadsheetUrl);
+            localStorage.setItem('google_clinical_sheet_url', data.clinicalSpreadsheetUrl);
+          }
+          if (data.childSheetGids) {
+            cachedSheetsConfig.childSheetGids = data.childSheetGids;
+            localStorage.setItem('chm_child_sheet_gids', JSON.stringify(data.childSheetGids));
+          }
+          targetUrl = getChildGoogleSheetUrl(childId, childName) || data.clinicalSpreadsheetUrl;
+        }
       }
-      targetUrl = getChildGoogleSheetUrl(childId, childName) || cfg.spreadsheetUrl;
+    } catch (e) {
+      console.warn('[Google Sheets] Sync exception:', e);
     }
   }
 
