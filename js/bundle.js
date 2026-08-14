@@ -34293,11 +34293,20 @@
   let cachedSheetsConfig = null;
 
   /**
+   * Helper to consistently get the sanitized lowercase NGO slug
+   */
+  function getNgoSlug(session) {
+    const sess = session || getSession() || {};
+    const raw = sess.ngoSlug || sess.ngo || 'ayusha-nilayam';
+    return String(raw).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
+  }
+
+  /**
    * Fetch Sheets config for the current NGO from backend API
    */
   async function fetchSheetsConfig(ngoSlug) {
     const session = getSession() || {};
-    const slug = session.ngo || 'ayusha-nilayam';
+    const slug = getNgoSlug(session);
     try {
       const res = await apiFetch$1(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
       if (res.ok) {
@@ -34308,6 +34317,10 @@
         if (cachedSheetsConfig?.clinicalSpreadsheetUrl) {
           localStorage.setItem(`google_clinical_sheet_url_${slug}`, cachedSheetsConfig.clinicalSpreadsheetUrl);
           localStorage.setItem('google_clinical_sheet_url', cachedSheetsConfig.clinicalSpreadsheetUrl);
+        }
+        if (cachedSheetsConfig?.spreadsheetUrl) {
+          localStorage.setItem(`google_sheet_url_${slug}`, cachedSheetsConfig.spreadsheetUrl);
+          localStorage.setItem('google_sheet_url', cachedSheetsConfig.spreadsheetUrl);
         }
         return cachedSheetsConfig;
       }
@@ -34325,22 +34338,30 @@
   }
 
   /**
-   * Get live view link to the logged-in NGO's Google Sheet (returns null if not connected)
+   * Get live view link to the Master Directory Google Sheet ("Ayusha Nilayam — Child Health Records")
    */
   function getGoogleSheetUrl() {
     const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoSlug = getNgoSlug(session);
     const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
     return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
+  }
+
+  /**
+   * Get live view link to the dedicated Student Medical Records workbook ("Ayusha Nilayam — Student Medical Records")
+   */
+  function getClinicalSheetUrl() {
+    const session = getSession() || {};
+    const ngoSlug = getNgoSlug(session);
+    const savedUrl = localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
+    return cachedSheetsConfig?.clinicalSpreadsheetUrl || savedUrl || null;
   }
 
   /**
    * Get direct Google Sheet URL for a specific child tab inside Student Medical Records workbook
    */
   function getChildGoogleSheetUrl(childId, childName) {
-    const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
-    const clinicalUrl = cachedSheetsConfig?.clinicalSpreadsheetUrl || localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
+    const clinicalUrl = getClinicalSheetUrl();
     if (!clinicalUrl) return null;
 
     let gids = cachedSheetsConfig?.childSheetGids;
@@ -34352,7 +34373,8 @@
       }
     }
 
-    const gid = gids?.[childId] ?? gids?.[childName] ?? gids?.[(childName || '').toUpperCase()] ?? null;
+    const nameUpper = (childName || '').trim().toUpperCase();
+    const gid = gids?.[childId] ?? gids?.[childName] ?? gids?.[nameUpper] ?? null;
 
     const baseUrl = clinicalUrl.split('#')[0].replace(/\/edit.*$/, '/edit');
     if (gid !== null && gid !== undefined) {
@@ -34377,7 +34399,7 @@
     } catch (e) {}
 
     const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoSlug = getNgoSlug(session);
     const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
     const children = getChildren() || [];
 
@@ -36526,11 +36548,12 @@
 
   function settingsPage() {
     const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoSlug = getNgoSlug(session);
     const sheetsConfig = getSheetsConfig() || {};
     const isConnected = !!sheetsConfig.connected;
     const adminEmail = sheetsConfig.adminEmail || 'Admin';
-    const sheetUrl = getGoogleSheetUrl();
+    const masterSheetUrl = getGoogleSheetUrl();
+    const clinicalSheetUrl = getClinicalSheetUrl();
 
     return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
   <div class="settings-layout">
@@ -36553,8 +36576,8 @@
           </div>
           <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
             ${isConnected 
-              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheet.`
-              : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records are stored directly in your own Google Spreadsheet.`
+              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
+              : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
             }
           </p>
 
@@ -36565,10 +36588,15 @@
                 Connect Google Sheets Sync
               </a>
             ` : `
-              ${sheetUrl ? `
-                <a href="${escapeHTML$1(sheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
+              ${clinicalSheetUrl ? `
+                <a href="${escapeHTML$1(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
                   ${icon('googleSheets')}
-                  Open Live Google Sheet ↗
+                  Open Student Medical Records Workbook ↗
+                </a>
+              ` : ''}
+              ${masterSheetUrl ? `
+                <a href="${escapeHTML$1(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                  📄 Master Directory Sheet ↗
                 </a>
               ` : ''}
               <a href="/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; text-decoration: none; margin-left: auto;">
