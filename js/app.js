@@ -22,20 +22,30 @@ const itemsPerPage = 5;
 let page = 'dashboard';
 
 // ─── Authentication Guard & Async App Start ───
+let renderCurrentPage = null;
+
 (async () => {
   localStorage.removeItem('sample-students');
   localStorage.setItem('chm-documents', '[]');
   localStorage.setItem('chm-pending-docs', '[]');
-  const isLoggedIn = isSessionActive();
 
   function getActivePage() {
     const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
     if (hash && hash.trim() !== '') return hash.trim();
-    return isLoggedIn ? 'dashboard' : 'login';
+    return isSessionActive() ? 'dashboard' : 'login';
   }
 
-  function renderCurrentPage() {
+  renderCurrentPage = async function() {
+    const loggedIn = isSessionActive();
     page = getActivePage();
+
+    if (!loggedIn && page !== 'login') {
+      window.location.hash = '#/login';
+      page = 'login';
+    } else if (loggedIn && page === 'login') {
+      window.location.hash = '#/';
+      page = 'dashboard';
+    }
 
     const deprecatedPages = ['emergency', 'expenses', 'nutrition', 'export'];
     if (deprecatedPages.includes(page)) {
@@ -56,36 +66,27 @@ let page = 'dashboard';
     }
 
     enableColumnResize();
-  }
 
-  page = getActivePage();
-
-  if (!isLoggedIn && page !== 'login') {
-    window.location.href = pagePath('login');
-  } else if (isLoggedIn && page === 'login') {
-    window.location.href = pagePath('dashboard');
-  } else {
-    // Await database sync from server & Google Workspace config if logged in
     if (page !== 'login') {
-      await Promise.all([
-        syncWithServer(),
-        fetchSheetsConfig(),
-        fetchDocsConfig()
-      ]);
+      syncWithServer().catch(() => {});
+      fetchSheetsConfig().catch(() => {});
+      fetchDocsConfig().catch(() => {});
     }
+  };
 
-    if (window.location.href.includes('google_connected=true')) {
-      toast('Google Workspace Connected!', 'Your NGO Google Account is connected for Sheets & Docs sync.');
-    } else if (window.location.href.includes('google_disconnected=true')) {
-      toast('Google Workspace Disconnected', 'Workspace integration turned off.');
-    }
-
-    renderCurrentPage();
-
-    window.addEventListener('hashchange', () => {
-      renderCurrentPage();
-    });
+  if (window.location.href.includes('google_connected=true')) {
+    toast('Google Workspace Connected!', 'Your NGO Google Account is connected for Sheets & Docs sync.');
+  } else if (window.location.href.includes('google_disconnected=true')) {
+    toast('Google Workspace Disconnected', 'Workspace integration turned off.');
   }
+
+  // Always listen for hash changes
+  window.addEventListener('hashchange', () => {
+    if (renderCurrentPage) renderCurrentPage();
+  });
+
+  // Initial render
+  await renderCurrentPage();
 })();
 
 
@@ -121,11 +122,15 @@ document.addEventListener('click', (event) => {
   if (target.matches('[data-notifications]')) { const dropdown = document.querySelector('[data-notif-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-profile-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
   if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-notif-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
 
-  if (target.matches('[data-sign-out]')) {
+  const signOutBtn = target.closest('[data-sign-out]');
+  if (signOutBtn) {
+    event.preventDefault();
     logoutUser().then(() => {
-      toast('Signed out', 'Terminated Firebase Session and cleared workspace state.');
-      window.setTimeout(() => { window.location.href = pagePath('login'); }, 600);
+      toast('Signed Out', 'Terminated session and cleared workspace state.');
+      window.location.hash = '#/login';
+      if (renderCurrentPage) renderCurrentPage();
     });
+    return;
   }
 
   if (target.closest('[data-google-login]')) {
@@ -133,7 +138,8 @@ document.addEventListener('click', (event) => {
     loginWithGoogle().then((res) => {
       if (res.success) {
         toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
-        window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
+        window.location.hash = '#/';
+        if (renderCurrentPage) renderCurrentPage();
       } else if (res.errorCode === 'ACCESS_DENIED') {
         modal({
           title: 'Access Denied',
@@ -499,13 +505,6 @@ document.addEventListener('click', (event) => {
 
   if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
     exportChildrenToExcel();
-  }
-
-  if (target.closest('[data-sign-out]')) {
-    logoutUser();
-    toast('Signed Out', 'You have been signed out.');
-    window.location.href = pagePath('login');
-    return;
   }
 
   if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
