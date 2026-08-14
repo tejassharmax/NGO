@@ -34029,7 +34029,7 @@
       const age = calculateAge(child.dob);
       return `<tr>
     <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
-    <td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name">${child.name}</span><span class="table-person__id">${child.id}</span></div></a></td>
+    <td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name" style="display:inline-flex; align-items:center; gap:6px;">${child.name}<button class="icon-button icon-button--small tooltip" data-tooltip="Open in Google Sheets" type="button" aria-label="Open ${child.name}'s Google Sheet" data-open-child-sheet="${child.id}" data-child-name="${child.name}" style="width:22px; height:22px; min-width:22px; padding:2px; border:none; background:transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.85; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">${icon('googleSheets')}</button></span><span class="table-person__id">${child.id}</span></div></a></td>
     <td data-column="age">${age || '—'}</td><td class="hide-tablet" data-column="gender">${child.gender || '—'}</td><td class="hide-tablet" data-column="blood">${child.blood || '—'}</td><td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>
     <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
   </tr>`;
@@ -34302,6 +34302,9 @@
       const res = await apiFetch$1(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
       if (res.ok) {
         cachedSheetsConfig = await res.json();
+        if (cachedSheetsConfig?.childSheetGids) {
+          localStorage.setItem('chm_child_sheet_gids', JSON.stringify(cachedSheetsConfig.childSheetGids));
+        }
         return cachedSheetsConfig;
       }
     } catch (err) {
@@ -34325,6 +34328,75 @@
     const ngoSlug = session.ngo || 'ayusha-nilayam';
     const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
     return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
+  }
+
+  /**
+   * Get direct Google Sheet URL for a specific child tab
+   */
+  function getChildGoogleSheetUrl(childId, childName) {
+    const masterUrl = getGoogleSheetUrl();
+    if (!masterUrl) return null;
+
+    let gids = cachedSheetsConfig?.childSheetGids;
+    if (!gids) {
+      try {
+        gids = JSON.parse(localStorage.getItem('chm_child_sheet_gids') || '{}');
+      } catch (e) {
+        gids = {};
+      }
+    }
+
+    const gid = gids?.[childId] ?? gids?.[childName] ?? gids?.[(childName || '').toUpperCase()] ?? null;
+
+    const baseUrl = masterUrl.split('#')[0].replace(/\/edit.*$/, '/edit');
+    if (gid !== null && gid !== undefined) {
+      return `${baseUrl}#gid=${gid}`;
+    }
+    return masterUrl;
+  }
+
+  /**
+   * Open a child's dedicated Google Sheet tab in a new browser window
+   */
+  async function openChildGoogleSheet(childId, childName) {
+    toast('Opening Google Sheet...', `Connecting to ${childName || 'child'}'s sheet...`);
+    
+    let targetUrl = getChildGoogleSheetUrl(childId, childName);
+    
+    if (!targetUrl) {
+      const cfg = await fetchSheetsConfig();
+      if (cfg && cfg.connected && cfg.spreadsheetUrl) {
+        if (cfg.childSheetGids) {
+          localStorage.setItem('chm_child_sheet_gids', JSON.stringify(cfg.childSheetGids));
+        }
+        targetUrl = getChildGoogleSheetUrl(childId, childName) || cfg.spreadsheetUrl;
+      }
+    }
+
+    if (targetUrl) {
+      window.open(targetUrl, '_blank');
+    } else {
+      // Show connection modal prompting user to connect Google Workspace in Settings
+      const modalRoot = document.querySelector('#modal-root');
+      if (modalRoot) {
+        modalRoot.innerHTML = `
+        <div class="modal-backdrop" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; justify-content:center; animation:fadeIn 0.2s ease;">
+          <div class="card" style="max-width:440px; width:90%; padding:24px; text-align:center; box-shadow:0 20px 25px -5px rgba(0,0,0,0.2);">
+            <div style="width:52px; height:52px; border-radius:50%; background:rgba(16,185,129,0.12); color:#059669; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
+              ${icon('googleSheets')}
+            </div>
+            <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
+            <p style="font-size:13.5px; color:var(--color-text-muted); margin:0 0 20px 0; line-height:1.5;">
+              To view <b>${escapeHTML$1(childName || 'this child')}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
+            </p>
+            <div style="display:flex; gap:10px; justify-content:center;">
+              <button class="button button--ghost" type="button" onclick="document.querySelector('#modal-root').replaceChildren();">Cancel</button>
+              <a class="button button--primary" href="#/settings" onclick="document.querySelector('#modal-root').replaceChildren();">Go to Settings</a>
+            </div>
+          </div>
+        </div>`;
+      }
+    }
   }
 
   function formatUnitValue(val, unit) {
@@ -34695,6 +34767,10 @@
             cachedSheetsConfig.connected = true;
             cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
             cachedSheetsConfig.sheetId = data.sheetId;
+            if (data.childSheetGids) {
+              cachedSheetsConfig.childSheetGids = data.childSheetGids;
+              localStorage.setItem('chm_child_sheet_gids', JSON.stringify(data.childSheetGids));
+            }
             localStorage.setItem(`google_sheet_url_${ngoSlug}`, data.spreadsheetUrl);
             localStorage.setItem('google_sheet_url', data.spreadsheetUrl);
           }
@@ -35938,7 +36014,7 @@
       timelineHTML = `<div class="timeline">${activities.map(a => `<div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>${a.action ? a.action.replace(/_/g, ' ').toUpperCase() : 'ACTIVITY'}</b><p>${a.detail || a.childName}</p><time>${timeAgo(a.timestamp)}</time></div></div>`).join('')}</div>`;
     }
 
-    return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
+    return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-open-child-sheet="${child.id}" data-child-name="${escapeHTML$1(child.name)}" style="display:inline-flex; align-items:center; gap:8px;">${icon('googleSheets')}Open Google Sheet</button><button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
   <section class="card">
     <div class="profile-header">
       <span class="profile-header__avatar">${initials(child.name)}</span>
@@ -37162,7 +37238,7 @@
 
   // Document Clicks
   document.addEventListener('click', (event) => {
-    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
+    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
     if (!target) return;
 
     if (target.matches('[data-topbar-back]')) {
@@ -37398,6 +37474,16 @@
           target.textContent = isHidden ? 'Fewer options' : 'More options';
         }
       }
+      return;
+    }
+
+    const childSheetBtn = target.closest('[data-open-child-sheet]');
+    if (childSheetBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      const childId = childSheetBtn.dataset.openChildSheet;
+      const childName = childSheetBtn.dataset.childName;
+      openChildGoogleSheet(childId, childName);
       return;
     }
 

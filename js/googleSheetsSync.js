@@ -9,7 +9,7 @@
 import { getSession } from './session.js';
 import { toast } from './toast.js';
 import { getChildren, calculateAge } from './storage.js';
-import { escapeHTML } from './utils.js';
+import { escapeHTML, icon } from './utils.js';
 import { apiFetch } from './apiClient.js';
 
 export const EXACT_SHEET_COLUMNS = [
@@ -45,6 +45,9 @@ export async function fetchSheetsConfig(ngoSlug) {
     const res = await apiFetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
     if (res.ok) {
       cachedSheetsConfig = await res.json();
+      if (cachedSheetsConfig?.childSheetGids) {
+        localStorage.setItem('chm_child_sheet_gids', JSON.stringify(cachedSheetsConfig.childSheetGids));
+      }
       return cachedSheetsConfig;
     }
   } catch (err) {
@@ -68,6 +71,75 @@ export function getGoogleSheetUrl() {
   const ngoSlug = session.ngo || 'ayusha-nilayam';
   const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
   return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
+}
+
+/**
+ * Get direct Google Sheet URL for a specific child tab
+ */
+export function getChildGoogleSheetUrl(childId, childName) {
+  const masterUrl = getGoogleSheetUrl();
+  if (!masterUrl) return null;
+
+  let gids = cachedSheetsConfig?.childSheetGids;
+  if (!gids) {
+    try {
+      gids = JSON.parse(localStorage.getItem('chm_child_sheet_gids') || '{}');
+    } catch (e) {
+      gids = {};
+    }
+  }
+
+  const gid = gids?.[childId] ?? gids?.[childName] ?? gids?.[(childName || '').toUpperCase()] ?? null;
+
+  const baseUrl = masterUrl.split('#')[0].replace(/\/edit.*$/, '/edit');
+  if (gid !== null && gid !== undefined) {
+    return `${baseUrl}#gid=${gid}`;
+  }
+  return masterUrl;
+}
+
+/**
+ * Open a child's dedicated Google Sheet tab in a new browser window
+ */
+export async function openChildGoogleSheet(childId, childName) {
+  toast('Opening Google Sheet...', `Connecting to ${childName || 'child'}'s sheet...`);
+  
+  let targetUrl = getChildGoogleSheetUrl(childId, childName);
+  
+  if (!targetUrl) {
+    const cfg = await fetchSheetsConfig();
+    if (cfg && cfg.connected && cfg.spreadsheetUrl) {
+      if (cfg.childSheetGids) {
+        localStorage.setItem('chm_child_sheet_gids', JSON.stringify(cfg.childSheetGids));
+      }
+      targetUrl = getChildGoogleSheetUrl(childId, childName) || cfg.spreadsheetUrl;
+    }
+  }
+
+  if (targetUrl) {
+    window.open(targetUrl, '_blank');
+  } else {
+    // Show connection modal prompting user to connect Google Workspace in Settings
+    const modalRoot = document.querySelector('#modal-root');
+    if (modalRoot) {
+      modalRoot.innerHTML = `
+        <div class="modal-backdrop" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; justify-content:center; animation:fadeIn 0.2s ease;">
+          <div class="card" style="max-width:440px; width:90%; padding:24px; text-align:center; box-shadow:0 20px 25px -5px rgba(0,0,0,0.2);">
+            <div style="width:52px; height:52px; border-radius:50%; background:rgba(16,185,129,0.12); color:#059669; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
+              ${icon('googleSheets')}
+            </div>
+            <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
+            <p style="font-size:13.5px; color:var(--color-text-muted); margin:0 0 20px 0; line-height:1.5;">
+              To view <b>${escapeHTML(childName || 'this child')}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
+            </p>
+            <div style="display:flex; gap:10px; justify-content:center;">
+              <button class="button button--ghost" type="button" onclick="document.querySelector('#modal-root').replaceChildren();">Cancel</button>
+              <a class="button button--primary" href="#/settings" onclick="document.querySelector('#modal-root').replaceChildren();">Go to Settings</a>
+            </div>
+          </div>
+        </div>`;
+    }
+  }
 }
 
 export function formatUnitValue(val, unit) {
@@ -451,6 +523,10 @@ export async function autoSyncChildToGoogleSheets(child) {
           cachedSheetsConfig.connected = true;
           cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
           cachedSheetsConfig.sheetId = data.sheetId;
+          if (data.childSheetGids) {
+            cachedSheetsConfig.childSheetGids = data.childSheetGids;
+            localStorage.setItem('chm_child_sheet_gids', JSON.stringify(data.childSheetGids));
+          }
           localStorage.setItem(`google_sheet_url_${ngoSlug}`, data.spreadsheetUrl);
           localStorage.setItem('google_sheet_url', data.spreadsheetUrl);
         }

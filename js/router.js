@@ -323,7 +323,7 @@ export function childProfilePage() {
     timelineHTML = `<div class="timeline">${activities.map(a => `<div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>${a.action ? a.action.replace(/_/g, ' ').toUpperCase() : 'ACTIVITY'}</b><p>${a.detail || a.childName}</p><time>${timeAgo(a.timestamp)}</time></div></div>`).join('')}</div>`;
   }
 
-  return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
+  return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-open-child-sheet="${child.id}" data-child-name="${escapeHTML(child.name)}" style="display:inline-flex; align-items:center; gap:8px;">${icon('googleSheets')}Open Google Sheet</button><button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
   <section class="card">
     <div class="profile-header">
       <span class="profile-header__avatar">${initials(child.name)}</span>

@@ -419,7 +419,8 @@ app.get('/api/sheets/config', requireAuth, (req, res) => {
     connected,
     adminEmail: integration.adminEmail || null,
     sheetId: integration.sheetId || null,
-    spreadsheetUrl: integration.spreadsheetUrl || null
+    spreadsheetUrl: integration.spreadsheetUrl || null,
+    childSheetGids: integration.childSheetGids || {}
   });
 });
 
