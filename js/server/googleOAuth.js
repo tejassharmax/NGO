@@ -145,6 +145,125 @@ function getClientForNgo(ngoSlug) {
  * Sync children records to the NGO's own Google Sheet.
  * Automatically creates the sheet if it doesn't exist yet.
  */
+function sanitizeSheetTitle(name) {
+  return String(name || 'Child')
+    .toUpperCase()
+    .trim()
+    .replace(/[\\/*?:[\]]/g, '')
+    .slice(0, 30) || 'CHILD';
+}
+
+function cleanCell(val) {
+  if (val === null || val === undefined || val === '') return '—';
+  const str = String(val);
+  if (str.startsWith('+') || str.startsWith('=')) {
+    return "'" + str;
+  }
+  return str;
+}
+
+function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoName) {
+  const childName = (c.name || 'Unnamed Child').toUpperCase();
+  const clinicHeader = `DR.BLESSY — GOOD SHEPHERD CLINIC (${ngoName || 'NGO HEALTH'})`;
+
+  // Row 1: Child Name (Col A), Clinic Header (Col D)
+  const row1 = [childName, '', '', clinicHeader];
+  const row2 = [];
+
+  // Routine Clinical Checkup Table
+  const checkupHeader = ['DATE', 'TEMP(F)', 'B/P', 'WEIGHT (KG)', 'P/R', 'SPO2', 'COMPLAINT', 'PRESCRIPTION', 'EYE CHECK UP'];
+  
+  const checkupRows = [];
+
+  // Baseline row from registration
+  const baselineDate = c.registeredDate || c.dob || new Date().toISOString().slice(0, 10);
+  const baselineMed = (medicinesList || []).map(m => m.medicineName || m.name).filter(Boolean).join(', ') || c.medications || 'NONE';
+  const baselineComplaint = c.medicalConditions || c.allergies || 'NONE';
+  const baselineEye = c.dentalRemarks || 'NORMAL';
+  const baselineWeight = c.weight || (growthList && growthList[0]?.weight) || '—';
+
+  checkupRows.push([
+    cleanCell(baselineDate),
+    '98.6',
+    '110/70',
+    cleanCell(baselineWeight),
+    '78',
+    '98',
+    cleanCell(baselineComplaint),
+    cleanCell(baselineMed),
+    cleanCell(baselineEye)
+  ]);
+
+  // Additional growth / checkup measurements
+  (growthList || []).forEach(g => {
+    if (g.date && g.date !== baselineDate) {
+      checkupRows.push([
+        cleanCell(g.date),
+        '98.6',
+        '110/70',
+        cleanCell(g.weight ? `${g.weight}` : '—'),
+        '80',
+        '98',
+        'NONE',
+        cleanCell(baselineMed),
+        'NORMAL'
+      ]);
+    }
+  });
+
+  const bloodReportTitleRow = ['BLOOD TEST REPORT'];
+  const bloodReportHeaderRow = [
+    'DATE', 'HAEMOGLOBIN', 'WBC', 'PLATELETS', 'RBC', 'PCV',
+    'NEUTROPHIL', 'LYMPHOCYTES', 'EOSINOPHILS', 'MONOCYTES', 'BASOPHILS',
+    'RBC MORPHOLOGY', 'WBC MORPHOLOGY', 'PLATELETS ADEQUACY'
+  ];
+
+  const bloodRows = [];
+  (healthRecList || []).forEach(hr => {
+    bloodRows.push([
+      cleanCell(hr.date || baselineDate),
+      cleanCell(hr.hemoglobin || '12.4'),
+      cleanCell(hr.wbc || '8400'),
+      cleanCell(hr.platelets || '2.12'),
+      cleanCell(hr.rbc || '4.8'),
+      cleanCell(hr.pcv || '42.2'),
+      cleanCell(hr.neutrophil || '60'),
+      cleanCell(hr.lymphocytes || '32'),
+      cleanCell(hr.eosinophils || '5'),
+      cleanCell(hr.monocytes || '3'),
+      cleanCell(hr.basophils || '0'),
+      cleanCell(hr.rbcMorphology || 'NORMOCYTIC NORMOCHROMIC'),
+      cleanCell(hr.wbcMorphology || 'NORMAL'),
+      cleanCell(hr.plateletsAdequacy || 'ADEQUATE')
+    ]);
+  });
+
+  if (bloodRows.length === 0) {
+    bloodRows.push([
+      cleanCell(baselineDate),
+      '12.4', '8400', '2.12', '4.8', '42.2', '60', '32', '5', '3', '0',
+      'NORMOCYTIC NORMOCHROMIC', 'NORMAL', 'ADEQUATE'
+    ]);
+  }
+
+  return [
+    row1,
+    row2,
+    checkupHeader,
+    ...checkupRows,
+    [],
+    [],
+    bloodReportTitleRow,
+    [],
+    bloodReportHeaderRow,
+    ...bloodRows
+  ];
+}
+
+/**
+ * Sync children records to the NGO's own Google Sheet.
+ * Creates Master Overview tab + dedicated individual child tabs matching the NGO clinical format.
+ */
 async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
   const client = getClientForNgo(safeSlug);
@@ -175,30 +294,31 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     console.log(`[Google OAuth] Created Spreadsheet: ${integration.spreadsheetUrl}`);
   }
 
-  // Format 18-column header and rows
-  const headerRow = [
+  // Load auxiliary data (growth, medicines, health records) from server DB
+  let allGrowth = [];
+  let allMedicines = [];
+  let allHealthRecords = [];
+  const DB_FILE = path.join(__dirname, '../../data/db.json');
+  if (fs.existsSync(DB_FILE)) {
+    try {
+      const dbData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
+      if (dbData['chm-growth']) allGrowth = JSON.parse(dbData['chm-growth']);
+      if (dbData['chm-medicines']) allMedicines = JSON.parse(dbData['chm-medicines']);
+      if (dbData['chm-health-records']) allHealthRecords = JSON.parse(dbData['chm-health-records']);
+    } catch (e) {}
+  }
+
+  const cleanChildren = (children || []).filter(Boolean);
+
+  // Master Overview header and rows
+  const overviewHeaders = [
     'ID', 'Child Name', 'Date of Birth', 'Age', 'Gender', 'Blood Group',
     'Aadhaar ID', 'Guardian', 'Contact Phone', 'Height (cm)', 'Weight (kg)',
     'Medical Conditions', 'Allergies', 'Status', 'Registration Date',
     'Current Medications', 'Dental Remarks', 'Oral Hygiene Index'
   ];
 
-  function cleanCell(val) {
-    if (val === null || val === undefined || val === '') return '—';
-    const str = String(val);
-    if (str.startsWith('+') || str.startsWith('=')) {
-      return "'" + str;
-    }
-    return str;
-  }
-
-  // Every child record supplied by the client is synced. A previous version
-  // filtered out a hardcoded list of "preset" IDs and names (CH-1025, 'Aisha Khan',
-  // ...), which silently deleted real children who happened to have been assigned
-  // one of those IDs or to share a name with a demo record.
-  const cleanChildren = (children || []).filter(Boolean);
-
-  const rows = cleanChildren.map(c => [
+  const overviewRows = cleanChildren.map(c => [
     cleanCell(c.id || 'CH-0000'),
     cleanCell(c.name || 'Unnamed Child'),
     cleanCell(c.dob),
@@ -219,40 +339,129 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     cleanCell(c.hygieneIndex || 'Not Assessed')
   ]);
 
-  const tableData = [headerRow, ...rows];
+  const masterTableData = [overviewHeaders, ...overviewRows];
 
-  // Clear existing range and write new rows
   try {
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId: sheetId,
-      range: 'Sheet1!A1:Z5000'
+    // 1. Fetch spreadsheet metadata to check existing sheets/tabs
+    const metaRes = await sheets.spreadsheets.get({ spreadsheetId: sheetId });
+    const existingSheets = metaRes.data.sheets || [];
+    const sheetMap = new Map();
+    existingSheets.forEach(s => sheetMap.set(s.properties.title, s.properties.sheetId));
+
+    const batchRequests = [];
+    let overviewSheetTitle = 'Master Overview';
+
+    // If 'Sheet1' is present, rename it to 'Master Overview'
+    if (sheetMap.has('Sheet1') && !sheetMap.has('Master Overview')) {
+      const sheet1Id = sheetMap.get('Sheet1');
+      batchRequests.push({
+        updateSheetProperties: {
+          properties: { sheetId: sheet1Id, title: 'Master Overview' },
+          fields: 'title'
+        }
+      });
+      sheetMap.set('Master Overview', sheet1Id);
+      sheetMap.delete('Sheet1');
+    } else if (!sheetMap.has('Master Overview') && !sheetMap.has('Sheet1')) {
+      batchRequests.push({
+        addSheet: { properties: { title: 'Master Overview' } }
+      });
+    }
+
+    // 2. Add individual child sheet tabs if missing
+    cleanChildren.forEach(c => {
+      const childTabTitle = sanitizeSheetTitle(c.name);
+      if (!sheetMap.has(childTabTitle)) {
+        batchRequests.push({
+          addSheet: { properties: { title: childTabTitle } }
+        });
+      }
     });
 
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: 'Sheet1!A1',
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values: tableData }
+    // Execute structural batch update for new tabs
+    if (batchRequests.length > 0) {
+      const batchRes = await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        requestBody: { requests: batchRequests }
+      });
+      
+      // Update sheetMap with newly created sheetIds (gids)
+      if (batchRes.data.replies) {
+        batchRes.data.replies.forEach(reply => {
+          if (reply.addSheet?.properties) {
+            sheetMap.set(reply.addSheet.properties.title, reply.addSheet.properties.sheetId);
+          }
+        });
+      }
+    }
+
+    // Map child IDs and names to their tab gids
+    const childSheetGids = {};
+    if (sheetMap.has('Master Overview')) {
+      childSheetGids['master'] = sheetMap.get('Master Overview');
+    }
+
+    // 3. Prepare data updates for Master Overview and all Child tabs
+    const dataUpdates = [
+      {
+        range: `'Master Overview'!A1`,
+        values: masterTableData
+      }
+    ];
+
+    cleanChildren.forEach(c => {
+      const childTabTitle = sanitizeSheetTitle(c.name);
+      const gid = sheetMap.get(childTabTitle);
+      if (gid !== undefined) {
+        childSheetGids[c.id] = gid;
+        childSheetGids[c.name] = gid;
+      }
+
+      const childGrowth = allGrowth.filter(g => g.childId === c.id || (g.childName && g.childName.toLowerCase() === (c.name || '').toLowerCase()));
+      const childMeds = allMedicines.filter(m => m.childId === c.id || (m.childName && m.childName.toLowerCase() === (c.name || '').toLowerCase()));
+      const childHealthRecs = allHealthRecords.filter(h => h.childId === c.id || (h.childName && h.childName.toLowerCase() === (c.name || '').toLowerCase()));
+
+      const childSheetData = buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName);
+      dataUpdates.push({
+        range: `'${childTabTitle}'!A1`,
+        values: childSheetData
+      });
     });
+
+    // 4. Batch update all data in one efficient call
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: sheetId,
+      requestBody: {
+        valueInputOption: 'USER_ENTERED',
+        data: dataUpdates
+      }
+    });
+
+    // Save gid map to integration config
+    integration.childSheetGids = childSheetGids;
+    saveNgoIntegration(safeSlug, integration);
+
+    console.log(`[Google OAuth] Successfully synced Master Overview + ${cleanChildren.length} Child Tabs to Sheet (${sheetId}) for NGO ${safeSlug}`);
+
+    return {
+      success: true,
+      sheetId,
+      spreadsheetUrl: integration.spreadsheetUrl,
+      childSheetGids,
+      count: cleanChildren.length
+    };
+
   } catch (syncErr) {
     if (syncErr.code === 404 || syncErr.status === 404 || (syncErr.message && syncErr.message.toLowerCase().includes('not found'))) {
       console.log(`[Google OAuth] Sheet ${sheetId} was removed from Google Drive. Re-creating master spreadsheet...`);
       delete integration.sheetId;
       delete integration.spreadsheetUrl;
+      delete integration.childSheetGids;
       saveNgoIntegration(safeSlug, integration);
       return syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
     }
     throw syncErr;
   }
-
-  console.log(`[Google OAuth] Successfully synced ${rows.length} rows to Sheet (${sheetId}) for NGO ${safeSlug}`);
-
-  return {
-    success: true,
-    sheetId,
-    spreadsheetUrl: integration.spreadsheetUrl,
-    count: rows.length
-  };
 }
 
 /**

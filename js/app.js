@@ -10,7 +10,7 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig } from './googleSheetsSync.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet } from './googleSheetsSync.js';
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
@@ -93,7 +93,7 @@ let page = 'dashboard';
 
 // Document Clicks
 document.addEventListener('click', (event) => {
-  const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
+  const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
   if (!target) return;
 
   if (target.matches('[data-topbar-back]')) {
@@ -329,6 +329,16 @@ document.addEventListener('click', (event) => {
         target.textContent = isHidden ? 'Fewer options' : 'More options';
       }
     }
+    return;
+  }
+
+  const childSheetBtn = target.closest('[data-open-child-sheet]');
+  if (childSheetBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    const childId = childSheetBtn.dataset.openChildSheet;
+    const childName = childSheetBtn.dataset.childName;
+    openChildGoogleSheet(childId, childName);
     return;
   }
 
