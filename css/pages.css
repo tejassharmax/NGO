@@ -1,22 +1,22 @@
 /* Page compositions built solely from design-system primitives */
-/* ─── Apple Glassmorphism & Gradient Glow Stat Cards ─── */
+/* ─── Apple Glassmorphism & Gradient Glow Stat Cards (Compact Space-Optimized) ─── */
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .stat-card {
   position: relative;
   background: var(--color-surface, #ffffff);
   border: 1px solid rgba(226, 232, 240, 0.85);
-  border-radius: 18px;
-  padding: 18px 20px;
+  border-radius: 14px;
+  padding: 12px 14px;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  box-shadow: 0 4px 16px -4px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -31,9 +31,9 @@
   left: 0;
   right: 0;
   height: 100%;
-  border-radius: 18px;
+  border-radius: 14px;
   opacity: 0.55;
-  transition: opacity 0.35s ease;
+  transition: opacity 0.3s ease;
   pointer-events: none;
 }
 
@@ -46,32 +46,32 @@
 
 /* Interactive Hover Lift & Glow */
 .stat-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-3px);
 }
 
 .stat-card--blue:hover {
   border-color: rgba(59, 130, 246, 0.35);
-  box-shadow: 0 16px 32px -8px rgba(59, 130, 246, 0.18), 0 4px 12px rgba(59, 130, 246, 0.06);
+  box-shadow: 0 10px 24px -6px rgba(59, 130, 246, 0.18), 0 2px 8px rgba(59, 130, 246, 0.06);
 }
 .stat-card--green:hover {
   border-color: rgba(16, 185, 129, 0.35);
-  box-shadow: 0 16px 32px -8px rgba(16, 185, 129, 0.18), 0 4px 12px rgba(16, 185, 129, 0.06);
+  box-shadow: 0 10px 24px -6px rgba(16, 185, 129, 0.18), 0 2px 8px rgba(16, 185, 129, 0.06);
 }
 .stat-card--amber:hover {
   border-color: rgba(245, 158, 11, 0.35);
-  box-shadow: 0 16px 32px -8px rgba(245, 158, 11, 0.18), 0 4px 12px rgba(245, 158, 11, 0.06);
+  box-shadow: 0 10px 24px -6px rgba(245, 158, 11, 0.18), 0 2px 8px rgba(245, 158, 11, 0.06);
 }
 .stat-card--violet:hover {
   border-color: rgba(139, 92, 246, 0.35);
-  box-shadow: 0 16px 32px -8px rgba(139, 92, 246, 0.18), 0 4px 12px rgba(139, 92, 246, 0.06);
+  box-shadow: 0 10px 24px -6px rgba(139, 92, 246, 0.18), 0 2px 8px rgba(139, 92, 246, 0.06);
 }
 .stat-card--rose:hover {
   border-color: rgba(244, 63, 94, 0.35);
-  box-shadow: 0 16px 32px -8px rgba(244, 63, 94, 0.18), 0 4px 12px rgba(244, 63, 94, 0.06);
+  box-shadow: 0 10px 24px -6px rgba(244, 63, 94, 0.18), 0 2px 8px rgba(244, 63, 94, 0.06);
 }
 .stat-card--cyan:hover {
   border-color: rgba(6, 182, 212, 0.35);
-  box-shadow: 0 16px 32px -8px rgba(6, 182, 212, 0.18), 0 4px 12px rgba(6, 182, 212, 0.06);
+  box-shadow: 0 10px 24px -6px rgba(6, 182, 212, 0.18), 0 2px 8px rgba(6, 182, 212, 0.06);
 }
 
 .stat-card__top {
@@ -80,23 +80,29 @@
   justify-content: space-between;
   position: relative;
   z-index: 1;
+  gap: 8px;
 }
 
 .stat-card__label {
   color: var(--color-text-muted, #64748b);
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.01em;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Dual-Tone Floating Glass Icon Pills */
+/* Compact Dual-Tone Floating Glass Icon Pills */
 .stat-card__icon {
   display: grid;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 9px;
   place-items: center;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .stat-card:hover .stat-card__icon {
@@ -104,78 +110,79 @@
 }
 
 .stat-card__icon svg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 
 .stat-card__icon--blue {
   color: #2563eb;
   background: linear-gradient(135deg, rgba(239, 246, 255, 0.95), rgba(219, 234, 254, 0.7));
   border: 1px solid rgba(191, 219, 254, 0.7);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
 }
 .stat-card__icon--green {
   color: #059669;
   background: linear-gradient(135deg, rgba(236, 253, 245, 0.95), rgba(209, 250, 229, 0.7));
   border: 1px solid rgba(167, 243, 208, 0.7);
-  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.1);
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.08);
 }
 .stat-card__icon--amber {
   color: #d97706;
   background: linear-gradient(135deg, rgba(255, 251, 235, 0.95), rgba(254, 243, 199, 0.7));
   border: 1px solid rgba(253, 230, 138, 0.7);
-  box-shadow: 0 2px 8px rgba(217, 119, 6, 0.1);
+  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.08);
 }
 .stat-card__icon--violet {
   color: #7c3aed;
   background: linear-gradient(135deg, rgba(245, 243, 255, 0.95), rgba(237, 233, 254, 0.7));
   border: 1px solid rgba(221, 214, 254, 0.7);
-  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.1);
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.08);
 }
 .stat-card__icon--rose {
   color: #e11d48;
   background: linear-gradient(135deg, rgba(255, 241, 242, 0.95), rgba(255, 228, 230, 0.7));
   border: 1px solid rgba(254, 205, 211, 0.7);
-  box-shadow: 0 2px 8px rgba(225, 29, 72, 0.1);
+  box-shadow: 0 2px 6px rgba(225, 29, 72, 0.08);
 }
 .stat-card__icon--cyan {
   color: #0891b2;
   background: linear-gradient(135deg, rgba(236, 254, 255, 0.95), rgba(207, 250, 254, 0.7));
   border: 1px solid rgba(165, 243, 252, 0.7);
-  box-shadow: 0 2px 8px rgba(8, 145, 178, 0.1);
+  box-shadow: 0 2px 6px rgba(8, 145, 178, 0.08);
+}
+
+/* Bottom Row with Number & Trend Pill side-by-side */
+.stat-card__bottom {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  position: relative;
+  z-index: 1;
+  flex-wrap: wrap;
 }
 
 /* Stat Number Typography */
 .stat-card__number {
-  margin-top: 14px;
-  font-size: 30px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.03em;
-  line-height: 1.1;
+  line-height: 1;
   color: var(--color-text, #0f172a);
-  position: relative;
-  z-index: 1;
 }
 
 /* Footer Status Pill */
-.stat-card__footer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  font-size: 11.5px;
-  position: relative;
-  z-index: 1;
-}
-
 .stat-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 12px;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 8px;
   font-weight: 700;
-  font-size: 11px;
+  font-size: 10px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 .stat-pill--blue { color: #1d4ed8; background: #eff6ff; }

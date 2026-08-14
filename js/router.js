@@ -104,13 +104,13 @@ function getDynamicGreeting() {
 const statCard = (label, value, trend, glyph, color = 'blue') => `
   <article class="stat-card stat-card--${color}">
     <div class="stat-card__top">
-      <span class="stat-card__label">${label}</span>
+      <span class="stat-card__label" title="${escapeHTML(label)}">${label}</span>
       <span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span>
     </div>
-    <div class="stat-card__number">${value}</div>
-    <div class="stat-card__footer">
+    <div class="stat-card__bottom">
+      <div class="stat-card__number">${value}</div>
       <span class="stat-pill stat-pill--${color}">
-        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+        <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
         ${trend}
       </span>
     </div>
