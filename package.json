@@ -5,7 +5,6 @@
   "main": "server.js",
   "scripts": {
     "build": "rollup -c",
-    "postinstall": "rollup -c",
     "start": "node server.js"
   },
   "engines": {
@@ -13,16 +12,15 @@
   },
   "dependencies": {
     "@google-cloud/vision": "^5.3.7",
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "firebase": "^12.16.0",
     "googleapis": "^173.0.0",
     "multer": "^2.2.0",
+    "rollup": "^4.62.4",
     "sharp": "^0.35.3",
     "tesseract.js": "^7.0.0"
-  },
-  "devDependencies": {
-    "@rollup/plugin-commonjs": "^29.0.3",
-    "@rollup/plugin-node-resolve": "^16.0.3"
   }
 }
