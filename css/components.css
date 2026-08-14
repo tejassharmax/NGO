@@ -257,16 +257,69 @@ th.col-drag-over-right {
   background: #f1f5f9;
 }
 
-/* Settled state after column drop — Apple spring physics */
-th.col-drag-settled, td.col-drag-settled {
-  animation: none !important;
-  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.35s ease, box-shadow 0.35s ease;
-  transform: scale(1);
+/* ─── 2-Second Color Fade-out on Drop / Position Change ─── */
+@keyframes flash-fade-2s-header {
+  0% {
+    background-color: #e0e7ff !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35);
+  }
+  20% {
+    background-color: #eef2ff !important;
+    box-shadow: 0 0 0 1.5px rgba(99, 102, 241, 0.2);
+  }
+  70% {
+    background-color: rgba(238, 242, 255, 0.3) !important;
+    box-shadow: none;
+  }
+  100% {
+    background-color: #fcfcfc !important;
+    box-shadow: none;
+  }
 }
-th.col-drag-flash, td.col-drag-flash {
-  background: #eef2ff !important;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
-  transition: background 0.6s ease, box-shadow 0.6s ease;
+
+@keyframes flash-fade-2s-cell {
+  0% {
+    background-color: #e0e7ff !important;
+  }
+  20% {
+    background-color: #eef2ff !important;
+  }
+  70% {
+    background-color: rgba(238, 242, 255, 0.3) !important;
+  }
+  100% {
+    background-color: transparent !important;
+  }
+}
+
+@keyframes flash-fade-2s-row {
+  0% {
+    background-color: #e0e7ff !important;
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35), 0 4px 16px rgba(99, 102, 241, 0.15);
+  }
+  20% {
+    background-color: #eef2ff !important;
+  }
+  70% {
+    background-color: rgba(238, 242, 255, 0.3) !important;
+    box-shadow: none;
+  }
+  100% {
+    background-color: transparent !important;
+    box-shadow: none;
+  }
+}
+
+th.col-drag-flash {
+  animation: flash-fade-2s-header 2s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+}
+
+td.col-drag-flash {
+  animation: flash-fade-2s-cell 2s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
+}
+
+tr.drag-flash {
+  animation: flash-fade-2s-row 2s cubic-bezier(0.25, 1, 0.5, 1) forwards !important;
 }
 .sort-button { display: inline-flex; align-items: center; gap: 5px; padding: 0; color: inherit; background: none; border: 0; font: inherit; text-transform: inherit; }
 .sort-button svg { width: 14px; height: 14px; }
