@@ -420,6 +420,8 @@ app.get('/api/sheets/config', requireAuth, (req, res) => {
     adminEmail: integration.adminEmail || null,
     sheetId: integration.sheetId || null,
     spreadsheetUrl: integration.spreadsheetUrl || null,
+    clinicalSheetId: integration.clinicalSheetId || null,
+    clinicalSpreadsheetUrl: integration.clinicalSpreadsheetUrl || null,
     childSheetGids: integration.childSheetGids || {}
   });
 });

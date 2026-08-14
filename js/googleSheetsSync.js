@@ -48,6 +48,10 @@ export async function fetchSheetsConfig(ngoSlug) {
       if (cachedSheetsConfig?.childSheetGids) {
         localStorage.setItem('chm_child_sheet_gids', JSON.stringify(cachedSheetsConfig.childSheetGids));
       }
+      if (cachedSheetsConfig?.clinicalSpreadsheetUrl) {
+        localStorage.setItem(`google_clinical_sheet_url_${slug}`, cachedSheetsConfig.clinicalSpreadsheetUrl);
+        localStorage.setItem('google_clinical_sheet_url', cachedSheetsConfig.clinicalSpreadsheetUrl);
+      }
       return cachedSheetsConfig;
     }
   } catch (err) {
@@ -77,8 +81,10 @@ export function getGoogleSheetUrl() {
  * Get direct Google Sheet URL for a specific child tab
  */
 export function getChildGoogleSheetUrl(childId, childName) {
-  const masterUrl = getGoogleSheetUrl();
-  if (!masterUrl) return null;
+  const session = getSession() || {};
+  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const clinicalUrl = cachedSheetsConfig?.clinicalSpreadsheetUrl || localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url') || getGoogleSheetUrl();
+  if (!clinicalUrl) return null;
 
   let gids = cachedSheetsConfig?.childSheetGids;
   if (!gids) {
@@ -91,11 +97,11 @@ export function getChildGoogleSheetUrl(childId, childName) {
 
   const gid = gids?.[childId] ?? gids?.[childName] ?? gids?.[(childName || '').toUpperCase()] ?? null;
 
-  const baseUrl = masterUrl.split('#')[0].replace(/\/edit.*$/, '/edit');
+  const baseUrl = clinicalUrl.split('#')[0].replace(/\/edit.*$/, '/edit');
   if (gid !== null && gid !== undefined) {
     return `${baseUrl}#gid=${gid}`;
   }
-  return masterUrl;
+  return clinicalUrl;
 }
 
 /**
@@ -518,17 +524,25 @@ export async function autoSyncChildToGoogleSheets(child) {
     if (res.ok) {
       const data = await res.json();
       if (data && data.success) {
-        if (data.spreadsheetUrl) {
+        if (data.spreadsheetUrl || data.clinicalSpreadsheetUrl) {
           if (!cachedSheetsConfig) cachedSheetsConfig = { connected: true };
           cachedSheetsConfig.connected = true;
-          cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl;
-          cachedSheetsConfig.sheetId = data.sheetId;
+          cachedSheetsConfig.spreadsheetUrl = data.spreadsheetUrl || cachedSheetsConfig.spreadsheetUrl;
+          cachedSheetsConfig.sheetId = data.sheetId || cachedSheetsConfig.sheetId;
+          cachedSheetsConfig.clinicalSpreadsheetUrl = data.clinicalSpreadsheetUrl || cachedSheetsConfig.clinicalSpreadsheetUrl;
+          cachedSheetsConfig.clinicalSheetId = data.clinicalSheetId || cachedSheetsConfig.clinicalSheetId;
           if (data.childSheetGids) {
             cachedSheetsConfig.childSheetGids = data.childSheetGids;
             localStorage.setItem('chm_child_sheet_gids', JSON.stringify(data.childSheetGids));
           }
-          localStorage.setItem(`google_sheet_url_${ngoSlug}`, data.spreadsheetUrl);
-          localStorage.setItem('google_sheet_url', data.spreadsheetUrl);
+          if (data.spreadsheetUrl) {
+            localStorage.setItem(`google_sheet_url_${ngoSlug}`, data.spreadsheetUrl);
+            localStorage.setItem('google_sheet_url', data.spreadsheetUrl);
+          }
+          if (data.clinicalSpreadsheetUrl) {
+            localStorage.setItem(`google_clinical_sheet_url_${ngoSlug}`, data.clinicalSpreadsheetUrl);
+            localStorage.setItem('google_clinical_sheet_url', data.clinicalSpreadsheetUrl);
+          }
         }
         toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
       } else if (data && data.message === 'Not connected') {
