@@ -72,9 +72,18 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static frontend files with caching
-app.use(express.static(__dirname, { maxAge: '1d', etag: true }));
-app.use('/pages', express.static('pages', { maxAge: '1d', etag: true }));
+// Serve static frontend files with no-cache for code files to prevent stale bundles
+app.use(express.static(__dirname, {
+  etag: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+    }
+  }
+}));
+app.use('/pages', express.static('pages', { maxAge: 0 }));
 
 
 /* ═══════════════════════════════════════════════════════

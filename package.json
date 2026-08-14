@@ -4,6 +4,8 @@
   "description": "NGO Child Health Management Platform with Medical Document OCR",
   "main": "server.js",
   "scripts": {
+    "build": "rollup -c",
+    "postinstall": "rollup -c",
     "start": "node server.js"
   },
   "engines": {

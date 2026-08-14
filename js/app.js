@@ -57,19 +57,31 @@ let renderCurrentPage = null;
   });
 
   function getActivePage() {
+    if (!isSessionActive()) {
+      return 'login';
+    }
     const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
-    if (hash && hash.trim() !== '') return hash.trim();
-    return isSessionActive() ? 'dashboard' : 'login';
+    if (hash && hash.trim() !== '' && hash !== 'login') return hash.trim();
+    return 'dashboard';
   }
 
   renderCurrentPage = async function() {
     const loggedIn = isSessionActive();
-    page = getActivePage();
 
-    if (!loggedIn && page !== 'login') {
-      window.location.hash = '#/login';
+    if (!loggedIn) {
       page = 'login';
-    } else if (loggedIn && page === 'login') {
+      if (window.location.hash !== '#/login') {
+        window.location.hash = '#/login';
+      }
+      const app = document.querySelector('#app');
+      if (app) {
+        app.innerHTML = renderPage('login');
+      }
+      return;
+    }
+
+    page = getActivePage();
+    if (page === 'login') {
       window.location.hash = '#/';
       page = 'dashboard';
     }
@@ -80,13 +92,11 @@ let renderCurrentPage = null;
       return;
     }
 
-    if (loggedIn && page !== 'login') {
-      await Promise.all([
-        hydrateFromServer().catch(() => {}),
-        fetchSheetsConfig().catch(() => {}),
-        fetchDocsConfig().catch(() => {})
-      ]);
-    }
+    await Promise.all([
+      hydrateFromServer().catch(() => {}),
+      fetchSheetsConfig().catch(() => {}),
+      fetchDocsConfig().catch(() => {})
+    ]);
 
     const app = document.querySelector('#app');
     if (app) {
@@ -105,10 +115,7 @@ let renderCurrentPage = null;
     }
 
     enableColumnResize();
-
-    if (page !== 'login') {
-      syncWithServer().catch(() => {});
-    }
+    syncWithServer().catch(() => {});
   };
 
   if (window.location.href.includes('google_connected=true')) {
