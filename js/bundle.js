@@ -35986,7 +35986,6 @@
     const growthCount = getGrowthRecords().length;
     const medicinesCount = getMedicines().length;
     const uploadedDocsCount = getUploadedDocs().length;
-    const healthReportsCount = getHealthRecords().length || 4;
 
     // Flagged children for alerts
     const flaggedChildren = children.filter(c => healthStatus(c).level !== 'good');
@@ -36000,7 +35999,6 @@
     return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <div class="stat-grid">
     ${statCard('Total Children', totalChildren.toLocaleString(), 'Active records', 'users', 'blue')}
-    ${statCard('Recent Health Reports', healthReportsCount.toLocaleString(), 'Lab test panels', 'heartPulse', 'green')}
     ${statCard('Growth Records', growthCount.toLocaleString(), 'Vitals logged', 'ruler', 'amber')}
     ${statCard('Prescriptions', medicinesCount.toLocaleString(), 'Active prescriptions', 'pill', 'violet')}
     ${statCard('Uploaded Documents', uploadedDocsCount.toLocaleString(), 'Google Drive', 'file', 'cyan')}
