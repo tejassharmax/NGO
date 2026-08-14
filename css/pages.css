@@ -1478,4 +1478,207 @@ body.theme-dark .login-card__hero-icon {
   border-top: 1px solid var(--color-border, #e0e0e0);
 }
 
+/* ═══════════════════════════════════════════════════════
+   Google Calendar UI System — Comprehensive Dark Mode
+   ═══════════════════════════════════════════════════════ */
+
+body.theme-dark .cal-card {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+body.theme-dark .gcal-header {
+  background: #172234;
+  border-bottom-color: var(--color-border);
+}
+
+body.theme-dark .gcal-brand-icon {
+  background: #1e3a5f;
+}
+body.theme-dark .gcal-brand-icon svg {
+  stroke: #60a5fa;
+}
+
+body.theme-dark .gcal-title {
+  color: var(--color-text);
+}
+
+body.theme-dark .gcal-btn {
+  background: #111827;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+body.theme-dark .gcal-btn:hover {
+  background: #1e2d42;
+  border-color: #3b4d66;
+}
+
+body.theme-dark .gcal-nav-group {
+  background: #111827;
+  border-color: var(--color-border);
+}
+
+body.theme-dark .gcal-nav-btn {
+  color: var(--color-text);
+}
+
+body.theme-dark .gcal-nav-btn:first-child {
+  border-right-color: var(--color-border);
+}
+
+body.theme-dark .gcal-nav-btn:hover {
+  background: #1e2d42;
+  color: #60a5fa;
+}
+
+body.theme-dark .gcal-toggle-group {
+  background: #0b0f19;
+  border-color: var(--color-border);
+}
+
+body.theme-dark .gcal-toggle-btn {
+  color: var(--color-text-muted);
+}
+
+body.theme-dark .gcal-toggle-btn.active {
+  background: #172234;
+  color: #60a5fa;
+}
+
+body.theme-dark .gcal-month-grid {
+  background: var(--color-border);
+  border-bottom-color: var(--color-border);
+}
+
+body.theme-dark .gcal-header-cell {
+  background: #131b2a;
+  color: var(--color-text-muted);
+}
+
+body.theme-dark .gcal-day-cell {
+  background: #172234;
+}
+
+body.theme-dark .gcal-day-cell:hover:not(.gcal-day-cell--outside) {
+  background: #1e2d42;
+}
+
+body.theme-dark .gcal-day-cell--outside {
+  background: #0f172a;
+}
+
+body.theme-dark .gcal-day-cell--outside .gcal-day-num {
+  color: #475569;
+}
+
+body.theme-dark .gcal-day-cell--today {
+  background: #172b4d;
+}
+
+body.theme-dark .gcal-day-cell--selected {
+  background: #1e3a5f;
+}
+
+body.theme-dark .gcal-day-num {
+  color: var(--color-text);
+}
+
+body.theme-dark .gcal-more-chip {
+  color: var(--color-text-muted);
+}
+
+body.theme-dark .gcal-more-chip:hover {
+  background: #1e2d42;
+}
+
+body.theme-dark .gcal-legend-bar {
+  background: #131b2a;
+  border-top-color: var(--color-border);
+}
+
+body.theme-dark .gcal-day-header {
+  border-bottom-color: var(--color-border);
+}
+
+body.theme-dark .gcal-day-title h3 {
+  color: var(--color-text);
+}
+
+body.theme-dark .gcal-timeline-grid {
+  background: #172234;
+  border-color: var(--color-border);
+}
+
+body.theme-dark .gcal-timeline-row {
+  border-bottom-color: var(--color-border);
+}
+
+body.theme-dark .gcal-timeline-row:hover {
+  background: rgba(37, 99, 235, 0.15);
+}
+
+body.theme-dark .gcal-time-col {
+  background: #131b2a;
+  border-right-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+body.theme-dark .gcal-event-card {
+  background: #172234;
+  border-color: var(--color-border);
+}
+
+body.theme-dark .gcal-event-name,
+body.theme-dark .gcal-event-title-row {
+  color: var(--color-text);
+}
+
+body.theme-dark .gcal-event-detail-text {
+  color: #cbd5e1;
+}
+
+body.theme-dark .gcal-popup-card {
+  background: #172234;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+body.theme-dark .gcal-popup-title-input {
+  color: var(--color-text);
+  border-bottom-color: var(--color-border);
+}
+
+body.theme-dark .gcal-popup-title-input::placeholder {
+  color: #64748b;
+}
+
+body.theme-dark .gcal-popup-close {
+  color: var(--color-text-muted);
+}
+
+body.theme-dark .gcal-popup-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-text);
+}
+
+body.theme-dark .gcal-popover-card {
+  background: #172234;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+body.theme-dark .gcal-popover-desc,
+body.theme-dark .gcal-popover-meta {
+  color: var(--color-text);
+}
+
+body.theme-dark .gcal-popover-header {
+  border-bottom-color: var(--color-border);
+}
+
+body.theme-dark .gcal-popover-footer {
+  border-top-color: var(--color-border);
+}
+
 
