@@ -47,12 +47,15 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY);
   localStorage.removeItem('sample-logged-in');
   localStorage.removeItem('google-user-email');
+  localStorage.removeItem('sample-org-name');
 }
 
 /**
- * Check if a valid session exists
+ * Check if a valid authenticated session exists
  * @returns {boolean}
  */
 export function isSessionActive() {
-  return localStorage.getItem('sample-logged-in') === 'true';
+  const loggedIn = localStorage.getItem('sample-logged-in') === 'true';
+  const session = getSession();
+  return Boolean(loggedIn && session && session.email && session.email.trim() !== '');
 }
