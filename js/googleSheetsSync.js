@@ -110,6 +110,15 @@ export function getChildGoogleSheetUrl(childId, childName) {
 export async function openChildGoogleSheet(childId, childName) {
   toast('Opening Google Sheet...', `Connecting to ${childName || 'student'}'s sheet...`);
   
+  // Open window synchronously on user click to avoid browser popup blockers
+  let win = null;
+  try {
+    win = window.open('', '_blank');
+    if (win && win.document) {
+      win.document.write('<html><head><title>Loading Sheet...</title></head><body style="font-family:system-ui,sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f8fafc; color:#334155;"><div style="text-align:center;"><div style="width:40px; height:40px; border:3px solid #cbd5e1; border-top-color:#0f9d58; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 16px auto;"></div><p style="font-size:15px; font-weight:600; margin:0;">Opening Student Medical Records...</p><p style="font-size:13px; color:#64748b; margin:6px 0 0 0;">Connecting to ' + (childName || 'child') + '\'s tab...</p></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></body></html>');
+    }
+  } catch (e) {}
+
   const session = getSession() || {};
   const ngoSlug = session.ngo || 'ayusha-nilayam';
   const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
@@ -151,8 +160,13 @@ export async function openChildGoogleSheet(childId, childName) {
   }
 
   if (targetUrl) {
-    window.open(targetUrl, '_blank');
+    if (win && !win.closed) {
+      win.location.href = targetUrl;
+    } else {
+      window.open(targetUrl, '_blank');
+    }
   } else {
+    if (win && !win.closed) win.close();
     // Show connection modal prompting user to connect Google Workspace in Settings
     const modalRoot = document.querySelector('#modal-root');
     if (modalRoot) {

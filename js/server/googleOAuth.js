@@ -40,17 +40,33 @@ function getIntegrationPath(ngoSlug) {
  * Load stored integration data for an NGO
  */
 function getNgoIntegration(ngoSlug) {
+  let data = {};
   try {
     ensureIntegrationsDir();
     const filepath = getIntegrationPath(ngoSlug);
     if (fs.existsSync(filepath)) {
       const content = fs.readFileSync(filepath, 'utf8');
-      return JSON.parse(content || '{}');
+      data = JSON.parse(content || '{}');
     }
   } catch (err) {
     console.warn('[Google OAuth] Error reading integration file:', err.message);
   }
-  return {};
+
+  // Fallback to environment variables if integration file is not present on disk
+  if (!data.refresh_token && process.env.GOOGLE_OAUTH_REFRESH_TOKEN) {
+    data.refresh_token = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+    data.adminEmail = process.env.GOOGLE_OAUTH_ADMIN_EMAIL || 'Authorized Admin';
+    if (process.env.GOOGLE_SPREADSHEET_ID && !data.sheetId) {
+      data.sheetId = process.env.GOOGLE_SPREADSHEET_ID;
+      data.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${data.sheetId}/edit`;
+    }
+    if (process.env.GOOGLE_CLINICAL_SPREADSHEET_ID && !data.clinicalSheetId) {
+      data.clinicalSheetId = process.env.GOOGLE_CLINICAL_SPREADSHEET_ID;
+      data.clinicalSpreadsheetUrl = `https://docs.google.com/spreadsheets/d/${data.clinicalSheetId}/edit`;
+    }
+  }
+
+  return data;
 }
 
 /**
