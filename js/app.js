@@ -30,15 +30,15 @@ let renderCurrentPage = null;
   localStorage.setItem('chm-documents', '[]');
   localStorage.setItem('chm-pending-docs', '[]');
 
-  // Purge legacy preset mock data completely
-  const MOCK_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Unnamed Child'];
-  const MOCK_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-1001', 'CH-1002', 'CH-1461'];
+  // Purge legacy preset mock data and test registrations completely
+  const MOCK_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Unnamed Child', 'Tejas Sharma'];
+  const MOCK_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-1001', 'CH-1002', 'CH-1461', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-3938', 'CH-1079'];
 
   try {
     const rawKids = localStorage.getItem('chm-children');
     if (rawKids) {
       const kids = JSON.parse(rawKids);
-      const cleanKids = (kids || []).filter(k => k && !MOCK_NAMES.includes(k.name) && !MOCK_IDS.includes(k.id));
+      const cleanKids = (kids || []).filter(k => k && !MOCK_NAMES.includes((k.name || '').trim()) && !MOCK_IDS.includes(k.id));
       localStorage.setItem('chm-children', JSON.stringify(cleanKids));
     }
   } catch (e) {}

@@ -490,11 +490,13 @@ function mergeJSONArrays(clientJSON, serverJSON) {
   if (!Array.isArray(serverArr)) serverArr = [];
 
   const map = new Map();
-  // Merge server and client arrays, using ID as the deduplication key.
-  // The old version filtered out a hardcoded PRESET_IDS/PRESET_NAMES list here,
-  // which silently deleted real children who happened to match those values.
+  const DISALLOWED_MOCK_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Unnamed Child', 'Tejas Sharma'];
+
   serverArr.concat(clientArr).forEach(item => {
     if (item && typeof item === 'object') {
+      // Exclude legacy mock records and admin self-registration tests
+      if (item.name && DISALLOWED_MOCK_NAMES.includes(item.name.trim())) return;
+      if (item.childName && DISALLOWED_MOCK_NAMES.includes(item.childName.trim())) return;
       const key = item.id || JSON.stringify(item);
       map.set(key, item);
     }
