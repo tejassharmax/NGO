@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, hydrateFromServer, addSponsor } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
 import { updateChildTable, childRows } from './table.js';
 import { searchChildren, globalSearchMarkup, renderSearchResultsList } from './search.js';
 import { toast } from './toast.js';
@@ -94,6 +94,7 @@ let renderCurrentPage = null;
       applyColumnVisibility();
       initFormListeners();
       initOCRProcessing();
+      if (page === 'children') initDragReorder();
     }
 
     if (page === 'dashboard' || page === 'reports') {
@@ -884,6 +885,109 @@ document.addEventListener('drop', (event) => {
     }
   }
 });
+
+// ─── Drag-and-Drop Row Reorder (Apple-style) ───
+function initDragReorder() {
+  const tbody = document.querySelector('#child-table-body');
+  if (!tbody) return;
+
+  let dragRow = null;
+
+  tbody.addEventListener('dragstart', (e) => {
+    const tr = e.target.closest('tr[draggable]');
+    if (!tr) return;
+    // Only allow drag from the handle
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) { e.preventDefault(); return; }
+
+    dragRow = tr;
+    tr.classList.add('dragging');
+    tbody.classList.add('drag-active');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', tr.dataset.childId);
+
+    // Use the row itself as the drag image
+    try {
+      const rect = tr.getBoundingClientRect();
+      e.dataTransfer.setDragImage(tr, e.clientX - rect.left, e.clientY - rect.top);
+    } catch (_) {}
+  });
+
+  tbody.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const tr = e.target.closest('tr[draggable]');
+    if (!tr || tr === dragRow) return;
+
+    // Clear previous indicators
+    tbody.querySelectorAll('.drag-over-top, .drag-over-bottom').forEach(el => {
+      el.classList.remove('drag-over-top', 'drag-over-bottom');
+    });
+
+    // Determine if cursor is in the top or bottom half of the row
+    const rect = tr.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    if (e.clientY < midY) {
+      tr.classList.add('drag-over-top');
+    } else {
+      tr.classList.add('drag-over-bottom');
+    }
+  });
+
+  tbody.addEventListener('dragleave', (e) => {
+    const tr = e.target.closest('tr[draggable]');
+    if (tr) {
+      tr.classList.remove('drag-over-top', 'drag-over-bottom');
+    }
+  });
+
+  tbody.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const targetTr = e.target.closest('tr[draggable]');
+    if (!targetTr || !dragRow || targetTr === dragRow) return;
+
+    // Determine insertion position
+    const rect = targetTr.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const insertBefore = e.clientY < midY;
+
+    if (insertBefore) {
+      tbody.insertBefore(dragRow, targetTr);
+    } else {
+      tbody.insertBefore(dragRow, targetTr.nextSibling);
+    }
+
+    // Collect new order of child IDs and persist
+    const orderedIds = Array.from(tbody.querySelectorAll('tr[data-child-id]'))
+      .map(row => row.dataset.childId);
+    reorderChildren(orderedIds);
+
+    // Flash the moved row
+    dragRow.classList.add('drag-flash');
+    setTimeout(() => dragRow.classList.remove('drag-flash'), 600);
+  });
+
+  tbody.addEventListener('dragend', () => {
+    if (dragRow) {
+      dragRow.classList.remove('dragging');
+    }
+    // Settle all rows: stop wiggle with a spring-back
+    tbody.querySelectorAll('tr').forEach(tr => {
+      tr.classList.remove('drag-over-top', 'drag-over-bottom');
+      tr.classList.add('drag-settled');
+    });
+    tbody.classList.remove('drag-active');
+
+    // Remove settled class after animation completes
+    setTimeout(() => {
+      tbody.querySelectorAll('.drag-settled').forEach(tr => {
+        tr.classList.remove('drag-settled');
+      });
+    }, 500);
+
+    dragRow = null;
+  });
+}
 
 // ─── Form Submissions ───
 function initFormListeners() {

@@ -65,6 +65,15 @@ export function getChild(id) {
   return getChildren().find(c => c.id === id) || null;
 }
 
+export function reorderChildren(orderedIds) {
+  const children = getChildren();
+  const map = new Map(children.map(c => [c.id, c]));
+  const reordered = orderedIds.map(id => map.get(id)).filter(Boolean);
+  // Append any children not in orderedIds (safety net)
+  children.forEach(c => { if (!orderedIds.includes(c.id)) reordered.push(c); });
+  localStorage.setItem(CHILDREN_KEY, JSON.stringify(reordered));
+}
+
 /* ─── Activity Log ─── */
 
 export function logActivity(type, subject, description) {
