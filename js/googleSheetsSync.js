@@ -148,7 +148,17 @@ export async function openChildGoogleSheet(childId, childName) {
 
   let targetUrl = getChildGoogleSheetUrl(childId, childName);
 
-  // If Student Medical Records workbook or child GID is not ready, trigger a fast sync to create & fetch it
+  // 1. Fast check: try fetching current config from server if not cached yet
+  if (!targetUrl || !cachedSheetsConfig?.clinicalSpreadsheetUrl) {
+    try {
+      const cfg = await fetchSheetsConfig(ngoSlug);
+      if (cfg && cfg.connected && cfg.clinicalSpreadsheetUrl) {
+        targetUrl = getChildGoogleSheetUrl(childId, childName) || cfg.clinicalSpreadsheetUrl;
+      }
+    } catch (e) {}
+  }
+
+  // 2. If still missing, trigger a full live sync to generate spreadsheet and child tabs
   if (!targetUrl || !cachedSheetsConfig?.clinicalSpreadsheetUrl) {
     try {
       const res = await apiFetch('/api/sheets/sync', {
