@@ -411,10 +411,26 @@ app.all('/api/google/disconnect', requireAuth, (req, res) => {
 });
 
 // GET /api/sheets/config?ngo=...
-app.get('/api/sheets/config', requireAuth, (req, res) => {
+app.get('/api/sheets/config', requireAuth, async (req, res) => {
   const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
   const integration = getNgoIntegration(ngoSlug);
   const connected = !!(integration && integration.refresh_token);
+
+  // Auto-create/sync Student Medical Records sheet if connected but not yet generated
+  if (connected && (!integration.clinicalSheetId || !integration.sheetId)) {
+    try {
+      const DB_FILE = path.join(__dirname, 'data/db.json');
+      let children = [];
+      if (fs.existsSync(DB_FILE)) {
+        const serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
+        if (serverData['chm-children']) children = JSON.parse(serverData['chm-children']);
+      }
+      await oauthSyncSheets(children, ngoSlug, 'Ayusha Nilayam');
+    } catch (e) {
+      console.warn('[Sheets Config] Auto-sync notice:', e.message);
+    }
+  }
+
   res.json({
     connected,
     adminEmail: integration.adminEmail || null,
@@ -535,7 +551,7 @@ app.post('/api/sync', requireAuth, apiLimiter, (req, res) => {
           updateLocalCSVExport(children);
           const ngoSlug = req.body?.ngo || 'ayusha-nilayam';
           const ngoName = req.body?.ngoName || 'Ayusha Nilayam';
-          syncChildrenToGoogleSheets(children, ngoSlug, ngoName).catch(err => {
+          oauthSyncSheets(children, ngoSlug, ngoName).catch(err => {
             console.warn('[Sync] Background Google Sheets auto-sync notice:', err.message);
           });
         }
