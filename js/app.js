@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
 import { updateChildTable, childRows, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, renderSearchResultsList } from './search.js';
 import { toast } from './toast.js';
@@ -159,12 +159,120 @@ document.addEventListener('click', (event) => {
     window.location.href = pagePath(prev);
   }
 
-  if (target.matches('[data-collapse-sidebar]')) document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
-  if (target.matches('[data-open-sidebar]')) { document.querySelector('.app-shell').classList.add('sidebar-open'); document.querySelector('.mobile-backdrop').hidden = false; }
-  if (target.matches('[data-close-sidebar]')) { document.querySelector('.app-shell').classList.remove('sidebar-open'); target.hidden = true; }
-  if (target.matches('[data-theme-toggle]')) setTheme(!document.body.classList.contains('theme-dark'));
-  if (target.matches('[data-notifications]')) { const dropdown = document.querySelector('[data-notif-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-profile-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
-  if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-notif-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
+  if (target.closest('[data-collapse-sidebar]')) document.querySelector('.app-shell')?.classList.toggle('sidebar-collapsed');
+  if (target.closest('[data-open-sidebar]')) { document.querySelector('.app-shell')?.classList.add('sidebar-open'); const mb = document.querySelector('.mobile-backdrop'); if (mb) mb.hidden = false; }
+  if (target.closest('[data-close-sidebar]')) { document.querySelector('.app-shell')?.classList.remove('sidebar-open'); const mb = document.querySelector('.mobile-backdrop'); if (mb) mb.hidden = true; }
+
+  // Dynamic Day/Dark Theme toggle
+  const themeBtn = target.closest('[data-theme-toggle]');
+  if (themeBtn) {
+    event.preventDefault();
+    const isDark = !document.body.classList.contains('theme-dark');
+    setTheme(isDark);
+    toast(isDark ? 'Dark Theme Activated' : 'Light Theme Activated', `Switched workspace display mode.`);
+    return;
+  }
+
+  // Notifications dropdown toggle
+  const notifBtn = target.closest('[data-notifications]');
+  if (notifBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    const dropdown = document.querySelector('[data-notif-dropdown]');
+    if (dropdown) {
+      const willShow = dropdown.hidden;
+      document.querySelectorAll('[data-profile-dropdown]').forEach(d => d.hidden = true);
+      dropdown.hidden = !willShow;
+      notifBtn.setAttribute('aria-expanded', String(willShow));
+    }
+    return;
+  }
+
+  // Dismiss single alert
+  const dismissAlertBtn = target.closest('[data-dismiss-alert-id]');
+  if (dismissAlertBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    const alertId = dismissAlertBtn.getAttribute('data-dismiss-alert-id');
+    if (alertId) {
+      dismissAlert(alertId);
+      const itemEl = target.closest('[data-notif-item-id]');
+      if (itemEl) {
+        itemEl.style.opacity = '0.5';
+        dismissAlertBtn.replaceWith(Object.assign(document.createElement('span'), {
+          textContent: 'Dismissed',
+          style: 'font-size:10px; color:var(--color-text-muted);'
+        }));
+      }
+      const activeUnread = getAlerts().filter(a => !a.dismissed).length;
+      const dot = document.querySelector('.notif-badge-dot');
+      if (dot && activeUnread === 0) dot.remove();
+      const badge = document.querySelector('[data-notif-dropdown] .badge');
+      if (badge) {
+        if (activeUnread === 0) {
+          badge.className = 'badge badge--neutral';
+          badge.textContent = '0 new';
+          document.querySelector('[data-clear-all-notifs]')?.remove();
+        } else {
+          badge.textContent = `${activeUnread} new`;
+        }
+      }
+    }
+    return;
+  }
+
+  // Mark all notifications as read
+  const clearAllNotifsBtn = target.closest('[data-clear-all-notifs]');
+  if (clearAllNotifsBtn) {
+    event.preventDefault();
+    event.stopPropagation();
+    const allAlerts = getAlerts().map(a => ({ ...a, dismissed: true }));
+    localStorage.setItem('sample-alerts', JSON.stringify(allAlerts));
+
+    document.querySelector('.notif-badge-dot')?.remove();
+    clearAllNotifsBtn.remove();
+
+    const badge = document.querySelector('[data-notif-dropdown] .badge');
+    if (badge) {
+      badge.className = 'badge badge--neutral';
+      badge.textContent = '0 new';
+    }
+
+    document.querySelectorAll('[data-dismiss-alert-id]').forEach(btn => {
+      btn.replaceWith(Object.assign(document.createElement('span'), {
+        textContent: 'Dismissed',
+        style: 'font-size:10px; color:var(--color-text-muted);'
+      }));
+    });
+    document.querySelectorAll('[data-notif-item-id]').forEach(el => el.style.opacity = '0.5');
+    toast('Notifications Cleared', 'All alerts marked as read.');
+    return;
+  }
+
+  // Profile menu toggle
+  const profileTrigger = target.closest('[data-profile-menu]');
+  if (profileTrigger) {
+    event.preventDefault();
+    event.stopPropagation();
+    const dropdown = document.querySelector('[data-profile-dropdown]');
+    if (dropdown) {
+      const willShow = dropdown.hidden;
+      document.querySelectorAll('[data-notif-dropdown]').forEach(d => d.hidden = true);
+      dropdown.hidden = !willShow;
+      profileTrigger.setAttribute('aria-expanded', String(willShow));
+    }
+    return;
+  }
+
+  // Close dropdowns if clicking outside
+  if (!target.closest('.topbar-notif') && !target.closest('.topbar-profile')) {
+    document.querySelectorAll('[data-notif-dropdown], [data-profile-dropdown]').forEach(d => {
+      d.hidden = true;
+    });
+    document.querySelectorAll('[data-notifications], [data-profile-menu]').forEach(b => {
+      b.setAttribute('aria-expanded', 'false');
+    });
+  }
 
   const signOutBtn = target.closest('[data-sign-out]');
   if (signOutBtn) {
@@ -1558,6 +1666,9 @@ function enableColumnResize() {
 function setTheme(isDark) {
   document.body.classList.toggle('theme-dark', isDark);
   localStorage.setItem('sample-theme', isDark ? 'dark' : 'light');
+  document.querySelectorAll('[data-theme-toggle] .theme-icon-container').forEach(el => {
+    el.innerHTML = isDark ? icon('sun') : icon('moon');
+  });
 }
 
 setTheme(localStorage.getItem('sample-theme') === 'dark');

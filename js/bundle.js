@@ -35897,6 +35897,45 @@
 
     const navHTML = nav.map(group => group.items.map(item => navItem(item, page)).join('')).join('');
 
+    const alerts = getAlerts();
+    const unreadAlerts = alerts.filter(a => !a.dismissed);
+    const unreadCount = unreadAlerts.length;
+
+    let notifItemsHTML = '';
+    if (alerts.length === 0) {
+      notifItemsHTML = `
+      <div style="padding: 28px 16px; text-align: center; color: var(--color-text-muted);">
+        <span style="font-size: 24px; display: block; margin-bottom: 4px;">🔔</span>
+        <p style="margin: 0; font-size: 13px; font-weight: 700; color: var(--color-text);">All Caught Up</p>
+        <span style="font-size: 11px; opacity: 0.8;">No new health or system alerts.</span>
+      </div>
+    `;
+    } else {
+      notifItemsHTML = alerts.slice(0, 8).map(alert => {
+        const isCritical = alert.type === 'critical';
+        const isWarning = alert.type === 'warning';
+        const badgeColor = isCritical ? 'rose' : isWarning ? 'amber' : 'blue';
+        const glyph = isCritical ? 'heartPulse' : isWarning ? 'clock' : 'alertCircle';
+
+        return `
+        <div class="notif-item" style="padding: 11px 14px; border-bottom: 1px solid var(--color-border); display: flex; gap: 10px; align-items: flex-start; ${alert.dismissed ? 'opacity: 0.6;' : ''}" data-notif-item-id="${alert.id}">
+          <span class="stat-card__icon stat-card__icon--${badgeColor}" style="width: 26px; height: 26px; flex: 0 0 26px; border-radius: 7px;">
+            ${icon(glyph)}
+          </span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--color-text); line-height: 1.35; margin-bottom: 2px;">
+              ${escapeHTML$1(alert.message)}
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; color: var(--color-text-muted); margin-top: 3px;">
+              <span>${timeAgo(alert.timestamp)}</span>
+              ${alert.dismissed ? '<span style="font-size:10px; color:var(--color-text-muted);">Dismissed</span>' : `<button type="button" data-dismiss-alert-id="${alert.id}" style="background: none; border: none; color: var(--color-primary); cursor: pointer; font-size: 10.5px; padding: 0; font-weight: 600;">Dismiss</button>`}
+            </div>
+          </div>
+        </div>
+      `;
+      }).join('');
+    }
+
     return `<div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
       <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
@@ -35909,25 +35948,52 @@
         <div class="topbar__crumbs"><span>Demo</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
         <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
         <div class="topbar__actions">
-          <button class="icon-button tooltip" data-tooltip="Toggle theme" data-theme-toggle type="button" aria-label="Toggle color theme">${icon('sun')}</button>
-          <button class="icon-button tooltip" data-tooltip="Notifications" type="button" aria-label="Notifications" data-notifications>${icon('bell')}</button>
+          <button class="icon-button" data-theme-toggle type="button" aria-label="Toggle color theme" style="cursor: pointer;">
+            <span class="theme-icon-container">
+              ${document.body?.classList?.contains('theme-dark') || (typeof localStorage !== 'undefined' && localStorage.getItem('sample-theme') === 'dark') ? icon('sun') : icon('moon')}
+            </span>
+          </button>
+          
+          <div class="topbar-notif" style="position: relative;">
+            <button class="icon-button" data-notifications type="button" aria-label="Notifications" aria-haspopup="true" aria-expanded="false" style="cursor: pointer; position: relative;">
+              ${icon('bell')}
+              ${unreadCount > 0 ? `<span class="notif-badge-dot" style="position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: #ef4444; border: 2px solid var(--color-surface, #fff);"></span>` : ''}
+            </button>
+            <div class="dropdown notif-dropdown" hidden data-notif-dropdown style="position: absolute; top: calc(100% + 8px); right: 0; width: 330px; max-width: 90vw; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 14px; box-shadow: 0 12px 32px -4px rgba(0,0,0,0.15); z-index: 1000; overflow: hidden;">
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-alt, #f8fafc);">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <b style="font-size: 13px; color: var(--color-text);">Notifications</b>
+                  <span class="badge ${unreadCount > 0 ? 'badge--danger' : 'badge--neutral'}" style="font-size: 10px; padding: 1px 6px;">${unreadCount} new</span>
+                </div>
+                ${unreadCount > 0 ? `<button type="button" data-clear-all-notifs style="background: none; border: none; font-size: 11px; font-weight: 600; color: var(--color-primary); cursor: pointer; padding: 0;">Mark all as read</button>` : ''}
+              </div>
+              <div class="notif-dropdown__list" style="max-height: 340px; overflow-y: auto;">
+                ${notifItemsHTML}
+              </div>
+              <div style="padding: 10px 16px; border-top: 1px solid var(--color-border); background: var(--color-bg-alt, #f8fafc); text-align: center;">
+                <a href="${pagePath('appointments')}" style="font-size: 11.5px; font-weight: 600; color: var(--color-primary); text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                  ${icon('calendar')} View All Appointments & Vitals
+                </a>
+              </div>
+            </div>
+          </div>
           
           <!-- DASHBOARD HEADER GOOGLE USER PROFILE & NGO WORKSPACE -->
-          <div class="topbar-profile" style="display:flex; align-items:center; gap:12px;">
-            <button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:20px; border:1px solid var(--color-border); background:var(--color-bg);">
+          <div class="topbar-profile" style="display:flex; align-items:center; gap:12px; position: relative;">
+            <button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:20px; border:1px solid var(--color-border); background:var(--color-bg); cursor: pointer;">
               ${photoURL ? `<img src="${escapeHTML$1(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
               <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML$1(displayName)}</span>
               ${icon('chevronDown')}
             </button>
-            <div class="dropdown" hidden data-profile-dropdown>
+            <div class="dropdown" hidden data-profile-dropdown style="position: absolute; top: calc(100% + 8px); right: 0; width: 240px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 14px; box-shadow: 0 12px 32px -4px rgba(0,0,0,0.15); z-index: 1000; overflow: hidden;">
               <div style="padding:12px 14px; border-bottom:1px solid var(--color-border); font-size:12px;">
                 <div style="font-weight:700; color:var(--color-text);">${escapeHTML$1(displayName)}</div>
                 <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML$1(email)}</div>
                 <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML$1(ngoName)}</span></div>
               </div>
               <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
-              <div class="divider"></div>
-              <button class="dropdown__item" type="button" data-sign-out>${icon('lock')}Sign out</button>
+              <div class="divider" style="margin: 4px 0; border-top: 1px solid var(--color-border);"></div>
+              <button class="dropdown__item" type="button" data-sign-out style="width: 100%; border: none; background: none; text-align: left; cursor: pointer; padding: 10px 14px; display: flex; align-items: center; gap: 8px; color: var(--color-danger); font-size: 12.5px; font-weight: 600;">${icon('lock')}Sign out</button>
             </div>
           </div>
         </div>
@@ -37464,12 +37530,120 @@
       window.location.href = pagePath(prev);
     }
 
-    if (target.matches('[data-collapse-sidebar]')) document.querySelector('.app-shell').classList.toggle('sidebar-collapsed');
-    if (target.matches('[data-open-sidebar]')) { document.querySelector('.app-shell').classList.add('sidebar-open'); document.querySelector('.mobile-backdrop').hidden = false; }
-    if (target.matches('[data-close-sidebar]')) { document.querySelector('.app-shell').classList.remove('sidebar-open'); target.hidden = true; }
-    if (target.matches('[data-theme-toggle]')) setTheme(!document.body.classList.contains('theme-dark'));
-    if (target.matches('[data-notifications]')) { const dropdown = document.querySelector('[data-notif-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-profile-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
-    if (target.matches('[data-profile-menu]')) { const dropdown = document.querySelector('[data-profile-dropdown]'); const visible = dropdown.hidden; document.querySelectorAll('[data-notif-dropdown]').forEach(d => d.hidden = true); dropdown.hidden = !visible; target.setAttribute('aria-expanded', String(visible)); }
+    if (target.closest('[data-collapse-sidebar]')) document.querySelector('.app-shell')?.classList.toggle('sidebar-collapsed');
+    if (target.closest('[data-open-sidebar]')) { document.querySelector('.app-shell')?.classList.add('sidebar-open'); const mb = document.querySelector('.mobile-backdrop'); if (mb) mb.hidden = false; }
+    if (target.closest('[data-close-sidebar]')) { document.querySelector('.app-shell')?.classList.remove('sidebar-open'); const mb = document.querySelector('.mobile-backdrop'); if (mb) mb.hidden = true; }
+
+    // Dynamic Day/Dark Theme toggle
+    const themeBtn = target.closest('[data-theme-toggle]');
+    if (themeBtn) {
+      event.preventDefault();
+      const isDark = !document.body.classList.contains('theme-dark');
+      setTheme(isDark);
+      toast(isDark ? 'Dark Theme Activated' : 'Light Theme Activated', `Switched workspace display mode.`);
+      return;
+    }
+
+    // Notifications dropdown toggle
+    const notifBtn = target.closest('[data-notifications]');
+    if (notifBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      const dropdown = document.querySelector('[data-notif-dropdown]');
+      if (dropdown) {
+        const willShow = dropdown.hidden;
+        document.querySelectorAll('[data-profile-dropdown]').forEach(d => d.hidden = true);
+        dropdown.hidden = !willShow;
+        notifBtn.setAttribute('aria-expanded', String(willShow));
+      }
+      return;
+    }
+
+    // Dismiss single alert
+    const dismissAlertBtn = target.closest('[data-dismiss-alert-id]');
+    if (dismissAlertBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      const alertId = dismissAlertBtn.getAttribute('data-dismiss-alert-id');
+      if (alertId) {
+        dismissAlert(alertId);
+        const itemEl = target.closest('[data-notif-item-id]');
+        if (itemEl) {
+          itemEl.style.opacity = '0.5';
+          dismissAlertBtn.replaceWith(Object.assign(document.createElement('span'), {
+            textContent: 'Dismissed',
+            style: 'font-size:10px; color:var(--color-text-muted);'
+          }));
+        }
+        const activeUnread = getAlerts().filter(a => !a.dismissed).length;
+        const dot = document.querySelector('.notif-badge-dot');
+        if (dot && activeUnread === 0) dot.remove();
+        const badge = document.querySelector('[data-notif-dropdown] .badge');
+        if (badge) {
+          if (activeUnread === 0) {
+            badge.className = 'badge badge--neutral';
+            badge.textContent = '0 new';
+            document.querySelector('[data-clear-all-notifs]')?.remove();
+          } else {
+            badge.textContent = `${activeUnread} new`;
+          }
+        }
+      }
+      return;
+    }
+
+    // Mark all notifications as read
+    const clearAllNotifsBtn = target.closest('[data-clear-all-notifs]');
+    if (clearAllNotifsBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      const allAlerts = getAlerts().map(a => ({ ...a, dismissed: true }));
+      localStorage.setItem('sample-alerts', JSON.stringify(allAlerts));
+
+      document.querySelector('.notif-badge-dot')?.remove();
+      clearAllNotifsBtn.remove();
+
+      const badge = document.querySelector('[data-notif-dropdown] .badge');
+      if (badge) {
+        badge.className = 'badge badge--neutral';
+        badge.textContent = '0 new';
+      }
+
+      document.querySelectorAll('[data-dismiss-alert-id]').forEach(btn => {
+        btn.replaceWith(Object.assign(document.createElement('span'), {
+          textContent: 'Dismissed',
+          style: 'font-size:10px; color:var(--color-text-muted);'
+        }));
+      });
+      document.querySelectorAll('[data-notif-item-id]').forEach(el => el.style.opacity = '0.5');
+      toast('Notifications Cleared', 'All alerts marked as read.');
+      return;
+    }
+
+    // Profile menu toggle
+    const profileTrigger = target.closest('[data-profile-menu]');
+    if (profileTrigger) {
+      event.preventDefault();
+      event.stopPropagation();
+      const dropdown = document.querySelector('[data-profile-dropdown]');
+      if (dropdown) {
+        const willShow = dropdown.hidden;
+        document.querySelectorAll('[data-notif-dropdown]').forEach(d => d.hidden = true);
+        dropdown.hidden = !willShow;
+        profileTrigger.setAttribute('aria-expanded', String(willShow));
+      }
+      return;
+    }
+
+    // Close dropdowns if clicking outside
+    if (!target.closest('.topbar-notif') && !target.closest('.topbar-profile')) {
+      document.querySelectorAll('[data-notif-dropdown], [data-profile-dropdown]').forEach(d => {
+        d.hidden = true;
+      });
+      document.querySelectorAll('[data-notifications], [data-profile-menu]').forEach(b => {
+        b.setAttribute('aria-expanded', 'false');
+      });
+    }
 
     const signOutBtn = target.closest('[data-sign-out]');
     if (signOutBtn) {
@@ -38863,6 +39037,9 @@
   function setTheme(isDark) {
     document.body.classList.toggle('theme-dark', isDark);
     localStorage.setItem('sample-theme', isDark ? 'dark' : 'light');
+    document.querySelectorAll('[data-theme-toggle] .theme-icon-container').forEach(el => {
+      el.innerHTML = isDark ? icon('sun') : icon('moon');
+    });
   }
 
   setTheme(localStorage.getItem('sample-theme') === 'dark');
