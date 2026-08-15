@@ -684,7 +684,10 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
   let addedCount = 0;
   let updatedCount = 0;
-  const mergedChildren = [...existingChildren];
+  let removedCount = 0;
+  const sheetSeenIds = new Set();
+  const sheetSeenNames = new Set();
+  const validSheetChildren = [];
 
   // 1. Read Master Directory Sheet (Sheet1)
   try {
@@ -723,7 +726,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
         let name = (nameCol >= 0 && row[nameCol]) ? String(row[nameCol]).trim() : '';
-        if (!name || name === 'Unnamed Child' || name === 'CHILD' || name.toLowerCase() === 'name') continue;
+        if (!name || IGNORED_NAMES.includes(name.toLowerCase())) continue;
 
         // Strip leading clean quote if present
         if (name.startsWith("'")) name = name.slice(1).trim();
@@ -758,6 +761,9 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
         const rawDental = cleanVal(dentalCol);
         const rawHygiene = cleanVal(hygieneCol);
 
+        sheetSeenIds.add(id.toLowerCase().trim());
+        sheetSeenNames.add(name.toLowerCase().trim());
+
         const existingMatch = existingMap.get(id.toLowerCase()) || existingMap.get(name.toLowerCase());
 
         if (existingMatch) {
@@ -777,6 +783,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
           if (rawDental !== existingMatch.dentalRemarks && rawDental !== 'None') { existingMatch.dentalRemarks = rawDental; changed = true; }
           if (rawHygiene !== existingMatch.hygieneIndex && rawHygiene !== 'Not Assessed') { existingMatch.hygieneIndex = rawHygiene; changed = true; }
           if (changed) updatedCount++;
+          validSheetChildren.push(existingMatch);
         } else {
           const newChild = {
             id,
@@ -799,32 +806,57 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
             hygieneIndex: rawHygiene === 'Not Assessed' ? '' : rawHygiene,
             source: 'Google Sheets Live Sync'
           };
-          mergedChildren.push(newChild);
+          validSheetChildren.push(newChild);
           existingMap.set(id.toLowerCase(), newChild);
           existingMap.set(name.toLowerCase(), newChild);
           addedCount++;
         }
       }
+
+      // Check for removed children (present in app database previously, but deleted from Google Sheets)
+      existingChildren.forEach(ec => {
+        const idKey = (ec.id || '').toLowerCase().trim();
+        const nameKey = (ec.name || '').toLowerCase().trim();
+        if (!sheetSeenIds.has(idKey) && !sheetSeenNames.has(nameKey)) {
+          removedCount++;
+        }
+      });
     }
   } catch (readErr) {
     console.warn('[Google OAuth] Master sheet read warning:', readErr.message);
   }
 
-  // Save merged records to data/db.json
-  // Also clean out any legacy Unnamed Child
-  const cleanedChildren = mergedChildren.filter(c => c && c.name && !IGNORED_NAMES.includes(c.name.trim().toLowerCase()));
+  // Deduplicate and filter final children list
+  const finalMap = new Map();
+  validSheetChildren.forEach(c => {
+    if (c && c.name && !IGNORED_NAMES.includes(c.name.trim().toLowerCase())) {
+      const key = (c.id || c.name).toLowerCase().trim();
+      finalMap.set(key, c);
+    }
+  });
+
+  const cleanedChildren = Array.from(finalMap.values());
 
   serverData['chm-children'] = JSON.stringify(cleanedChildren);
   fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
-  console.log(`[Google OAuth] Pulled from Child Health Records master sheet: ${addedCount} new child(ren), ${updatedCount} updated.`);
+  console.log(`[Google OAuth] Pulled from Child Health Records master sheet: ${addedCount} added, ${updatedCount} updated, ${removedCount} removed.`);
+
+  let statusMsg = 'Synced with Child Health Records: ';
+  const parts = [];
+  if (addedCount > 0) parts.push(`${addedCount} new child(ren) imported`);
+  if (updatedCount > 0) parts.push(`${updatedCount} updated`);
+  if (removedCount > 0) parts.push(`${removedCount} deleted child(ren) removed`);
+  if (parts.length === 0) parts.push('All records up to date');
+  statusMsg += parts.join(', ') + '.';
 
   return {
     success: true,
     addedCount,
     updatedCount,
+    removedCount,
     totalCount: cleanedChildren.length,
     children: cleanedChildren,
-    message: `Synced with Child Health Records: ${addedCount} new child(ren) imported, ${updatedCount} record(s) updated.`
+    message: statusMsg
   };
 }
 

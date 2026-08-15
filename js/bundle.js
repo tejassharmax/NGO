@@ -34966,13 +34966,13 @@
           if (data.addedCount > 0) {
             logActivity('child_added', `${data.addedCount} student(s)`, `Imported ${data.addedCount} new child record(s) from Google Sheets.`);
           }
+          if (data.removedCount > 0) {
+            logActivity('child_removed', `${data.removedCount} student(s)`, `Removed ${data.removedCount} child record(s) deleted from Google Sheets.`);
+          }
 
           if (!options.silent) {
-            if (data.addedCount > 0 || data.updatedCount > 0) {
-              toast(
-                'Google Sheets Sync Complete',
-                `Imported ${data.addedCount} new child(ren) and updated ${data.updatedCount} record(s) from Google Sheets.`
-              );
+            if (data.addedCount > 0 || data.updatedCount > 0 || data.removedCount > 0) {
+              toast('Google Sheets Sync Complete', data.message || `Updated ${data.totalCount || 0} children records.`);
             } else {
               toast('Google Sheets Up to Date', 'All children records are already in sync with Google Sheets.');
             }
