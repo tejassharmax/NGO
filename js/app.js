@@ -10,7 +10,7 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets } from './googleSheetsSync.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets } from './googleSheetsSync.js';
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
@@ -600,7 +600,20 @@ document.addEventListener('click', (event) => {
   if (target.matches('[data-delete]')) {
     const id = target.dataset.delete;
     const child = getChildren().find((item) => item.id === id);
-    modal({ title: `Remove ${child?.name || 'child'}?`, body: 'This removes the child record from this workspace. This action cannot be undone.', confirmText: 'Remove child', confirmClass: 'button--danger', onConfirm: () => { deleteChild(id); applyTableFilters(); toast('Child removed', 'The record has been removed from this workspace.'); } });
+    const childName = child?.name || 'child';
+    modal({
+      title: `Remove ${childName}?`,
+      body: 'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
+      confirmText: 'Remove child',
+      confirmClass: 'button--danger',
+      onConfirm: () => {
+        deleteChild(id);
+        applyTableFilters();
+        toast('Child removed', `The record for ${childName} has been removed.`);
+        autoSyncDeleteChildFromGoogleSheets(id, childName);
+        syncWithServer().catch(() => {});
+      }
+    });
   }
 
   if (target.matches('[data-edit]')) {
