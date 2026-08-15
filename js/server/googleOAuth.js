@@ -188,7 +188,7 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
 
   // Row 3: Routine Clinical Checkup Table Headers
   const checkupHeader = ['DATE', 'TEMP(F)', 'B/P', 'WEIGHT', 'P/R', 'SPO2', 'COMPLAINT', 'PRESCRIPTION', 'EYE CHECK UP'];
-  
+
   const checkupRows = [];
 
   // Real growth / checkup measurements ONLY if they exist
@@ -342,7 +342,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
       if (dbData['chm-growth']) allGrowth = JSON.parse(dbData['chm-growth']);
       if (dbData['chm-medicines']) allMedicines = JSON.parse(dbData['chm-medicines']);
       if (dbData['chm-health-records']) allHealthRecords = JSON.parse(dbData['chm-health-records']);
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // Master Directory header and rows
@@ -660,6 +660,8 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
   const sheets = google.sheets({ version: 'v4', auth: client });
 
+  const IGNORED_NAMES = ['unnamed child', 'child', 'name', 'child name', 'student name', 'sample', 'template'];
+
   // Load existing children from server DB
   const DB_FILE = path.join(__dirname, '../../data/db.json');
   let existingChildren = [];
@@ -668,8 +670,11 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
     try {
       serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
       if (serverData['chm-children']) existingChildren = JSON.parse(serverData['chm-children']);
-    } catch (e) {}
+    } catch (e) { }
   }
+
+  // Filter out any legacy placeholder entries
+  existingChildren = existingChildren.filter(c => c && c.name && !IGNORED_NAMES.includes(c.name.trim().toLowerCase()));
 
   const existingMap = new Map();
   existingChildren.forEach(c => {
@@ -805,61 +810,21 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
     console.warn('[Google OAuth] Master sheet read warning:', readErr.message);
   }
 
-  // 2. Also check if new child tabs exist in the Student Medical Records workbook (clinicalSheetId)
-  if (integration.clinicalSheetId) {
-    try {
-      const metaRes = await sheets.spreadsheets.get({ spreadsheetId: integration.clinicalSheetId });
-      const IGNORED_TABS = ['sheet1', 'student records', 'unnamed child', 'child', 'template', 'sample', 'student record', 'instructions'];
-      sheetTabs.forEach(s => {
-        const title = (s.properties.title || '').trim();
-        if (title && !IGNORED_TABS.includes(title.toLowerCase())) {
-          const formattedName = title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
-          if (!existingMap.has(title.toLowerCase()) && !existingMap.has(formattedName.toLowerCase())) {
-            const newChild = {
-              id: `CH-${Math.floor(1000 + Math.random() * 9000)}`,
-              name: formattedName,
-              dob: '',
-              gender: 'Male',
-              blood: 'O+',
-              idNumber: '',
-              father: '',
-              guardian: '',
-              phone: '',
-              height: '',
-              weight: '',
-              medicalConditions: '',
-              allergies: '',
-              status: 'Active',
-              registeredDate: new Date().toISOString().slice(0, 10),
-              source: 'Google Sheets Tab Sync'
-            };
-            mergedChildren.push(newChild);
-            existingMap.set(newChild.id.toLowerCase(), newChild);
-            existingMap.set(title.toLowerCase(), newChild);
-            existingMap.set(formattedName.toLowerCase(), newChild);
-            addedCount++;
-          }
-        }
-      });
-    } catch (tabErr) {
-      console.warn('[Google OAuth] Clinical tab read notice:', tabErr.message);
-    }
-  }
-
   // Save merged records to data/db.json
-  if (addedCount > 0 || updatedCount > 0) {
-    serverData['chm-children'] = JSON.stringify(mergedChildren);
-    fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
-    console.log(`[Google OAuth] Pulled from Google Sheets: ${addedCount} new child(ren), ${updatedCount} updated.`);
-  }
+  // Also clean out any legacy Unnamed Child
+  const cleanedChildren = mergedChildren.filter(c => c && c.name && !IGNORED_NAMES.includes(c.name.trim().toLowerCase()));
+
+  serverData['chm-children'] = JSON.stringify(cleanedChildren);
+  fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
+  console.log(`[Google OAuth] Pulled from Child Health Records master sheet: ${addedCount} new child(ren), ${updatedCount} updated.`);
 
   return {
     success: true,
     addedCount,
     updatedCount,
-    totalCount: mergedChildren.length,
-    children: mergedChildren,
-    message: `Synced with Google Sheets: ${addedCount} new child(ren) imported, ${updatedCount} record(s) updated.`
+    totalCount: cleanedChildren.length,
+    children: cleanedChildren,
+    message: `Synced with Child Health Records: ${addedCount} new child(ren) imported, ${updatedCount} record(s) updated.`
   };
 }
 
