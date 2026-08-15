@@ -8,7 +8,7 @@
 
 import { getSession } from './session.js';
 import { toast } from './toast.js';
-import { getChildren, calculateAge } from './storage.js';
+import { getChildren, calculateAge, logActivity } from './storage.js';
 import { escapeHTML, icon } from './utils.js';
 import { apiFetch } from './apiClient.js';
 
@@ -626,6 +626,62 @@ export async function autoSyncChildToGoogleSheets(child) {
   } catch (e) {
     console.warn('[Google Sheets] OAuth sync exception:', e);
   }
+}
+
+/**
+ * Pull and import children records from the connected Google Sheets.
+ * Merges any new children added directly in Google Sheets and updates existing children.
+ */
+export async function pullChildrenFromGoogleSheets(options = {}) {
+  const session = getSession() || {};
+  const ngoSlug = getNgoSlug(session);
+  const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+
+  if (!options.silent) {
+    toast('Syncing with Google Sheets', 'Checking for newly added children and updates in Google Sheets...');
+  }
+
+  try {
+    const res = await apiFetch('/api/sheets/pull', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ngo: ngoSlug, ngoName })
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.success && Array.isArray(data.children)) {
+        // Save merged children into localStorage
+        localStorage.setItem('chm-children', JSON.stringify(data.children));
+
+        if (data.addedCount > 0) {
+          logActivity('child_added', `${data.addedCount} student(s)`, `Imported ${data.addedCount} new child record(s) from Google Sheets.`);
+        }
+
+        if (!options.silent) {
+          if (data.addedCount > 0 || data.updatedCount > 0) {
+            toast(
+              'Google Sheets Sync Complete',
+              `Imported ${data.addedCount} new child(ren) and updated ${data.updatedCount} record(s) from Google Sheets.`
+            );
+          } else {
+            toast('Google Sheets Up to Date', 'All children records are already in sync with Google Sheets.');
+          }
+        }
+        return data;
+      } else {
+        if (!options.silent) {
+          toast('Sync Notice', data.message || 'Unable to sync with Google Sheets.');
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Google Sheets] Pull sync error:', err);
+    if (!options.silent) {
+      toast('Sync Error', 'Failed to connect to Google Sheets server.');
+    }
+  }
+  return { success: false };
 }
 
 /**

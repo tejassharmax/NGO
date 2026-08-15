@@ -639,6 +639,231 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
 }
 
 /**
+ * Pull and import children records from the NGO's Google Sheets (Master Directory & Medical Records).
+ * If someone adds a student directly in Google Sheets or updates student data,
+ * this pulls those rows and synchronizes them into the app database.
+ */
+async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
+  const safeSlug = sanitizeNgoSlug(ngoSlug);
+  const client = getClientForNgo(safeSlug);
+
+  if (!client) {
+    return { success: false, message: 'Google Sheets is not connected. Please connect Google Workspace in Settings.' };
+  }
+
+  const integration = getNgoIntegration(safeSlug);
+  const sheetId = integration.sheetId;
+
+  if (!sheetId) {
+    return { success: false, message: 'No Google Sheet found for this organization. Please sync or create one first.' };
+  }
+
+  const sheets = google.sheets({ version: 'v4', auth: client });
+
+  // Load existing children from server DB
+  const DB_FILE = path.join(__dirname, '../../data/db.json');
+  let existingChildren = [];
+  let serverData = {};
+  if (fs.existsSync(DB_FILE)) {
+    try {
+      serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
+      if (serverData['chm-children']) existingChildren = JSON.parse(serverData['chm-children']);
+    } catch (e) {}
+  }
+
+  const existingMap = new Map();
+  existingChildren.forEach(c => {
+    if (c.id) existingMap.set(c.id.toLowerCase().trim(), c);
+    if (c.name) existingMap.set(c.name.toLowerCase().trim(), c);
+  });
+
+  let addedCount = 0;
+  let updatedCount = 0;
+  const mergedChildren = [...existingChildren];
+
+  // 1. Read Master Directory Sheet (Sheet1)
+  try {
+    const readRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: 'Sheet1!A1:Z5000'
+    });
+
+    const rawRows = readRes.data.values || [];
+    if (rawRows.length >= 2) {
+      const headers = rawRows[0].map(h => String(h || '').trim().toLowerCase());
+
+      const getColIdx = (candidates) => {
+        return headers.findIndex(h => candidates.some(c => h.includes(c)));
+      };
+
+      const idCol = getColIdx(['id', 'child id']);
+      const nameCol = getColIdx(['child name', 'name', 'student name']);
+      const dobCol = getColIdx(['date of birth', 'dob', 'birth date']);
+      const ageCol = getColIdx(['age']);
+      const genderCol = getColIdx(['gender', 'sex']);
+      const bloodCol = getColIdx(['blood group', 'blood']);
+      const idNumCol = getColIdx(['aadhaar', 'id number', 'aadhaar id', 'gov id']);
+      const guardianCol = getColIdx(['guardian', 'father', 'parent', 'mother']);
+      const phoneCol = getColIdx(['phone', 'contact phone', 'mobile', 'contact']);
+      const heightCol = getColIdx(['height']);
+      const weightCol = getColIdx(['weight']);
+      const medCondCol = getColIdx(['medical conditions', 'medical condition', 'condition', 'diagnosis']);
+      const allergiesCol = getColIdx(['allergies', 'allergy']);
+      const statusCol = getColIdx(['status']);
+      const regDateCol = getColIdx(['registration date', 'registered date', 'reg date', 'date']);
+      const medsCol = getColIdx(['current medications', 'medications', 'medicine']);
+      const dentalCol = getColIdx(['dental remarks', 'dental']);
+      const hygieneCol = getColIdx(['oral hygiene index', 'hygiene index', 'hygiene']);
+
+      for (let i = 1; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        let name = (nameCol >= 0 && row[nameCol]) ? String(row[nameCol]).trim() : '';
+        if (!name || name === 'Unnamed Child' || name === 'CHILD' || name.toLowerCase() === 'name') continue;
+
+        // Strip leading clean quote if present
+        if (name.startsWith("'")) name = name.slice(1).trim();
+
+        let id = (idCol >= 0 && row[idCol]) ? String(row[idCol]).trim() : '';
+        if (id.startsWith("'")) id = id.slice(1).trim();
+        if (!id || id === '—' || id === 'CH-0000') {
+          id = `CH-${Math.floor(1000 + Math.random() * 9000)}`;
+        }
+
+        const cleanVal = (col) => {
+          if (col < 0 || !row[col]) return '';
+          let v = String(row[col]).trim();
+          if (v.startsWith("'")) v = v.slice(1).trim();
+          return v;
+        };
+
+        const rawDob = cleanVal(dobCol);
+        const rawAge = cleanVal(ageCol);
+        const rawGender = cleanVal(genderCol) || 'Male';
+        const rawBlood = cleanVal(bloodCol) || 'O+';
+        const rawIdNum = cleanVal(idNumCol);
+        const rawGuardian = cleanVal(guardianCol);
+        const rawPhone = cleanVal(phoneCol);
+        const rawHeight = cleanVal(heightCol).replace(/cm/gi, '').trim();
+        const rawWeight = cleanVal(weightCol).replace(/kg/gi, '').trim();
+        const rawMedCond = cleanVal(medCondCol);
+        const rawAllergies = cleanVal(allergiesCol);
+        const rawStatus = cleanVal(statusCol) || 'Active';
+        const rawRegDate = cleanVal(regDateCol) || new Date().toISOString().slice(0, 10);
+        const rawMeds = cleanVal(medsCol);
+        const rawDental = cleanVal(dentalCol);
+        const rawHygiene = cleanVal(hygieneCol);
+
+        const existingMatch = existingMap.get(id.toLowerCase()) || existingMap.get(name.toLowerCase());
+
+        if (existingMatch) {
+          let changed = false;
+          if (rawDob && rawDob !== existingMatch.dob) { existingMatch.dob = rawDob; changed = true; }
+          if (rawGender && rawGender !== existingMatch.gender) { existingMatch.gender = rawGender; changed = true; }
+          if (rawBlood && rawBlood !== existingMatch.blood) { existingMatch.blood = rawBlood; changed = true; }
+          if (rawIdNum && rawIdNum !== existingMatch.idNumber) { existingMatch.idNumber = rawIdNum; changed = true; }
+          if (rawGuardian && rawGuardian !== existingMatch.father && rawGuardian !== existingMatch.guardian) { existingMatch.father = rawGuardian; existingMatch.guardian = rawGuardian; changed = true; }
+          if (rawPhone && rawPhone !== existingMatch.phone) { existingMatch.phone = rawPhone; changed = true; }
+          if (rawHeight && rawHeight !== existingMatch.height) { existingMatch.height = rawHeight; changed = true; }
+          if (rawWeight && rawWeight !== existingMatch.weight) { existingMatch.weight = rawWeight; changed = true; }
+          if (rawMedCond && rawMedCond !== existingMatch.medicalConditions && rawMedCond !== 'None') { existingMatch.medicalConditions = rawMedCond; changed = true; }
+          if (rawAllergies && rawAllergies !== existingMatch.allergies && rawAllergies !== 'None') { existingMatch.allergies = rawAllergies; changed = true; }
+          if (rawStatus && rawStatus !== existingMatch.status) { existingMatch.status = rawStatus; changed = true; }
+          if (rawMeds && rawMeds !== existingMatch.medications && rawMeds !== 'None') { existingMatch.medications = rawMeds; changed = true; }
+          if (rawDental && rawDental !== existingMatch.dentalRemarks && rawDental !== 'None') { existingMatch.dentalRemarks = rawDental; changed = true; }
+          if (rawHygiene && rawHygiene !== existingMatch.hygieneIndex && rawHygiene !== 'Not Assessed') { existingMatch.hygieneIndex = rawHygiene; changed = true; }
+          if (changed) updatedCount++;
+        } else {
+          const newChild = {
+            id,
+            name,
+            dob: rawDob,
+            gender: rawGender,
+            blood: rawBlood,
+            idNumber: rawIdNum,
+            father: rawGuardian,
+            guardian: rawGuardian,
+            phone: rawPhone,
+            height: rawHeight,
+            weight: rawWeight,
+            medicalConditions: rawMedCond === 'None' ? '' : rawMedCond,
+            allergies: rawAllergies === 'None' ? '' : rawAllergies,
+            status: rawStatus || 'Active',
+            registeredDate: rawRegDate,
+            medications: rawMeds === 'None' ? '' : rawMeds,
+            dentalRemarks: rawDental === 'None' ? '' : rawDental,
+            hygieneIndex: rawHygiene === 'Not Assessed' ? '' : rawHygiene,
+            source: 'Google Sheets Live Sync'
+          };
+          mergedChildren.push(newChild);
+          existingMap.set(id.toLowerCase(), newChild);
+          existingMap.set(name.toLowerCase(), newChild);
+          addedCount++;
+        }
+      }
+    }
+  } catch (readErr) {
+    console.warn('[Google OAuth] Master sheet read warning:', readErr.message);
+  }
+
+  // 2. Also check if new child tabs exist in the Student Medical Records workbook (clinicalSheetId)
+  if (integration.clinicalSheetId) {
+    try {
+      const metaRes = await sheets.spreadsheets.get({ spreadsheetId: integration.clinicalSheetId });
+      const IGNORED_TABS = ['sheet1', 'student records', 'unnamed child', 'child', 'template', 'sample', 'student record', 'instructions'];
+      sheetTabs.forEach(s => {
+        const title = (s.properties.title || '').trim();
+        if (title && !IGNORED_TABS.includes(title.toLowerCase())) {
+          const formattedName = title.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+          if (!existingMap.has(title.toLowerCase()) && !existingMap.has(formattedName.toLowerCase())) {
+            const newChild = {
+              id: `CH-${Math.floor(1000 + Math.random() * 9000)}`,
+              name: formattedName,
+              dob: '',
+              gender: 'Male',
+              blood: 'O+',
+              idNumber: '',
+              father: '',
+              guardian: '',
+              phone: '',
+              height: '',
+              weight: '',
+              medicalConditions: '',
+              allergies: '',
+              status: 'Active',
+              registeredDate: new Date().toISOString().slice(0, 10),
+              source: 'Google Sheets Tab Sync'
+            };
+            mergedChildren.push(newChild);
+            existingMap.set(newChild.id.toLowerCase(), newChild);
+            existingMap.set(title.toLowerCase(), newChild);
+            existingMap.set(formattedName.toLowerCase(), newChild);
+            addedCount++;
+          }
+        }
+      });
+    } catch (tabErr) {
+      console.warn('[Google OAuth] Clinical tab read notice:', tabErr.message);
+    }
+  }
+
+  // Save merged records to data/db.json
+  if (addedCount > 0 || updatedCount > 0) {
+    serverData['chm-children'] = JSON.stringify(mergedChildren);
+    fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
+    console.log(`[Google OAuth] Pulled from Google Sheets: ${addedCount} new child(ren), ${updatedCount} updated.`);
+  }
+
+  return {
+    success: true,
+    addedCount,
+    updatedCount,
+    totalCount: mergedChildren.length,
+    children: mergedChildren,
+    message: `Synced with Google Sheets: ${addedCount} new child(ren) imported, ${updatedCount} record(s) updated.`
+  };
+}
+
+/**
  * Sync executive health audit report content to the NGO's own Google Doc.
  * Automatically creates the document if it doesn't exist yet.
  */
@@ -718,5 +943,6 @@ module.exports = {
   getNgoIntegration,
   saveNgoIntegration,
   syncChildrenToGoogleSheets,
+  pullChildrenFromGoogleSheets,
   syncExecutiveDocToGoogleDocs
 };

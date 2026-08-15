@@ -20,6 +20,7 @@ const {
   getNgoIntegration,
   saveNgoIntegration,
   syncChildrenToGoogleSheets: oauthSyncSheets,
+  pullChildrenFromGoogleSheets: oauthPullSheets,
   syncExecutiveDocToGoogleDocs
 } = require('./js/server/googleOAuth');
 
@@ -460,6 +461,19 @@ app.post('/api/sheets/sync', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.warn('Per-NGO Sheets sync notice:', err.message);
+    res.json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/sheets/pull
+app.post('/api/sheets/pull', async (req, res) => {
+  try {
+    const { ngo, ngoName } = req.body || {};
+    const ngoSlug = (ngo || req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const result = await oauthPullSheets(ngoSlug, ngoName);
+    res.json(result);
+  } catch (err) {
+    console.warn('Per-NGO Sheets pull notice:', err.message);
     res.json({ success: false, message: err.message });
   }
 });
