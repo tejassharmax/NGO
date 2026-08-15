@@ -34938,6 +34938,34 @@
   }
 
   /**
+   * Automatically sync child deletion to the NGO's Google Sheet
+   * Rewrites the Master Directory Sheet with remaining children so deleted child is removed in Google Sheets!
+   */
+  async function autoSyncDeleteChildFromGoogleSheets(deletedChildId, childName) {
+    const session = getSession() || {};
+    const ngoSlug = getNgoSlug(session);
+    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+    const remainingChildren = (getChildren() || []).filter(c => c && c.id !== deletedChildId);
+
+    try {
+      const res = await apiFetch$1('/api/sheets/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ children: remainingChildren, ngo: ngoSlug, ngoName })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          toast('Google Sheets Updated', `Removed ${childName || 'child'} from connected Google Sheet.`);
+        }
+      }
+    } catch (e) {
+      console.warn('[Google Sheets] Delete sync exception:', e);
+    }
+  }
+
+  /**
    * Pull and import children records from the connected Google Sheets.
    * Merges any new children added directly in Google Sheets and updates existing children.
    */
@@ -38034,7 +38062,20 @@
     if (target.matches('[data-delete]')) {
       const id = target.dataset.delete;
       const child = getChildren().find((item) => item.id === id);
-      modal$1({ title: `Remove ${child?.name || 'child'}?`, body: 'This removes the child record from this workspace. This action cannot be undone.', confirmText: 'Remove child', confirmClass: 'button--danger', onConfirm: () => { deleteChild(id); applyTableFilters(); toast('Child removed', 'The record has been removed from this workspace.'); } });
+      const childName = child?.name || 'child';
+      modal$1({
+        title: `Remove ${childName}?`,
+        body: 'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
+        confirmText: 'Remove child',
+        confirmClass: 'button--danger',
+        onConfirm: () => {
+          deleteChild(id);
+          applyTableFilters();
+          toast('Child removed', `The record for ${childName} has been removed.`);
+          autoSyncDeleteChildFromGoogleSheets(id, childName);
+          syncWithServer().catch(() => {});
+        }
+      });
     }
 
     if (target.matches('[data-edit]')) {
