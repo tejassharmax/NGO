@@ -10,7 +10,7 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet } from './googleSheetsSync.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets } from './googleSheetsSync.js';
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
@@ -107,6 +107,11 @@ let renderCurrentPage = null;
       if (page === 'children') {
         initDragReorder();
         initColumnDragReorder();
+        pullChildrenFromGoogleSheets({ silent: true }).then(res => {
+          if (res && res.success && res.addedCount > 0) {
+            updateChildTable();
+          }
+        }).catch(() => {});
       }
     }
 
@@ -512,6 +517,29 @@ document.addEventListener('click', (event) => {
 
   if (target.closest('[data-sync-google-doc]')) {
     syncAndOpenGoogleDoc();
+  }
+
+  const syncSheetsBtn = target.closest('[data-sync-from-sheets]');
+  if (syncSheetsBtn) {
+    event.preventDefault();
+    syncSheetsBtn.disabled = true;
+    const origHTML = syncSheetsBtn.innerHTML;
+    syncSheetsBtn.innerHTML = `${icon('rotate')} Syncing...`;
+    pullChildrenFromGoogleSheets().then(res => {
+      syncSheetsBtn.disabled = false;
+      syncSheetsBtn.innerHTML = origHTML;
+      if (res && res.success) {
+        if (page === 'children') {
+          updateChildTable();
+        } else if (renderCurrentPage) {
+          renderCurrentPage();
+        }
+      }
+    }).catch(() => {
+      syncSheetsBtn.disabled = false;
+      syncSheetsBtn.innerHTML = origHTML;
+    });
+    return;
   }
 
 

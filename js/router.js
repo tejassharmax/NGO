@@ -273,7 +273,7 @@ export function childrenPage() {
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
   const paginated = children.slice(0, itemsPerPage);
 
-  return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
+  return shell('children', `${heading('Children', 'Search, monitor, and manage every child health record in one place.', `<div style="display:flex; align-items:center; gap:8px;"><button class="button" type="button" data-sync-from-sheets style="display:inline-flex; align-items:center; gap:6px;">${icon('googleSheets')}Sync from Sheets</button><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a></div>`)}
   <section class="card"><div class="table-toolbar"><label class="input-group table-toolbar__search">${icon('search')}<input class="input" id="child-search" type="search" placeholder="Search name, guardian, phone, ID…" aria-label="Search children"></label><div class="table-toolbar__actions"><button class="button button--sm" type="button" data-filter-toggle>${icon('filter')}Filters</button><button class="icon-button tooltip" data-tooltip="Column visibility" type="button" aria-label="Change visible columns" data-column-visibility-toggle>${icon('settings')}</button></div></div><div class="filter-row" hidden data-filter-row><label class="field"><span class="field__label">Status</span><select class="select" data-filter-status><option value="">All statuses</option><option>Active</option><option>Pending</option><option>Verified</option></select></label><label class="field"><span class="field__label">Blood group</span><select class="select" data-filter-blood><option value="">All groups</option><option>A+</option><option>B+</option><option>O+</option><option>AB+</option><option>A-</option><option>B-</option><option>O-</option><option>AB-</option></select></label><button class="button button--ghost button--sm" type="button" data-clear-filters>Clear filters</button></div><div class="data-table-wrap"><table class="data-table"><thead>${childTableHeaders()}</thead><tbody id="child-table-body">${childRows(paginated)}</tbody></table></div><footer class="pagination"><span id="child-count">${totalItems} children (Page 1 of ${totalPages})</span><div class="pagination__buttons"><button class="button button--sm" id="btn-prev" disabled>${icon('chevronLeft')}Previous</button><button class="button button--sm" id="btn-next" ${totalPages <= 1 ? 'disabled' : ''}>Next${icon('chevronRight')}</button></div></footer></section>`);
 }
 
@@ -915,6 +915,9 @@ export function settingsPage() {
                   📄 Master Directory Sheet ↗
                 </a>
               ` : ''}
+              <button class="button button--ghost" type="button" data-sync-from-sheets style="font-weight: 600; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                ${icon('rotate')} Pull from Sheets
+              </button>
               <a href="/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; text-decoration: none; margin-left: auto;">
                 Disconnect
               </a>
