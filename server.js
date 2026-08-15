@@ -21,6 +21,7 @@ const {
   saveNgoIntegration,
   syncChildrenToGoogleSheets: oauthSyncSheets,
   pullChildrenFromGoogleSheets: oauthPullSheets,
+  deleteChildFromGoogleSheets: oauthDeleteChild,
   syncExecutiveDocToGoogleDocs
 } = require('./js/server/googleOAuth');
 
@@ -534,6 +535,20 @@ function mergeJSONArrays(clientJSON, serverJSON) {
   return JSON.stringify(result);
 }
 
+// DELETE /api/children/:id - Delete a specific child from the DB and Google Sheets
+app.delete('/api/children/:id', requireAuth, async (req, res) => {
+  try {
+    const childId = req.params.id;
+    const { ngo, ngoName } = req.body || {};
+    const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const result = await oauthDeleteChild(childId, ngoSlug, ngoName);
+    res.json(result);
+  } catch (err) {
+    console.error('[API] Error deleting child:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // GET /api/sync - Returns current database state for authenticated Google account / NGO
 app.get('/api/sync', requireAuth, (req, res) => {
   try {
@@ -567,7 +582,17 @@ app.post('/api/sync', requireAuth, apiLimiter, (req, res) => {
     ];
 
     keys.forEach(k => {
-      if (k.startsWith('chm-')) {
+      if (k === 'chm-children') {
+        let clientArr = [];
+        try { clientArr = JSON.parse(clientData[k] || '[]'); } catch (e) {}
+        if (Array.isArray(clientArr) && clientArr.length > 0) {
+          mergedData[k] = JSON.stringify(clientArr);
+        } else if (serverData[k]) {
+          mergedData[k] = serverData[k];
+        } else {
+          mergedData[k] = '[]';
+        }
+      } else if (k.startsWith('chm-')) {
         mergedData[k] = mergeJSONArrays(clientData[k], serverData[k]);
       } else if (clientData[k] !== undefined && clientData[k] !== null) {
         mergedData[k] = clientData[k];
