@@ -355,23 +355,23 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
 
   const overviewRows = cleanChildren.map(c => [
     cleanCell(c.id || 'CH-0000'),
-    cleanCell(c.name || 'Unnamed Child'),
-    cleanCell(c.dob),
-    cleanCell(c.age),
-    cleanCell(c.gender),
-    cleanCell(c.blood),
-    cleanCell(c.idNumber),
-    cleanCell(c.father || c.guardian),
-    cleanCell(c.phone),
-    cleanCell(c.height ? `${c.height} cm` : '—'),
-    cleanCell(c.weight ? `${c.weight} kg` : '—'),
-    cleanCell(c.medicalConditions || 'None'),
-    cleanCell(c.allergies || 'None'),
+    cleanCell(c.name || ''),
+    cleanCell(c.dob || ''),
+    cleanCell(c.age || ''),
+    cleanCell(c.gender || ''),
+    cleanCell(c.blood || ''),
+    cleanCell(c.idNumber || ''),
+    cleanCell(c.father || c.guardian || ''),
+    cleanCell(c.phone || ''),
+    cleanCell(c.height ? `${c.height} cm` : ''),
+    cleanCell(c.weight ? `${c.weight} kg` : ''),
+    cleanCell(c.medicalConditions || ''),
+    cleanCell(c.allergies || ''),
     cleanCell(c.status || 'Active'),
     cleanCell(c.registeredDate || new Date().toISOString().slice(0, 10)),
-    cleanCell(c.medications || 'None'),
-    cleanCell(c.dentalRemarks || 'None'),
-    cleanCell(c.hygieneIndex || 'Not Assessed')
+    cleanCell(c.medications || ''),
+    cleanCell(c.dentalRemarks || ''),
+    cleanCell(c.hygieneIndex || '')
   ]);
 
   const masterTableData = [overviewHeaders, ...overviewRows];
@@ -743,8 +743,8 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
         const rawDob = cleanVal(dobCol);
         const rawAge = cleanVal(ageCol);
-        const rawGender = cleanVal(genderCol) || 'Male';
-        const rawBlood = cleanVal(bloodCol) || 'O+';
+        const rawGender = cleanVal(genderCol);
+        const rawBlood = cleanVal(bloodCol);
         const rawIdNum = cleanVal(idNumCol);
         const rawGuardian = cleanVal(guardianCol);
         const rawPhone = cleanVal(phoneCol);
@@ -762,20 +762,20 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
         if (existingMatch) {
           let changed = false;
-          if (rawDob && rawDob !== existingMatch.dob) { existingMatch.dob = rawDob; changed = true; }
-          if (rawGender && rawGender !== existingMatch.gender) { existingMatch.gender = rawGender; changed = true; }
-          if (rawBlood && rawBlood !== existingMatch.blood) { existingMatch.blood = rawBlood; changed = true; }
-          if (rawIdNum && rawIdNum !== existingMatch.idNumber) { existingMatch.idNumber = rawIdNum; changed = true; }
-          if (rawGuardian && rawGuardian !== existingMatch.father && rawGuardian !== existingMatch.guardian) { existingMatch.father = rawGuardian; existingMatch.guardian = rawGuardian; changed = true; }
-          if (rawPhone && rawPhone !== existingMatch.phone) { existingMatch.phone = rawPhone; changed = true; }
-          if (rawHeight && rawHeight !== existingMatch.height) { existingMatch.height = rawHeight; changed = true; }
-          if (rawWeight && rawWeight !== existingMatch.weight) { existingMatch.weight = rawWeight; changed = true; }
-          if (rawMedCond && rawMedCond !== existingMatch.medicalConditions && rawMedCond !== 'None') { existingMatch.medicalConditions = rawMedCond; changed = true; }
-          if (rawAllergies && rawAllergies !== existingMatch.allergies && rawAllergies !== 'None') { existingMatch.allergies = rawAllergies; changed = true; }
+          if (rawDob !== existingMatch.dob) { existingMatch.dob = rawDob; changed = true; }
+          if (rawGender !== existingMatch.gender) { existingMatch.gender = rawGender; changed = true; }
+          if (rawBlood !== existingMatch.blood) { existingMatch.blood = rawBlood; changed = true; }
+          if (rawIdNum !== existingMatch.idNumber) { existingMatch.idNumber = rawIdNum; changed = true; }
+          if (rawGuardian !== existingMatch.father && rawGuardian !== existingMatch.guardian) { existingMatch.father = rawGuardian; existingMatch.guardian = rawGuardian; changed = true; }
+          if (rawPhone !== existingMatch.phone) { existingMatch.phone = rawPhone; changed = true; }
+          if (rawHeight !== existingMatch.height) { existingMatch.height = rawHeight; changed = true; }
+          if (rawWeight !== existingMatch.weight) { existingMatch.weight = rawWeight; changed = true; }
+          if (rawMedCond !== existingMatch.medicalConditions && rawMedCond !== 'None') { existingMatch.medicalConditions = rawMedCond; changed = true; }
+          if (rawAllergies !== existingMatch.allergies && rawAllergies !== 'None') { existingMatch.allergies = rawAllergies; changed = true; }
           if (rawStatus && rawStatus !== existingMatch.status) { existingMatch.status = rawStatus; changed = true; }
-          if (rawMeds && rawMeds !== existingMatch.medications && rawMeds !== 'None') { existingMatch.medications = rawMeds; changed = true; }
-          if (rawDental && rawDental !== existingMatch.dentalRemarks && rawDental !== 'None') { existingMatch.dentalRemarks = rawDental; changed = true; }
-          if (rawHygiene && rawHygiene !== existingMatch.hygieneIndex && rawHygiene !== 'Not Assessed') { existingMatch.hygieneIndex = rawHygiene; changed = true; }
+          if (rawMeds !== existingMatch.medications && rawMeds !== 'None') { existingMatch.medications = rawMeds; changed = true; }
+          if (rawDental !== existingMatch.dentalRemarks && rawDental !== 'None') { existingMatch.dentalRemarks = rawDental; changed = true; }
+          if (rawHygiene !== existingMatch.hygieneIndex && rawHygiene !== 'Not Assessed') { existingMatch.hygieneIndex = rawHygiene; changed = true; }
           if (changed) updatedCount++;
         } else {
           const newChild = {

@@ -1,5 +1,5 @@
 import { icon, initials, pagePath, statusBadge, healthDot } from './utils.js';
-import { healthStatus, calculateAge } from './storage.js';
+import { healthStatus, calculateAge, getChildren } from './storage.js';
 
 export const DEFAULT_COLUMN_ORDER = ['child', 'age', 'gender', 'blood', 'status'];
 
@@ -64,8 +64,12 @@ export function childRows(children) {
 }
 
 export function updateChildTable(children) {
+  const list = (children && Array.isArray(children)) ? children : (getChildren() || []);
   const body = document.querySelector('#child-table-body');
-  if (body) body.innerHTML = childRows(children);
+  if (body) body.innerHTML = childRows(list);
   const count = document.querySelector('#child-count');
-  if (count) count.textContent = `${children.length} children`;
+  if (count) {
+    const totalPages = Math.ceil(list.length / 5) || 1;
+    count.textContent = `${list.length} children (Page 1 of ${totalPages})`;
+  }
 }
