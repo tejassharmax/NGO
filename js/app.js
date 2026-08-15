@@ -529,10 +529,10 @@ document.addEventListener('click', (event) => {
       syncSheetsBtn.disabled = false;
       syncSheetsBtn.innerHTML = origHTML;
       if (res && res.success) {
-        if (page === 'children') {
-          updateChildTable();
-        } else if (renderCurrentPage) {
+        if (renderCurrentPage) {
           renderCurrentPage();
+        } else {
+          updateChildTable(res.children || getChildren());
         }
       }
     }).catch(() => {

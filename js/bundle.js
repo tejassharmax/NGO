@@ -34095,10 +34095,14 @@
   }
 
   function updateChildTable(children) {
+    const list = (children && Array.isArray(children)) ? children : (getChildren() || []);
     const body = document.querySelector('#child-table-body');
-    if (body) body.innerHTML = childRows(children);
+    if (body) body.innerHTML = childRows(list);
     const count = document.querySelector('#child-count');
-    if (count) count.textContent = `${children.length} children`;
+    if (count) {
+      const totalPages = Math.ceil(list.length / 5) || 1;
+      count.textContent = `${list.length} children (Page 1 of ${totalPages})`;
+    }
   }
 
   function getChartData() {
@@ -37959,10 +37963,10 @@
         syncSheetsBtn.disabled = false;
         syncSheetsBtn.innerHTML = origHTML;
         if (res && res.success) {
-          if (page === 'children') {
-            updateChildTable();
-          } else if (renderCurrentPage) {
+          if (renderCurrentPage) {
             renderCurrentPage();
+          } else {
+            updateChildTable(res.children || getChildren());
           }
         }
       }).catch(() => {
