@@ -827,19 +827,20 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
   }
 
   // Deduplicate and filter final children list
-  const finalMap = new Map();
-  validSheetChildren.forEach(c => {
-    if (c && c.name && !IGNORED_NAMES.includes(c.name.trim().toLowerCase())) {
-      const key = (c.id || c.name).toLowerCase().trim();
-      finalMap.set(key, c);
-    }
-  });
-
-  const cleanedChildren = Array.from(finalMap.values());
-
-  serverData['chm-children'] = JSON.stringify(cleanedChildren);
-  fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
-  console.log(`[Google OAuth] Pulled from Child Health Records master sheet: ${addedCount} added, ${updatedCount} updated, ${removedCount} removed.`);
+  let cleanedChildren = existingChildren;
+  if (validSheetChildren.length > 0) {
+    const finalMap = new Map();
+    validSheetChildren.forEach(c => {
+      if (c && c.name && !IGNORED_NAMES.includes(c.name.trim().toLowerCase())) {
+        const key = (c.id || c.name).toLowerCase().trim();
+        finalMap.set(key, c);
+      }
+    });
+    cleanedChildren = Array.from(finalMap.values());
+    serverData['chm-children'] = JSON.stringify(cleanedChildren);
+    fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
+    console.log(`[Google OAuth] Pulled from Child Health Records master sheet: ${addedCount} added, ${updatedCount} updated, ${removedCount} removed.`);
+  }
 
   let statusMsg = 'Synced with Child Health Records: ';
   const parts = [];
@@ -857,6 +858,135 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
     totalCount: cleanedChildren.length,
     children: cleanedChildren,
     message: statusMsg
+  };
+}
+
+/**
+ * Delete a specific child from the database and Google Sheets
+ * Safely removes ONLY the targeted child, updates Sheet1, and removes the child's tab in clinicalSheetId
+ */
+async function deleteChildFromGoogleSheets(childId, ngoSlug, ngoName) {
+  if (!childId) return { success: false, message: 'Child ID is required' };
+
+  const safeSlug = sanitizeNgoSlug(ngoSlug);
+  const DB_FILE = path.join(__dirname, '../../data/db.json');
+  let serverData = {};
+  let currentChildren = [];
+
+  if (fs.existsSync(DB_FILE)) {
+    try {
+      serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
+      if (serverData['chm-children']) {
+        currentChildren = JSON.parse(serverData['chm-children']);
+      }
+    } catch (e) { }
+  }
+
+  const targetChild = currentChildren.find(c => c.id === childId || c.name?.toLowerCase() === childId.toLowerCase());
+  const remainingChildren = currentChildren.filter(c => c.id !== childId && c.name?.toLowerCase() !== childId.toLowerCase());
+
+  // Update server DB with remaining children
+  serverData['chm-children'] = JSON.stringify(remainingChildren);
+  fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
+
+  // Update local CSV backup
+  try {
+    const { updateLocalCSVExport } = require('../../server');
+    if (typeof updateLocalCSVExport === 'function') {
+      updateLocalCSVExport(remainingChildren);
+    }
+  } catch (e) { }
+
+  // Sync remaining children to Google Sheets Master Directory (Sheet1)
+  const client = await getClientForNgo(safeSlug);
+  const integration = getNgoIntegration(safeSlug);
+
+  if (client && integration && integration.sheetId) {
+    try {
+      const sheets = google.sheets({ version: 'v4', auth: client });
+
+      const overviewHeaders = [
+        'ID', 'Child Name', 'Date of Birth', 'Age', 'Gender', 'Blood Group',
+        'Aadhaar ID', 'Guardian', 'Contact Phone', 'Height (cm)', 'Weight (kg)',
+        'Medical Conditions', 'Allergies', 'Status', 'Registration Date',
+        'Current Medications', 'Dental Remarks', 'Oral Hygiene Index'
+      ];
+
+      const overviewRows = remainingChildren.map(c => [
+        cleanCell(c.id || 'CH-0000'),
+        cleanCell(c.name || ''),
+        cleanCell(c.dob || ''),
+        cleanCell(c.age || ''),
+        cleanCell(c.gender || ''),
+        cleanCell(c.blood || ''),
+        cleanCell(c.idNumber || ''),
+        cleanCell(c.father || c.guardian || ''),
+        cleanCell(c.phone || ''),
+        cleanCell(c.height ? `${c.height} cm` : ''),
+        cleanCell(c.weight ? `${c.weight} kg` : ''),
+        cleanCell(c.medicalConditions || ''),
+        cleanCell(c.allergies || ''),
+        cleanCell(c.status || 'Active'),
+        cleanCell(c.registeredDate || new Date().toISOString().slice(0, 10)),
+        cleanCell(c.medications || ''),
+        cleanCell(c.dentalRemarks || ''),
+        cleanCell(c.hygieneIndex || '')
+      ]);
+
+      const masterTableData = [overviewHeaders, ...overviewRows];
+
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: integration.sheetId,
+        range: 'Sheet1!A1:Z5000'
+      });
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: integration.sheetId,
+        range: 'Sheet1!A1',
+        valueInputOption: 'USER_ENTERED',
+        requestBody: { values: masterTableData }
+      });
+      console.log(`[Google OAuth] Child ${childId} (${targetChild?.name || 'child'}) removed from Google Sheet (${remainingChildren.length} remaining).`);
+    } catch (sheetErr) {
+      console.warn('[Google OAuth] Error clearing child row in Google Sheet:', sheetErr.message);
+    }
+
+    // Also remove the child's tab in clinicalSheetId if present
+    if (integration.clinicalSheetId && targetChild && targetChild.name) {
+      try {
+        const sheets = google.sheets({ version: 'v4', auth: client });
+        const metaRes = await sheets.spreadsheets.get({ spreadsheetId: integration.clinicalSheetId });
+        const existingSheets = metaRes.data.sheets || [];
+        const childTabTitle = sanitizeSheetTitle(targetChild.name);
+
+        const matchingSheet = existingSheets.find(s =>
+          s.properties.title === childTabTitle ||
+          s.properties.title.toLowerCase() === targetChild.name.toLowerCase()
+        );
+
+        if (matchingSheet && existingSheets.length > 1) {
+          await sheets.spreadsheets.batchUpdate({
+            spreadsheetId: integration.clinicalSheetId,
+            requestBody: {
+              requests: [
+                { deleteSheet: { sheetId: matchingSheet.properties.sheetId } }
+              ]
+            }
+          });
+          console.log(`[Google OAuth] Deleted tab "${matchingSheet.properties.title}" for removed child.`);
+        }
+      } catch (tabErr) {
+        console.warn('[Google OAuth] Error deleting child tab in clinical sheet:', tabErr.message);
+      }
+    }
+  }
+
+  return {
+    success: true,
+    removedChild: targetChild || { id: childId },
+    children: remainingChildren,
+    remainingCount: remainingChildren.length,
+    message: `Successfully removed ${targetChild?.name || childId} from app and Google Sheet.`
   };
 }
 
@@ -941,5 +1071,6 @@ module.exports = {
   saveNgoIntegration,
   syncChildrenToGoogleSheets,
   pullChildrenFromGoogleSheets,
+  deleteChildFromGoogleSheets,
   syncExecutiveDocToGoogleDocs
 };

@@ -630,25 +630,26 @@ export async function autoSyncChildToGoogleSheets(child) {
 
 /**
  * Automatically sync child deletion to the NGO's Google Sheet
- * Rewrites the Master Directory Sheet with remaining children so deleted child is removed in Google Sheets!
+ * Removes ONLY the targeted child from both the database and Google Sheets!
  */
 export async function autoSyncDeleteChildFromGoogleSheets(deletedChildId, childName) {
   const session = getSession() || {};
   const ngoSlug = getNgoSlug(session);
   const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
-  const remainingChildren = (getChildren() || []).filter(c => c && c.id !== deletedChildId);
 
   try {
-    const res = await apiFetch('/api/sheets/sync', {
-      method: 'POST',
+    const res = await apiFetch(`/api/children/${encodeURIComponent(deletedChildId)}`, {
+      method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ children: remainingChildren, ngo: ngoSlug, ngoName })
+      body: JSON.stringify({ ngo: ngoSlug, ngoName })
     });
 
     if (res.ok) {
       const data = await res.json();
-      if (data && data.success) {
+      if (data && data.success && Array.isArray(data.children)) {
+        localStorage.setItem('chm-children', JSON.stringify(data.children));
         toast('Google Sheets Updated', `Removed ${childName || 'child'} from connected Google Sheet.`);
+        return data;
       }
     }
   } catch (e) {

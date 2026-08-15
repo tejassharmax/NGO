@@ -606,12 +606,16 @@ document.addEventListener('click', (event) => {
       body: 'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
       confirmText: 'Remove child',
       confirmClass: 'button--danger',
-      onConfirm: () => {
+      onConfirm: async () => {
         deleteChild(id);
         applyTableFilters();
         toast('Child removed', `The record for ${childName} has been removed.`);
-        autoSyncDeleteChildFromGoogleSheets(id, childName);
-        syncWithServer().catch(() => {});
+        await autoSyncDeleteChildFromGoogleSheets(id, childName);
+        if (typeof renderCurrentPage === 'function') {
+          renderCurrentPage();
+        } else {
+          updateChildTable(getChildren());
+        }
       }
     });
   }
