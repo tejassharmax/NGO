@@ -521,7 +521,12 @@ function mergeJSONArrays(clientJSON, serverJSON) {
       // Exclude legacy mock records and admin self-registration tests
       if (item.name && DISALLOWED_MOCK_NAMES.includes(item.name.trim())) return;
       if (item.childName && DISALLOWED_MOCK_NAMES.includes(item.childName.trim())) return;
-      const key = item.id || JSON.stringify(item);
+      let key = item.id;
+      if (item.childId && item.date && item.time && item.type) {
+        key = `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
+      } else if (!key) {
+        key = JSON.stringify(item);
+      }
       map.set(key, item);
     }
   });

@@ -263,6 +263,20 @@ export function getAppointments(childId) {
 
 export function addAppointment(appt) {
   const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+
+  // Guard against duplicate creation within 5 seconds for same child, date, time & type
+  const isDuplicate = all.some(a =>
+    a.childId === appt.childId &&
+    a.date === appt.date &&
+    (a.time || '10:00') === (appt.time || '10:00') &&
+    a.type === appt.type &&
+    Math.abs((a.timestamp || 0) - Date.now()) < 5000
+  );
+  if (isDuplicate) {
+    console.warn('[Storage] Duplicate appointment creation prevented for:', appt.childName, appt.date);
+    return all.find(a => a.childId === appt.childId && a.date === appt.date && (a.time || '10:00') === (appt.time || '10:00') && a.type === appt.type);
+  }
+
   appt.id = appt.id || `APT-${Date.now()}`;
   appt.timestamp = Date.now();
   all.unshift(appt);

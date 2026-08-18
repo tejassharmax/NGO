@@ -33713,6 +33713,20 @@
 
   function addAppointment(appt) {
     const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+
+    // Guard against duplicate creation within 5 seconds for same child, date, time & type
+    const isDuplicate = all.some(a =>
+      a.childId === appt.childId &&
+      a.date === appt.date &&
+      (a.time || '10:00') === (appt.time || '10:00') &&
+      a.type === appt.type &&
+      Math.abs((a.timestamp || 0) - Date.now()) < 5000
+    );
+    if (isDuplicate) {
+      console.warn('[Storage] Duplicate appointment creation prevented for:', appt.childName, appt.date);
+      return all.find(a => a.childId === appt.childId && a.date === appt.date && (a.time || '10:00') === (appt.time || '10:00') && a.type === appt.type);
+    }
+
     appt.id = appt.id || `APT-${Date.now()}`;
     appt.timestamp = Date.now();
     all.unshift(appt);
@@ -38762,13 +38776,17 @@
   }
 
   // ─── Form Submissions ───
+  let formListenersInitialized = false;
+
   function initFormListeners() {
-    console.log("initFormListeners called for page:", page);
+    if (formListenersInitialized) return;
+    formListenersInitialized = true;
 
     // Child registration form
-    document.querySelector('#child-form')?.addEventListener('submit', (event) => {
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.id !== 'child-form') return;
       event.preventDefault();
-      const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const child = saveChild(form);
       form.reset();
@@ -38781,9 +38799,10 @@
     });
 
     // OCR additional form
-    document.querySelector('#ocr-additional-form')?.addEventListener('submit', (event) => {
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.id !== 'ocr-additional-form') return;
       event.preventDefault();
-      const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const child = saveChild(form);
       logActivity('doc_processed', child.name, 'OCR-verified child saved');
@@ -38868,9 +38887,10 @@
     });
 
     // Meal form
-    document.querySelector('#meal-form')?.addEventListener('submit', (event) => {
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.id !== 'meal-form') return;
       event.preventDefault();
-      const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const values = Object.fromEntries(new FormData(form));
       const child = getChild(values.childId);
@@ -38887,9 +38907,10 @@
     });
 
     // Medicine form
-    document.querySelector('#medicine-form')?.addEventListener('submit', (event) => {
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.id !== 'medicine-form') return;
       event.preventDefault();
-      const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const values = Object.fromEntries(new FormData(form));
       const child = getChild(values.childId);
@@ -38908,8 +38929,18 @@
     });
 
     // Appointment form (legacy & calendar widget)
+    let isBookingSubmitting = false;
     const handleBookingSubmit = (form) => {
+      if (isBookingSubmitting) return;
       if (!form.reportValidity()) return;
+      isBookingSubmitting = true;
+
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Scheduling...';
+      }
+
       const values = Object.fromEntries(new FormData(form));
       const child = getChild(values.childId);
       bookAppointment({
@@ -38927,18 +38958,17 @@
       const calModal = document.querySelector('#cal-booking-modal');
       if (calModal) calModal.remove();
 
-      window.setTimeout(() => window.location.reload(), 1000);
+      window.setTimeout(() => {
+        isBookingSubmitting = false;
+        window.location.reload();
+      }, 800);
     };
 
-    document.querySelector('#appointment-form')?.addEventListener('submit', (event) => {
-      event.preventDefault();
-      handleBookingSubmit(event.currentTarget);
-    });
-
     document.addEventListener('submit', (event) => {
-      if (event.target && (event.target.id === 'cal-booking-form' || event.target.classList.contains('cal-booking-form'))) {
+      const form = event.target;
+      if (form && (form.id === 'cal-booking-form' || form.id === 'appointment-form' || form.classList.contains('cal-booking-form'))) {
         event.preventDefault();
-        handleBookingSubmit(event.target);
+        handleBookingSubmit(form);
       }
     });
 
@@ -38962,10 +38992,10 @@
     });
 
     // Emergency contact form
-    document.querySelector('#emergency-form')?.addEventListener('submit', (event) => {
-      console.log("Emergency form submit captured!");
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.id !== 'emergency-form') return;
       event.preventDefault();
-      const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const values = Object.fromEntries(new FormData(form));
       addEmergencyContact({
@@ -38980,10 +39010,10 @@
     });
 
     // Sponsor form
-    document.querySelector('#sponsor-form')?.addEventListener('submit', (event) => {
-      console.log("Sponsor form submit captured!");
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.id !== 'sponsor-form') return;
       event.preventDefault();
-      const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const formData = new FormData(form);
       const values = Object.fromEntries(formData);
@@ -38999,10 +39029,10 @@
     });
 
     // Expense form
-
-    document.querySelector('#expense-form')?.addEventListener('submit', (event) => {
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.id !== 'expense-form') return;
       event.preventDefault();
-      const form = event.currentTarget;
       if (!form.reportValidity()) return;
       const values = Object.fromEntries(new FormData(form));
       const child = values.childId ? getChild(values.childId) : null;
@@ -39019,7 +39049,9 @@
     });
 
     // Login form (triggers Google Auth flow)
-    document.querySelector('[data-login-form]')?.addEventListener('submit', (event) => {
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || !form.matches('[data-login-form]')) return;
       event.preventDefault();
       toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
       loginWithGoogle().then((res) => {
@@ -39031,13 +39063,9 @@
             title: 'Access Denied',
             body: `<div style="text-align:center; padding:16px 8px;">
               <div style="font-size:44px; margin-bottom:8px;">🚫</div>
-              <h3 style="color:var(--color-danger); margin:0 0 8px 0; font-size:18px; font-weight:700;">Access Denied</h3>
-              <p style="font-size:14px; color:var(--color-text); margin:0 0 12px 0; font-weight:600;">This Google account is not authorized.</p>
-              <div style="padding:10px; background:var(--color-bg-alt); border:1px solid var(--color-border); border-radius:6px; font-size:12px; font-weight:500;">
-                Tried account: <code>${res.email || 'Unauthorized Account'}</code>
-              </div>
+              <p style="font-size:15px; color:var(--color-text); margin-bottom:8px;"><strong>Unauthorized Google Account</strong></p>
+              <p style="font-size:13.5px; color:var(--color-text-muted); line-height:1.5;">${res.message || 'Your email is not on the authorized administrator allowlist.'}</p>
             </div>`,
-            confirmText: 'Try Authorized Account',
             onConfirm: () => { window.location.reload(); }
           });
         } else {
