@@ -35910,7 +35910,7 @@
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
                 Clinical Notes
               </div>
-              <button class="gcal-notes-inline-edit-btn" type="button" data-toggle-notes-edit="${appt.id}" title="Edit clinical notes" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#1a73e8; background:transparent; border:none; cursor:pointer; padding:2px 6px; border-radius:4px; transition:background 0.15s;">
+              <button class="gcal-notes-inline-edit-btn" id="notes-btn-${appt.id}" type="button" data-toggle-notes-edit="${appt.id}" title="Edit clinical notes" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#1a73e8; background:transparent; border:none; cursor:pointer; padding:2px 6px; border-radius:4px; transition:background 0.15s;">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 <span>Edit</span>
               </button>
@@ -38063,9 +38063,11 @@
       const viewEl = document.querySelector(`#notes-view-${id}`);
       const editEl = document.querySelector(`#notes-edit-${id}`);
       const inputEl = document.querySelector(`#notes-input-${id}`);
+      const btnEl = document.querySelector(`#notes-btn-${id}`);
       if (viewEl && editEl) {
         viewEl.style.display = 'none';
         editEl.style.display = 'block';
+        if (btnEl) btnEl.style.display = 'none';
         inputEl?.focus();
       }
       return;
@@ -38076,9 +38078,11 @@
       const id = cancelNotesBtn.getAttribute('data-cancel-notes-edit');
       const viewEl = document.querySelector(`#notes-view-${id}`);
       const editEl = document.querySelector(`#notes-edit-${id}`);
+      const btnEl = document.querySelector(`#notes-btn-${id}`);
       if (viewEl && editEl) {
         viewEl.style.display = 'block';
         editEl.style.display = 'none';
+        if (btnEl) btnEl.style.display = 'inline-flex';
       }
       return;
     }
@@ -38089,6 +38093,7 @@
       const inputEl = document.querySelector(`#notes-input-${id}`);
       const viewEl = document.querySelector(`#notes-view-${id}`);
       const editEl = document.querySelector(`#notes-edit-${id}`);
+      const btnEl = document.querySelector(`#notes-btn-${id}`);
       const newNotes = inputEl ? inputEl.value : '';
 
       const appt = getAppointments().find(a => String(a.id) === String(id));
@@ -38100,6 +38105,7 @@
           viewEl.style.display = 'block';
         }
         if (editEl) editEl.style.display = 'none';
+        if (btnEl) btnEl.style.display = 'inline-flex';
         toast('Notes Saved', `Updated clinical notes for ${appt.childName}.`);
       }
       return;

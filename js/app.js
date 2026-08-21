@@ -386,9 +386,11 @@ document.addEventListener('click', (event) => {
     const viewEl = document.querySelector(`#notes-view-${id}`);
     const editEl = document.querySelector(`#notes-edit-${id}`);
     const inputEl = document.querySelector(`#notes-input-${id}`);
+    const btnEl = document.querySelector(`#notes-btn-${id}`);
     if (viewEl && editEl) {
       viewEl.style.display = 'none';
       editEl.style.display = 'block';
+      if (btnEl) btnEl.style.display = 'none';
       inputEl?.focus();
     }
     return;
@@ -399,9 +401,11 @@ document.addEventListener('click', (event) => {
     const id = cancelNotesBtn.getAttribute('data-cancel-notes-edit');
     const viewEl = document.querySelector(`#notes-view-${id}`);
     const editEl = document.querySelector(`#notes-edit-${id}`);
+    const btnEl = document.querySelector(`#notes-btn-${id}`);
     if (viewEl && editEl) {
       viewEl.style.display = 'block';
       editEl.style.display = 'none';
+      if (btnEl) btnEl.style.display = 'inline-flex';
     }
     return;
   }
@@ -412,6 +416,7 @@ document.addEventListener('click', (event) => {
     const inputEl = document.querySelector(`#notes-input-${id}`);
     const viewEl = document.querySelector(`#notes-view-${id}`);
     const editEl = document.querySelector(`#notes-edit-${id}`);
+    const btnEl = document.querySelector(`#notes-btn-${id}`);
     const newNotes = inputEl ? inputEl.value : '';
 
     const appt = getAppointments().find(a => String(a.id) === String(id));
@@ -423,6 +428,7 @@ document.addEventListener('click', (event) => {
         viewEl.style.display = 'block';
       }
       if (editEl) editEl.style.display = 'none';
+      if (btnEl) btnEl.style.display = 'inline-flex';
       toast('Notes Saved', `Updated clinical notes for ${appt.childName}.`);
     }
     return;
