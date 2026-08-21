@@ -178,7 +178,17 @@ function cleanCell(val) {
   return str;
 }
 
-function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoName) {
+function formatCellLink(text, url) {
+  if (!text) return '';
+  if (!url || typeof url !== 'string' || !url.trim() || url === '#' || url.startsWith('javascript:')) {
+    return cleanCell(text);
+  }
+  const safeUrl = String(url).replace(/"/g, '%22');
+  const safeText = String(text).replace(/"/g, '""');
+  return `=HYPERLINK("${safeUrl}", "${safeText}")`;
+}
+
+function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoName, uploadedDocsList = []) {
   const childName = (c.name || 'CHILD').toUpperCase();
   const clinicHeader = 'DR.BLESSY — GOOD SHEPHERD CLINIC';
 
@@ -194,8 +204,14 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
   // Real growth / checkup measurements ONLY if they exist
   (growthList || []).forEach(g => {
     if (g.date || g.weight || g.temperature || g.bp) {
+      const matchingDoc = (uploadedDocsList || []).find(d => 
+        (d.childId === c.id || (d.childName && d.childName.toLowerCase() === (c.name || '').toLowerCase()) || (d.child && d.child.toLowerCase() === (c.name || '').toLowerCase())) &&
+        ((d.date && g.date && d.date.slice(0, 10) === g.date.slice(0, 10)) || d.docType === 'Prescription')
+      );
+      const docLink = g.fileUrl || g.docUrl || matchingDoc?.fileUrl || matchingDoc?.driveUrl || matchingDoc?.webViewLink || matchingDoc?.image || matchingDoc?.fileData;
+
       checkupRows.push([
-        cleanCell(g.date),
+        formatCellLink(g.date, docLink),
         cleanCell(g.temperature || g.temp),
         cleanCell(g.bp || g.bloodPressure),
         cleanCell(g.weight),
@@ -232,8 +248,14 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
   const bloodRows = [];
   (healthRecList || []).forEach(hr => {
     if (hr.date || hr.hemoglobin || hr.wbc || hr.platelets) {
+      const matchingDoc = (uploadedDocsList || []).find(d => 
+        (d.childId === c.id || (d.childName && d.childName.toLowerCase() === (c.name || '').toLowerCase()) || (d.child && d.child.toLowerCase() === (c.name || '').toLowerCase())) &&
+        ((d.date && hr.date && d.date.slice(0, 10) === hr.date.slice(0, 10)) || d.healthRecordId === hr.id || d.docType === 'Bi-Annual CBC' || d.docType === 'Medical Report')
+      );
+      const docLink = hr.fileUrl || hr.docUrl || matchingDoc?.fileUrl || matchingDoc?.driveUrl || matchingDoc?.webViewLink || matchingDoc?.image || matchingDoc?.fileData;
+
       bloodRows.push([
-        cleanCell(hr.date),
+        formatCellLink(hr.date, docLink),
         cleanCell(hr.hemoglobin || hr.hb),
         cleanCell(hr.wbc),
         cleanCell(hr.platelets),
@@ -331,10 +353,11 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     console.log(`[Google OAuth] Created Student Medical Records Spreadsheet: ${integration.clinicalSpreadsheetUrl}`);
   }
 
-  // Load auxiliary data (growth, medicines, health records) from server DB
+  // Load auxiliary data (growth, medicines, health records, uploaded documents) from server DB
   let allGrowth = [];
   let allMedicines = [];
   let allHealthRecords = [];
+  let allUploadedDocs = [];
   const DB_FILE = path.join(__dirname, '../../data/db.json');
   if (fs.existsSync(DB_FILE)) {
     try {
@@ -342,6 +365,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
       if (dbData['chm-growth']) allGrowth = JSON.parse(dbData['chm-growth']);
       if (dbData['chm-medicines']) allMedicines = JSON.parse(dbData['chm-medicines']);
       if (dbData['chm-health-records']) allHealthRecords = JSON.parse(dbData['chm-health-records']);
+      if (dbData['chm-uploaded-docs']) allUploadedDocs = JSON.parse(dbData['chm-uploaded-docs']);
     } catch (e) { }
   }
 
@@ -461,8 +485,9 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
         const childGrowth = allGrowth.filter(g => g.childId === c.id || (g.childName && g.childName.toLowerCase() === (c.name || '').toLowerCase()));
         const childMeds = allMedicines.filter(m => m.childId === c.id || (m.childName && m.childName.toLowerCase() === (c.name || '').toLowerCase()));
         const childHealthRecs = allHealthRecords.filter(h => h.childId === c.id || (h.childName && h.childName.toLowerCase() === (c.name || '').toLowerCase()));
+        const childDocs = allUploadedDocs.filter(d => d.childId === c.id || (d.childName && d.childName.toLowerCase() === (c.name || '').toLowerCase()) || (d.child && d.child.toLowerCase() === (c.name || '').toLowerCase()));
 
-        const childSheetData = buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName);
+        const childSheetData = buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName, childDocs);
         clinicalDataUpdates.push({
           range: `'${childTabTitle}'!A1`,
           values: childSheetData
