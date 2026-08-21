@@ -520,34 +520,35 @@ export function renderEventDetailsModalMarkup(eventId) {
 
   const currentStatus = computeAppointmentStatus(appt);
   const dateObj = new Date(appt.date + 'T00:00:00');
-  const dayStr = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  const dayStr = !isNaN(dateObj) ? dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' }) : appt.date;
   const timeRangeFormatted = formatDisplayTimeRange(appt.time || '10:00 AM');
 
   const hexColors = {
-    blue: '#039be5',
-    green: '#0b8043',
-    amber: '#f4511e',
-    violet: '#8e24aa'
+    blue: '#2563eb',
+    green: '#16a34a',
+    amber: '#ea580c',
+    violet: '#9333ea'
   };
-  const colorHex = hexColors[typeColor(appt.type)] || '#039be5';
+  const colorHex = hexColors[typeColor(appt.type)] || '#2563eb';
 
   return `
     <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
       <div class="gcal-event-popover-card" role="dialog" aria-modal="true">
-        <!-- Banner Header -->
+        <!-- Banner Header with Aesthetic Image -->
         <div class="gcal-popover-banner" style="background-image: url('assets/gcal_event_banner.png');">
+          <div class="gcal-popover-banner-overlay"></div>
           <div class="gcal-popover-actions">
-            <button class="gcal-popover-btn" type="button" data-edit-event-id="${appt.id}" title="Edit appointment">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <button class="gcal-popover-btn gcal-popover-btn--edit" type="button" data-edit-event-id="${appt.id}" title="Edit appointment">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" style="pointer-events:none;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
-            <button class="gcal-popover-btn" type="button" data-delete-event-id="${appt.id}" title="Delete appointment">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <button class="gcal-popover-btn gcal-popover-btn--delete" type="button" data-delete-event-id="${appt.id}" title="Delete appointment">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" style="pointer-events:none;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
-            <button class="gcal-popover-btn" type="button" data-sync-event-id="${appt.id}" title="Open in Google Calendar">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            <button class="gcal-popover-btn gcal-popover-btn--sync" type="button" data-sync-event-id="${appt.id}" title="Open in Google Calendar">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" style="pointer-events:none;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
             </button>
-            <button class="gcal-popover-btn" type="button" data-close-cal-modal title="Close">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="pointer-events:none;"><path d="M18 6L6 18M6 6l12 12"/></svg>
+            <button class="gcal-popover-btn gcal-popover-btn--close" type="button" data-close-cal-modal title="Close">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" style="pointer-events:none;"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
           </div>
         </div>
@@ -555,58 +556,195 @@ export function renderEventDetailsModalMarkup(eventId) {
         <!-- Details Body -->
         <div class="gcal-popover-body">
           <!-- Title row -->
-          <div class="gcal-popover-row gcal-popover-title-row">
-            <span class="gcal-popover-color-dot" style="background-color: ${colorHex}; margin-top: 4px;"></span>
-            <div class="gcal-popover-title-group" style="width: 100%;">
-              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;">
-                <div>
-                  <h2 class="gcal-popover-title" style="font-size: 19px; font-weight: 700; color: #0f172a; margin: 0; line-height: 1.3; letter-spacing: -0.01em;">${escapeHTML(appt.childName)}</h2>
-                  <div style="font-size: 13.5px; font-weight: 600; color: #475569; margin-top: 3px;">${escapeHTML(appt.type)}</div>
+          <div class="gcal-popover-header-block">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+              <div>
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+                  <span class="gcal-popover-color-dot" style="background-color: ${colorHex};"></span>
+                  <span class="gcal-event-chip gcal-event-chip--${typeColor(appt.type)}" style="font-size:12px; font-weight:700; padding:3px 10px; border-radius:12px; display:inline-flex;">
+                    ${escapeHTML(appt.type || 'Appointment')}
+                  </span>
+                  ${appt.childId ? `<span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:var(--color-bg-alt, #f1f5f9); padding:2px 8px; border-radius:10px;">ID: ${appt.childId}</span>` : ''}
                 </div>
-                <span class="gcal-status-pill gcal-status-pill--${currentStatus === 'Completed' ? 'done' : 'upcoming'}">${currentStatus}</span>
+                <h2 class="gcal-popover-title" style="font-size:20px; font-weight:700; color:var(--color-text); margin:0; line-height:1.3;">${escapeHTML(appt.childName)}</h2>
               </div>
-              <div class="gcal-popover-time" style="margin-top: 6px; font-size: 13px; color: #64748b; font-weight: 500;">${dayStr} · ${timeRangeFormatted}</div>
+              <span class="gcal-status-pill gcal-status-pill--${currentStatus.toLowerCase() === 'completed' ? 'done' : 'upcoming'}" style="font-size:11px; font-weight:700; padding:4px 12px; border-radius:14px; white-space:nowrap;">
+                ${currentStatus.toUpperCase()}
+              </span>
+            </div>
+            <div class="gcal-popover-time" style="margin-top:8px; display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text-muted); font-weight:500;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <span>${dayStr} · ${timeRangeFormatted}</span>
             </div>
           </div>
 
-          <!-- Description row -->
-          <div class="gcal-popover-row">
-            <div class="gcal-popover-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><line x1="21" y1="10" x2="3" y2="10"/><line x1="21" y1="6" x2="3" y2="6"/><line x1="21" y1="14" x2="3" y2="14"/><line x1="21" y1="18" x2="3" y2="18"/></svg>
+          <!-- Doctor & Info Cards -->
+          <div class="gcal-popover-info-grid">
+            <div class="gcal-popover-info-item">
+              <div class="gcal-popover-info-icon">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#2563eb" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div class="gcal-popover-info-text">
+                <span class="gcal-popover-info-label">Doctor / Title</span>
+                <span class="gcal-popover-info-val">${escapeHTML(appt.doctor || 'Routine Healthcare')}</span>
+              </div>
             </div>
-            <div class="gcal-popover-desc">
-              <p><strong>Doctor:</strong> ${escapeHTML(appt.doctor || 'Checkup')}</p>
-              <p><strong>Child:</strong> ${escapeHTML(appt.childName)}</p>
-              <p><strong>Type:</strong> ${escapeHTML(appt.type)}</p>
-              <p><strong>Notes:</strong> ${escapeHTML(appt.notes || 'No notes')}</p>
-              <p class="gcal-popover-app-tag">Created from Child Health Management App</p>
+
+            <div class="gcal-popover-info-item">
+              <div class="gcal-popover-info-icon">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              </div>
+              <div class="gcal-popover-info-text">
+                <span class="gcal-popover-info-label">Notification</span>
+                <span class="gcal-popover-info-val">30 mins before</span>
+              </div>
             </div>
           </div>
 
-          <!-- Notification row -->
-          <div class="gcal-popover-row">
-            <div class="gcal-popover-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <!-- Notes Card -->
+          <div class="gcal-popover-notes-card">
+            <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--color-text-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.04em;">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+              Clinical Notes
             </div>
-            <div class="gcal-popover-meta">30 minutes before</div>
+            <div style="font-size:13px; color:var(--color-text); line-height:1.5;">
+              ${escapeHTML(appt.notes || 'No specific clinical instructions provided.')}
+            </div>
           </div>
 
-          <!-- User row -->
-          <div class="gcal-popover-row">
-            <div class="gcal-popover-icon">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            </div>
-            <div class="gcal-popover-meta">Tejas Sharma</div>
-          </div>
-
-          <!-- Sync Action Footer -->
-          <div class="gcal-popover-footer">
-            <button class="gcal-popup-save-btn" type="button" data-sync-event-id="${appt.id}" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+          <!-- Dual Action Footer -->
+          <div class="gcal-popover-footer-dual">
+            <button class="gcal-btn gcal-btn--secondary" type="button" data-edit-event-id="${appt.id}" style="flex:1; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>
+            <button class="gcal-btn gcal-btn--create" type="button" data-sync-event-id="${appt.id}" style="flex:1.4; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
               Open in Google Calendar
             </button>
           </div>
         </div>
+      </div>
+    </div>`;
+}
+
+export function renderEditAppointmentModalMarkup(eventId) {
+  const appointments = getAppointments();
+  const appt = appointments.find(a => String(a.id) === String(eventId));
+  if (!appt) return '';
+
+  const children = getChildren();
+  const childOptions = children.map(c => 
+    `<option value="${c.id}" ${c.id === appt.childId ? 'selected' : ''}>${escapeHTML(c.name)} (${c.id})</option>`
+  ).join('');
+
+  const typeOptions = [
+    { value: 'Doctor visit', label: 'Doctor Visit' },
+    { value: 'Follow-up', label: 'Follow-up' },
+    { value: 'Dental checkup', label: 'Dental Checkup' },
+    { value: 'Deworming', label: 'Deworming' },
+    { value: 'Vaccination', label: 'Vaccination' },
+    { value: 'Monthly checkup', label: 'Monthly Checkup' },
+    { value: 'Oral checkup', label: 'Oral Checkup' }
+  ].map(t => `<option value="${t.value}" ${t.value.toLowerCase() === (appt.type || '').toLowerCase() ? 'selected' : ''}>${t.label}</option>`).join('');
+
+  const statusOptions = [
+    { value: 'Upcoming', label: 'Upcoming' },
+    { value: 'Completed', label: 'Completed' },
+    { value: 'Cancelled', label: 'Cancelled' }
+  ].map(s => `<option value="${s.value}" ${s.value.toLowerCase() === (appt.status || 'upcoming').toLowerCase() ? 'selected' : ''}>${s.label}</option>`).join('');
+
+  return `
+    <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
+      <div class="gcal-popup-card gcal-edit-modal-card" role="dialog" aria-modal="true">
+        <!-- Header with Banner & Close Button -->
+        <div class="gcal-popover-banner" style="background-image: url('assets/gcal_event_banner.png'); height: 110px;">
+          <div class="gcal-popover-banner-overlay"></div>
+          <button class="gcal-popup-close" type="button" aria-label="Close" data-close-cal-modal style="position:absolute; top:10px; right:12px; z-index:5;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+          <div style="position:absolute; bottom:12px; left:16px; color:#fff; font-weight:700; font-size:16px; text-shadow:0 1px 4px rgba(0,0,0,0.6); display:flex; align-items:center; gap:8px; z-index:3;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit Appointment
+          </div>
+        </div>
+
+        <form class="gcal-popup-form" id="cal-edit-appointment-form" style="padding:16px 20px;">
+          <input type="hidden" name="id" value="${appt.id}" />
+
+          <!-- Title / Doctor row -->
+          <div class="gcal-popup-title-row" style="margin-bottom:12px;">
+            <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add doctor or clinic title" value="${escapeHTML(appt.doctor || '')}" autocomplete="off" />
+          </div>
+
+          <div class="gcal-popup-rows">
+            <!-- Date & Time -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <div class="gcal-popup-datetime">
+                  <input class="gcal-popup-date-input" name="date" type="date" value="${appt.date || ''}" required />
+                  <input class="gcal-popup-time-input" name="time" type="time" value="${appt.time || '10:00'}" />
+                </div>
+              </div>
+            </div>
+
+            <!-- Child select -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <select class="gcal-popup-select" name="childId" required>
+                  <option value="">Select child</option>
+                  ${childOptions}
+                </select>
+              </div>
+            </div>
+
+            <!-- Type -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <select class="gcal-popup-select" name="type" required>
+                  ${typeOptions}
+                </select>
+              </div>
+            </div>
+
+            <!-- Status -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="20 6 9 17 4 12"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <select class="gcal-popup-select" name="status">
+                  ${statusOptions}
+                </select>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <textarea class="gcal-popup-notes" name="notes" rows="2" placeholder="Add description or clinical notes">${escapeHTML(appt.notes || '')}</textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer buttons -->
+          <div class="gcal-popup-footer" style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:14px;">
+            <button class="gcal-popup-more-btn" type="button" data-event-id="${appt.id}">Cancel</button>
+            <button class="gcal-popup-save-btn" type="submit">Save Changes</button>
+          </div>
+        </form>
       </div>
     </div>`;
 }

@@ -12,7 +12,7 @@ import { getAuthorizedUser } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets } from './googleSheetsSync.js';
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
-import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
+import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, renderEditAppointmentModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
@@ -375,7 +375,7 @@ document.addEventListener('click', (event) => {
     const appt = getAppointments().find(a => String(a.id) === String(id));
     if (appt) {
       const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
-      modalContainer.innerHTML = renderBookingModalMarkup(appt.date, appt.time || '10:00');
+      modalContainer.innerHTML = renderEditAppointmentModalMarkup(appt.id);
     }
     return;
   }
@@ -1530,6 +1530,41 @@ function initFormListeners() {
       event.preventDefault();
       handleBookingSubmit(form);
     }
+  });
+
+  // Edit appointment form submit
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!form || form.id !== 'cal-edit-appointment-form') return;
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+
+    const values = Object.fromEntries(new FormData(form));
+    const child = getChild(values.childId);
+    const existing = getAppointments().find(a => String(a.id) === String(values.id));
+
+    const updatedAppt = {
+      id: values.id,
+      childId: values.childId,
+      childName: child ? child.name : (existing ? existing.childName : 'Unknown'),
+      type: values.type,
+      date: values.date,
+      time: values.time || '10:00',
+      doctor: values.doctor || '',
+      notes: values.notes || '',
+      status: values.status || 'Upcoming',
+      timestamp: existing ? (existing.timestamp || Date.now()) : Date.now()
+    };
+
+    updateAppointment(updatedAppt);
+    toast('Appointment Updated', `${updatedAppt.childName} — ${updatedAppt.type} saved.`);
+
+    const modalRoot = document.querySelector('#modal-root');
+    if (modalRoot) modalRoot.replaceChildren();
+    const calModal = document.querySelector('#cal-booking-modal');
+    if (calModal) calModal.remove();
+
+    window.setTimeout(() => window.location.reload(), 500);
   });
 
   // Sync Child Select & All Children Pill toggle
