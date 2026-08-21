@@ -627,93 +627,110 @@ body.theme-dark .login-card__hero-icon {
   flex-wrap: wrap;
 }
 
-/* Header Buttons */
+/* Header Buttons — Liquid Glass & Modern Aesthetic */
 .gcal-btn {
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
-  padding: 8px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  padding: 7px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   color: var(--color-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.15s ease;
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.8), 0 2px 6px rgba(15, 23, 42, 0.05);
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .gcal-btn:hover {
-  background: var(--color-bg-alt);
-  border-color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(255, 255, 255, 0.8);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
 }
 .gcal-btn--create {
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #ffffff;
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.3);
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4);
 }
 .gcal-btn--create:hover {
   background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
-  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+  transform: translateY(-1.5px) scale(1.02);
 }
 
+/* Liquid Glass Date Navigation Pod */
 .gcal-nav-group {
   display: flex;
   align-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--color-bg);
+  padding: 3px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06), inset 0 1px 1.5px rgba(255, 255, 255, 0.8);
 }
 .gcal-nav-btn {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   border: none;
   background: transparent;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
   cursor: pointer;
   display: grid;
   place-items: center;
-  transition: background 0.15s ease;
-}
-.gcal-nav-btn:first-child {
-  border-right: 1px solid var(--color-border);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .gcal-nav-btn:hover {
-  background: var(--color-bg-alt);
-  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.88);
+  color: #2563eb;
+  transform: scale(1.1);
+  box-shadow: inset 0 1px 1px #fff, 0 2px 6px rgba(0,0,0,0.06);
 }
 
+/* Segmented Liquid Glass View Switcher (Month / Day) */
 .gcal-toggle-group {
   display: flex;
   align-items: center;
-  background: var(--color-bg-alt);
   padding: 3px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06), inset 0 1px 1.5px rgba(255, 255, 255, 0.8);
 }
 .gcal-toggle-btn {
   font-family: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   padding: 5px 14px;
-  border-radius: 6px;
+  border-radius: 20px;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.gcal-toggle-btn:hover {
+  color: var(--color-text);
 }
 .gcal-toggle-btn.active {
-  background: var(--color-bg);
-  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.95);
+  color: #2563eb;
   font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15), inset 0 1px 1px rgba(255, 255, 255, 1);
+  transform: scale(1.02);
 }
 
 /* Month Grid Layout */
