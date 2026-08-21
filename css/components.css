@@ -373,12 +373,12 @@ tr.drag-flash {
 .modal__title { font-size: 20px; }
 .modal__body { padding: 0 24px 24px; color: var(--color-text-muted); }
 .modal__footer { display: flex; justify-content: flex-end; gap: 8px; padding: 16px 24px; border-top: 1px solid var(--color-border); }
-.toast-stack { position: fixed; z-index: 120; right: 20px; bottom: 20px; display: grid; gap: 8px; width: min(380px, calc(100vw - 40px)); }
-.toast { display: flex; align-items: flex-start; gap: 10px; padding: 14px; color: #374151; background: #fff; border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); animation: enter 200ms ease; }
-.toast__icon { display: grid; flex: 0 0 22px; width: 22px; height: 22px; color: var(--color-success); background: var(--color-success-soft); border-radius: 50%; place-items: center; }
-.toast__icon svg { width: 14px; }
-.toast__title { font-size: 12px; font-weight: 700; }
-.toast__message { margin-top: 1px; color: var(--color-text-muted); font-size: 11px; }
+.toast-stack { position: fixed; z-index: 120; right: 20px; bottom: 20px; display: grid; gap: 10px; width: min(380px, calc(100vw - 40px)); }
+.toast { display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px; color: #1e293b; background: rgba(255, 255, 255, 0.78); backdrop-filter: blur(24px) saturate(190%); -webkit-backdrop-filter: blur(24px) saturate(190%); border: 1px solid rgba(255, 255, 255, 0.65); border-radius: 20px; box-shadow: 0 12px 36px rgba(15, 23, 42, 0.12), inset 0 1px 1.5px rgba(255, 255, 255, 0.9); animation: enter 220ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.toast__icon { display: grid; flex: 0 0 24px; width: 24px; height: 24px; color: #16a34a; background: rgba(22, 163, 74, 0.12); border-radius: 50%; place-items: center; border: 1px solid rgba(22, 163, 74, 0.2); }
+.toast__icon svg { width: 13px; }
+.toast__title { font-size: 13px; font-weight: 700; color: #0f172a; }
+.toast__message { margin-top: 2px; color: #475569; font-size: 11.5px; line-height: 1.4; }
 .tabs { display: flex; gap: 20px; border-bottom: 1px solid var(--color-border); }
 .tab { position: relative; padding: 0 0 12px; color: var(--color-text-muted); background: none; border: 0; font-size: 13px; font-weight: 700; white-space: nowrap; }
 .tab--active { color: var(--color-primary); }
@@ -587,23 +587,38 @@ body.theme-dark .topbar__crumbs b {
 }
 
 body.theme-dark .topbar-search {
-  background: #131b2a;
-  border: 1px solid var(--color-border);
+  background: transparent;
+  border: none;
 }
 body.theme-dark .topbar-search input {
-  background: transparent;
+  background: rgba(19, 27, 42, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--color-text);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+body.theme-dark .topbar-search input:focus {
+  background: rgba(23, 34, 52, 0.85);
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 body.theme-dark .topbar-search kbd {
-  background: #1e2d42;
-  border-color: #243146;
+  background: rgba(30, 45, 66, 0.8);
+  border-color: rgba(255, 255, 255, 0.12);
   color: var(--color-text-muted);
 }
 
 body.theme-dark .topbar-profile__trigger {
-  background: #172234 !important;
-  border-color: #243146 !important;
+  background: rgba(23, 34, 52, 0.65) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
   color: var(--color-text) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+body.theme-dark .topbar-profile__trigger:hover {
+  background: rgba(30, 45, 66, 0.85) !important;
 }
 
 body.theme-dark .sidebar {
@@ -791,18 +806,20 @@ body.theme-dark .modal__body {
 }
 
 body.theme-dark .toast {
-  background: #172234;
-  border-color: #243146;
-  color: var(--color-text);
-  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.6);
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #f8fafc;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
 body.theme-dark .toast__title {
-  color: var(--color-text);
+  color: #f8fafc;
 }
 
 body.theme-dark .toast__message {
-  color: var(--color-text-muted);
+  color: #94a3b8;
 }
 
 body.theme-dark .tabs {
