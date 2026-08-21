@@ -38755,6 +38755,7 @@
           <label class="field">
             <span class="field__label">Category / Document Type *</span>
             <select class="select" name="docType">
+              <option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
               <option value="Medical Report">Medical Report / Lab Test</option>
               <option value="Aadhaar Card">Aadhaar Card / Govt ID</option>
               <option value="Birth Certificate">Birth Certificate</option>
@@ -39009,6 +39010,7 @@
             <label class="field">
               <span class="field__label">Category *</span>
               <select class="select" name="docType" required>
+                <option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
                 <option value="Aadhaar Card">Aadhaar Card</option>
                 <option value="Medical Report">Medical Report / Lab Test</option>
                 <option value="Birth Certificate">Birth Certificate</option>
