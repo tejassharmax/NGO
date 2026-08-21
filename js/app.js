@@ -380,10 +380,66 @@ document.addEventListener('click', (event) => {
     return;
   }
 
+  const toggleNotesBtn = target.closest('[data-toggle-notes-edit]');
+  if (toggleNotesBtn) {
+    const id = toggleNotesBtn.getAttribute('data-toggle-notes-edit');
+    const viewEl = document.querySelector(`#notes-view-${id}`);
+    const editEl = document.querySelector(`#notes-edit-${id}`);
+    const inputEl = document.querySelector(`#notes-input-${id}`);
+    if (viewEl && editEl) {
+      viewEl.style.display = 'none';
+      editEl.style.display = 'block';
+      inputEl?.focus();
+    }
+    return;
+  }
+
+  const cancelNotesBtn = target.closest('[data-cancel-notes-edit]');
+  if (cancelNotesBtn) {
+    const id = cancelNotesBtn.getAttribute('data-cancel-notes-edit');
+    const viewEl = document.querySelector(`#notes-view-${id}`);
+    const editEl = document.querySelector(`#notes-edit-${id}`);
+    if (viewEl && editEl) {
+      viewEl.style.display = 'block';
+      editEl.style.display = 'none';
+    }
+    return;
+  }
+
+  const saveNotesBtn = target.closest('[data-save-notes-inline]');
+  if (saveNotesBtn) {
+    const id = saveNotesBtn.getAttribute('data-save-notes-inline');
+    const inputEl = document.querySelector(`#notes-input-${id}`);
+    const viewEl = document.querySelector(`#notes-view-${id}`);
+    const editEl = document.querySelector(`#notes-edit-${id}`);
+    const newNotes = inputEl ? inputEl.value : '';
+
+    const appt = getAppointments().find(a => String(a.id) === String(id));
+    if (appt) {
+      appt.notes = newNotes;
+      updateAppointment(appt);
+      if (viewEl) {
+        viewEl.textContent = newNotes || 'No specific clinical instructions provided.';
+        viewEl.style.display = 'block';
+      }
+      if (editEl) editEl.style.display = 'none';
+      toast('Notes Saved', `Updated clinical notes for ${appt.childName}.`);
+    }
+    return;
+  }
+
   const syncBtn = target.closest('[data-sync-event-id]');
   if (syncBtn) {
-    window.open('https://calendar.google.com/', '_blank');
-    toast('Google Calendar', 'Opening Google Calendar...');
+    const eventId = syncBtn.getAttribute('data-sync-event-id');
+    const appt = getAppointments().find(a => String(a.id) === String(eventId));
+    if (appt) {
+      const calUrl = buildGoogleCalendarUrl(appt);
+      window.open(calUrl, '_blank');
+      toast('Google Calendar', `Opening ${appt.childName} event in Google Calendar...`);
+    } else {
+      window.open('https://calendar.google.com/', '_blank');
+      toast('Google Calendar', 'Opening Google Calendar...');
+    }
     return;
   }
 

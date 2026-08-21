@@ -277,7 +277,7 @@ export function addAppointment(appt) {
     return all.find(a => a.childId === appt.childId && a.date === appt.date && (a.time || '10:00') === (appt.time || '10:00') && a.type === appt.type);
   }
 
-  appt.id = appt.id || `APT-${Date.now()}`;
+  appt.id = appt.id || `APT-${appt.childId || 'GEN'}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   appt.timestamp = Date.now();
   all.unshift(appt);
   localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));

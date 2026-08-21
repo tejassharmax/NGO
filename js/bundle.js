@@ -33727,7 +33727,7 @@
       return all.find(a => a.childId === appt.childId && a.date === appt.date && (a.time || '10:00') === (appt.time || '10:00') && a.type === appt.type);
     }
 
-    appt.id = appt.id || `APT-${Date.now()}`;
+    appt.id = appt.id || `APT-${appt.childId || 'GEN'}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     appt.timestamp = Date.now();
     all.unshift(appt);
     localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
@@ -35903,14 +35903,28 @@
             </div>
           </div>
 
-          <!-- Notes Card -->
+          <!-- Notes Card with Dedicated Inline Edit -->
           <div class="gcal-popover-notes-card">
-            <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--color-text-muted); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.04em;">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-              Clinical Notes
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+              <div style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; color:var(--color-text-muted); text-transform:uppercase; letter-spacing:0.04em;">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+                Clinical Notes
+              </div>
+              <button class="gcal-notes-inline-edit-btn" type="button" data-toggle-notes-edit="${appt.id}" title="Edit clinical notes" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#1a73e8; background:transparent; border:none; cursor:pointer; padding:2px 6px; border-radius:4px; transition:background 0.15s;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span>Edit</span>
+              </button>
             </div>
-            <div style="font-size:13px; color:var(--color-text); line-height:1.5;">
-              ${escapeHTML(appt.notes || 'No specific clinical instructions provided.')}
+            <div class="gcal-notes-view-mode" id="notes-view-${appt.id}" style="font-size:13px; color:var(--color-text); line-height:1.5; white-space:pre-wrap;">${escapeHTML(appt.notes || 'No specific clinical instructions provided.')}</div>
+            <div class="gcal-notes-edit-mode" id="notes-edit-${appt.id}" style="display:none; margin-top:6px;">
+              <textarea class="gcal-popup-notes" id="notes-input-${appt.id}" rows="3" style="width:100%; font-size:13px; padding:8px 10px; border:1px solid #1a73e8; border-radius:6px; outline:none; resize:vertical; font-family:inherit; background:var(--color-surface, #fff); color:var(--color-text);" placeholder="Type clinical notes...">${escapeHTML(appt.notes || '')}</textarea>
+              <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:8px;">
+                <button type="button" class="button button--secondary button--sm" data-cancel-notes-edit="${appt.id}" style="padding:4px 10px; font-size:11px;">Cancel</button>
+                <button type="button" class="button button--primary button--sm" data-save-notes-inline="${appt.id}" style="padding:4px 12px; font-size:11px; gap:4px;">
+                  <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  Save Notes
+                </button>
+              </div>
             </div>
           </div>
 
@@ -38043,10 +38057,66 @@
       return;
     }
 
+    const toggleNotesBtn = target.closest('[data-toggle-notes-edit]');
+    if (toggleNotesBtn) {
+      const id = toggleNotesBtn.getAttribute('data-toggle-notes-edit');
+      const viewEl = document.querySelector(`#notes-view-${id}`);
+      const editEl = document.querySelector(`#notes-edit-${id}`);
+      const inputEl = document.querySelector(`#notes-input-${id}`);
+      if (viewEl && editEl) {
+        viewEl.style.display = 'none';
+        editEl.style.display = 'block';
+        inputEl?.focus();
+      }
+      return;
+    }
+
+    const cancelNotesBtn = target.closest('[data-cancel-notes-edit]');
+    if (cancelNotesBtn) {
+      const id = cancelNotesBtn.getAttribute('data-cancel-notes-edit');
+      const viewEl = document.querySelector(`#notes-view-${id}`);
+      const editEl = document.querySelector(`#notes-edit-${id}`);
+      if (viewEl && editEl) {
+        viewEl.style.display = 'block';
+        editEl.style.display = 'none';
+      }
+      return;
+    }
+
+    const saveNotesBtn = target.closest('[data-save-notes-inline]');
+    if (saveNotesBtn) {
+      const id = saveNotesBtn.getAttribute('data-save-notes-inline');
+      const inputEl = document.querySelector(`#notes-input-${id}`);
+      const viewEl = document.querySelector(`#notes-view-${id}`);
+      const editEl = document.querySelector(`#notes-edit-${id}`);
+      const newNotes = inputEl ? inputEl.value : '';
+
+      const appt = getAppointments().find(a => String(a.id) === String(id));
+      if (appt) {
+        appt.notes = newNotes;
+        updateAppointment(appt);
+        if (viewEl) {
+          viewEl.textContent = newNotes || 'No specific clinical instructions provided.';
+          viewEl.style.display = 'block';
+        }
+        if (editEl) editEl.style.display = 'none';
+        toast('Notes Saved', `Updated clinical notes for ${appt.childName}.`);
+      }
+      return;
+    }
+
     const syncBtn = target.closest('[data-sync-event-id]');
     if (syncBtn) {
-      window.open('https://calendar.google.com/', '_blank');
-      toast('Google Calendar', 'Opening Google Calendar...');
+      const eventId = syncBtn.getAttribute('data-sync-event-id');
+      const appt = getAppointments().find(a => String(a.id) === String(eventId));
+      if (appt) {
+        const calUrl = buildGoogleCalendarUrl(appt);
+        window.open(calUrl, '_blank');
+        toast('Google Calendar', `Opening ${appt.childName} event in Google Calendar...`);
+      } else {
+        window.open('https://calendar.google.com/', '_blank');
+        toast('Google Calendar', 'Opening Google Calendar...');
+      }
       return;
     }
 
