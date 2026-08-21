@@ -35466,9 +35466,9 @@
   function typeColor(type) {
     if (!type) return 'blue';
     const t = type.toLowerCase();
-    if (t.includes('doctor') || t.includes('general')) return 'blue';
+    if (t.includes('doctor') || t.includes('general') || t.includes('monthly')) return 'blue';
     if (t.includes('follow') || t.includes('vaccin')) return 'green';
-    if (t.includes('dental') || t.includes('eye')) return 'amber';
+    if (t.includes('dental') || t.includes('oral') || t.includes('eye')) return 'amber';
     if (t.includes('deworm')) return 'violet';
     return 'blue';
   }
@@ -35570,9 +35570,9 @@
         ${cellsHTML}
       </div>
       <div class="gcal-legend-bar">
-        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--blue"></span> Doctor Visit</span>
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--blue"></span> Doctor Visit / Monthly</span>
         <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--green"></span> Follow-up / Vaccine</span>
-        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--amber"></span> Dental / Eye</span>
+        <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--amber"></span> Dental / Oral</span>
         <span class="gcal-legend-tag"><span class="gcal-dot gcal-dot--violet"></span> Deworming</span>
       </div>
     </div>`;
@@ -35715,8 +35715,8 @@
               <option value="Dental checkup">Dental Checkup</option>
               <option value="Deworming">Deworming</option>
               <option value="Vaccination">Vaccination</option>
-              <option value="Eye checkup">Eye Checkup</option>
-              <option value="General checkup">General Checkup</option>
+              <option value="Monthly checkup">Monthly Checkup</option>
+              <option value="Oral checkup">Oral Checkup</option>
             </select>
           </div>
         </div>
