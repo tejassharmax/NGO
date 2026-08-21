@@ -153,10 +153,14 @@ export function bookAppointment(data) {
     status: 'Upcoming'
   });
 
-  const calUrl = buildGoogleCalendarUrl(appt);
-  window.open(calUrl, '_blank');
+  if (!data.isBulk || data.openCal) {
+    const calUrl = buildGoogleCalendarUrl(appt);
+    window.open(calUrl, '_blank');
+  }
 
-  toast('Appointment Scheduled', `${data.childName} — ${data.type} on ${data.date}. Google Calendar synced.`);
+  if (!data.isBulk) {
+    toast('Appointment Scheduled', `${data.childName} — ${data.type} on ${data.date}. Google Calendar synced.`);
+  }
   return appt;
 }
 
@@ -395,16 +399,21 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
           </div>
         </div>
 
-        <!-- Child selector -->
+        <!-- Child selector with All Children toggle pill -->
         <div class="gcal-popup-row">
           <div class="gcal-popup-icon">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
-          <div class="gcal-popup-row-content">
-            <select class="gcal-popup-select" name="childId" required>
+          <div class="gcal-popup-row-content" style="display: flex; align-items: center; gap: 8px; width: 100%;">
+            <select class="gcal-popup-select" name="childId" id="cal-child-select" required style="flex: 1; min-width: 0;">
               <option value="">Select child</option>
+              <option value="ALL">👥 All Children (${children.length})</option>
               ${childOptions}
             </select>
+            <label class="gcal-all-pill" id="cal-all-pill" title="Select all ${children.length} registered children">
+              <input type="checkbox" id="cal-all-children-check" name="selectAllChildren" value="true" />
+              <span>All Children</span>
+            </label>
           </div>
         </div>
 

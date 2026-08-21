@@ -1465,16 +1465,40 @@ function initFormListeners() {
     }
 
     const values = Object.fromEntries(new FormData(form));
-    const child = getChild(values.childId);
-    bookAppointment({
-      childId: values.childId,
-      childName: child ? child.name : 'Unknown',
-      type: values.type,
-      date: values.date,
-      time: values.time || '',
-      doctor: values.doctor || '',
-      notes: values.notes || ''
-    });
+    const isAllChildren = values.childId === 'ALL' || values.selectAllChildren === 'true';
+
+    if (isAllChildren) {
+      const allChildren = getChildren();
+      if (allChildren.length > 0) {
+        allChildren.forEach((child, index) => {
+          bookAppointment({
+            childId: child.id,
+            childName: child.name,
+            type: values.type,
+            date: values.date,
+            time: values.time || '',
+            doctor: values.doctor || '',
+            notes: values.notes || '',
+            isBulk: true,
+            openCal: index === 0
+          });
+        });
+        toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} children on ${values.date}.`);
+      } else {
+        toast('No Children Registered', 'Please register children before booking group appointments.');
+      }
+    } else {
+      const child = getChild(values.childId);
+      bookAppointment({
+        childId: values.childId,
+        childName: child ? child.name : 'Unknown',
+        type: values.type,
+        date: values.date,
+        time: values.time || '',
+        doctor: values.doctor || '',
+        notes: values.notes || ''
+      });
+    }
 
     const modalRoot = document.querySelector('#modal-root');
     if (modalRoot) modalRoot.replaceChildren();
@@ -1492,6 +1516,34 @@ function initFormListeners() {
     if (form && (form.id === 'cal-booking-form' || form.id === 'appointment-form' || form.classList.contains('cal-booking-form'))) {
       event.preventDefault();
       handleBookingSubmit(form);
+    }
+  });
+
+  // Sync Child Select & All Children Pill toggle
+  document.addEventListener('change', (event) => {
+    const target = event.target;
+    if (target && target.id === 'cal-all-children-check') {
+      const select = document.querySelector('#cal-child-select');
+      const pill = document.querySelector('#cal-all-pill');
+      if (target.checked) {
+        if (select) select.value = 'ALL';
+        pill?.classList.add('gcal-all-pill--active');
+      } else {
+        if (select && select.value === 'ALL') select.value = '';
+        pill?.classList.remove('gcal-all-pill--active');
+      }
+    }
+
+    if (target && target.id === 'cal-child-select') {
+      const checkbox = document.querySelector('#cal-all-children-check');
+      const pill = document.querySelector('#cal-all-pill');
+      if (target.value === 'ALL') {
+        if (checkbox) checkbox.checked = true;
+        pill?.classList.add('gcal-all-pill--active');
+      } else {
+        if (checkbox) checkbox.checked = false;
+        pill?.classList.remove('gcal-all-pill--active');
+      }
     }
   });
 
