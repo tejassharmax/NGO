@@ -165,10 +165,8 @@ export function renderSpotlightItemsHTML(items, activeIndex = 0, currentTab = 'a
     let badgeHtml = '';
 
     if (itemType === 'student') {
-      const status = healthStatus(item);
-      const badgeClass = status === 'Healthy' ? 'badge--success' : (status === 'Critical' ? 'badge--danger' : 'badge--warning');
       iconHtml = `<div class="spotlight-item-avatar">${initials(item.name)}</div>`;
-      badgeHtml = `<span class="badge ${badgeClass}" style="font-size:10px; padding:2px 8px; border-radius:10px;">${status}</span>`;
+      badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">Student</span>`;
     } else if (itemType === 'appointment') {
       iconHtml = `<div class="spotlight-item-icon spotlight-item-icon--cal"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>`;
       badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">Camp / Appt</span>`;
@@ -210,9 +208,10 @@ export function renderSpotlightPreviewHTML(item) {
   }
 
   if (item.spotlightType === 'student') {
-    const status = healthStatus(item);
+    const hs = healthStatus(item);
+    const healthLabel = typeof hs === 'object' ? (hs.label || 'Healthy') : String(hs || 'Healthy');
+    const statusClass = (hs?.level === 'good' || healthLabel === 'Healthy') ? 'badge--success' : ((hs?.level === 'critical' || healthLabel === 'Critical') ? 'badge--danger' : 'badge--warning');
     const age = calculateAge(item.dob) || item.age || '—';
-    const statusClass = status === 'Healthy' ? 'badge--success' : (status === 'Critical' ? 'badge--danger' : 'badge--warning');
 
     return `
       <div class="spotlight-preview-card">
@@ -221,7 +220,8 @@ export function renderSpotlightPreviewHTML(item) {
           <div class="spotlight-preview-avatar">${initials(item.name)}</div>
           <div style="min-width:0; flex:1;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-              <span class="badge ${statusClass}" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">${status.toUpperCase()}</span>
+              <span class="badge badge--primary" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">STUDENT</span>
+              <span class="badge ${statusClass}" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">${healthLabel.toUpperCase()}</span>
               <span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:var(--color-bg-alt); padding:2px 8px; border-radius:10px;">${item.id}</span>
             </div>
             <h3 style="margin:0; font-size:18px; font-weight:700; color:var(--color-text); line-height:1.2;">${escapeHTML(item.name)}</h3>
