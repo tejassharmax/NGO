@@ -219,6 +219,36 @@ function parseBloodReport(cleanText, lines, result) {
     const m = pcvLine.match(/pcv\s*(\d+\.?\d*)/i);
     if (m) result.pcv = m[1];
   }
+
+  const neutroLine = lines.find(l => /\bneutrophil/i.test(l));
+  if (neutroLine) {
+    const m = neutroLine.match(/neutrophils?\s*(\d+\.?\d*)/i);
+    if (m) result.neutrophil = m[1];
+  }
+
+  const lymphLine = lines.find(l => /\blymphocyte/i.test(l));
+  if (lymphLine) {
+    const m = lymphLine.match(/lymphocytes?\s*(\d+\.?\d*)/i);
+    if (m) result.lymphocytes = m[1];
+  }
+
+  const eosinoLine = lines.find(l => /\beosinophil/i.test(l));
+  if (eosinoLine) {
+    const m = eosinoLine.match(/eosinophils?\s*(\d+\.?\d*)/i);
+    if (m) result.eosinophils = m[1];
+  }
+
+  const monoLine = lines.find(l => /\bmonocyte/i.test(l));
+  if (monoLine) {
+    const m = monoLine.match(/monocytes?\s*(\d+\.?\d*)/i);
+    if (m) result.monocytes = m[1];
+  }
+
+  const basoLine = lines.find(l => /\bbasophil/i.test(l));
+  if (basoLine) {
+    const m = basoLine.match(/basophils?\s*(\d+\.?\d*)/i);
+    if (m) result.basophils = m[1];
+  }
 }
 
 function parseBirthCertificate(cleanText, lines, result) {
