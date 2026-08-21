@@ -1,7 +1,7 @@
 import { renderPage } from './router.js';
 import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
 import { updateChildTable, childRows, setColumnOrder } from './table.js';
-import { searchChildren, globalSearchMarkup, renderSearchResultsList } from './search.js';
+import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
 import { modal, closeModal } from './modal.js';
 import { saveChild } from './form.js';
@@ -1894,32 +1894,159 @@ function setTheme(isDark) {
 
 setTheme(localStorage.getItem('sample-theme') === 'dark');
 
-function openGlobalSearch(query = '') {
+let currentSpotlightTab = 'all';
+let currentSpotlightIndex = 0;
+let currentSpotlightItems = [];
+
+function updateSpotlightState(root, query, tab = currentSpotlightTab, newIndex = 0) {
+  const data = getAllSpotlightItems(query);
+  currentSpotlightTab = tab;
+  currentSpotlightItems = data[tab] || data.all;
+  
+  if (newIndex >= currentSpotlightItems.length) newIndex = Math.max(0, currentSpotlightItems.length - 1);
+  currentSpotlightIndex = newIndex;
+
+  const resultsContainer = root.querySelector('#spotlight-results-container');
+  const previewContainer = root.querySelector('#spotlight-preview-container');
+
+  if (resultsContainer) {
+    resultsContainer.innerHTML = renderSpotlightItemsHTML(currentSpotlightItems, currentSpotlightIndex, currentSpotlightTab);
+  }
+  if (previewContainer) {
+    previewContainer.innerHTML = renderSpotlightPreviewHTML(currentSpotlightItems[currentSpotlightIndex]);
+  }
+
+  root.querySelectorAll('[data-spotlight-tab]').forEach(btn => {
+    btn.classList.toggle('spotlight-tab--active', btn.getAttribute('data-spotlight-tab') === tab);
+  });
+}
+
+function openGlobalSearch(initialQuery = '') {
   const root = document.querySelector('#modal-root');
   if (!root) return;
 
-  const existingInput = root.querySelector('#global-search-input');
-  const resultsContainer = root.querySelector('#global-search-results-container');
-
-  if (existingInput && resultsContainer) {
-    resultsContainer.innerHTML = renderSearchResultsList(query);
-  } else {
-    root.innerHTML = globalSearchMarkup(query);
-    const input = root.querySelector('#global-search-input');
+  const existingSpotlight = root.querySelector('#spotlight-modal');
+  if (existingSpotlight) {
+    const input = existingSpotlight.querySelector('#spotlight-search-input');
     if (input) {
+      input.value = initialQuery;
+      updateSpotlightState(root, initialQuery, currentSpotlightTab, 0);
       input.focus();
-      input.setSelectionRange(input.value.length, input.value.length);
-      input.addEventListener('input', () => {
-        const container = root.querySelector('#global-search-results-container');
-        if (container) {
-          container.innerHTML = renderSearchResultsList(input.value);
-        }
-      });
     }
-    root.querySelector('.modal-backdrop')?.addEventListener('click', (event) => {
-      if (event.target === event.currentTarget) closeModal();
+    return;
+  }
+
+  root.innerHTML = globalSearchMarkup(initialQuery);
+  const input = root.querySelector('#spotlight-search-input');
+  currentSpotlightTab = 'all';
+  currentSpotlightIndex = 0;
+
+  const spotlightBackdrop = root.querySelector('#spotlight-modal');
+  if (!spotlightBackdrop) return;
+
+  updateSpotlightState(root, initialQuery, 'all', 0);
+
+  function closeSpotlight() {
+    root.replaceChildren();
+  }
+
+  function executeSpotlightAction(item) {
+    if (!item) return;
+    closeSpotlight();
+    if (item.actionType === 'sheets-modal') {
+      openGoogleSheetsTemplateModal();
+    } else if (item.targetUrl && item.targetUrl !== '#') {
+      window.location.href = item.targetUrl;
+    }
+  }
+
+  if (input) {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
+    
+    input.addEventListener('input', () => {
+      updateSpotlightState(root, input.value, currentSpotlightTab, 0);
+    });
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (currentSpotlightItems.length > 0) {
+          const nextIdx = (currentSpotlightIndex + 1) % currentSpotlightItems.length;
+          updateSpotlightState(root, input.value, currentSpotlightTab, nextIdx);
+          const activeEl = root.querySelector(`[data-spotlight-index="${nextIdx}"]`);
+          activeEl?.scrollIntoView({ block: 'nearest' });
+        }
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (currentSpotlightItems.length > 0) {
+          const prevIdx = (currentSpotlightIndex - 1 + currentSpotlightItems.length) % currentSpotlightItems.length;
+          updateSpotlightState(root, input.value, currentSpotlightTab, prevIdx);
+          const activeEl = root.querySelector(`[data-spotlight-index="${prevIdx}"]`);
+          activeEl?.scrollIntoView({ block: 'nearest' });
+        }
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const selected = currentSpotlightItems[currentSpotlightIndex];
+        if (selected) {
+          executeSpotlightAction(selected);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSpotlight();
+      }
     });
   }
+
+  spotlightBackdrop.addEventListener('click', (e) => {
+    if (e.target === spotlightBackdrop || e.target.closest('[data-close-spotlight]')) {
+      closeSpotlight();
+      return;
+    }
+
+    const tabBtn = e.target.closest('[data-spotlight-tab]');
+    if (tabBtn) {
+      const tab = tabBtn.getAttribute('data-spotlight-tab');
+      updateSpotlightState(root, input ? input.value : '', tab, 0);
+      return;
+    }
+
+    const itemEl = e.target.closest('[data-spotlight-index]');
+    if (itemEl) {
+      const idx = parseInt(itemEl.getAttribute('data-spotlight-index'), 10);
+      const selected = currentSpotlightItems[idx];
+      if (selected) {
+        executeSpotlightAction(selected);
+      }
+      return;
+    }
+
+    const cmdBtn = e.target.closest('[data-run-spotlight-cmd]');
+    if (cmdBtn) {
+      const actionType = cmdBtn.getAttribute('data-action-type');
+      const targetUrl = cmdBtn.getAttribute('data-target-url');
+      executeSpotlightAction({ actionType, targetUrl });
+      return;
+    }
+  });
+
+  // Mouse hover over list item updates preview
+  spotlightBackdrop.addEventListener('mouseover', (e) => {
+    const itemEl = e.target.closest('[data-spotlight-index]');
+    if (itemEl) {
+      const idx = parseInt(itemEl.getAttribute('data-spotlight-index'), 10);
+      if (idx !== currentSpotlightIndex && idx >= 0 && idx < currentSpotlightItems.length) {
+        currentSpotlightIndex = idx;
+        root.querySelectorAll('[data-spotlight-index]').forEach((el, i) => {
+          el.classList.toggle('spotlight-result-item--active', i === idx);
+        });
+        const previewContainer = root.querySelector('#spotlight-preview-container');
+        if (previewContainer) {
+          previewContainer.innerHTML = renderSpotlightPreviewHTML(currentSpotlightItems[idx]);
+        }
+      }
+    }
+  });
 }
 
 function filteredChildren() {
