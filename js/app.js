@@ -1062,7 +1062,13 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-// Inputs
+// Inputs & Focus
+document.addEventListener('focusin', (event) => {
+  if (event.target && event.target.matches && event.target.matches('[data-global-search]')) {
+    openGlobalSearch(event.target.value || '');
+  }
+});
+
 document.addEventListener('input', (event) => {
   if (event.target.matches('[data-global-search]')) {
     openGlobalSearch(event.target.value);
