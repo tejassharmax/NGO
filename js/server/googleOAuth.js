@@ -486,22 +486,22 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
             const gid = sheetMap.get(childTabTitle);
             if (gid === undefined) return;
 
-            // Set column widths (Col A - N)
+            // Set column widths (Col A - N) matching Blood Test Report columns
             const colWidths = [
-              { start: 0, end: 1, width: 110 }, // A: DATE / CHILD NAME
-              { start: 1, end: 2, width: 100 }, // B: TEMP(F) / HAEMOGLOBIN
-              { start: 2, end: 3, width: 100 }, // C: B/P / WBC
-              { start: 3, end: 4, width: 180 }, // D: WEIGHT / CLINIC NAME
-              { start: 4, end: 5, width: 85 },  // E: P/R / RBC
-              { start: 5, end: 6, width: 85 },  // F: SPO2 / PCV
-              { start: 6, end: 7, width: 140 }, // G: COMPLAINT / NEUTROPHIL
-              { start: 7, end: 8, width: 150 }, // H: PRESCRIPTION / LYMPHOCYTES
-              { start: 8, end: 9, width: 130 }, // I: EYE CHECK UP / EOSINOPHILS
+              { start: 0, end: 1, width: 110 }, // A: DATE
+              { start: 1, end: 2, width: 125 }, // B: HAEMOGLOBIN
+              { start: 2, end: 3, width: 95 },  // C: WBC
+              { start: 3, end: 4, width: 115 }, // D: PLATELETS
+              { start: 4, end: 5, width: 90 },  // E: RBC
+              { start: 5, end: 6, width: 85 },  // F: PCV
+              { start: 6, end: 7, width: 120 }, // G: NEUTROPHIL
+              { start: 7, end: 8, width: 130 }, // H: LYMPHOCYTES
+              { start: 8, end: 9, width: 120 }, // I: EOSINOPHILS
               { start: 9, end: 10, width: 110 },// J: MONOCYTES
               { start: 10, end: 11, width: 100 },// K: BASOPHILS
-              { start: 11, end: 12, width: 160 },// L: RBC MORPHOLOGY
+              { start: 11, end: 12, width: 150 },// L: RBC MORPHOLOGY
               { start: 12, end: 13, width: 150 },// M: WBC MORPHOLOGY
-              { start: 13, end: 14, width: 160 } // N: PLATELETS ADEQUACY
+              { start: 13, end: 14, width: 165 } // N: PLATELETS ADEQUACY
             ];
 
             colWidths.forEach(cw => {
