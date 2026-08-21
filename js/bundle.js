@@ -35357,14 +35357,44 @@
   /**
    * Build Google Calendar TEMPLATE URL for instant synchronization
    */
-  function buildGoogleCalendarUrl(appointment) {
+  function buildGoogleCalendarUrl(appointment, isGroupPlan = false, allChildrenList = []) {
     const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-    const title = encodeURIComponent(`${appointment.childName} — ${appointment.type}`);
-    const details = encodeURIComponent(
-      `Doctor: ${appointment.doctor || 'N/A'}\nChild: ${appointment.childName}\nType: ${appointment.type}\nNotes: ${appointment.notes || 'No notes'}\n\nCreated from Child Health Management App`
-    );
 
-    const dateStr = appointment.date.replace(/-/g, '');
+    let titleStr = '';
+    let detailsStr = '';
+
+    if (isGroupPlan || appointment.isGroupPlan || appointment.childId === 'ALL' || appointment.childName === 'All Children') {
+      const list = allChildrenList && allChildrenList.length > 0 ? allChildrenList : getChildren();
+      const groupCount = list.length;
+      const titlePrefix = appointment.doctor ? `${appointment.doctor.trim()} — ` : '';
+      titleStr = `${titlePrefix}All Children (${groupCount}) — ${appointment.type}`;
+
+      const childrenNames = list.map((c, i) => `  ${i + 1}. ${c.name} (ID: ${c.id || 'N/A'})`).join('\n');
+      detailsStr =
+        `📋 GROUP APPOINTMENT: All Children — ${appointment.type}\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `👥 Target: All Registered Children (${groupCount} Students)\n` +
+        `🩺 Doctor / Title: ${appointment.doctor || 'Routine Healthcare Session'}\n` +
+        `📅 Date: ${appointment.date}\n` +
+        `⏰ Time: ${formatSingleDisplayTime(appointment.time || '10:00')}\n\n` +
+        `📋 Children Included in this Plan (${groupCount}):\n${childrenNames}\n\n` +
+        `📝 Notes: ${appointment.notes || 'No additional notes'}\n\n` +
+        `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+        `Created from Child Health Management App`;
+    } else {
+      titleStr = `${appointment.childName} — ${appointment.type}`;
+      detailsStr =
+        `Doctor: ${appointment.doctor || 'N/A'}\n` +
+        `Child: ${appointment.childName}\n` +
+        `Type: ${appointment.type}\n` +
+        `Notes: ${appointment.notes || 'No notes'}\n\n` +
+        `Created from Child Health Management App`;
+    }
+
+    const title = encodeURIComponent(titleStr);
+    const details = encodeURIComponent(detailsStr);
+
+    const dateStr = (appointment.date || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
     let startTime = '100000';
     let endTime = '110000';
 
@@ -38957,20 +38987,33 @@
       if (isAllChildren) {
         const allChildren = getChildren();
         if (allChildren.length > 0) {
-          allChildren.forEach((child, index) => {
-            bookAppointment({
+          allChildren.forEach((child) => {
+            addAppointment({
               childId: child.id,
               childName: child.name,
               type: values.type,
               date: values.date,
-              time: values.time || '',
+              time: values.time || '10:00',
               doctor: values.doctor || '',
               notes: values.notes || '',
-              isBulk: true,
-              openCal: index === 0
+              status: 'Upcoming'
             });
           });
-          toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} children on ${values.date}.`);
+
+          // Open unified All Children Group Plan in Google Calendar
+          const groupCalUrl = buildGoogleCalendarUrl({
+            childId: 'ALL',
+            childName: 'All Children',
+            type: values.type,
+            date: values.date,
+            time: values.time || '10:00',
+            doctor: values.doctor || '',
+            notes: values.notes || '',
+            isGroupPlan: true
+          }, true, allChildren);
+
+          window.open(groupCalUrl, '_blank');
+          toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} children on ${values.date}. Google Calendar synced.`);
         } else {
           toast('No Children Registered', 'Please register children before booking group appointments.');
         }
