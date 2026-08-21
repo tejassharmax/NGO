@@ -1470,20 +1470,33 @@ function initFormListeners() {
     if (isAllChildren) {
       const allChildren = getChildren();
       if (allChildren.length > 0) {
-        allChildren.forEach((child, index) => {
-          bookAppointment({
+        allChildren.forEach((child) => {
+          addAppointment({
             childId: child.id,
             childName: child.name,
             type: values.type,
             date: values.date,
-            time: values.time || '',
+            time: values.time || '10:00',
             doctor: values.doctor || '',
             notes: values.notes || '',
-            isBulk: true,
-            openCal: index === 0
+            status: 'Upcoming'
           });
         });
-        toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} children on ${values.date}.`);
+
+        // Open unified All Children Group Plan in Google Calendar
+        const groupCalUrl = buildGoogleCalendarUrl({
+          childId: 'ALL',
+          childName: 'All Children',
+          type: values.type,
+          date: values.date,
+          time: values.time || '10:00',
+          doctor: values.doctor || '',
+          notes: values.notes || '',
+          isGroupPlan: true
+        }, true, allChildren);
+
+        window.open(groupCalUrl, '_blank');
+        toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} children on ${values.date}. Google Calendar synced.`);
       } else {
         toast('No Children Registered', 'Please register children before booking group appointments.');
       }
