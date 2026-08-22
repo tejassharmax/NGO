@@ -574,18 +574,6 @@ app.delete('/api/children/:id', requireAuth, async (req, res) => {
   }
 });
 
-// GET /api/sync - Returns current database state for authenticated Google account / NGO
-app.get('/api/sync', requireAuth, (req, res) => {
-  try {
-    let serverData = {};
-    if (fs.existsSync(DB_FILE)) {
-      serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
-    }
-    res.json(serverData);
-  } catch (err) {
-    res.status(500).json({ error: 'Could not fetch database state' });
-  }
-});
 
 // POST /api/sync - Merges and saves the database
 app.post('/api/sync', requireAuth, apiLimiter, (req, res) => {

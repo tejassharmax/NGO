@@ -59,7 +59,7 @@
 
   const icon = (name) => icons[name] || '';
   const initials = (name) => name.split(' ').map((item) => item[0]).join('').slice(0, 2).toUpperCase();
-  const escapeHTML$2 = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
+  const escapeHTML$1 = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
   const formatDate = (date) => { try { return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date)); } catch { return date || ''; } };
   const pagePath = (page) => {
     if (!page || page === 'dashboard') return 'index.html#/';
@@ -34336,8 +34336,8 @@
   function toast(title, message = 'Your changes have been saved.') {
     const root = document.querySelector('#toast-root');
     if (!root) return;
-    const safeTitle = escapeHTML$2(title);
-    const safeMsg = escapeHTML$2(message);
+    const safeTitle = escapeHTML$1(title);
+    const safeMsg = escapeHTML$1(message);
     const element = document.createElement('div');
     element.className = 'toast';
     element.innerHTML = `<span class="toast__icon">${icon('check')}</span><div><div class="toast__title">${safeTitle}</div><div class="toast__message">${safeMsg}</div></div><button class="icon-button icon-button--small" type="button" aria-label="Dismiss notification">${icon('x')}</button>`;
@@ -34554,7 +34554,7 @@
             </div>
             <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
             <p style="font-size:13.5px; color:var(--color-text-muted); margin:0 0 20px 0; line-height:1.5;">
-              To view <b>${escapeHTML$2(childName || 'this child')}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
+              To view <b>${escapeHTML$1(childName || 'this child')}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
             </p>
             <div style="display:flex; gap:10px; justify-content:center;">
               <button class="button button--ghost" type="button" onclick="document.querySelector('#modal-root').replaceChildren();">Cancel</button>
@@ -34663,14 +34663,14 @@
           const badgeColor = isVerified ? '#15803d' : '#b45309';
           return `
           <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; ${bgStyle} white-space: nowrap;">
-            <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:${badgeBg}; color:${badgeColor};">${escapeHTML$2(String(val))}</span>
+            <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:${badgeBg}; color:${badgeColor};">${escapeHTML$1(String(val))}</span>
           </td>
         `;
         }
 
         return `
         <td style="padding: 8px 14px; border: 1px solid #e2e8f0; font-size: 12.5px; color: #1e293b; ${bgStyle} white-space: nowrap;">
-          ${escapeHTML$2(String(val))}
+          ${escapeHTML$1(String(val))}
         </td>
       `;
       }).join('');
@@ -34702,7 +34702,7 @@
                 </span>
               </div>
               <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px; display:flex; align-items:center; gap:8px;">
-                <span>Google Account: <b>${escapeHTML$2(userEmail)}</b></span>
+                <span>Google Account: <b>${escapeHTML$1(userEmail)}</b></span>
                 <span>•</span>
                 <span><b>${children.length} Records</b> Formatted (18 Columns)</span>
               </div>
@@ -34797,7 +34797,7 @@
       </div>
       
       <h2 style="font-size:18px; font-weight:700; margin:0 0 6px 0; color:var(--color-text);">Updating Live Google Sheet</h2>
-      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing for <b>${escapeHTML$2(childName)}</b> to live Google Sheet...</p>
+      <p style="font-size:13px; color:var(--color-text-muted); margin:0 0 20px 0;">Auto-syncing for <b>${escapeHTML$1(childName)}</b> to live Google Sheet...</p>
       
       <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
@@ -35207,18 +35207,18 @@
 
     const rowsHTML = children.map((c, idx) => `
     <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : 'background:#ffffff;'}">
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-family:monospace; font-size:12px; font-weight:700; color:#1a73e8;">${escapeHTML$2(c.id || 'CH-0000')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:13px; font-weight:600; color:#1e293b;">${escapeHTML$2(c.name || 'Child')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-family:monospace; font-size:12px; font-weight:700; color:#1a73e8;">${escapeHTML$1(c.id || 'CH-0000')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:13px; font-weight:600; color:#1e293b;">${escapeHTML$1(c.name || 'Child')}</td>
       <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${calculateAge(c.dob) || c.age || '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$2(c.gender || '—')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.gender || '—')}</td>
       <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.height ? `${c.height} cm` : '—'}</td>
       <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.weight ? `${c.weight} kg` : '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$2(c.medications || 'None')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$2(c.dentalRemarks || '—')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$2(c.hygieneIndex || 'N/A')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.medications || 'None')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.dentalRemarks || '—')}</td>
+      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.hygieneIndex || 'N/A')}</td>
       <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px;">
         <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:#dcfce7; color:#15803d;">
-          ${escapeHTML$2(c.status || 'Active')}
+          ${escapeHTML$1(c.status || 'Active')}
         </span>
       </td>
     </tr>
@@ -35243,7 +35243,7 @@
                 </span>
               </div>
               <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px;">
-                Connected Account: <b>${escapeHTML$2(userEmail)}</b> • Real-time Executive Report
+                Connected Account: <b>${escapeHTML$1(userEmail)}</b> • Real-time Executive Report
               </div>
             </div>
           </div>
@@ -35270,7 +35270,7 @@
             <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1a73e8; padding-bottom:16px; margin-bottom:24px;">
               <div>
                 <h1 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 4px 0; letter-spacing:-0.02em;">CHILD HEALTH EXECUTIVE REPORT</h1>
-                <p style="font-size:13px; color:#64748b; margin:0; font-weight:600;">NGO: ${escapeHTML$2(ngoName)} • Live Auto-Synced Document</p>
+                <p style="font-size:13px; color:#64748b; margin:0; font-weight:600;">NGO: ${escapeHTML$1(ngoName)} • Live Auto-Synced Document</p>
               </div>
               <span style="font-size:11px; background:#eff6ff; color:#1a73e8; font-weight:700; padding:6px 12px; border-radius:20px; border:1px solid #bfdbfe;">
                 Status: Updated Today
@@ -35515,7 +35515,7 @@
     return 'blue';
   }
 
-  function escapeHTML$1(str) {
+  function escapeHTML(str) {
     if (!str) return '';
     return str.replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
   }
@@ -35570,9 +35570,9 @@
       if (dayAppts.length > 0) {
         const visible = dayAppts.slice(0, 2);
         chipsHTML = visible.map(a => `
-        <div class="gcal-event-chip gcal-event-chip--${typeColor(a.type)}" data-event-id="${a.id}" title="${escapeHTML$1(a.childName)} - ${escapeHTML$1(a.type)}">
+        <div class="gcal-event-chip gcal-event-chip--${typeColor(a.type)}" data-event-id="${a.id}" title="${escapeHTML(a.childName)} - ${escapeHTML(a.type)}">
           <span class="gcal-chip-time">${a.time || '10:00'}</span>
-          <span class="gcal-chip-title">${escapeHTML$1(a.childName)}</span>
+          <span class="gcal-chip-title">${escapeHTML(a.childName)}</span>
         </div>
       `).join('');
 
@@ -35664,9 +35664,9 @@
           <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
             <div class="gcal-event-card-main">
               <div class="gcal-event-title-row">
-                <span class="gcal-event-name">${escapeHTML$1(a.childName)}</span>
+                <span class="gcal-event-name">${escapeHTML(a.childName)}</span>
                 <span class="gcal-event-dot">·</span>
-                <span class="gcal-event-detail-text">${escapeHTML$1(a.type)}${a.doctor ? ` (${escapeHTML$1(a.doctor)})` : ''}</span>
+                <span class="gcal-event-detail-text">${escapeHTML(a.type)}${a.doctor ? ` (${escapeHTML(a.doctor)})` : ''}</span>
               </div>
               <div class="gcal-event-time-row">${formatSingleDisplayTime(a.time || slot.label)}</div>
             </div>
@@ -35698,7 +35698,7 @@
 
   function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
     const children = getChildren();
-    const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML$1(c.name)} (${c.id})</option>`).join('');
+    const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
     const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
 
     // Format display date
@@ -35864,11 +35864,11 @@
                 <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
                   <span class="gcal-popover-color-dot" style="background-color: ${colorHex};"></span>
                   <span class="gcal-event-chip gcal-event-chip--${typeColor(appt.type)}" style="font-size:12px; font-weight:700; padding:3px 10px; border-radius:12px; display:inline-flex;">
-                    ${escapeHTML$1(appt.type || 'Appointment')}
+                    ${escapeHTML(appt.type || 'Appointment')}
                   </span>
                   ${appt.childId ? `<span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:var(--color-bg-alt, #f1f5f9); padding:2px 8px; border-radius:10px;">ID: ${appt.childId}</span>` : ''}
                 </div>
-                <h2 class="gcal-popover-title" style="font-size:20px; font-weight:700; color:var(--color-text); margin:0; line-height:1.3;">${escapeHTML$1(appt.childName)}</h2>
+                <h2 class="gcal-popover-title" style="font-size:20px; font-weight:700; color:var(--color-text); margin:0; line-height:1.3;">${escapeHTML(appt.childName)}</h2>
               </div>
               <span class="gcal-status-pill gcal-status-pill--${currentStatus.toLowerCase() === 'completed' ? 'done' : 'upcoming'}" style="font-size:11px; font-weight:700; padding:4px 12px; border-radius:14px; white-space:nowrap;">
                 ${currentStatus.toUpperCase()}
@@ -35888,7 +35888,7 @@
               </div>
               <div class="gcal-popover-info-text">
                 <span class="gcal-popover-info-label">Doctor / Title</span>
-                <span class="gcal-popover-info-val">${escapeHTML$1(appt.doctor || 'Routine Healthcare')}</span>
+                <span class="gcal-popover-info-val">${escapeHTML(appt.doctor || 'Routine Healthcare')}</span>
               </div>
             </div>
 
@@ -35915,9 +35915,9 @@
                 <span>Edit</span>
               </button>
             </div>
-            <div class="gcal-notes-view-mode" id="notes-view-${appt.id}" style="font-size:13px; color:var(--color-text); line-height:1.5; white-space:pre-wrap;">${escapeHTML$1(appt.notes || 'No specific clinical instructions provided.')}</div>
+            <div class="gcal-notes-view-mode" id="notes-view-${appt.id}" style="font-size:13px; color:var(--color-text); line-height:1.5; white-space:pre-wrap;">${escapeHTML(appt.notes || 'No specific clinical instructions provided.')}</div>
             <div class="gcal-notes-edit-mode" id="notes-edit-${appt.id}" style="display:none; margin-top:6px;">
-              <textarea class="gcal-popup-notes" id="notes-input-${appt.id}" rows="3" style="width:100%; font-size:13px; padding:8px 10px; border:1px solid #1a73e8; border-radius:6px; outline:none; resize:vertical; font-family:inherit; background:var(--color-surface, #fff); color:var(--color-text);" placeholder="Type clinical notes...">${escapeHTML$1(appt.notes || '')}</textarea>
+              <textarea class="gcal-popup-notes" id="notes-input-${appt.id}" rows="3" style="width:100%; font-size:13px; padding:8px 10px; border:1px solid #1a73e8; border-radius:6px; outline:none; resize:vertical; font-family:inherit; background:var(--color-surface, #fff); color:var(--color-text);" placeholder="Type clinical notes...">${escapeHTML(appt.notes || '')}</textarea>
               <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:8px;">
                 <button type="button" class="button button--secondary button--sm" data-cancel-notes-edit="${appt.id}" style="padding:4px 10px; font-size:11px;">Cancel</button>
                 <button type="button" class="button button--primary button--sm" data-save-notes-inline="${appt.id}" style="padding:4px 12px; font-size:11px; gap:4px;">
@@ -35951,7 +35951,7 @@
 
     const children = getChildren();
     const childOptions = children.map(c => 
-      `<option value="${c.id}" ${c.id === appt.childId ? 'selected' : ''}>${escapeHTML$1(c.name)} (${c.id})</option>`
+      `<option value="${c.id}" ${c.id === appt.childId ? 'selected' : ''}>${escapeHTML(c.name)} (${c.id})</option>`
     ).join('');
 
     const typeOptions = [
@@ -35990,7 +35990,7 @@
 
           <!-- Title / Doctor row -->
           <div class="gcal-popup-title-row" style="margin-bottom:12px;">
-            <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add doctor or clinic title" value="${escapeHTML$1(appt.doctor || '')}" autocomplete="off" />
+            <input class="gcal-popup-title-input" name="doctor" type="text" placeholder="Add doctor or clinic title" value="${escapeHTML(appt.doctor || '')}" autocomplete="off" />
           </div>
 
           <div class="gcal-popup-rows">
@@ -36050,7 +36050,7 @@
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
               </div>
               <div class="gcal-popup-row-content">
-                <textarea class="gcal-popup-notes" name="notes" rows="2" placeholder="Add description or clinical notes">${escapeHTML$1(appt.notes || '')}</textarea>
+                <textarea class="gcal-popup-notes" name="notes" rows="2" placeholder="Add description or clinical notes">${escapeHTML(appt.notes || '')}</textarea>
               </div>
             </div>
           </div>
@@ -36227,7 +36227,7 @@
           </span>
           <div style="flex: 1; min-width: 0;">
             <div style="font-size: 12px; font-weight: 600; color: var(--color-text); line-height: 1.35; margin-bottom: 2px;">
-              ${escapeHTML$2(alert.message)}
+              ${escapeHTML$1(alert.message)}
             </div>
             <div style="display: flex; align-items: center; justify-content: space-between; font-size: 10.5px; color: var(--color-text-muted); margin-top: 3px;">
               <span>${timeAgo(alert.timestamp)}</span>
@@ -36243,7 +36243,7 @@
     <aside class="sidebar" aria-label="Primary navigation">
       <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
       <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
-      <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML$2(ngoName)}</span><span class="workspace-user__role">${escapeHTML$2(role)}</span></span></div></div>
+      <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML$1(ngoName)}</span><span class="workspace-user__role">${escapeHTML$1(role)}</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
     <main class="app-main" id="app-main">
       <header class="topbar">
@@ -36284,15 +36284,15 @@
           <!-- DASHBOARD HEADER GOOGLE USER PROFILE & NGO WORKSPACE -->
           <div class="topbar-profile" style="display:flex; align-items:center; gap:12px; position: relative;">
             <button class="topbar-profile__trigger" data-profile-menu type="button" aria-haspopup="true" aria-expanded="false" style="display:flex; align-items:center; gap:8px; padding:4px 8px; border-radius:20px; border:1px solid var(--color-border); background:var(--color-bg); cursor: pointer;">
-              ${photoURL ? `<img src="${escapeHTML$2(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
-              <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML$2(displayName)}</span>
+              ${photoURL ? `<img src="${escapeHTML$1(photoURL)}" style="width:28px; height:28px; border-radius:50%; object-fit:cover;" />` : `<span class="avatar" style="width:28px; height:28px; border-radius:50%; font-size:11px; font-weight:700;">${userInitials}</span>`}
+              <span class="topbar-profile__name" style="font-weight:600; font-size:13px;">${escapeHTML$1(displayName)}</span>
               ${icon('chevronDown')}
             </button>
             <div class="dropdown" hidden data-profile-dropdown style="position: absolute; top: calc(100% + 8px); right: 0; width: 240px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 14px; box-shadow: 0 12px 32px -4px rgba(0,0,0,0.15); z-index: 1000; overflow: hidden;">
               <div style="padding:12px 14px; border-bottom:1px solid var(--color-border); font-size:12px;">
-                <div style="font-weight:700; color:var(--color-text);">${escapeHTML$2(displayName)}</div>
-                <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML$2(email)}</div>
-                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML$2(ngoName)}</span></div>
+                <div style="font-weight:700; color:var(--color-text);">${escapeHTML$1(displayName)}</div>
+                <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML$1(email)}</div>
+                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML$1(ngoName)}</span></div>
               </div>
               <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
               <div class="divider" style="margin: 4px 0; border-top: 1px solid var(--color-border);"></div>
@@ -36318,14 +36318,14 @@
   const statCard = (label, value, glyph, color = 'blue') => `
   <article class="stat-card stat-card--${color}">
     <div class="stat-card__top">
-      <span class="stat-card__label" title="${escapeHTML$2(label)}">${label}</span>
+      <span class="stat-card__label" title="${escapeHTML$1(label)}">${label}</span>
       <span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span>
     </div>
     <div class="stat-card__number">${value}</div>
   </article>
 `;
 
-  const field = (label, name, placeholder, type = 'text', hint = '', value = '', extra = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML$2(value)}" ${extra}>${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
+  const field = (label, name, placeholder, type = 'text', hint = '', value = '', extra = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML$1(value)}" ${extra}>${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
 
   function formatDateForInput(dateStr) {
     if (!dateStr) return '';
@@ -36452,7 +36452,7 @@
     // Docs HTML for Documents tab
     let docsHTML = '';
     if (docs.length === 0) {
-      docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records, Aadhaar cards, and health certificates uploaded for ${escapeHTML$2(child.name)} will appear here.</p><div style="margin-top:16px;"><button class="button button--primary" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$2(child.name)}">${icon('upload')} Upload Document for ${escapeHTML$2(child.name)}</button></div></div>`;
+      docsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('file')}</span><h3>No documents uploaded</h3><p>Medical records, Aadhaar cards, and health certificates uploaded for ${escapeHTML$1(child.name)} will appear here.</p><div style="margin-top:16px;"><button class="button button--primary" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$1(child.name)}">${icon('upload')} Upload Document for ${escapeHTML$1(child.name)}</button></div></div>`;
     } else {
       docsHTML = `<div class="document-grid">${docs.map((d, idx) => `
       <article class="card document-card" style="position:relative;">
@@ -36537,7 +36537,7 @@
       timelineHTML = `<div class="timeline">${activities.map(a => `<div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>${a.action ? a.action.replace(/_/g, ' ').toUpperCase() : 'ACTIVITY'}</b><p>${a.detail || a.childName}</p><time>${timeAgo(a.timestamp)}</time></div></div>`).join('')}</div>`;
     }
 
-    return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-open-child-sheet="${child.id}" data-child-name="${escapeHTML$2(child.name)}" style="display:inline-flex; align-items:center; gap:8px;">${icon('googleSheets')}Open Google Sheet</button><button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
+    return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-open-child-sheet="${child.id}" data-child-name="${escapeHTML$1(child.name)}" style="display:inline-flex; align-items:center; gap:8px;">${icon('googleSheets')}Open Google Sheet</button><button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
   <section class="card">
     <div class="profile-header">
       <span class="profile-header__avatar">${initials(child.name)}</span>
@@ -36654,8 +36654,8 @@
     <div data-tab-panel="documents" style="display: none;">
       <section class="card">
         <header class="card__header" style="display:flex; justify-content:space-between; align-items:center;">
-          <div><h2 class="card__title">Uploaded Documents & Records</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports for ${escapeHTML$2(child.name)}</p></div>
-          <button class="button button--primary button--sm" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$2(child.name)}">${icon('upload')} Upload Document</button>
+          <div><h2 class="card__title">Uploaded Documents & Records</h2><p class="card__caption">Aadhaar scans, birth certificates, and medical reports for ${escapeHTML$1(child.name)}</p></div>
+          <button class="button button--primary button--sm" type="button" data-upload-profile-doc="${child.id}" data-child-name="${escapeHTML$1(child.name)}">${icon('upload')} Upload Document</button>
         </header>
         <div class="card__body">
           ${docsHTML}
@@ -36713,13 +36713,13 @@
 
     return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName, 'required')}${field('Last name', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '', 'required')}<label class="field"><span class="field__label">Gender *</span><select class="input" name="gender" required><option value="" disabled ${!child || !child.gender ? 'selected' : ''}>Select gender</option><option value="Male" ${child && child.gender === 'Male' ? 'selected' : ''}>Male</option><option value="Female" ${child && child.gender === 'Female' ? 'selected' : ''}>Female</option><option value="Other" ${child && child.gender === 'Other' ? 'selected' : ''}>Other</option></select></label>${field('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '', 'step="any" min="0"')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '', 'step="any" min="0"')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML$2(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML$2(child.allergies) : ''}</textarea></label>
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '', 'step="any" min="0"')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '', 'step="any" min="0"')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML$1(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML$1(child.allergies) : ''}</textarea></label>
   <div class="field form-span-all">
     <span class="field__label">Current medications</span>
     <div class="combobox" data-combobox>
-      <input type="hidden" name="medications" value="${escapeHTML$2(curMed)}">
+      <input type="hidden" name="medications" value="${escapeHTML$1(curMed)}">
       <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10v7h7Z"/><path d="m8.5 15.5 7-7"/></svg></span>
-      <input class="combobox__input" type="text" placeholder="Search or type a medication..." value="${escapeHTML$2(curMed)}" autocomplete="off" data-combobox-input>
+      <input class="combobox__input" type="text" placeholder="Search or type a medication..." value="${escapeHTML$1(curMed)}" autocomplete="off" data-combobox-input>
       <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
       <div class="combobox__panel" data-combobox-panel>
         <div class="combobox__hint">Common medications</div>
@@ -36739,13 +36739,13 @@
     </div>
     <span class="field__hint">Select a preset or type any custom medicine name directly.</span>
   </div>
-  <label class="field form-span-all"><span class="field__label">Dental remarks</span><textarea class="textarea" name="dentalRemarks" placeholder="e.g. RESTORATION, SCALING, ORTHODONTIC TREATMENT">${child ? escapeHTML$2(child.dentalRemarks || '') : ''}</textarea></label>
+  <label class="field form-span-all"><span class="field__label">Dental remarks</span><textarea class="textarea" name="dentalRemarks" placeholder="e.g. RESTORATION, SCALING, ORTHODONTIC TREATMENT">${child ? escapeHTML$1(child.dentalRemarks || '') : ''}</textarea></label>
   <div class="field form-span-all">
     <span class="field__label">Oral Hygiene Index</span>
     <div class="combobox" data-combobox>
-      <input type="hidden" name="hygieneIndex" value="${child ? escapeHTML$2(child.hygieneIndex || '') : ''}">
+      <input type="hidden" name="hygieneIndex" value="${child ? escapeHTML$1(child.hygieneIndex || '') : ''}">
       <span class="combobox__icon-left"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg></span>
-      <input class="combobox__input" type="text" placeholder="Select hygiene index..." value="${child ? escapeHTML$2(child.hygieneIndex || '') : ''}" autocomplete="off" data-combobox-input readonly style="cursor:pointer;">
+      <input class="combobox__input" type="text" placeholder="Select hygiene index..." value="${child ? escapeHTML$1(child.hygieneIndex || '') : ''}" autocomplete="off" data-combobox-input readonly style="cursor:pointer;">
       <span class="combobox__chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg></span>
       <div class="combobox__panel" data-combobox-panel>
         <div data-combobox-option="SATISFACTORY" class="combobox__option">SATISFACTORY<span class="combobox__option-check"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></span></div>
@@ -36756,7 +36756,7 @@
   </div>
   </div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML$2(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML$2(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML$1(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML$1(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -37017,11 +37017,11 @@
               ${icon('googleSheets')}
               Google Sheets Live Sync
             </b>
-            ${isConnected ? `<span class="badge badge--success">Connected as ${escapeHTML$2(adminEmail)}</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
+            ${isConnected ? `<span class="badge badge--success">Connected as ${escapeHTML$1(adminEmail)}</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
           </div>
           <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
             ${isConnected 
-              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$2(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
+              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
               : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
             }
           </p>
@@ -37034,13 +37034,13 @@
               </a>
             ` : `
               ${clinicalSheetUrl ? `
-                <a href="${escapeHTML$2(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
+                <a href="${escapeHTML$1(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
                   ${icon('googleSheets')}
                   Open Student Medical Records Workbook ↗
                 </a>
               ` : ''}
               ${masterSheetUrl ? `
-                <a href="${escapeHTML$2(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                <a href="${escapeHTML$1(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
                   📄 Master Directory Sheet ↗
                 </a>
               ` : ''}
@@ -37124,20 +37124,20 @@
                     <div style="display:flex; align-items:center; gap:10px;">
                       <div class="avatar avatar--sm" style="background:#e8f0fe; color:#1a73e8; font-weight:700; font-size:12px; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;">${initials(a.childName || 'C')}</div>
                       <div>
-                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML$2(a.childName || 'Child')}</strong>
+                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML$1(a.childName || 'Child')}</strong>
                         <span style="font-size:11px; color:var(--color-text-muted);">${a.childId ? `ID: ${a.childId}` : ''}</span>
                       </div>
                     </div>
                   </td>
                   <td>
                     <span class="gcal-event-chip gcal-event-chip--${typeClass}" style="display:inline-flex; width:auto; padding:3px 10px; font-size:12px; font-weight:600; cursor:pointer;" data-event-id="${a.id}">
-                      ${escapeHTML$2(a.type || 'General')}
+                      ${escapeHTML$1(a.type || 'General')}
                     </span>
                   </td>
                   <td>
                     <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text);">
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#70757a" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                      <span>${escapeHTML$2(a.doctor || 'General Clinic')}</span>
+                      <span>${escapeHTML$1(a.doctor || 'General Clinic')}</span>
                     </div>
                   </td>
                   <td>
@@ -37398,8 +37398,8 @@
         <div style="display:flex; align-items:center; gap:12px; min-width:0; flex:1;">
           ${iconHtml}
           <div class="spotlight-item-text">
-            <div class="spotlight-item-title">${escapeHTML$2(item.searchTitle)}</div>
-            <div class="spotlight-item-sub">${escapeHTML$2(item.searchSubtitle)}</div>
+            <div class="spotlight-item-title">${escapeHTML$1(item.searchTitle)}</div>
+            <div class="spotlight-item-sub">${escapeHTML$1(item.searchSubtitle)}</div>
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:8px;">
@@ -37439,7 +37439,7 @@
               <span class="badge ${statusClass}" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">${healthLabel.toUpperCase()}</span>
               <span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:var(--color-bg-alt); padding:2px 8px; border-radius:10px;">${item.id}</span>
             </div>
-            <h3 style="margin:0; font-size:18px; font-weight:700; color:var(--color-text); line-height:1.2;">${escapeHTML$2(item.name)}</h3>
+            <h3 style="margin:0; font-size:18px; font-weight:700; color:var(--color-text); line-height:1.2;">${escapeHTML$1(item.name)}</h3>
             <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">Student Profile</div>
           </div>
         </div>
@@ -37491,14 +37491,14 @@
               <span class="badge badge--primary" style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px;">${item.type || 'Appointment'}</span>
               <span class="badge badge--neutral" style="font-size:10px; padding:2px 8px; border-radius:10px;">${item.status || 'Upcoming'}</span>
             </div>
-            <h3 style="margin:0; font-size:17px; font-weight:700; color:var(--color-text);">${escapeHTML$2(item.childName)}</h3>
+            <h3 style="margin:0; font-size:17px; font-weight:700; color:var(--color-text);">${escapeHTML$1(item.childName)}</h3>
             <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">${item.date} • ${item.time || '10:00 AM'}</div>
           </div>
         </div>
 
         <div class="spotlight-preview-notes-box">
           <div style="font-size:11px; font-weight:700; color:var(--color-text-muted); text-transform:uppercase; margin-bottom:4px;">Clinical Notes</div>
-          <div style="font-size:12.5px; color:var(--color-text); line-height:1.4;">${escapeHTML$2(item.notes || 'No specific clinical instructions provided.')}</div>
+          <div style="font-size:12.5px; color:var(--color-text); line-height:1.4;">${escapeHTML$1(item.notes || 'No specific clinical instructions provided.')}</div>
         </div>
 
         <div class="spotlight-preview-actions">
@@ -37521,8 +37521,8 @@
           <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
             <span class="badge badge--neutral" style="font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px;">${item.badge || 'Quick Command'}</span>
           </div>
-          <h3 style="margin:0; font-size:17px; font-weight:700; color:var(--color-text);">${escapeHTML$2(item.title)}</h3>
-          <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">${escapeHTML$2(item.subtitle)}</div>
+          <h3 style="margin:0; font-size:17px; font-weight:700; color:var(--color-text);">${escapeHTML$1(item.title)}</h3>
+          <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">${escapeHTML$1(item.subtitle)}</div>
         </div>
       </div>
 
@@ -37558,7 +37558,7 @@
             class="spotlight-input" 
             type="search" 
             placeholder="Search students, health records, appointments, or commands…" 
-            value="${escapeHTML$2(query)}" 
+            value="${escapeHTML$1(query)}" 
             autocomplete="off" 
             spellcheck="false" 
             autofocus 
@@ -37623,7 +37623,7 @@
 
   function modal$1({ title, body, confirmText = 'Confirm', confirmClass = 'button--primary', onConfirm }) {
     const root = document.querySelector('#modal-root');
-    const safeTitle = escapeHTML$2(title);
+    const safeTitle = escapeHTML$1(title);
     root.innerHTML = `<div class="modal-backdrop" role="presentation"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal__header"><div><h2 id="modal-title" class="modal__title">${safeTitle}</h2></div><button class="icon-button icon-button--small" type="button" aria-label="Close dialog" data-modal-close>${icon('x')}</button></header><div class="modal__body">${body}</div><footer class="modal__footer"><button class="button" type="button" data-modal-close>Cancel</button><button class="button ${confirmClass}" type="button" data-modal-confirm>${confirmText}</button></footer></section></div>`;
     root.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', closeModal));
     root.querySelector('.modal-backdrop').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
@@ -38684,7 +38684,7 @@
           <div style="font-size:38px; margin-bottom:10px;">🔌</div>
           <h4 style="margin:0 0 8px 0; font-size:15px; font-weight:700; color:var(--color-text);">Disconnect Workspace Sync</h4>
           <p style="font-size:13px; color:var(--color-text-muted); line-height:1.5; margin:0;">
-            Are you sure you want to disconnect Google Sheets sync for <b>${escapeHTML(ngoSlug)}</b>? Live updates to spreadsheets will be paused until you reconnect.
+            Are you sure you want to disconnect Google Sheets sync for <b>${escapeHTML$1(ngoSlug)}</b>? Live updates to spreadsheets will be paused until you reconnect.
           </p>
         </div>
       `,
