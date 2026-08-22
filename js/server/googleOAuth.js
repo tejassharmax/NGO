@@ -171,7 +171,7 @@ function sanitizeSheetTitle(name) {
 }
 
 function cleanCell(val) {
-  if (val === null || val === undefined) return '';
+  if (val === null || val === undefined || val === '' || val === '—') return '';
   const str = String(val).trim();
   if (str.startsWith('=HYPERLINK(')) {
     return str;
@@ -369,7 +369,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
       if (dbData['chm-growth']) allGrowth = JSON.parse(dbData['chm-growth']);
       if (dbData['chm-medicines']) allMedicines = JSON.parse(dbData['chm-medicines']);
       if (dbData['chm-health-records']) allHealthRecords = JSON.parse(dbData['chm-health-records']);
-      if (dbData['chm-uploaded-docs']) allUploadedDocs = JSON.parse(dbData['chm-uploaded-docs']);
+      if (dbData['chm-documents']) allUploadedDocs = JSON.parse(dbData['chm-documents']);
     } catch (e) { }
   }
 

@@ -5,7 +5,7 @@ import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlig
 import { toast } from './toast.js';
 import { modal, closeModal } from './modal.js';
 import { saveChild } from './form.js';
-import { pagePath, icon } from './utils.js';
+import { pagePath, icon, escapeHTML } from './utils.js';
 import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser } from './firestore.js';
