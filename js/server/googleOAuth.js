@@ -170,8 +170,11 @@ function sanitizeSheetTitle(name) {
 }
 
 function cleanCell(val) {
-  if (val === null || val === undefined || val === '' || val === '—') return '';
+  if (val === null || val === undefined) return '';
   const str = String(val).trim();
+  if (str.startsWith('=HYPERLINK(')) {
+    return str;
+  }
   if (str.startsWith('+') || str.startsWith('=')) {
     return "'" + str;
   }

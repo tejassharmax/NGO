@@ -918,9 +918,9 @@ export function settingsPage() {
               <button class="button button--ghost" type="button" data-sync-from-sheets style="font-weight: 600; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
                 ${icon('rotate')} Pull from Sheets
               </button>
-              <a href="/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; text-decoration: none; margin-left: auto;">
-                Disconnect
-              </a>
+              <button type="button" data-disconnect-google-sheets data-ngo="${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-left: auto; cursor: pointer;">
+                ${icon('trash')} Disconnect
+              </button>
             `}
           </div>
         </div>
