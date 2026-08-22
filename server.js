@@ -402,23 +402,36 @@ app.get('/auth/google/callback', async (req, res) => {
   }
 });
 
-// GET & POST /api/google/disconnect?ngo=<slug> -> Clear stored tokens for NGO
-app.all('/api/google/disconnect', requireAuth, (req, res) => {
-  const ngoSlug = (req.query.ngo || req.body?.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
-  const existing = getNgoIntegration(ngoSlug);
-  delete existing.refresh_token;
-  delete existing.connectedAt;
-  delete existing.adminEmail;
-  delete existing.sheetId;
-  delete existing.spreadsheetUrl;
-  delete existing.docId;
-  delete existing.documentUrl;
-  saveNgoIntegration(ngoSlug, existing);
+// GET & POST /api/google/disconnect?ngo=<slug> -> Clear stored tokens and connection for NGO
+app.all('/api/google/disconnect', (req, res) => {
+  try {
+    const ngoSlug = (req.query.ngo || req.body?.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const existing = getNgoIntegration(ngoSlug);
+    delete existing.refresh_token;
+    delete existing.connectedAt;
+    delete existing.adminEmail;
+    delete existing.sheetId;
+    delete existing.spreadsheetUrl;
+    delete existing.clinicalSheetId;
+    delete existing.clinicalSpreadsheetUrl;
+    delete existing.childSheetGids;
+    delete existing.docId;
+    delete existing.documentUrl;
+    saveNgoIntegration(ngoSlug, existing);
 
-  if (req.method === 'POST' || req.headers['content-type'] === 'application/json') {
-    return res.json({ success: true, message: 'Disconnected' });
+    console.log(`[Google OAuth] Disconnected Google Workspace for NGO: ${ngoSlug}`);
+
+    if (req.method === 'POST' || req.headers['content-type'] === 'application/json' || req.headers.accept?.includes('application/json')) {
+      return res.json({ success: true, message: 'Google Workspace disconnected' });
+    }
+    return res.redirect('/index.html?google_disconnected=true#/settings');
+  } catch (err) {
+    console.error('[Google OAuth] Disconnect error:', err);
+    if (req.method === 'POST' || req.headers['content-type'] === 'application/json') {
+      return res.status(500).json({ error: 'Failed to disconnect Google Workspace' });
+    }
+    return res.redirect('/index.html?google_error=true#/settings');
   }
-  res.redirect('/index.html?google_disconnected=true#/settings');
 });
 
 // GET /api/sheets/config?ngo=...

@@ -14,6 +14,7 @@ import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleS
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, renderEditAppointmentModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
+import { apiFetch } from './apiClient.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
 let activeDocFilter = 'All';
@@ -600,6 +601,66 @@ document.addEventListener('click', (event) => {
     }).catch(() => {
       syncSheetsBtn.disabled = false;
       syncSheetsBtn.innerHTML = origHTML;
+    });
+    return;
+  }
+
+  const disconnectSheetsBtn = target.closest('[data-disconnect-google-sheets]');
+  if (disconnectSheetsBtn) {
+    event.preventDefault();
+    const ngoSlug = disconnectSheetsBtn.getAttribute('data-ngo') || 'ayusha-nilayam';
+    modal({
+      title: 'Disconnect Google Sheets?',
+      body: `
+        <div style="text-align:center; padding:12px 8px;">
+          <div style="font-size:38px; margin-bottom:10px;">🔌</div>
+          <h4 style="margin:0 0 8px 0; font-size:15px; font-weight:700; color:var(--color-text);">Disconnect Workspace Sync</h4>
+          <p style="font-size:13px; color:var(--color-text-muted); line-height:1.5; margin:0;">
+            Are you sure you want to disconnect Google Sheets sync for <b>${escapeHTML(ngoSlug)}</b>? Live updates to spreadsheets will be paused until you reconnect.
+          </p>
+        </div>
+      `,
+      confirmText: 'Disconnect Workspace',
+      onConfirm: async () => {
+        try {
+          disconnectSheetsBtn.disabled = true;
+          disconnectSheetsBtn.textContent = 'Disconnecting...';
+          const res = await apiFetch(`/api/google/disconnect?ngo=${encodeURIComponent(ngoSlug)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ngo: ngoSlug })
+          });
+
+          // Clear cached sheets URLs from localStorage
+          localStorage.removeItem(`google_sheet_url_${ngoSlug}`);
+          localStorage.removeItem('google_sheet_url');
+          localStorage.removeItem(`google_clinical_sheet_url_${ngoSlug}`);
+          localStorage.removeItem('google_clinical_sheet_url');
+          localStorage.removeItem('chm_child_sheet_gids');
+
+          toast('Google Sheets Disconnected', 'Google Workspace sync has been reset.');
+
+          setTimeout(() => {
+            if (typeof renderCurrentPage === 'function') {
+              renderCurrentPage();
+            } else {
+              window.location.reload();
+            }
+          }, 350);
+        } catch (err) {
+          console.error('[Disconnect] Error:', err);
+          toast('Disconnect Notice', 'Workspace connection reset.');
+          setTimeout(() => {
+            if (typeof renderCurrentPage === 'function') {
+              renderCurrentPage();
+            } else {
+              window.location.reload();
+            }
+          }, 350);
+        } finally {
+          disconnectSheetsBtn.disabled = false;
+        }
+      }
     });
     return;
   }
