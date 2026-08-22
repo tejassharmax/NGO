@@ -131,6 +131,7 @@ function getAuthUrl(ngoSlug, req = null, state = null) {
     scope: [
       'openid',
       'email',
+      'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/drive.file'
     ],
     state: state || safeSlug
