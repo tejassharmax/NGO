@@ -34912,7 +34912,7 @@
     if (!child) return;
 
     const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoSlug = getNgoSlug(session);
     const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
     let children = getChildren() || [];
     if (child && !children.some(c => c.id === child.id)) {
@@ -35059,7 +35059,7 @@
    */
   async function fetchDocsConfig(ngoSlug) {
     const session = getSession() || {};
-    const slug = session.ngo || 'ayusha-nilayam';
+    const slug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
     try {
       const res = await apiFetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
       if (res.ok) {
@@ -35145,7 +35145,7 @@
    */
   async function autoSyncToGoogleDocs() {
     const session = getSession() || {};
-    const ngoSlug = session.ngo || 'ayusha-nilayam';
+    const ngoSlug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
     const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
     const reportContent = generateExecutiveDocContent();
 

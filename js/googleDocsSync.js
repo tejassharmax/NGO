@@ -18,7 +18,7 @@ let cachedDocsConfig = null;
  */
 export async function fetchDocsConfig(ngoSlug) {
   const session = getSession() || {};
-  const slug = ngoSlug || session.ngo || 'ayusha-nilayam';
+  const slug = String(ngoSlug || session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
   try {
     const res = await apiFetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
     if (res.ok) {
@@ -111,7 +111,7 @@ export function generateExecutiveDocContent() {
  */
 export async function autoSyncToGoogleDocs() {
   const session = getSession() || {};
-  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const ngoSlug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
   const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
   const reportContent = generateExecutiveDocContent();
 

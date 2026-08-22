@@ -581,7 +581,7 @@ export async function autoSyncChildToGoogleSheets(child) {
   if (!child) return;
 
   const session = getSession() || {};
-  const ngoSlug = session.ngo || 'ayusha-nilayam';
+  const ngoSlug = getNgoSlug(session);
   const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
   let children = getChildren() || [];
   if (child && !children.some(c => c.id === child.id)) {
