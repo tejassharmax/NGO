@@ -66,6 +66,44 @@ let renderCurrentPage = null;
     return 'dashboard';
   }
 
+  function handleOAuthUrlParams() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('google_connected')) {
+        toast('Google Sheets Connected!', 'Live sync active. Spreadsheets have been generated in your Google Drive.');
+        fetchSheetsConfig().then(() => {
+          if (renderCurrentPage) renderCurrentPage();
+        }).catch(() => {});
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      } else if (urlParams.has('google_error')) {
+        const errType = urlParams.get('google_error');
+        if (errType === 'unauthorized') {
+          modal({
+            title: 'Account Authorization Notice',
+            body: `
+              <div style="text-align:center; padding:12px 8px;">
+                <div style="font-size:40px; margin-bottom:10px;">⚠️</div>
+                <h4 style="margin:0 0 8px 0; font-size:16px; font-weight:700; color:var(--color-danger);">Google Account Not Authorized</h4>
+                <p style="font-size:13px; color:var(--color-text-muted); line-height:1.5; margin:0;">
+                  Please ensure you connect using an authorized NGO administrator Google account.
+                </p>
+              </div>
+            `,
+            confirmText: 'Understood'
+          });
+        } else {
+          toast('Google Workspace Notice', 'Connection flow was not completed. Please try connecting again.');
+        }
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      } else if (urlParams.has('google_disconnected')) {
+        toast('Google Workspace Disconnected', 'Google Sheets sync connection has been reset.');
+        window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      }
+    } catch (e) {}
+  }
+
+  handleOAuthUrlParams();
+
   renderCurrentPage = async function() {
     const loggedIn = isSessionActive();
 
