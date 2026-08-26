@@ -26,6 +26,45 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
+    // The child health database, namespaced one document tree per NGO:
+    //   ngos/{ngoSlug}/children/{childId}
+    //   ngos/{ngoSlug}/appointments/{apptId}   ... one subcollection per data type
+    //   ngos/{ngoSlug}/settings/org
+    //
+    // The browser does not talk to Firestore directly for this data — it goes
+    // through /api/sync, which uses the Admin SDK and bypasses these rules
+    // entirely. So the only thing these rules must do is stop a stolen client
+    // API key from reading another NGO's roster, and stop any client from
+    // writing (the server owns writes so the merge rules can't be bypassed).
+    //
+    // Tenant identity comes from the `ngo` custom claim, which only the Admin SDK
+    // can set. A client cannot forge it, unlike a request parameter.
+    match /ngos/{ngoSlug} {
+      allow read: if request.auth != null
+                  && request.auth.token.email_verified == true
+                  && request.auth.token.ngo == ngoSlug;
+      allow write: if false;
+
+      match /{collection}/{docId} {
+        allow read: if request.auth != null
+                    && request.auth.token.email_verified == true
+                    && request.auth.token.ngo == ngoSlug;
+        allow write: if false;
+      }
+    }
+
+    // Each NGO's Google Workspace connection: OAuth refresh token, the connecting
+    // admin's email, and the IDs of the spreadsheets/documents created in Drive.
+    //
+    // Denied to every client, including that NGO's own admins. A refresh token
+    // grants long-lived access to the connected Google account, so it must never
+    // be reachable from a browser — which is exactly why it is NOT stored under
+    // `ngos/{slug}`, where the rules above would have made it readable. Only the
+    // server touches this, via the Admin SDK, which bypasses these rules.
+    match /integrations/{ngoSlug} {
+      allow read, write: if false;
+    }
+
     // Everything else is denied by default. Add explicit rules above if the app
     // later needs another collection.
     match /{document=**} {

@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "build": "rollup -c",
-    "start": "node server.js"
+    "start": "node server.js",
+    "setup:firestore": "node scripts/setupFirestore.js",
+    "setup:firestore:dry": "node scripts/setupFirestore.js --dry-run"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -17,6 +19,7 @@
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "firebase": "^12.16.0",
+    "firebase-admin": "^14.3.0",
     "googleapis": "^173.0.0",
     "multer": "^2.2.0",
     "rollup": "^4.62.4",

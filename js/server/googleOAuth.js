@@ -1,25 +1,20 @@
 /**
  * googleOAuth.js
  * Backend OAuth2 client helper and per-NGO Google Sheets & Docs sync module.
- * Manages OAuth2 authorization code flow, refresh tokens in data/integrations/<ngo-slug>.json,
- * and automated creation & updates of Google Spreadsheets and Google Documents.
+ * Manages the OAuth2 authorization code flow, refresh tokens (persisted by
+ * integrationStore.js, which survives a Render deploy), and automated creation &
+ * updates of Google Spreadsheets and Google Documents.
  */
 
-const fs = require('fs');
-const path = require('path');
 const { google } = require('googleapis');
 
-// Directory for storing per-NGO integration files
-const INTEGRATIONS_DIR = path.join(__dirname, '../../data/integrations');
+// Tenant-scoped database access. Reads and writes go to `ngos/{slug}` in
+// Firestore, falling back to data/db.json when no service-account key is present.
+const { readTenantArrays, writeTenantChildren } = require('./dataSource');
 
-/**
- * Ensure integrations directory exists
- */
-function ensureIntegrationsDir() {
-  if (!fs.existsSync(INTEGRATIONS_DIR)) {
-    fs.mkdirSync(INTEGRATIONS_DIR, { recursive: true });
-  }
-}
+// Where the refresh token and the created sheet/doc IDs live. Firestore-backed so
+// the Google connection is not lost every time the host restarts.
+const { loadIntegration, saveIntegration } = require('./integrationStore');
 
 /**
  * Sanitize NGO slug for filename safety
@@ -29,30 +24,20 @@ function sanitizeNgoSlug(ngoSlug) {
 }
 
 /**
- * Get path to NGO integration JSON file
+ * Load stored integration data for an NGO.
+ *
+ * Async because the store is Firestore in a deployed environment. Every caller is
+ * already inside an async function.
+ *
+ * @param {string} ngoSlug
+ * @returns {Promise<object>}
  */
-function getIntegrationPath(ngoSlug) {
-  const safeSlug = sanitizeNgoSlug(ngoSlug);
-  return path.join(INTEGRATIONS_DIR, `${safeSlug}.json`);
-}
+async function getNgoIntegration(ngoSlug) {
+  const data = await loadIntegration(ngoSlug);
 
-/**
- * Load stored integration data for an NGO
- */
-function getNgoIntegration(ngoSlug) {
-  let data = {};
-  try {
-    ensureIntegrationsDir();
-    const filepath = getIntegrationPath(ngoSlug);
-    if (fs.existsSync(filepath)) {
-      const content = fs.readFileSync(filepath, 'utf8');
-      data = JSON.parse(content || '{}');
-    }
-  } catch (err) {
-    console.warn('[Google OAuth] Error reading integration file:', err.message);
-  }
-
-  // Fallback to environment variables if integration file is not present on disk
+  // Fallback to environment variables when nothing has been connected yet. Lets a
+  // deployment be seeded with a pre-existing refresh token instead of requiring
+  // someone to click through the consent screen.
   if (!data.refresh_token && process.env.GOOGLE_OAUTH_REFRESH_TOKEN) {
     data.refresh_token = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
     data.adminEmail = process.env.GOOGLE_OAUTH_ADMIN_EMAIL || 'Authorized Admin';
@@ -70,18 +55,13 @@ function getNgoIntegration(ngoSlug) {
 }
 
 /**
- * Save integration data for an NGO
+ * Save integration data for an NGO.
+ * @param {string} ngoSlug
+ * @param {object} data
+ * @returns {Promise<boolean>}
  */
-function saveNgoIntegration(ngoSlug, data) {
-  try {
-    ensureIntegrationsDir();
-    const filepath = getIntegrationPath(ngoSlug);
-    fs.writeFileSync(filepath, JSON.stringify(data, null, 2), 'utf8');
-    return true;
-  } catch (err) {
-    console.error('[Google OAuth] Error saving integration file:', err.message);
-    return false;
-  }
+async function saveNgoIntegration(ngoSlug, data) {
+  return saveIntegration(ngoSlug, data);
 }
 
 /**
@@ -141,10 +121,14 @@ function getAuthUrl(ngoSlug, req = null, state = null) {
 /**
  * Get authenticated OAuth2Client for an NGO using its stored refresh token.
  * Returns null if the NGO has not connected.
+ *
+ * Async since the refresh token now comes from Firestore rather than a local file.
+ * @param {string} ngoSlug
+ * @returns {Promise<import('google-auth-library').OAuth2Client|null>}
  */
-function getClientForNgo(ngoSlug) {
+async function getClientForNgo(ngoSlug) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
-  const integration = getNgoIntegration(safeSlug);
+  const integration = await getNgoIntegration(safeSlug);
 
   if (!integration || !integration.refresh_token) {
     return null;
@@ -208,7 +192,7 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
   // Real growth / checkup measurements ONLY if they exist
   (growthList || []).forEach(g => {
     if (g.date || g.weight || g.temperature || g.bp) {
-      const matchingDoc = (uploadedDocsList || []).find(d => 
+      const matchingDoc = (uploadedDocsList || []).find(d =>
         (d.childId === c.id || (d.childName && d.childName.toLowerCase() === (c.name || '').toLowerCase()) || (d.child && d.child.toLowerCase() === (c.name || '').toLowerCase())) &&
         ((d.date && g.date && d.date.slice(0, 10) === g.date.slice(0, 10)) || d.docType === 'Prescription')
       );
@@ -252,7 +236,7 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
   const bloodRows = [];
   (healthRecList || []).forEach(hr => {
     if (hr.date || hr.hemoglobin || hr.wbc || hr.platelets) {
-      const matchingDoc = (uploadedDocsList || []).find(d => 
+      const matchingDoc = (uploadedDocsList || []).find(d =>
         (d.childId === c.id || (d.childName && d.childName.toLowerCase() === (c.name || '').toLowerCase()) || (d.child && d.child.toLowerCase() === (c.name || '').toLowerCase())) &&
         ((d.date && hr.date && d.date.slice(0, 10) === hr.date.slice(0, 10)) || d.healthRecordId === hr.id || d.docType === 'Bi-Annual CBC' || d.docType === 'Medical Report')
       );
@@ -301,13 +285,13 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
  */
 async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
-  const client = getClientForNgo(safeSlug);
+  const client = await getClientForNgo(safeSlug);
 
   if (!client) {
     return { success: false, message: 'Not connected' };
   }
 
-  const integration = getNgoIntegration(safeSlug);
+  const integration = await getNgoIntegration(safeSlug);
   const sheets = google.sheets({ version: 'v4', auth: client });
   let sheetId = integration.sheetId;
   const displayName = ngoName || safeSlug.replace(/-/g, ' ');
@@ -325,7 +309,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     sheetId = createRes.data.spreadsheetId;
     integration.sheetId = sheetId;
     integration.spreadsheetUrl = createRes.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
-    saveNgoIntegration(safeSlug, integration);
+    await saveNgoIntegration(safeSlug, integration);
     console.log(`[Google OAuth] Created Master Spreadsheet: ${integration.spreadsheetUrl}`);
   }
 
@@ -353,25 +337,19 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     clinicalSheetId = createRes.data.spreadsheetId;
     integration.clinicalSheetId = clinicalSheetId;
     integration.clinicalSpreadsheetUrl = createRes.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${clinicalSheetId}/edit`;
-    saveNgoIntegration(safeSlug, integration);
+    await saveNgoIntegration(safeSlug, integration);
     console.log(`[Google OAuth] Created Student Medical Records Spreadsheet: ${integration.clinicalSpreadsheetUrl}`);
   }
 
-  // Load auxiliary data (growth, medicines, health records, uploaded documents) from server DB
-  let allGrowth = [];
-  let allMedicines = [];
-  let allHealthRecords = [];
-  let allUploadedDocs = [];
-  const DB_FILE = path.join(__dirname, '../../data/db.json');
-  if (fs.existsSync(DB_FILE)) {
-    try {
-      const dbData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
-      if (dbData['chm-growth']) allGrowth = JSON.parse(dbData['chm-growth']);
-      if (dbData['chm-medicines']) allMedicines = JSON.parse(dbData['chm-medicines']);
-      if (dbData['chm-health-records']) allHealthRecords = JSON.parse(dbData['chm-health-records']);
-      if (dbData['chm-documents']) allUploadedDocs = JSON.parse(dbData['chm-documents']);
-    } catch (e) { }
-  }
+  // Load auxiliary data (growth, medicines, health records, uploaded documents)
+  // from this NGO's database, not the old global blob.
+  const aux = await readTenantArrays(safeSlug, [
+    'chm-growth', 'chm-medicines', 'chm-health-records', 'chm-documents'
+  ]);
+  const allGrowth = aux['chm-growth'];
+  const allMedicines = aux['chm-medicines'];
+  const allHealthRecords = aux['chm-health-records'];
+  const allUploadedDocs = aux['chm-documents'];
 
   // Master Directory header and rows
   const overviewHeaders = [
@@ -420,7 +398,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     if (err1.code === 404 || err1.status === 404) {
       delete integration.sheetId;
       delete integration.spreadsheetUrl;
-      saveNgoIntegration(safeSlug, integration);
+      await saveNgoIntegration(safeSlug, integration);
       return syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
     }
   }
@@ -646,7 +624,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
         delete integration.clinicalSheetId;
         delete integration.clinicalSpreadsheetUrl;
         delete integration.childSheetGids;
-        saveNgoIntegration(safeSlug, integration);
+        await saveNgoIntegration(safeSlug, integration);
         return syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
       }
     }
@@ -654,7 +632,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
 
   // Save gid map and URLs to integration config
   integration.childSheetGids = childSheetGids;
-  saveNgoIntegration(safeSlug, integration);
+  await saveNgoIntegration(safeSlug, integration);
 
   return {
     success: true,
@@ -674,13 +652,13 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
  */
 async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
-  const client = getClientForNgo(safeSlug);
+  const client = await getClientForNgo(safeSlug);
 
   if (!client) {
     return { success: false, message: 'Google Sheets is not connected. Please connect Google Workspace in Settings.' };
   }
 
-  const integration = getNgoIntegration(safeSlug);
+  const integration = await getNgoIntegration(safeSlug);
   const sheetId = integration.sheetId;
 
   if (!sheetId) {
@@ -691,16 +669,9 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
   const IGNORED_NAMES = ['unnamed child', 'child', 'name', 'child name', 'student name', 'sample', 'template'];
 
-  // Load existing children from server DB
-  const DB_FILE = path.join(__dirname, '../../data/db.json');
-  let existingChildren = [];
-  let serverData = {};
-  if (fs.existsSync(DB_FILE)) {
-    try {
-      serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
-      if (serverData['chm-children']) existingChildren = JSON.parse(serverData['chm-children']);
-    } catch (e) { }
-  }
+  // Load this NGO's existing children from whichever backend is live
+  const pulled = await readTenantArrays(safeSlug, ['chm-children']);
+  let existingChildren = pulled['chm-children'];
 
   // Filter out any legacy placeholder entries
   existingChildren = existingChildren.filter(c => c && c.name && !IGNORED_NAMES.includes(c.name.trim().toLowerCase()));
@@ -866,8 +837,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
       }
     });
     cleanedChildren = Array.from(finalMap.values());
-    serverData['chm-children'] = JSON.stringify(cleanedChildren);
-    fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
+    await writeTenantChildren(safeSlug, cleanedChildren);
     console.log(`[Google OAuth] Pulled from Child Health Records master sheet: ${addedCount} added, ${updatedCount} updated, ${removedCount} removed.`);
   }
 
@@ -898,25 +868,14 @@ async function deleteChildFromGoogleSheets(childId, ngoSlug, ngoName) {
   if (!childId) return { success: false, message: 'Child ID is required' };
 
   const safeSlug = sanitizeNgoSlug(ngoSlug);
-  const DB_FILE = path.join(__dirname, '../../data/db.json');
-  let serverData = {};
-  let currentChildren = [];
-
-  if (fs.existsSync(DB_FILE)) {
-    try {
-      serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
-      if (serverData['chm-children']) {
-        currentChildren = JSON.parse(serverData['chm-children']);
-      }
-    } catch (e) { }
-  }
+  const loaded = await readTenantArrays(safeSlug, ['chm-children']);
+  const currentChildren = loaded['chm-children'];
 
   const targetChild = currentChildren.find(c => c.id === childId || c.name?.toLowerCase() === childId.toLowerCase());
   const remainingChildren = currentChildren.filter(c => c.id !== childId && c.name?.toLowerCase() !== childId.toLowerCase());
 
-  // Update server DB with remaining children
-  serverData['chm-children'] = JSON.stringify(remainingChildren);
-  fs.writeFileSync(DB_FILE, JSON.stringify(serverData, null, 2), 'utf8');
+  // Update this NGO's roster with the remaining children
+  await writeTenantChildren(safeSlug, remainingChildren);
 
   // Update local CSV backup
   try {
@@ -928,7 +887,7 @@ async function deleteChildFromGoogleSheets(childId, ngoSlug, ngoName) {
 
   // Sync remaining children to Google Sheets Master Directory (Sheet1)
   const client = await getClientForNgo(safeSlug);
-  const integration = getNgoIntegration(safeSlug);
+  const integration = await getNgoIntegration(safeSlug);
 
   if (client && integration && integration.sheetId) {
     try {
@@ -1025,13 +984,13 @@ async function deleteChildFromGoogleSheets(childId, ngoSlug, ngoName) {
  */
 async function syncExecutiveDocToGoogleDocs(reportContent, ngoSlug, ngoName) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
-  const client = getClientForNgo(safeSlug);
+  const client = await getClientForNgo(safeSlug);
 
   if (!client) {
     return { success: false, message: 'Not connected' };
   }
 
-  const integration = getNgoIntegration(safeSlug);
+  const integration = await getNgoIntegration(safeSlug);
   const docs = google.docs({ version: 'v1', auth: client });
   let docId = integration.docId;
   const displayName = ngoName || safeSlug.replace(/-/g, ' ');
@@ -1047,7 +1006,7 @@ async function syncExecutiveDocToGoogleDocs(reportContent, ngoSlug, ngoName) {
     docId = createRes.data.documentId;
     integration.docId = docId;
     integration.documentUrl = `https://docs.google.com/document/d/${docId}/edit`;
-    saveNgoIntegration(safeSlug, integration);
+    await saveNgoIntegration(safeSlug, integration);
     console.log(`[Google OAuth] Created Google Doc: ${integration.documentUrl}`);
   }
 
