@@ -34,8 +34,39 @@ const ALLOWED_EMAILS = new Set(
     .filter(Boolean)
 );
 
+/**
+ * True when this process is serving real traffic, in which case the local
+ * development bypass below must never engage. Render sets RENDER=true on every
+ * service automatically, so a deploy is covered even if NODE_ENV is unset.
+ */
+const IS_PRODUCTION =
+  process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
+
+/** Account the local bypass assumes. Only ever used off-production. */
+const LOCAL_DEV_EMAIL =
+  (process.env.LOCAL_DEV_EMAIL || 'tejassachin2010@gmail.com').trim().toLowerCase();
+
 // Cached certificates, refreshed according to the response's Cache-Control.
 let certCache = { keys: null, expiresAt: 0 };
+
+/**
+ * True only when the TCP peer is the loopback interface.
+ *
+ * WHY NOT req.hostname
+ * `req.hostname` is derived from the Host header, which the client sends and can
+ * set to anything. Behind a proxy that routes on TLS SNI — Render does — a
+ * request to the public URL carrying `Host: localhost` would have satisfied a
+ * hostname check and skipped authentication entirely, handing over the whole
+ * child medical database. The socket's peer address is set by the kernel from the
+ * TCP handshake and cannot be forged this way.
+ *
+ * @param {import('express').Request} req
+ * @returns {boolean}
+ */
+function isLoopbackPeer(req) {
+  const address = (req.socket && req.socket.remoteAddress) || '';
+  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+}
 
 /**
  * Fetch (and cache) Google's token-signing certificates.
@@ -131,15 +162,19 @@ async function verifyIdToken(token) {
  * Express middleware: require a valid ID token from an allowlisted account.
  * Responds 401 when the token is missing/invalid and 403 when the verified
  * account is not on the allowlist.
+ *
+ * Off-production, an unauthenticated request arriving over loopback is admitted
+ * as LOCAL_DEV_EMAIL so `npm start` needs no browser sign-in. On Render this
+ * branch is unreachable: IS_PRODUCTION is true and the peer is the platform
+ * proxy, never loopback.
  */
 async function requireAuth(req, res, next) {
-  const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
   const header = req.headers.authorization || '';
   const match = header.match(/^Bearer\s+(.+)$/i);
 
   if (!match) {
-    if (isLocal) {
-      req.user = { email: 'tejassachin2010@gmail.com', emailVerified: true };
+    if (!IS_PRODUCTION && isLoopbackPeer(req)) {
+      req.user = { email: LOCAL_DEV_EMAIL, emailVerified: true };
       return next();
     }
     return res.status(401).json({ error: 'Authentication required' });
@@ -166,4 +201,4 @@ async function requireAuth(req, res, next) {
   next();
 }
 
-module.exports = { requireAuth, verifyIdToken, ALLOWED_EMAILS };
+module.exports = { requireAuth, verifyIdToken, ALLOWED_EMAILS, IS_PRODUCTION };

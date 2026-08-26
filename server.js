@@ -8,7 +8,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const express = require('express');
 const multer = require('multer');
-const vision = require('@google-cloud/vision');
+// @google-cloud/vision is required lazily, only when ENABLE_VISION_OCR is set.
 const { google } = require('googleapis');
 require('dotenv').config();
 
@@ -36,19 +36,72 @@ const { createRateLimiter } = require('./js/server/rateLimiter');
 const apiLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Too many API calls. Please wait a minute.' });
 const ocrLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: 'Too many document uploads. Please wait a minute.' });
 
-// Initialize the Google Cloud Vision client
+/**
+ * Google Cloud Vision client — DISABLED.
+ *
+ * OCR runs entirely on the bundled Tesseract engine: js/server/ocrParser.js falls
+ * back to it whenever this is null, so document upload and field parsing keep
+ * working with no Google Cloud credential at all.
+ *
+ * WHY IT IS OFF
+ * Vision needs a service-account key, which is gitignored and so cannot exist on
+ * Render. Worse, the previous code constructed a client from the key *path*
+ * without checking the file was there, which made every OCR request fail inside
+ * the Vision library instead of reaching the Tesseract fallback. Off is the honest
+ * default, and it drops a paid API plus a second Google Cloud project from the
+ * deployment.
+ *
+ * TO RE-ENABLE
+ * Set ENABLE_VISION_OCR=true and exactly one credential:
+ *   GOOGLE_VISION_CREDENTIALS      full service-account JSON — for Render and any
+ *                                  other host with an ephemeral filesystem
+ *   GOOGLE_APPLICATION_CREDENTIALS path to a key file — for local development
+ */
+const VISION_ENABLED = String(process.env.ENABLE_VISION_OCR || '').toLowerCase() === 'true';
+
 let visionClient = null;
-try {
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    visionClient = new vision.ImageAnnotatorClient({
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
-    });
+if (VISION_ENABLED) {
+  try {
+    // Required lazily so the disabled path never loads the Vision SDK, which
+    // measurably shortens cold start on a free Render instance.
+    const vision = require('@google-cloud/vision');
+    const nodeFs = require('fs');
+    const inlineKey = (process.env.GOOGLE_VISION_CREDENTIALS || '').trim();
+    const keyFile = (process.env.GOOGLE_APPLICATION_CREDENTIALS || '').trim();
+
+    if (inlineKey) {
+      const parsed = JSON.parse(inlineKey);
+      visionClient = new vision.ImageAnnotatorClient({
+        credentials: { client_email: parsed.client_email, private_key: parsed.private_key },
+        projectId: parsed.project_id
+      });
+      console.log(`[Vision] Enabled with inline credentials for project "${parsed.project_id}"`);
+    } else if (keyFile && nodeFs.existsSync(keyFile)) {
+      visionClient = new vision.ImageAnnotatorClient({ keyFilename: keyFile });
+      console.log(`[Vision] Enabled with key file ${keyFile}`);
+    } else {
+      console.warn(
+        '[Vision] ENABLE_VISION_OCR=true but no usable credential was found. ' +
+        'Set GOOGLE_VISION_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS. Using Tesseract.'
+      );
+    }
+  } catch (e) {
+    console.warn('[Vision] Initialization failed, OCR will use Tesseract:', e.message);
+    visionClient = null;
   }
-} catch (e) {
-  console.warn('[Vision] Vision API initialization notice:', e.message);
+} else {
+  console.log('[Vision] Disabled. OCR uses the bundled Tesseract engine.');
 }
 
 const app = express();
+
+// Render terminates TLS at its edge proxy and forwards over plain HTTP, so without
+// this `req.protocol` reports "http" and `req.secure` is false for every request.
+// One hop only: trusting the whole chain would let a client forge X-Forwarded-For.
+// Note this deliberately does NOT affect authentication — js/server/auth.js keys
+// its local-development bypass on the TCP peer address, never on a proxy header.
+app.set('trust proxy', 1);
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } }); // Max 15MB
@@ -130,34 +183,76 @@ app.post('/api/ocr', requireAuth, ocrLimiter, upload.single('document'), async (
 
 /* ───────────────────────────────────────────────────────
    DATABASE SYNC API
+
+   Firestore is the primary store, namespaced per NGO at
+   `ngos/{ngoSlug}/...`. The tenant is resolved server-side from the verified
+   token email, never from anything the client sends.
+
+   data/db.json remains as a fallback for when no Admin service-account key for
+   the Firebase project is installed. That file is a single global blob shared by
+   every admin and lives on an ephemeral disk, so it is a development
+   convenience, not a deployment target.
    ─────────────────────────────────────────────────────── */
 const fs = require('fs');
 const path = require('path');
 
-const DB_DIR = path.join(__dirname, 'data');
-const DB_FILE = path.join(DB_DIR, 'db.json');
+const { isFirestoreEnabled, getStatus: firestoreStatus } = require('./js/server/firebaseAdmin');
+const { mergeNamespace } = require('./js/server/syncMerge');
+const { resolveNgoForEmail, writeSnapshot } = require('./js/server/ngoStore');
+const {
+  DB_FILE,
+  readFileStore,
+  writeFileStore,
+  readTenant
+} = require('./js/server/dataSource');
+
+const DB_DIR = path.dirname(DB_FILE);
 
 // Ensure db directory exists
 if (!fs.existsSync(DB_DIR)) {
   fs.mkdirSync(DB_DIR, { recursive: true });
 }
 
-// GET /api/sync - Returns the entire database
-app.get('/api/sync', requireAuth, (req, res) => {
+/**
+ * The NGO whose data this request may touch. Resolved from the verified email so
+ * a client cannot read another tenant's records by passing a different slug.
+ * @param {import('express').Request} req
+ * @returns {Promise<{slug: string, name: string}>}
+ */
+async function tenantFor(req) {
+  return resolveNgoForEmail(req.user && req.user.email);
+}
+
+// GET /api/sync - Returns this NGO's entire database
+app.get('/api/sync', requireAuth, async (req, res) => {
   try {
-    if (fs.existsSync(DB_FILE)) {
-      const data = fs.readFileSync(DB_FILE, 'utf8');
-      return res.json(JSON.parse(data || '{}'));
+    if (!isFirestoreEnabled()) {
+      return res.json(readFileStore());
     }
-    return res.json({});
+    const tenant = await tenantFor(req);
+    const { payload } = await readTenant(tenant.slug);
+    return res.json(payload);
   } catch (err) {
-    console.error('Failed to read db file:', err);
+    console.error('[sync] Read failed:', err);
     return res.status(500).json({ error: 'Failed to read database' });
   }
 });
 
-// NOTE: mergeJSONArrays is defined once, further down, next to POST /api/sync.
-// A second, earlier definition used to shadow it silently.
+// GET /api/health - Which database backend is live, and for whom
+app.get('/api/health', requireAuth, async (req, res) => {
+  const firestore = isFirestoreEnabled();
+  let tenant = null;
+  try {
+    tenant = await tenantFor(req);
+  } catch (e) { }
+  res.json({
+    backend: firestore ? 'firestore' : 'file',
+    detail: firestoreStatus(),
+    ngoSlug: tenant ? tenant.slug : null,
+    ngoName: tenant ? tenant.name : null,
+    email: req.user ? req.user.email : null
+  });
+});
 
 /* ═══════════════════════════════════════════════════════
    AUTOMATIC GOOGLE SHEETS SYNC SERVICE
@@ -170,7 +265,7 @@ function getSheetsConfig() {
     if (fs.existsSync(SHEETS_CONFIG_FILE)) {
       return JSON.parse(fs.readFileSync(SHEETS_CONFIG_FILE, 'utf8'));
     }
-  } catch (e) {}
+  } catch (e) { }
   return {
     sheetId: process.env.GOOGLE_SHEET_ID || '',
     autoSync: true,
@@ -228,10 +323,10 @@ function formatChildrenForSheet(children) {
 function updateLocalCSVExport(children) {
   try {
     const tableData = formatChildrenForSheet(children);
-    const csvContent = tableData.map(row => 
+    const csvContent = tableData.map(row =>
       row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
     ).join('\n');
-    
+
     const csvPath = path.join(DB_DIR, 'google_sheets_live_sync.csv');
     fs.writeFileSync(csvPath, csvContent, 'utf8');
     console.log(`✓ Synchronized local Google Sheets CSV backup (${children.length} records)`);
@@ -242,7 +337,7 @@ function updateLocalCSVExport(children) {
 
 async function syncChildrenToGoogleSheets(children) {
   if (!Array.isArray(children)) return { success: false, message: 'Invalid children data' };
-  
+
   // Always keep local CSV live export updated immediately
   updateLocalCSVExport(children);
 
@@ -345,7 +440,8 @@ app.get('/api/google/connect', (req, res) => {
 app.get('/auth/google/callback', async (req, res) => {
   try {
     const code = req.query.code;
-    const ngoSlug = (req.query.state || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    // Reassigned below once the connecting admin's real NGO is known.
+    let ngoSlug = (req.query.state || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
     if (!code) {
       return res.status(400).send('Authorization code missing from callback');
     }
@@ -358,45 +454,53 @@ app.get('/auth/google/callback', async (req, res) => {
       try {
         const payload = JSON.parse(Buffer.from(tokens.id_token.split('.')[1], 'base64').toString());
         if (payload && payload.email) adminEmail = payload.email;
-      } catch (e) {}
+      } catch (e) { }
     }
 
     // Only an authorized admin may bind a Google account to this NGO.
+    //
+    // The allowlist is the only test. Earlier versions also accepted any address
+    // merely *containing* "tejas", "sachin" or "ayusha", and accepted everyone
+    // when the allowlist was empty. On localhost that was harmless; on a public
+    // URL it let a stranger with a lookalike Gmail address bind their own Google
+    // account to this NGO, which would then receive every synced medical record.
     const connectingEmail = String(adminEmail || '').trim().toLowerCase();
-    const isAuthorized = ALLOWED_EMAILS.has(connectingEmail) ||
-      connectingEmail.includes('ayusha') ||
-      connectingEmail.includes('sachin') ||
-      connectingEmail.includes('tejas') ||
-      ALLOWED_EMAILS.size === 0;
+    const isAuthorized = ALLOWED_EMAILS.has(connectingEmail);
 
     if (!isAuthorized) {
       console.warn(`[oauth] Refused workspace connect from non-allowlisted account: ${connectingEmail}`);
       return res.redirect('/index.html?google_error=unauthorized#/settings');
     }
 
+    // The NGO comes from the connecting admin's own allowlist record, not from the
+    // `state` slug the browser sent, so a crafted connect link cannot file a
+    // refresh token under someone else's tenant.
+    const tenant = await resolveNgoForEmail(connectingEmail);
+    if (tenant.slug !== ngoSlug) {
+      console.warn(
+        `[oauth] state slug "${ngoSlug}" does not match ${connectingEmail}'s NGO ` +
+        `"${tenant.slug}"; using the account's own NGO.`
+      );
+    }
+    ngoSlug = tenant.slug;
+
     console.log(`[OAuth Callback] Successfully authenticated connecting admin: ${connectingEmail} for NGO: ${ngoSlug}`);
 
-    const existing = getNgoIntegration(ngoSlug);
+    const existing = await getNgoIntegration(ngoSlug);
     const updated = {
       ...existing,
       refresh_token: tokens.refresh_token || existing.refresh_token,
       connectedAt: new Date().toISOString(),
       adminEmail: adminEmail !== 'Admin' ? adminEmail : (existing.adminEmail || 'Connected Admin')
     };
-    saveNgoIntegration(ngoSlug, updated);
+    await saveNgoIntegration(ngoSlug, updated);
 
     // Immediately create Google Spreadsheet in user's Drive and populate records
-    let children = [];
-    if (fs.existsSync(DB_FILE)) {
-      try {
-        const serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
-        if (serverData['chm-children']) children = JSON.parse(serverData['chm-children']);
-      } catch (e) {}
-    }
+    const children = await readChildrenFor(tenant);
 
     try {
       console.log(`[OAuth Callback] Auto-creating Google Spreadsheet in Drive for ${connectingEmail}...`);
-      await oauthSyncSheets(children, ngoSlug, 'Ayusha Nilayam');
+      await oauthSyncSheets(children, ngoSlug, tenant.name);
     } catch (e) {
       console.warn('[OAuth Callback] Google Spreadsheet auto-creation warning:', e.message);
     }
@@ -408,11 +512,14 @@ app.get('/auth/google/callback', async (req, res) => {
   }
 });
 
-// GET & POST /api/google/disconnect?ngo=<slug> -> Clear stored tokens and connection for NGO
-app.all('/api/google/disconnect', (req, res) => {
+// GET & POST /api/google/disconnect -> Clear stored tokens and connection for NGO
+// Requires auth: this endpoint used to be open to the internet, so anyone could
+// disconnect an NGO's Google Workspace. The NGO is resolved from the verified
+// token, not from the query string, so one tenant cannot disconnect another.
+app.all('/api/google/disconnect', requireAuth, async (req, res) => {
   try {
-    const ngoSlug = (req.query.ngo || req.body?.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
-    const existing = getNgoIntegration(ngoSlug);
+    const { slug: ngoSlug } = await tenantFor(req);
+    const existing = await getNgoIntegration(ngoSlug);
     delete existing.refresh_token;
     delete existing.connectedAt;
     delete existing.adminEmail;
@@ -423,7 +530,7 @@ app.all('/api/google/disconnect', (req, res) => {
     delete existing.childSheetGids;
     delete existing.docId;
     delete existing.documentUrl;
-    saveNgoIntegration(ngoSlug, existing);
+    await saveNgoIntegration(ngoSlug, existing);
 
     console.log(`[Google OAuth] Disconnected Google Workspace for NGO: ${ngoSlug}`);
 
@@ -440,23 +547,37 @@ app.all('/api/google/disconnect', (req, res) => {
   }
 });
 
-// GET /api/sheets/config?ngo=...
-app.get('/api/sheets/config', async (req, res) => {
-  const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
-  let integration = getNgoIntegration(ngoSlug);
+/**
+ * This NGO's children, from whichever backend is live. Used by the Google Sheets
+ * routes that need to populate a freshly created spreadsheet.
+ * @param {{slug: string}} tenant
+ * @returns {Promise<object[]>}
+ */
+async function readChildrenFor(tenant) {
+  try {
+    const { payload } = await readTenant(tenant.slug);
+    const raw = payload['chm-children'];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    console.warn('[sheets] Could not load children for sheet population:', e.message);
+    return [];
+  }
+}
+
+// GET /api/sheets/config -> connection state for the caller's own NGO
+app.get('/api/sheets/config', requireAuth, async (req, res) => {
+  const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
+  let integration = await getNgoIntegration(ngoSlug);
   const connected = !!(integration && integration.refresh_token);
 
   // Auto-create/sync Student Medical Records sheet if connected but not yet generated
   if (connected && (!integration.clinicalSheetId || !integration.sheetId)) {
     try {
-      const DB_FILE = path.join(__dirname, 'data/db.json');
-      let children = [];
-      if (fs.existsSync(DB_FILE)) {
-        const serverData = JSON.parse(fs.readFileSync(DB_FILE, 'utf8') || '{}');
-        if (serverData['chm-children']) children = JSON.parse(serverData['chm-children']);
-      }
-      await oauthSyncSheets(children, ngoSlug, 'Ayusha Nilayam');
-      integration = getNgoIntegration(ngoSlug); // Refresh snapshot after auto-sync
+      const children = await readChildrenFor({ slug: ngoSlug });
+      await oauthSyncSheets(children, ngoSlug, ngoName);
+      integration = await getNgoIntegration(ngoSlug); // Refresh snapshot after auto-sync
     } catch (e) {
       console.warn('[Sheets Config] Auto-sync notice:', e.message);
     }
@@ -474,10 +595,10 @@ app.get('/api/sheets/config', async (req, res) => {
 });
 
 // POST /api/sheets/sync
-app.post('/api/sheets/sync', async (req, res) => {
+app.post('/api/sheets/sync', requireAuth, async (req, res) => {
   try {
-    const { children, ngo, ngoName } = req.body || {};
-    const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const { children } = req.body || {};
+    const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
     const result = await oauthSyncSheets(children || [], ngoSlug, ngoName);
     res.json(result);
   } catch (err) {
@@ -487,10 +608,9 @@ app.post('/api/sheets/sync', async (req, res) => {
 });
 
 // POST /api/sheets/pull
-app.post('/api/sheets/pull', async (req, res) => {
+app.post('/api/sheets/pull', requireAuth, async (req, res) => {
   try {
-    const { ngo, ngoName } = req.body || {};
-    const ngoSlug = (ngo || req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
     const result = await oauthPullSheets(ngoSlug, ngoName);
     res.json(result);
   } catch (err) {
@@ -499,10 +619,10 @@ app.post('/api/sheets/pull', async (req, res) => {
   }
 });
 
-// GET /api/docs/config?ngo=...
-app.get('/api/docs/config', (req, res) => {
-  const ngoSlug = (req.query.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
-  const integration = getNgoIntegration(ngoSlug);
+// GET /api/docs/config -> Google Docs connection state for the caller's own NGO
+app.get('/api/docs/config', requireAuth, async (req, res) => {
+  const { slug: ngoSlug } = await tenantFor(req);
+  const integration = await getNgoIntegration(ngoSlug);
   const connected = !!(integration && integration.refresh_token);
   res.json({
     connected,
@@ -515,8 +635,8 @@ app.get('/api/docs/config', (req, res) => {
 // POST /api/docs/sync
 app.post('/api/docs/sync', requireAuth, async (req, res) => {
   try {
-    const { reportContent, ngo, ngoName } = req.body || {};
-    const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const { reportContent } = req.body || {};
+    const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
     const result = await syncExecutiveDocToGoogleDocs(reportContent, ngoSlug, ngoName);
     res.json(result);
   } catch (err) {
@@ -525,47 +645,14 @@ app.post('/api/docs/sync', requireAuth, async (req, res) => {
   }
 });
 
-function mergeJSONArrays(clientJSON, serverJSON) {
-  let clientArr = [];
-  let serverArr = [];
-  try { clientArr = JSON.parse(clientJSON || '[]'); } catch (e) {}
-  try { serverArr = JSON.parse(serverJSON || '[]'); } catch (e) {}
-  if (!Array.isArray(clientArr)) clientArr = [];
-  if (!Array.isArray(serverArr)) serverArr = [];
-
-  const map = new Map();
-  const DISALLOWED_MOCK_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Unnamed Child', 'Tejas Sharma'];
-
-  serverArr.concat(clientArr).forEach(item => {
-    if (item && typeof item === 'object') {
-      // Exclude legacy mock records and admin self-registration tests
-      if (item.name && DISALLOWED_MOCK_NAMES.includes(item.name.trim())) return;
-      if (item.childName && DISALLOWED_MOCK_NAMES.includes(item.childName.trim())) return;
-      let key = item.id;
-      if (item.childId && item.date && item.time && item.type) {
-        key = `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
-      } else if (!key) {
-        key = JSON.stringify(item);
-      }
-      map.set(key, item);
-    }
-  });
-
-  let result = Array.from(map.values());
-  if (result.length > 100 && result[0] && typeof result[0] === 'object' && result[0].timestamp && result[0].type) {
-    result.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    result = result.slice(0, 100);
-  }
-
-  return JSON.stringify(result);
-}
+// mergeJSONArrays and the per-key merge rules now live in js/server/syncMerge.js
+// so the Firestore store and the legacy file store cannot drift apart.
 
 // DELETE /api/children/:id - Delete a specific child from the DB and Google Sheets
 app.delete('/api/children/:id', requireAuth, async (req, res) => {
   try {
     const childId = req.params.id;
-    const { ngo, ngoName } = req.body || {};
-    const ngoSlug = (ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
     const result = await oauthDeleteChild(childId, ngoSlug, ngoName);
     res.json(result);
   } catch (err) {
@@ -575,48 +662,19 @@ app.delete('/api/children/:id', requireAuth, async (req, res) => {
 });
 
 
-// POST /api/sync - Merges and saves the database
-app.post('/api/sync', requireAuth, apiLimiter, (req, res) => {
+// POST /api/sync - Merges and saves this NGO's database
+app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
   try {
-    let serverData = {};
-    let currentDBString = '';
-    if (fs.existsSync(DB_FILE)) {
-      currentDBString = fs.readFileSync(DB_FILE, 'utf8') || '{}';
-      try { serverData = JSON.parse(currentDBString); } catch (e) {}
-    }
-
     const clientData = req.body || {};
-    const mergedData = {};
-    const keys = [
-      'chm-children', 'chm-activity', 'chm-pending-docs', 'chm-documents', 'chm-growth',
-      'chm-nutrition', 'chm-medicines', 'chm-appointments', 'chm-emergency',
-      'chm-expenses', 'chm-alerts', 'chm-health-records',
-      'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
-    ];
+    const tenant = await tenantFor(req);
+    const { payload: serverData, index, firestore } = await readTenant(tenant.slug);
 
-    keys.forEach(k => {
-      if (k === 'chm-children') {
-        let clientArr = [];
-        try { clientArr = JSON.parse(clientData[k] || '[]'); } catch (e) {}
-        if (Array.isArray(clientArr) && clientArr.length > 0) {
-          mergedData[k] = JSON.stringify(clientArr);
-        } else if (serverData[k]) {
-          mergedData[k] = serverData[k];
-        } else {
-          mergedData[k] = '[]';
-        }
-      } else if (k.startsWith('chm-')) {
-        mergedData[k] = mergeJSONArrays(clientData[k], serverData[k]);
-      } else if (clientData[k] !== undefined && clientData[k] !== null) {
-        mergedData[k] = clientData[k];
-      } else {
-        mergedData[k] = serverData[k] || null;
-      }
-    });
+    const mergedData = mergeNamespace(clientData, serverData);
 
-    const newDBString = JSON.stringify(mergedData, null, 2);
-    if (newDBString !== currentDBString) {
-      fs.writeFileSync(DB_FILE, newDBString, 'utf8');
+    if (firestore) {
+      await writeSnapshot(tenant.slug, mergedData, index);
+    } else {
+      writeFileStore(mergedData);
     }
 
     // Immediately sync local CSV backup and trigger Google Sheets sync
@@ -625,18 +683,17 @@ app.post('/api/sync', requireAuth, apiLimiter, (req, res) => {
         const children = JSON.parse(mergedData['chm-children']);
         if (Array.isArray(children)) {
           updateLocalCSVExport(children);
-          const ngoSlug = req.body?.ngo || 'ayusha-nilayam';
-          const ngoName = req.body?.ngoName || 'Ayusha Nilayam';
-          oauthSyncSheets(children, ngoSlug, ngoName).catch(err => {
+          // The tenant comes from the verified token, not the request body.
+          oauthSyncSheets(children, tenant.slug, tenant.name).catch(err => {
             console.warn('[Sync] Background Google Sheets auto-sync notice:', err.message);
           });
         }
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return res.json(mergedData);
   } catch (err) {
-    console.error('[Sync] Error merging database file:', err);
+    console.error('[Sync] Error merging database:', err);
     return res.status(500).json({ error: 'Failed to sync database' });
   }
 });
@@ -652,4 +709,10 @@ app.listen(PORT, () => {
   console.log(`[Server] NGO Platform running on http://localhost:${PORT}`);
   console.log(`[Server] Image preprocessing: sharp enabled`);
   console.log(`[Server] Security & rate limiting middleware active`);
+  // Touch the Admin SDK now so the active database is visible in the boot log
+  // instead of only appearing on the first sync request.
+  console.log(
+    `[Server] Database: ${isFirestoreEnabled() ? 'Firestore (per NGO)' : 'data/db.json (fallback)'}` +
+    ` — ${firestoreStatus()}`
+  );
 });

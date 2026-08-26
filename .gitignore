@@ -46,3 +46,6 @@ remove appointments, emergency, exp.txt
 !assets/**/*.png
 !google-logo.png
 
+
+# Stray boot log from local debugging runs.
+_startup_log.txt
