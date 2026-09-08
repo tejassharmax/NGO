@@ -755,9 +755,9 @@ app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
 
     const mergedData = mergeNamespace(clientData, serverData);
 
-    if (firestore) {
+    if (isFirestoreEnabled()) {
       try {
-        await writeSnapshot(tenant.slug, mergedData, index);
+        await writeSnapshot(tenant.slug, mergedData, index || new Map());
       } catch (fsErr) {
         console.warn(`[Sync] Firestore write failed (${fsErr.message}). Persisting to file store fallback.`);
         writeFileStore(mergedData);

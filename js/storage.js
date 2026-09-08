@@ -679,13 +679,14 @@ let isSyncing = false;
  */
 export async function hydrateFromServer() {
   try {
+    isSyncing = true;
     const res = await apiFetch('/api/sync');
     if (res.ok) {
       const serverData = await res.json();
       if (serverData && typeof serverData === 'object') {
         Object.keys(serverData).forEach(k => {
           if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
-            localStorage.setItem(k, serverData[k]);
+            originalSetItem(k, serverData[k]);
           }
         });
         return true;
@@ -693,6 +694,8 @@ export async function hydrateFromServer() {
     }
   } catch (e) {
     console.warn('[Storage] Hydration notice:', e);
+  } finally {
+    isSyncing = false;
   }
   return false;
 }
@@ -723,10 +726,10 @@ export async function syncWithServer() {
 
     if (res.ok) {
       const serverData = await res.json();
-      // Apply merged state from server
+      // Apply merged state from server without triggering interceptor loops
       Object.keys(serverData).forEach(k => {
         if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
-          localStorage.setItem(k, serverData[k]);
+          originalSetItem(k, serverData[k]);
         }
       });
     }

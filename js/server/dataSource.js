@@ -16,8 +16,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const { isFirestoreEnabled } = require('./firebaseAdmin');
-const { readSnapshot, writeSnapshot, sanitizeNgoSlug } = require('./ngoStore');
+const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
+const { readSnapshot, writeSnapshot, updateSnapshotMemoryCache, sanitizeNgoSlug } = require('./ngoStore');
 const { SYNC_KEYS } = require('./syncMerge');
 
 const DB_FILE = path.join(__dirname, '../../data/db.json');
@@ -58,12 +58,16 @@ async function readTenant(ngoSlug) {
   if (!isFirestoreEnabled()) {
     return { payload: readFileStore(), index: null, firestore: false };
   }
+  const slug = sanitizeNgoSlug(ngoSlug);
   try {
-    const { payload, index } = await readSnapshot(sanitizeNgoSlug(ngoSlug));
+    const { payload, index } = await readSnapshot(slug);
     return { payload, index, firestore: true };
   } catch (err) {
-    console.warn(`[data] Firestore read failed for "${ngoSlug}" (${err.message}). Falling back to local file store.`);
-    return { payload: readFileStore(), index: null, firestore: false };
+    console.warn(`[data] Firestore read failed for "${slug}" (${err.message}). Using emergency local fallback.`);
+    const fallback = readFileStore();
+    // Pre-seed snapshot cache so subsequent calls stay fast and do not spam failed reads
+    updateSnapshotMemoryCache(slug, fallback);
+    return { payload: fallback, index: null, firestore: false };
   }
 }
 
@@ -105,30 +109,51 @@ async function readTenantArrays(ngoSlug, keys) {
  * the delete-child endpoint. Deliberately narrow: it writes only `chm-children`
  * so it can never clobber records it never read.
  *
+ * Writes directly to Firestore using batch operations without requiring prior reads.
+ *
  * @param {string} ngoSlug
  * @param {object[]} children
  * @returns {Promise<void>}
  */
 async function writeTenantChildren(ngoSlug, children) {
-  const json = JSON.stringify(Array.isArray(children) ? children : []);
+  const safeChildren = Array.isArray(children) ? children : [];
+  const json = JSON.stringify(safeChildren);
+  const slug = sanitizeNgoSlug(ngoSlug);
 
-  // Always persist to local file store so data is safe if Firestore quota is exceeded
+  // 1. Primary: Write directly to Firebase Cloud Firestore
+  if (isFirestoreEnabled()) {
+    try {
+      const db = getDb();
+      if (db) {
+        const root = db.collection('ngos').doc(slug);
+        const batch = db.batch();
+
+        safeChildren.forEach((c, idx) => {
+          if (c && c.id) {
+            const safeDocId = String(c.id).replace(/\//g, '_').trim();
+            const docRef = root.collection('children').doc(safeDocId);
+            batch.set(docRef, { ...c, _seq: idx }, { merge: true });
+          }
+        });
+
+        await batch.commit();
+        console.log(`[dataSource] Persisted ${safeChildren.length} children directly to Firestore (ngos/${slug}/children).`);
+
+        // Synchronize in-memory snapshot cache immediately
+        updateSnapshotMemoryCache(slug, { 'chm-children': json });
+      }
+    } catch (fsErr) {
+      console.warn(`[dataSource] Direct Firestore write warning (${fsErr.message}). Persisting to emergency local store.`);
+    }
+  }
+
+  // 2. Secondary: Emergency local file store backup
   try {
     const store = readFileStore();
     store['chm-children'] = json;
     writeFileStore(store);
   } catch (fileErr) {
     console.warn('[dataSource] Could not write to local store:', fileErr.message);
-  }
-
-  if (isFirestoreEnabled()) {
-    try {
-      const slug = sanitizeNgoSlug(ngoSlug);
-      const { index } = await readSnapshot(slug);
-      await writeSnapshot(slug, { 'chm-children': json }, index);
-    } catch (fsErr) {
-      console.warn(`[dataSource] Firestore write failed (${fsErr.message}). Persisted to local file store.`);
-    }
   }
 }
 
