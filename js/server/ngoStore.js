@@ -273,6 +273,31 @@ function fitToDocumentLimit(item, collectionName) {
 }
 
 /* ───────────────────────────────────────────────────────
+   SNAPSHOT CACHE (Protects 50k Firestore Daily Read Quota)
+   ─────────────────────────────────────────────────────── */
+
+// In-memory cache for Firestore snapshots to protect Spark tier quota (50k daily limit).
+// Caches reads for 60s while invalidating immediately whenever a write or delete occurs.
+const snapshotMemoryCache = new Map(); // slug -> { payload, index, timestamp }
+const SNAPSHOT_CACHE_TTL_MS = 60 * 1000;
+
+/**
+ * Update the in-memory snapshot cache for an NGO immediately.
+ * Called on any write/sync to keep the cache 100% fresh without burning Firestore reads.
+ */
+function updateSnapshotMemoryCache(ngoSlug, patchPayload = {}, patchIndex = null) {
+  const slug = sanitizeNgoSlug(ngoSlug);
+  const existing = snapshotMemoryCache.get(slug) || { payload: {}, index: new Map(), timestamp: 0 };
+  const updatedPayload = { ...existing.payload, ...patchPayload };
+  const updatedIndex = patchIndex instanceof Map ? patchIndex : existing.index;
+  snapshotMemoryCache.set(slug, {
+    payload: updatedPayload,
+    index: updatedIndex,
+    timestamp: Date.now()
+  });
+}
+
+/* ───────────────────────────────────────────────────────
    READ
    ─────────────────────────────────────────────────────── */
 
@@ -280,54 +305,76 @@ function fitToDocumentLimit(item, collectionName) {
  * Read one NGO's entire database.
  *
  * @param {string} ngoSlug
+ * @param {boolean} [forceRefresh=false]
  * @returns {Promise<{payload: Record<string,string>, index: Map<string, Map<string,{json: string, seq: number}>>}>}
  *   `payload` matches the /api/sync response contract. `index` maps each key to
  *   its stored documents (docId -> canonical JSON plus sequence), for diffing
  *   on write.
  */
-async function readSnapshot(ngoSlug) {
+async function readSnapshot(ngoSlug, forceRefresh = false) {
   const db = getDb();
   if (!db) throw new Error('Firestore is not available');
 
-  const root = db.collection('ngos').doc(sanitizeNgoSlug(ngoSlug));
+  const slug = sanitizeNgoSlug(ngoSlug);
+  const cached = snapshotMemoryCache.get(slug);
+  const now = Date.now();
+
+  // If cached and within TTL, return cached payload & index directly
+  if (!forceRefresh && cached && (now - cached.timestamp < SNAPSHOT_CACHE_TTL_MS)) {
+    return { payload: { ...cached.payload }, index: new Map(cached.index) };
+  }
+
+  const root = db.collection('ngos').doc(slug);
   const payload = {};
   const index = new Map();
 
-  const collectionReads = COLLECTION_KEYS.map(async key => {
-    const collectionName = COLLECTION_NAMES[key];
-    const snap = await root.collection(collectionName).get();
+  try {
+    const collectionReads = COLLECTION_KEYS.map(async key => {
+      const collectionName = COLLECTION_NAMES[key];
+      const snap = await root.collection(collectionName).get();
 
-    const rows = [];
-    const docIndex = new Map();
+      const rows = [];
+      const docIndex = new Map();
 
-    snap.forEach(doc => {
-      const data = doc.data() || {};
-      const seq = typeof data._seq === 'number' ? data._seq : Number.MAX_SAFE_INTEGER;
-      const item = { ...data };
-      delete item._seq;
-      rows.push({ seq, item });
-      docIndex.set(doc.id, { json: canonicalJSON(item), seq });
+      snap.forEach(doc => {
+        const data = doc.data() || {};
+        const seq = typeof data._seq === 'number' ? data._seq : Number.MAX_SAFE_INTEGER;
+        const item = { ...data };
+        delete item._seq;
+        rows.push({ seq, item });
+        docIndex.set(doc.id, { json: canonicalJSON(item), seq });
+      });
+
+      // `_seq` reproduces the newest-first order the client array had.
+      rows.sort((a, b) => a.seq - b.seq);
+
+      payload[key] = JSON.stringify(rows.map(r => r.item));
+      index.set(key, docIndex);
     });
 
-    // `_seq` reproduces the newest-first order the client array had.
-    rows.sort((a, b) => a.seq - b.seq);
-
-    payload[key] = JSON.stringify(rows.map(r => r.item));
-    index.set(key, docIndex);
-  });
-
-  const settingsRead = root.collection('settings').doc('org').get().then(snap => {
-    const data = snap.exists ? (snap.data() || {}) : {};
-    SCALAR_KEYS.forEach(key => {
-      const value = data[SCALAR_FIELDS[key]];
-      payload[key] = (value === undefined || value === null) ? null : String(value);
+    const settingsRead = root.collection('settings').doc('org').get().then(snap => {
+      const data = snap.exists ? (snap.data() || {}) : {};
+      SCALAR_KEYS.forEach(key => {
+        const value = data[SCALAR_FIELDS[key]];
+        payload[key] = (value === undefined || value === null) ? null : String(value);
+      });
+      // Stashed so writeSnapshot can skip rewriting an unchanged settings document.
+      index.set(SETTINGS_INDEX_KEY, data);
     });
-    // Stashed so writeSnapshot can skip rewriting an unchanged settings document.
-    index.set(SETTINGS_INDEX_KEY, data);
-  });
 
-  await Promise.all([...collectionReads, settingsRead]);
-  return { payload, index };
+    await Promise.all([...collectionReads, settingsRead]);
+
+    // Save snapshot in cache
+    snapshotMemoryCache.set(slug, { payload, index, timestamp: now });
+    return { payload, index };
+  } catch (err) {
+    // If Firestore read fails (e.g. quota limit reached) but we have warm cached data, serve it gracefully
+    if (cached && cached.payload) {
+      console.warn(`[ngoStore] Firestore read warning for "${slug}" (${err.message}). Serving cached snapshot.`);
+      return { payload: { ...cached.payload }, index: new Map(cached.index) };
+    }
+    throw err;
+  }
 }
 
 /* ───────────────────────────────────────────────────────
@@ -451,6 +498,10 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
     await batch.commit();
   }
 
+  // Keep in-memory cache synchronized with the latest written data
+  const slug = sanitizeNgoSlug(ngoSlug);
+  updateSnapshotMemoryCache(slug, merged, index);
+
   return { writes, deletes };
 }
 
@@ -462,6 +513,7 @@ module.exports = {
   ensureNgoClaim,
   readSnapshot,
   writeSnapshot,
+  updateSnapshotMemoryCache,
   DEFAULT_NGO,
   COLLECTION_NAMES,
   SCALAR_FIELDS

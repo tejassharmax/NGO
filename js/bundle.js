@@ -34080,13 +34080,14 @@
    */
   async function hydrateFromServer() {
     try {
+      isSyncing = true;
       const res = await apiFetch('/api/sync');
       if (res.ok) {
         const serverData = await res.json();
         if (serverData && typeof serverData === 'object') {
           Object.keys(serverData).forEach(k => {
             if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
-              localStorage.setItem(k, serverData[k]);
+              originalSetItem(k, serverData[k]);
             }
           });
           return true;
@@ -34094,6 +34095,8 @@
       }
     } catch (e) {
       console.warn('[Storage] Hydration notice:', e);
+    } finally {
+      isSyncing = false;
     }
     return false;
   }
@@ -34124,10 +34127,10 @@
 
       if (res.ok) {
         const serverData = await res.json();
-        // Apply merged state from server
+        // Apply merged state from server without triggering interceptor loops
         Object.keys(serverData).forEach(k => {
           if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
-            localStorage.setItem(k, serverData[k]);
+            originalSetItem(k, serverData[k]);
           }
         });
       }
@@ -39022,6 +39025,7 @@
   let currentPage = 1;
   const itemsPerPage = 5;
   let page = 'dashboard';
+  let lastSilentPullTime = 0;
 
   // ─── Authentication Guard & Async App Start ───
   let renderCurrentPage = null;
@@ -39149,11 +39153,15 @@
         if (page === 'children') {
           initDragReorder();
           initColumnDragReorder();
-          pullChildrenFromGoogleSheets({ silent: true }).then(res => {
-            if (res && res.success && res.addedCount > 0) {
-              updateChildTable();
-            }
-          }).catch(() => {});
+          const now = Date.now();
+          if (now - lastSilentPullTime > 180000) {
+            lastSilentPullTime = now;
+            pullChildrenFromGoogleSheets({ silent: true }).then(res => {
+              if (res && res.success && res.addedCount > 0) {
+                updateChildTable();
+              }
+            }).catch(() => {});
+          }
         }
       }
 
@@ -39162,7 +39170,6 @@
       }
 
       enableColumnResize();
-      syncWithServer().catch(() => {});
     };
 
     if (window.location.href.includes('google_connected=true')) {

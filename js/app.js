@@ -22,6 +22,7 @@ let activeDocFilter = 'All';
 let currentPage = 1;
 const itemsPerPage = 5;
 let page = 'dashboard';
+let lastSilentPullTime = 0;
 
 // ─── Authentication Guard & Async App Start ───
 let renderCurrentPage = null;
@@ -149,11 +150,15 @@ let renderCurrentPage = null;
       if (page === 'children') {
         initDragReorder();
         initColumnDragReorder();
-        pullChildrenFromGoogleSheets({ silent: true }).then(res => {
-          if (res && res.success && res.addedCount > 0) {
-            updateChildTable();
-          }
-        }).catch(() => {});
+        const now = Date.now();
+        if (now - lastSilentPullTime > 180000) {
+          lastSilentPullTime = now;
+          pullChildrenFromGoogleSheets({ silent: true }).then(res => {
+            if (res && res.success && res.addedCount > 0) {
+              updateChildTable();
+            }
+          }).catch(() => {});
+        }
       }
     }
 
@@ -162,7 +167,6 @@ let renderCurrentPage = null;
     }
 
     enableColumnResize();
-    syncWithServer().catch(() => {});
   };
 
   if (window.location.href.includes('google_connected=true')) {
