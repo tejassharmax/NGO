@@ -33673,10 +33673,27 @@
     return null;
   }
 
-  function deleteUploadedDoc(index) {
+  function deleteUploadedDoc(idOrIndex) {
     const docs = getUploadedDocs();
-    docs.splice(index, 1);
-    localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+    let deletedDoc = null;
+    let updatedDocs;
+
+    if (typeof idOrIndex === 'string') {
+      deletedDoc = docs.find(d => (d.id && d.id === idOrIndex) || (d.name && d.name === idOrIndex));
+      updatedDocs = docs.filter(d => (d.id || d.name) !== idOrIndex);
+    } else if (typeof idOrIndex === 'number' && !isNaN(idOrIndex)) {
+      deletedDoc = docs[idOrIndex];
+      docs.splice(idOrIndex, 1);
+      updatedDocs = docs;
+    } else {
+      updatedDocs = docs.filter(d => d.id !== idOrIndex);
+    }
+
+    localStorage.setItem(DOCS_KEY, JSON.stringify(updatedDocs));
+    if (deletedDoc) {
+      logActivity('doc_deleted', deletedDoc.child || deletedDoc.childName || 'Child', `Deleted document: ${deletedDoc.name || 'Medical Document'}`);
+    }
+    return updatedDocs;
   }
 
   function getGrowthRecords(childId) {
@@ -36870,7 +36887,7 @@
     } else {
       docsHTML = `<div class="document-grid">${docs.map((d, idx) => `
       <article class="card document-card" style="position:relative;">
-        <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
+        <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-id="${d.id || ''}" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
           ${icon('trash')}
         </button>
         <div class="document-card__body" style="padding:16px;">
@@ -37648,7 +37665,7 @@
       contentHTML = `<div class="document-grid" id="document-grid">
       ${docs.map((doc, idx) => `
         <article class="card document-card card--interactive" data-document-idx="${idx}" data-doc-id="${doc.id || ''}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}" style="position:relative;">
-          <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
+          <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-id="${doc.id || ''}" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
             ${icon('trash')}
           </button>
           <div class="document-card__preview" style="position:relative; width:100%; height:140px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
@@ -39012,7 +39029,6 @@
   (async () => {
     localStorage.removeItem('sample-students');
     localStorage.removeItem('sample-children');
-    localStorage.setItem('chm-documents', '[]');
     localStorage.setItem('chm-pending-docs', '[]');
 
     // Purge legacy preset mock data and test registrations completely
@@ -39926,9 +39942,10 @@
 
     const docCardClick = target.closest('[data-document-idx]');
     if (docCardClick && !target.matches('button, a') && !target.closest('button, a')) {
+      const docId = docCardClick.dataset.docId;
       const idx = docCardClick.dataset.documentIdx;
       const docs = getUploadedDocs();
-      const doc = docs[idx];
+      const doc = (docId && docs.find(d => d.id === docId)) || docs[idx];
       if (doc) {
         modal$1({
           title: `${doc.name} - ${doc.child || doc.student || '—'}`,
@@ -40358,19 +40375,52 @@
     }
 
     // Delete uploaded document
-    if (target.closest('[data-delete-doc-idx]')) {
-      const idx = parseInt(target.closest('[data-delete-doc-idx]').dataset.deleteDocIdx, 10);
+    const deleteDocBtn = target.closest('[data-delete-doc-id], [data-delete-doc-idx]');
+    if (deleteDocBtn) {
+      const docId = deleteDocBtn.dataset.deleteDocId;
+      const docIdx = parseInt(deleteDocBtn.dataset.deleteDocIdx, 10);
+      const docs = getUploadedDocs();
+      const targetDoc = (docId && docs.find(d => d.id === docId)) || (typeof docIdx === 'number' && !isNaN(docIdx) ? docs[docIdx] : null);
+      const docName = targetDoc?.name || 'Document';
+      const childName = targetDoc?.child || targetDoc?.childName || '';
+
       modal$1({
         title: 'Delete Document?',
-        body: 'Are you sure you want to delete this uploaded document?',
+        body: `Are you sure you want to remove <strong>${escapeHTML$1(docName)}</strong>${childName ? ` for ${escapeHTML$1(childName)}` : ''} from records?`,
         confirmText: 'Delete',
         confirmClass: 'button--danger',
-        onConfirm: () => {
-          deleteUploadedDoc(idx);
-          toast('Document removed', 'Document deleted from records.');
-          window.setTimeout(() => window.location.reload(), 400);
+        onConfirm: async () => {
+          const identifier = (targetDoc && targetDoc.id) ? targetDoc.id : (docId || docIdx);
+          deleteUploadedDoc(identifier);
+          toast('Document removed', `${docName} deleted from records.`);
+
+          // Visually remove the card from the UI immediately
+          const card = deleteDocBtn.closest('article.document-card');
+          if (card) {
+            card.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+              card.remove();
+              const grid = document.querySelector('#document-grid');
+              const remaining = grid ? grid.querySelectorAll('article.document-card') : [];
+              if (grid && remaining.length === 0 && typeof renderCurrentPage === 'function') {
+                renderCurrentPage();
+              }
+            }, 220);
+          } else if (typeof renderCurrentPage === 'function') {
+            await renderCurrentPage();
+          }
+
+          // Sync deletion to cloud database so it stays deleted
+          try {
+            await syncWithServer();
+          } catch (e) {
+            console.warn('[Doc Delete] Server sync notice:', e);
+          }
         }
       });
+      return;
     }
   });
 

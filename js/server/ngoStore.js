@@ -387,8 +387,8 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
       });
     });
 
-    // Only the authoritative roster removes records.
-    if (key === 'chm-children') {
+    // Only authoritative collections remove records when omitted.
+    if (key === 'chm-children' || key === 'chm-documents') {
       stored.forEach((_entry, docId) => {
         if (!seen.has(docId)) {
           operations.push({
