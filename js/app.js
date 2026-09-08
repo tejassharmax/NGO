@@ -1,18 +1,19 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, getGrowthRecords, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, saveHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
 import { updateChildTable, childRows, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
 import { modal, closeModal } from './modal.js';
 import { saveChild } from './form.js';
-import { pagePath, icon, escapeHTML } from './utils.js';
+import { pagePath, icon, escapeHTML, formatDate } from './utils.js';
 import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser } from './firestore.js';
 import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets } from './googleSheetsSync.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets, autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
 import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
-import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, renderEditAppointmentModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
+import { uploadDocumentToDrive, syncSingleDocToDrive, autoSyncPendingDocuments } from './googleDriveSync.js';
+import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, renderEditAppointmentModalMarkup, renderClinicalDataModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
 import { apiFetch } from './apiClient.js';
 
@@ -137,6 +138,9 @@ let renderCurrentPage = null;
       fetchDocsConfig().catch(() => {})
     ]);
 
+    // Auto-sync any unsynced local documents to Google Drive in the background
+    autoSyncPendingDocuments(false).catch(() => {});
+
     const app = document.querySelector('#app');
     if (app) {
       app.innerHTML = renderPage(page);
@@ -182,7 +186,7 @@ let renderCurrentPage = null;
 
 // Document Clicks
 document.addEventListener('click', (event) => {
-  const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
+  const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-open-clinical-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
   if (!target) return;
 
   if (target.matches('[data-topbar-back]')) {
@@ -415,6 +419,21 @@ document.addEventListener('click', (event) => {
     if (appt) {
       const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
       modalContainer.innerHTML = renderEditAppointmentModalMarkup(appt.id);
+    }
+    return;
+  }
+
+  const clinicalBtn = target.closest('[data-open-clinical-modal]');
+  if (clinicalBtn) {
+    const id = clinicalBtn.getAttribute('data-open-clinical-modal');
+    const childId = clinicalBtn.getAttribute('data-child-id');
+    const childName = clinicalBtn.getAttribute('data-child-name');
+    const appt = id ? getAppointments().find(a => String(a.id) === String(id)) : null;
+    const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
+    if (appt) {
+      modalContainer.innerHTML = renderClinicalDataModalMarkup(appt.id);
+    } else if (childId) {
+      modalContainer.innerHTML = renderClinicalDataModalMarkup(null, childId, childName);
     }
     return;
   }
@@ -850,20 +869,80 @@ document.addEventListener('click', (event) => {
           return;
         }
         const file = fileInput.files[0];
+        toast('Saving document...', 'Saving locally and syncing to Google Drive...', 'info');
         const reader = new FileReader();
-        reader.onload = function(e) {
-          addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+        reader.onload = async function(e) {
+          const newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
           logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
-          toast('Document uploaded', `${title} linked to ${childName}'s profile.`);
-          window.setTimeout(() => { window.location.reload(); }, 500);
+
+          try {
+            const driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
+            if (driveRes && driveRes.success && driveRes.driveUrl) {
+              updateUploadedDoc(newDoc.id, {
+                driveFileId: driveRes.driveFileId,
+                driveUrl: driveRes.driveUrl,
+                childFolderId: driveRes.childFolderId,
+                childFolderUrl: driveRes.childFolderUrl
+              });
+              toast('Google Drive Synced', `${title} backed up in ${childName}'s Google Drive folder.`, 'success');
+            } else {
+              toast('Document saved', `${title} saved locally.`);
+            }
+          } catch (uploadErr) {
+            console.warn('[Drive Upload]', uploadErr);
+            toast('Document saved', `${title} saved locally.`);
+          } finally {
+            window.setTimeout(() => { window.location.reload(); }, 300);
+          }
         };
         reader.readAsDataURL(file);
       }
     });
   }
 
+  // Individual document sync to Google Drive
+  if (target.closest('[data-sync-doc-id]')) {
+    const btn = target.closest('[data-sync-doc-id]');
+    const docId = btn.dataset.syncDocId;
+    const docs = getUploadedDocs();
+    const doc = docs.find(d => d.id === docId);
+    if (doc) {
+      btn.disabled = true;
+      btn.innerHTML = `${icon('refresh')} Syncing...`;
+      toast('Syncing document...', `Uploading ${doc.name} to Google Drive...`, 'info');
+      syncSingleDocToDrive(doc)
+        .then(() => {
+          toast('Google Drive Synced', `${doc.name} backed up in Google Drive.`, 'success');
+          window.setTimeout(() => window.location.reload(), 500);
+        })
+        .catch(err => {
+          btn.disabled = false;
+          btn.innerHTML = `${icon('refresh')} Sync to Drive`;
+          toast('Sync failed', err.message || 'Could not upload to Google Drive.');
+        });
+    }
+    return;
+  }
+
+  // Bulk auto-sync all documents to Google Drive
+  if (target.closest('[data-auto-sync-drive]')) {
+    const btn = target.closest('[data-auto-sync-drive]');
+    btn.disabled = true;
+    btn.innerHTML = `${icon('refresh')} Syncing...`;
+    autoSyncPendingDocuments(true)
+      .then(res => {
+        window.setTimeout(() => window.location.reload(), 600);
+      })
+      .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = `${icon('refresh')} Sync to Drive`;
+        toast('Sync failed', err.message);
+      });
+    return;
+  }
+
   const docCardClick = target.closest('[data-document-idx]');
-  if (docCardClick && !target.matches('button, a')) {
+  if (docCardClick && !target.matches('button, a') && !target.closest('button, a')) {
     const idx = docCardClick.dataset.documentIdx;
     const docs = getUploadedDocs();
     const doc = docs[idx];
@@ -1027,13 +1106,169 @@ document.addEventListener('click', (event) => {
       const profileContainer = document.querySelector('.profile-tab-content-container');
       if (profileContainer) {
         const panels = Array.from(profileContainer.querySelectorAll('[data-tab-panel]'));
-        const panelNames = ['overview', 'guardian', 'health', 'growth', 'documents', 'timeline', 'notes'];
+        const panelNames = ['overview', 'clinical', 'growth', 'documents'];
         const selectedPanelName = tabBtn.dataset.profileTab || panelNames[index] || 'overview';
+        sessionStorage.setItem('chm_active_profile_tab', selectedPanelName);
         panels.forEach((p) => {
           p.style.display = (p.dataset.tabPanel === selectedPanelName) ? 'block' : 'none';
         });
       }
     }
+  }
+
+  // Switch profile tab from button
+  if (target.closest('[data-switch-profile-tab]')) {
+    const tabName = target.closest('[data-switch-profile-tab]').dataset.switchProfileTab;
+    sessionStorage.setItem('chm_active_profile_tab', tabName);
+    const targetTabBtn = document.querySelector(`.tabs [data-profile-tab="${tabName}"]`);
+    if (targetTabBtn) {
+      targetTabBtn.click();
+    }
+  }
+
+  // Load clinical checkup or blood test item from history table into the profile clinical form
+  const loadClinicalBtn = target.closest('[data-load-clinical-item]');
+  if (loadClinicalBtn) {
+    try {
+      const item = JSON.parse(loadClinicalBtn.getAttribute('data-load-clinical-item'));
+      const form = document.querySelector('#profile-clinical-data-form');
+      if (form && item) {
+        if (item.entryType === 'checkup') {
+          const setVal = (id, val) => { const el = form.querySelector(`#prof-${id}`); if (el) el.value = val || ''; };
+          setVal('checkup-date', item.date);
+          setVal('checkup-temp', item.temperature || item.temp);
+          setVal('checkup-bp', item.bp || item.bloodPressure);
+          setVal('checkup-weight', item.weight);
+          setVal('checkup-pulse', item.pulse || item.pulseRate);
+          setVal('checkup-spo2', item.spo2);
+          setVal('checkup-eye', item.eyeCheckup || item.eyeRemarks);
+          setVal('checkup-complaint', item.complaint || item.symptoms);
+          setVal('checkup-prescription', item.prescription || item.medication);
+          const idInput = form.querySelector('#prof-growth-id');
+          if (idInput) idInput.value = item.id || '';
+          toast('Checkup Loaded', `Loaded checkup measurements from ${item.date || 'record'} into editor.`);
+        } else if (item.entryType === 'blood') {
+          const setVal = (id, val) => { const el = form.querySelector(`#prof-${id}`); if (el) el.value = val || ''; };
+          setVal('blood-date', item.date);
+          setVal('blood-hb', item.hemoglobin || item.hb);
+          setVal('blood-wbc', item.wbc);
+          setVal('blood-platelets', item.platelets);
+          setVal('blood-rbc', item.rbc);
+          setVal('blood-pcv', item.pcv);
+          setVal('blood-neutrophil', item.neutrophil);
+          setVal('blood-lymphocytes', item.lymphocytes);
+          setVal('blood-eosinophils', item.eosinophils);
+          setVal('blood-monocytes', item.monocytes);
+          setVal('blood-basophils', item.basophils);
+          setVal('blood-platelets-adequacy', item.plateletsAdequacy);
+          setVal('blood-rbc-morph', item.rbcMorphology);
+          setVal('blood-wbc-morph', item.wbcMorphology);
+          const idInput = form.querySelector('#prof-blood-id');
+          if (idInput) idInput.value = item.id || '';
+          toast('Blood Report Loaded', `Loaded blood test report from ${item.date || 'record'} into editor.`);
+        }
+        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } catch (err) {
+      console.error('Failed to load clinical item:', err);
+    }
+  }
+
+  // Edit growth item from history table
+  const editGrowthBtn = target.closest('[data-edit-growth-item]');
+  if (editGrowthBtn) {
+    try {
+      const g = JSON.parse(editGrowthBtn.dataset.editGrowthItem);
+      const form = document.querySelector('#child-growth-form');
+      if (form && g) {
+        if (form.querySelector('#growth-input-id')) form.querySelector('#growth-input-id').value = g.id || '';
+        if (form.querySelector('#growth-input-date')) form.querySelector('#growth-input-date').value = g.date || '';
+        if (form.querySelector('#growth-input-status')) form.querySelector('#growth-input-status').value = g.healthStatus || 'Healthy';
+        if (form.querySelector('#growth-input-height')) form.querySelector('#growth-input-height').value = g.height || '';
+        if (form.querySelector('#growth-input-weight')) form.querySelector('#growth-input-weight').value = g.weight || '';
+        if (form.querySelector('#growth-input-conditions')) form.querySelector('#growth-input-conditions').value = g.medicalConditions || '';
+        if (form.querySelector('#growth-input-allergies')) form.querySelector('#growth-input-allergies').value = g.allergies || '';
+        if (form.querySelector('#growth-input-meds')) form.querySelector('#growth-input-meds').value = g.medications || '';
+        if (form.querySelector('#growth-input-dental')) form.querySelector('#growth-input-dental').value = g.dentalRemarks || '';
+        if (form.querySelector('#growth-input-hygiene')) form.querySelector('#growth-input-hygiene').value = g.hygieneIndex || 'Not Assessed';
+
+        // Calculate and update BMI display
+        const h = parseFloat(g.height);
+        const w = parseFloat(g.weight);
+        const bmi = h && w ? (w / ((h / 100) ** 2)).toFixed(1) : (g.bmi || '—');
+        const bmiDisp = document.querySelector('#growth-display-bmi');
+        if (bmiDisp) bmiDisp.textContent = bmi;
+        const bmiBadge = document.querySelector('#growth-display-bmi-badge');
+        if (bmiBadge) {
+          bmiBadge.innerHTML = bmi && bmi !== '—'
+            ? (bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>')
+            : '';
+        }
+
+        const title = document.querySelector('#growth-form-title');
+        if (title) title.textContent = `Editing Growth Record (${formatDate(g.date)})`;
+        const caption = document.querySelector('#growth-form-caption');
+        if (caption) caption.textContent = `Update the vitals recorded on ${formatDate(g.date)} and click Save.`;
+        const badge = document.querySelector('#growth-status-badge');
+        if (badge) badge.textContent = `Editing: ${formatDate(g.date)}`;
+        const cancelBtn = document.querySelector('#growth-cancel-edit-btn');
+        if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+
+        form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    } catch (e) {
+      console.error('Failed to parse growth record item', e);
+    }
+  }
+
+  // Reset/New growth entry
+  if (target.closest('[data-new-growth-entry], [data-cancel-growth-edit]')) {
+    const form = document.querySelector('#child-growth-form');
+    if (form) {
+      form.reset();
+      const idInput = form.querySelector('#growth-input-id');
+      if (idInput) idInput.value = '';
+      const dateInput = form.querySelector('#growth-input-date');
+      if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+      const title = document.querySelector('#growth-form-title');
+      if (title) title.textContent = 'Health summary & Growth vitals';
+      const caption = document.querySelector('#growth-form-caption');
+      if (caption) caption.textContent = 'Edit and save date-referenced vitals and health status';
+      const badge = document.querySelector('#growth-status-badge');
+      if (badge) badge.textContent = 'New Entry';
+      const cancelBtn = document.querySelector('#growth-cancel-edit-btn');
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      const bmiDisp = document.querySelector('#growth-display-bmi');
+      if (bmiDisp) bmiDisp.textContent = '—';
+      const bmiBadge = document.querySelector('#growth-display-bmi-badge');
+      if (bmiBadge) bmiBadge.innerHTML = '';
+      form.scrollIntoView({ behavior: 'smooth' });
+    }
+  }
+
+  // Delete growth record
+  const delGrowthBtn = target.closest('[data-delete-growth-id]');
+  if (delGrowthBtn) {
+    const id = delGrowthBtn.dataset.deleteGrowthId;
+    modal({
+      title: 'Delete Growth Record?',
+      body: 'Are you sure you want to remove this historical measurement? This will update your local records and sync to cloud database.',
+      confirmText: 'Delete Record',
+      confirmClass: 'button--danger',
+      onConfirm: async () => {
+        deleteGrowthRecord(id);
+        try {
+          await syncWithServer();
+        } catch (e) {
+          console.warn('Sync failed:', e);
+        }
+        sessionStorage.setItem('chm_active_profile_tab', 'growth');
+        toast('Measurement removed', 'Growth entry has been deleted.');
+        if (typeof renderCurrentPage === 'function') {
+          await renderCurrentPage();
+        }
+      }
+    });
   }
   if (target.closest('.settings-nav button')) {
     target.closest('.settings-nav').querySelectorAll('button').forEach((button) => button.classList.toggle('active', button === target));
@@ -1105,12 +1340,31 @@ document.addEventListener('click', (event) => {
 
         if (fileInput && fileInput.files && fileInput.files[0]) {
           const file = fileInput.files[0];
+          toast('Saving document...', 'Saving locally and syncing to Google Drive...', 'info');
           const reader = new FileReader();
-          reader.onload = function (e) {
-            addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+          reader.onload = async function (e) {
+            const newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
             logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
-            toast('Document uploaded', `${docName} attached to ${childName}.`);
-            window.setTimeout(() => window.location.reload(), 400);
+
+            try {
+              const driveRes = await uploadDocumentToDrive(file, { childName, docName, docType });
+              if (driveRes && driveRes.success && driveRes.driveUrl) {
+                updateUploadedDoc(newDoc.id, {
+                  driveFileId: driveRes.driveFileId,
+                  driveUrl: driveRes.driveUrl,
+                  childFolderId: driveRes.childFolderId,
+                  childFolderUrl: driveRes.childFolderUrl
+                });
+                toast('Google Drive Synced', `${docName} backed up in ${childName}'s Google Drive folder.`, 'success');
+              } else {
+                toast('Document saved', `${docName} saved locally.`);
+              }
+            } catch (uploadErr) {
+              console.warn('[Drive Upload]', uploadErr);
+              toast('Document saved', `${docName} saved locally.`);
+            } finally {
+              window.setTimeout(() => window.location.reload(), 300);
+            }
           };
           reader.readAsDataURL(file);
         } else {
@@ -1191,7 +1445,26 @@ document.addEventListener('input', (event) => {
     currentPage = 1;
     applyTableFilters();
   }
-  if (event.target.matches('[data-document-search]')) applyDocumentFilters();
+  if (event.target.id === 'growth-input-height' || event.target.id === 'growth-input-weight') {
+    const hInput = document.querySelector('#growth-input-height');
+    const wInput = document.querySelector('#growth-input-weight');
+    const bmiDisp = document.querySelector('#growth-display-bmi');
+    const bmiBadge = document.querySelector('#growth-display-bmi-badge');
+    if (hInput && wInput && bmiDisp) {
+      const h = parseFloat(hInput.value);
+      const w = parseFloat(wInput.value);
+      if (h > 0 && w > 0) {
+        const bmi = +(w / ((h / 100) ** 2)).toFixed(1);
+        bmiDisp.textContent = bmi;
+        if (bmiBadge) {
+          bmiBadge.innerHTML = bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>';
+        }
+      } else {
+        bmiDisp.textContent = '—';
+        if (bmiBadge) bmiBadge.innerHTML = '';
+      }
+    }
+  }
 });
 
 // Changes
@@ -1510,14 +1783,29 @@ function initFormListeners() {
     } else if (fileName.toLowerCase().includes('blood') || fileName.toLowerCase().includes('cbc') || fileName.toLowerCase().includes('test')) {
       docLabel = 'Blood Test Report';
     }
-    addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel);
+    const ocrDoc = addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel, child.id);
+    if (fileData) {
+      syncSingleDocToDrive(ocrDoc).catch(e => console.warn('[OCR Drive Sync notice]', e.message));
+    }
 
     const addInput = form.querySelector('[data-additional-doc-input]');
     if (addInput && addInput.files && addInput.files[0]) {
       const addFile = addInput.files[0];
       const addReader = new FileReader();
-      addReader.onload = function (e) {
-        addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record');
+      addReader.onload = async function (e) {
+        const addDoc = addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record', child.id);
+        uploadDocumentToDrive(addFile, { childName: child.name, childId: child.id, docName: addFile.name, docType: 'Medical Record' })
+          .then(res => {
+            if (res && res.success && res.driveUrl) {
+              updateUploadedDoc(addDoc.id, {
+                driveFileId: res.driveFileId,
+                driveUrl: res.driveUrl,
+                childFolderId: res.childFolderId,
+                childFolderUrl: res.childFolderUrl
+              });
+            }
+          })
+          .catch(err => console.warn('[AddDoc Drive Sync notice]', err.message));
       };
       addReader.readAsDataURL(addFile);
     }
@@ -1556,6 +1844,53 @@ function initFormListeners() {
       toast('Verified child saved', `${child.name}'s record generated in Google Sheets.`);
       window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
     });
+  });
+
+  // Child Profile: Growth & Health Vitals form (with Date reference)
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!form || form.id !== 'child-growth-form') return;
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+
+    const values = Object.fromEntries(new FormData(form));
+    const childId = form.dataset.childId;
+    const childName = form.dataset.childName || 'Child';
+    const child = getChild(childId);
+
+    const record = {
+      id: values.id || `GW-${Date.now()}`,
+      childId,
+      childName,
+      date: values.date,
+      height: values.height ? String(values.height).trim() : '',
+      weight: values.weight ? String(values.weight).trim() : '',
+      healthStatus: values.healthStatus || 'Healthy',
+      medicalConditions: values.medicalConditions || '',
+      allergies: values.allergies || '',
+      medications: values.medications || '',
+      dentalRemarks: values.dentalRemarks || '',
+      hygieneIndex: values.hygieneIndex || 'Not Assessed'
+    };
+
+    saveGrowthRecord(record);
+    if (child) {
+      autoSyncChildToGoogleSheets(child).catch(() => {});
+    }
+
+    // Ensure state is committed to Firebase / Firestore before re-rendering
+    try {
+      await syncWithServer();
+    } catch (e) {
+      console.warn('Sync failed:', e);
+    }
+
+    sessionStorage.setItem('chm_active_profile_tab', 'growth');
+    toast('Health Vitals Saved', `Vitals for ${formatDate(record.date)} saved to Firebase & Google Sheets.`);
+
+    if (typeof renderCurrentPage === 'function') {
+      await renderCurrentPage();
+    }
   });
 
   // Growth form (using delegated submit handler for dynamic form cards)
@@ -1647,12 +1982,12 @@ function initFormListeners() {
             date: values.date,
             time: values.time || '10:00',
             doctor: values.doctor || '',
+            specialty: values.specialty || '',
             notes: values.notes || '',
             status: 'Upcoming'
           });
         });
 
-        // Open unified All Children Group Plan in Google Calendar
         const groupCalUrl = buildGoogleCalendarUrl({
           childId: 'ALL',
           childName: 'All Children',
@@ -1660,6 +1995,7 @@ function initFormListeners() {
           date: values.date,
           time: values.time || '10:00',
           doctor: values.doctor || '',
+          specialty: values.specialty || '',
           notes: values.notes || '',
           isGroupPlan: true
         }, true, allChildren);
@@ -1678,6 +2014,7 @@ function initFormListeners() {
         date: values.date,
         time: values.time || '',
         doctor: values.doctor || '',
+        specialty: values.specialty || '',
         notes: values.notes || ''
       });
     }
@@ -1717,6 +2054,7 @@ function initFormListeners() {
       childId: values.childId,
       childName: child ? child.name : (existing ? existing.childName : 'Unknown'),
       type: values.type,
+      specialty: values.specialty || '',
       date: values.date,
       time: values.time || '10:00',
       doctor: values.doctor || '',
@@ -1736,6 +2074,127 @@ function initFormListeners() {
     window.setTimeout(() => window.location.reload(), 500);
   });
 
+  // Clinical & Blood Test Data Entry form submit (both modal and profile page inline form)
+  document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!form || (form.id !== 'clinical-data-form' && form.id !== 'profile-clinical-data-form')) return;
+    event.preventDefault();
+    if (!form.reportValidity()) return;
+
+    const isProfileForm = form.id === 'profile-clinical-data-form';
+    const values = Object.fromEntries(new FormData(form));
+    const childId = values.childId;
+    const childName = values.childName || 'Child';
+    const checkupDate = values.checkup_date;
+    const bloodDate = values.blood_date || checkupDate;
+
+    const saveBtns = form.querySelectorAll('button[type="submit"]');
+    saveBtns.forEach(btn => {
+      btn.disabled = true;
+      btn.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" class="spin"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg> Saving &amp; Syncing...`;
+    });
+
+    try {
+      // 1. Routine Clinical Checkup (Row 3 in Google Sheets)
+      const hasGrowthData = values.temperature || values.bp || values.weight || values.pulse || values.spo2 || values.complaint || values.prescription || values.eyeCheckup;
+      if (hasGrowthData || checkupDate) {
+        const growthRecord = {
+          id: values.existingGrowthId || undefined,
+          childId: childId,
+          childName: childName,
+          date: checkupDate,
+          temperature: (values.temperature || '').trim(),
+          bp: (values.bp || '').trim(),
+          weight: (values.weight || '').trim(),
+          pulse: (values.pulse || '').trim(),
+          spo2: (values.spo2 || '').trim(),
+          complaint: (values.complaint || '').trim(),
+          prescription: (values.prescription || '').trim(),
+          eyeCheckup: (values.eyeCheckup || '').trim()
+        };
+        saveGrowthRecord(growthRecord);
+      }
+
+      // 2. Blood Test Report (Row 19 in Google Sheets)
+      const hasBloodData = values.hemoglobin || values.wbc || values.platelets || values.rbc || values.pcv || values.neutrophil || values.lymphocytes || values.eosinophils || values.monocytes || values.basophils || values.rbcMorphology || values.wbcMorphology || values.plateletsAdequacy;
+      if (hasBloodData) {
+        const bloodRecord = {
+          id: values.existingBloodId || undefined,
+          childId: childId,
+          childName: childName,
+          date: bloodDate,
+          recordType: 'Bi-Annual CBC / Blood Test',
+          hemoglobin: (values.hemoglobin || '').trim(),
+          wbc: (values.wbc || '').trim(),
+          platelets: (values.platelets || '').trim(),
+          rbc: (values.rbc || '').trim(),
+          pcv: (values.pcv || '').trim(),
+          neutrophil: (values.neutrophil || '').trim(),
+          lymphocytes: (values.lymphocytes || '').trim(),
+          eosinophils: (values.eosinophils || '').trim(),
+          monocytes: (values.monocytes || '').trim(),
+          basophils: (values.basophils || '').trim(),
+          rbcMorphology: (values.rbcMorphology || '').trim(),
+          wbcMorphology: (values.wbcMorphology || '').trim(),
+          plateletsAdequacy: (values.plateletsAdequacy || '').trim()
+        };
+        saveHealthRecord(bloodRecord);
+      }
+
+      // 3. Immediately trigger server & sheets sync
+      await syncWithServer();
+
+      // Check if Sheets sync succeeded or if re-authorization is needed
+      try {
+        const syncRes = await apiFetch('/api/sheets/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ children: getChildren() })
+        });
+        if (syncRes.ok) {
+          const syncData = await syncRes.json();
+          if (syncData?.tokenExpired || syncData?.error === 'invalid_grant') {
+            toast('Google Authorization Expired', 'Record saved locally, but Google authorization expired. Please click Reconnect in Settings.', 'warning');
+          }
+        }
+      } catch (syncErr) {}
+
+      toast('Clinical Details Saved', `Vitals and lab report saved & syncing to ${childName}'s Google Sheet.`);
+
+      // Close modal if open
+      const modalRoot = document.querySelector('#modal-root');
+      if (modalRoot) modalRoot.replaceChildren();
+      const calModal = document.querySelector('#cal-booking-modal');
+      if (calModal) calModal.remove();
+
+      // If from child profile, re-render current page keeping clinical tab active
+      if (isProfileForm || window.location.hash.includes('child-profile')) {
+        sessionStorage.setItem('chm_active_profile_tab', 'clinical');
+        if (renderCurrentPage) {
+          await renderCurrentPage();
+        }
+        return;
+      }
+
+      // Refresh calendar view if present
+      const calRoot = document.querySelector('[data-calendar-root]');
+      if (calRoot) {
+        const mode = calRoot.getAttribute('data-cal-view-mode') || 'month';
+        const year = parseInt(calRoot.getAttribute('data-cal-year')) || new Date().getFullYear();
+        const month = parseInt(calRoot.getAttribute('data-cal-month')) || new Date().getMonth();
+        const day = parseInt(calRoot.getAttribute('data-cal-day')) || new Date().getDate();
+        updateCalendarView(calRoot, mode, year, month, day);
+      }
+    } catch (err) {
+      console.error('Error saving clinical details:', err);
+      toast('Save Error', 'Failed to save clinical details. Please try again.');
+      saveBtns.forEach(btn => {
+        btn.disabled = false;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Save &amp; Sync to Sheet`;
+      });
+    }
+  });
+
   // Sync Child Select & All Children Pill toggle
   document.addEventListener('change', (event) => {
     const target = event.target;
@@ -1745,9 +2204,11 @@ function initFormListeners() {
       if (target.checked) {
         if (select) select.value = 'ALL';
         pill?.classList.add('gcal-all-pill--active');
+        pill?.setAttribute('aria-pressed', 'true');
       } else {
         if (select && select.value === 'ALL') select.value = '';
         pill?.classList.remove('gcal-all-pill--active');
+        pill?.setAttribute('aria-pressed', 'false');
       }
     }
 
@@ -1757,9 +2218,25 @@ function initFormListeners() {
       if (target.value === 'ALL') {
         if (checkbox) checkbox.checked = true;
         pill?.classList.add('gcal-all-pill--active');
+        pill?.setAttribute('aria-pressed', 'true');
       } else {
         if (checkbox) checkbox.checked = false;
         pill?.classList.remove('gcal-all-pill--active');
+        pill?.setAttribute('aria-pressed', 'false');
+      }
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === ' ' || event.key === 'Enter') {
+      const pill = event.target.closest('#cal-all-pill');
+      if (pill) {
+        event.preventDefault();
+        const checkbox = pill.querySelector('#cal-all-children-check');
+        if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+          checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+        }
       }
     }
   });

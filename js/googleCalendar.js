@@ -6,7 +6,7 @@
  */
 
 import { getAppointments, addAppointment } from './storage.js';
-import { getChildren, calculateAge } from './storage.js';
+import { getChildren, calculateAge, getGrowthRecords, getHealthRecords } from './storage.js';
 import { toast } from './toast.js';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -29,6 +29,21 @@ const HOURLY_SLOTS = [
   { label: '08:00 PM', value: '20:00' }
 ];
 
+export const DOCTOR_SPECIALTIES = [
+  'General Pediatrics',
+  'Pediatric Dentistry / Dental',
+  'Ophthalmology / Eye Specialist',
+  'ENT (Ear, Nose, Throat)',
+  'Dermatology / Skin Care',
+  'Pediatric Orthopedics',
+  'Cardiology',
+  'Neurology',
+  'Nutrition & Dietetics',
+  'Child Psychology / Mental Health',
+  'General Physician',
+  'Other Speciality'
+];
+
 /**
  * Build Google Calendar TEMPLATE URL for instant synchronization
  */
@@ -49,7 +64,7 @@ export function buildGoogleCalendarUrl(appointment, isGroupPlan = false, allChil
       `📋 GROUP APPOINTMENT: All Children — ${appointment.type}\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `👥 Target: All Registered Children (${groupCount} Students)\n` +
-      `🩺 Doctor / Title: ${appointment.doctor || 'Routine Healthcare Session'}\n` +
+      `🩺 Doctor / Title: ${appointment.doctor || 'Routine Healthcare Session'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
       `📅 Date: ${appointment.date}\n` +
       `⏰ Time: ${formatSingleDisplayTime(appointment.time || '10:00')}\n\n` +
       `📋 Children Included in this Plan (${groupCount}):\n${childrenNames}\n\n` +
@@ -59,7 +74,7 @@ export function buildGoogleCalendarUrl(appointment, isGroupPlan = false, allChil
   } else {
     titleStr = `${appointment.childName} — ${appointment.type}`;
     detailsStr =
-      `Doctor: ${appointment.doctor || 'N/A'}\n` +
+      `Doctor: ${appointment.doctor || 'N/A'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
       `Child: ${appointment.childName}\n` +
       `Type: ${appointment.type}\n` +
       `Notes: ${appointment.notes || 'No notes'}\n\n` +
@@ -176,6 +191,7 @@ export function bookAppointment(data) {
     childId: data.childId,
     childName: data.childName,
     type: data.type,
+    specialty: data.specialty || '',
     date: data.date,
     time: data.time || '10:00',
     doctor: data.doctor || '',
@@ -397,6 +413,7 @@ export function renderDayView(year, month, day) {
 export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
   const children = getChildren();
   const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
+  const specialtyOptions = DOCTOR_SPECIALTIES.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
   const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
 
   // Format display date
@@ -440,9 +457,10 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
               <option value="ALL">All Children (${children.length})</option>
               ${childOptions}
             </select>
-            <label class="gcal-all-pill" id="cal-all-pill" title="Select all ${children.length} registered children">
+            <label class="gcal-all-pill" id="cal-all-pill" title="Toggle all ${children.length} registered children" role="button" aria-pressed="false" tabindex="0">
               <input type="checkbox" id="cal-all-children-check" name="selectAllChildren" value="true" />
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg class="gcal-all-pill-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none; flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg class="gcal-all-pill-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               <span>All Children</span>
             </label>
           </div>
@@ -463,6 +481,19 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
               <option value="Vaccination">Vaccination</option>
               <option value="Monthly checkup">Monthly Checkup</option>
               <option value="Oral checkup">Oral Checkup</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Speciality of doctor (Optional, can be empty) -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <select class="gcal-popup-select" name="specialty" id="cal-specialty-select">
+              <option value="">Speciality of doctor</option>
+              ${specialtyOptions}
             </select>
           </div>
         </div>
@@ -586,7 +617,7 @@ export function renderEventDetailsModalMarkup(eventId) {
               </div>
               <div class="gcal-popover-info-text">
                 <span class="gcal-popover-info-label">Doctor / Title</span>
-                <span class="gcal-popover-info-val">${escapeHTML(appt.doctor || 'Routine Healthcare')}</span>
+                <span class="gcal-popover-info-val">${escapeHTML(appt.doctor || 'Routine Healthcare')}${appt.specialty ? ` <span style="font-size:12px; opacity:0.85; font-weight:500;">(${escapeHTML(appt.specialty)})</span>` : ''}</span>
               </div>
             </div>
 
@@ -628,9 +659,9 @@ export function renderEventDetailsModalMarkup(eventId) {
 
           <!-- Dual Action Footer -->
           <div class="gcal-popover-footer-dual">
-            <button class="gcal-btn gcal-btn--secondary" type="button" data-edit-event-id="${appt.id}" style="flex:1; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
+            <button class="gcal-btn gcal-btn--secondary" type="button" data-open-clinical-modal="${appt.id}" style="flex:1; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              Edit
+              Edit details
             </button>
             <button class="gcal-btn gcal-btn--create" type="button" data-sync-event-id="${appt.id}" style="flex:1.4; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
@@ -638,6 +669,280 @@ export function renderEventDetailsModalMarkup(eventId) {
             </button>
           </div>
         </div>
+      </div>
+    </div>`;
+}
+
+/**
+ * Render Clinical Vitals & Blood Test Report Data Entry Modal
+ * Exactly matches the NGO Google Sheet Child Tab format:
+ * - Row 3: DATE, TEMP(F), B/P, WEIGHT, P/R, SPO2, COMPLAINT, PRESCRIPTION, EYE CHECK UP
+ * - Row 19: DATE, HAEMOGLOBIN, WBC, PLATELETS, RBC, PCV, NEUTROPHIL, LYMPHOCYTES, EOSINOPHILS, MONOCYTES, BASOPHILS, RBC MORPHOLOGY, WBC MORPHOLOGY, PLATELETS ADEQUACY
+ */
+export function renderClinicalSectionsMarkup({ existingGrowth = {}, existingBlood = {}, targetDate = '', prefix = '' } = {}) {
+  const dateVal = targetDate || new Date().toISOString().slice(0, 10);
+  return `
+    <!-- SECTION 1: ROUTINE CLINICAL CHECKUP -->
+    <div class="clinical-section-card" style="margin-bottom: 24px;">
+      <div class="clinical-section-header">
+        <div class="clinical-section-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>Routine Clinical Checkup</span>
+        </div>
+        <span class="clinical-sync-badge">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M4 10h16"/><path d="M10 4v16"/></svg>
+          Syncs to Sheet Row 3
+        </span>
+      </div>
+
+      <div class="clinical-grid-3">
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-date">DATE</label>
+          <input class="clinical-input" id="${prefix}checkup-date" type="date" name="checkup_date" value="${existingGrowth.date || dateVal}" required />
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-temp">TEMP (F)</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}checkup-temp" type="text" name="temperature" placeholder="98.6" value="${escapeHTML(existingGrowth.temperature || existingGrowth.temp || '')}" />
+            <span class="clinical-input-unit">°F</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-bp">B/P</label>
+          <input class="clinical-input" id="${prefix}checkup-bp" type="text" name="bp" placeholder="110/70" value="${escapeHTML(existingGrowth.bp || existingGrowth.bloodPressure || '')}" />
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-weight">WEIGHT</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}checkup-weight" type="number" step="0.1" name="weight" placeholder="32.5" value="${escapeHTML(existingGrowth.weight || '')}" />
+            <span class="clinical-input-unit">kg</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-pulse">P/R</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}checkup-pulse" type="number" name="pulse" placeholder="78" value="${escapeHTML(existingGrowth.pulse || existingGrowth.pulseRate || '')}" />
+            <span class="clinical-input-unit">bpm</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-spo2">SPO2</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}checkup-spo2" type="number" name="spo2" placeholder="99" value="${escapeHTML(existingGrowth.spo2 || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group clinical-grid-full">
+          <label class="clinical-field-label" for="${prefix}checkup-eye">EYE CHECK UP</label>
+          <input class="clinical-input" id="${prefix}checkup-eye" type="text" name="eyeCheckup" placeholder="e.g. Normal 6/6, Clear vision" value="${escapeHTML(existingGrowth.eyeCheckup || existingGrowth.eyeRemarks || '')}" />
+        </div>
+
+        <div class="clinical-field-group clinical-grid-full">
+          <label class="clinical-field-label" for="${prefix}checkup-complaint">COMPLAINT</label>
+          <textarea class="clinical-textarea" id="${prefix}checkup-complaint" name="complaint" rows="2" placeholder="Presenting complaint or symptoms...">${escapeHTML(existingGrowth.complaint || existingGrowth.symptoms || '')}</textarea>
+        </div>
+
+        <div class="clinical-field-group clinical-grid-full">
+          <label class="clinical-field-label" for="${prefix}checkup-prescription">PRESCRIPTION</label>
+          <textarea class="clinical-textarea" id="${prefix}checkup-prescription" name="prescription" rows="2" placeholder="Prescription, medicines advised, treatment given...">${escapeHTML(existingGrowth.prescription || existingGrowth.medication || '')}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: BLOOD TEST REPORT -->
+    <div class="clinical-section-card">
+      <div class="clinical-section-header">
+        <div class="clinical-section-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#dc2626" stroke-width="2.2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+          <span>Blood Test Report</span>
+        </div>
+        <span class="clinical-sync-badge" style="background:#fee2e2; color:#b91c1c;">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M4 10h16"/><path d="M10 4v16"/></svg>
+          Syncs to Sheet Row 19
+        </span>
+      </div>
+
+      <div class="clinical-grid-4">
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-date">DATE</label>
+          <input class="clinical-input" id="${prefix}blood-date" type="date" name="blood_date" value="${existingBlood.date || dateVal}" />
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-hb">HAEMOGLOBIN</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-hb" type="text" name="hemoglobin" placeholder="13.2" value="${escapeHTML(existingBlood.hemoglobin || existingBlood.hb || '')}" />
+            <span class="clinical-input-unit">g/dL</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-wbc">WBC</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-wbc" type="text" name="wbc" placeholder="7500" value="${escapeHTML(existingBlood.wbc || '')}" />
+            <span class="clinical-input-unit">/cumm</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-platelets">PLATELETS</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-platelets" type="text" name="platelets" placeholder="2.5" value="${escapeHTML(existingBlood.platelets || '')}" />
+            <span class="clinical-input-unit">Lakhs</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-rbc">RBC</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-rbc" type="text" name="rbc" placeholder="4.5" value="${escapeHTML(existingBlood.rbc || '')}" />
+            <span class="clinical-input-unit">M/µL</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-pcv">PCV</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-pcv" type="text" name="pcv" placeholder="38" value="${escapeHTML(existingBlood.pcv || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-neutrophil">NEUTROPHIL</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-neutrophil" type="text" name="neutrophil" placeholder="62" value="${escapeHTML(existingBlood.neutrophil || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-lymphocytes">LYMPHOCYTES</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-lymphocytes" type="text" name="lymphocytes" placeholder="30" value="${escapeHTML(existingBlood.lymphocytes || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-eosinophils">EOSINOPHILS</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-eosinophils" type="text" name="eosinophils" placeholder="4" value="${escapeHTML(existingBlood.eosinophils || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-monocytes">MONOCYTES</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-monocytes" type="text" name="monocytes" placeholder="3" value="${escapeHTML(existingBlood.monocytes || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-basophils">BASOPHILS</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-basophils" type="text" name="basophils" placeholder="1" value="${escapeHTML(existingBlood.basophils || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-platelets-adequacy">PLATELETS ADEQUACY</label>
+          <input class="clinical-input" id="${prefix}blood-platelets-adequacy" type="text" name="plateletsAdequacy" placeholder="Adequate on smear" value="${escapeHTML(existingBlood.plateletsAdequacy || '')}" />
+        </div>
+
+        <div class="clinical-field-group" style="grid-column: span 2;">
+          <label class="clinical-field-label" for="${prefix}blood-rbc-morph">RBC MORPHOLOGY</label>
+          <input class="clinical-input" id="${prefix}blood-rbc-morph" type="text" name="rbcMorphology" placeholder="e.g. Normocytic Normochromic" value="${escapeHTML(existingBlood.rbcMorphology || '')}" />
+        </div>
+
+        <div class="clinical-field-group" style="grid-column: span 2;">
+          <label class="clinical-field-label" for="${prefix}blood-wbc-morph">WBC MORPHOLOGY</label>
+          <input class="clinical-input" id="${prefix}blood-wbc-morph" type="text" name="wbcMorphology" placeholder="e.g. Normal in number and morphology" value="${escapeHTML(existingBlood.wbcMorphology || '')}" />
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+export function renderClinicalDataModalMarkup(eventId, childIdParam = null, childNameParam = null) {
+  const appointments = getAppointments();
+  const appt = eventId ? appointments.find(a => String(a.id) === String(eventId)) : null;
+
+  const childId = appt ? appt.childId : childIdParam;
+  let childName = appt ? (appt.childName || 'Child') : (childNameParam || 'Child');
+  const targetDate = appt?.date || new Date().toISOString().slice(0, 10);
+
+  if (!childId && !appt) return '';
+
+  if (childId && !appt) {
+    const children = getChildren();
+    const c = children.find(ch => ch.id === childId || (ch.name && ch.name.toLowerCase() === (childNameParam || '').toLowerCase()));
+    if (c) childName = c.name;
+  }
+
+  // Retrieve any existing growth record for this child on this date (or latest)
+  const growthRecords = childId ? getGrowthRecords(childId) : [];
+  const existingGrowth = (appt?.date ? growthRecords.find(g => g.date === targetDate) : null) || growthRecords[0] || {};
+
+  // Retrieve any existing blood test record for this child on this date (or latest)
+  const healthRecords = childId ? getHealthRecords(childId) : [];
+  const existingBlood = (appt?.date ? healthRecords.find(h => h.date === targetDate) : null) || healthRecords[0] || {};
+
+  const subTitle = appt ? `${escapeHTML(appt.type || 'Appointment')} (${appt.date})` : 'Student Medical Records';
+
+  return `
+    <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
+      <div class="gcal-popup-card gcal-clinical-modal-card" role="dialog" aria-modal="true">
+        <!-- Banner Header -->
+        <div class="gcal-popover-banner" style="background-image: url('assets/gcal_event_banner.png'); height: 105px; min-height: 105px;">
+          <div class="gcal-popover-banner-overlay"></div>
+          <button class="gcal-popup-close" type="button" aria-label="Close" data-close-cal-modal style="position:absolute; top:10px; right:12px; z-index:5; color:#fff; background:rgba(0,0,0,0.3); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+          <div style="position:absolute; bottom:12px; left:20px; color:#fff; z-index:3;">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; opacity:0.92; margin-bottom:2px; display:flex; align-items:center; gap:6px;">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Clinical Details &amp; Google Sheet Sync
+            </div>
+            <div style="font-size:18px; font-weight:700; text-shadow:0 1px 4px rgba(0,0,0,0.6); display:flex; align-items:center; gap:8px;">
+              <span>${escapeHTML(childName)}</span>
+              ${childId ? `<span style="font-size:11px; font-weight:600; background:rgba(255,255,255,0.25); backdrop-filter:blur(4px); padding:2px 8px; border-radius:10px;">${escapeHTML(childId)}</span>` : ''}
+              <span style="font-size:12px; font-weight:500; opacity:0.85;">· ${subTitle}</span>
+            </div>
+          </div>
+        </div>
+
+        <form id="clinical-data-form" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+          <input type="hidden" name="appointmentId" value="${appt?.id || ''}" />
+          <input type="hidden" name="childId" value="${childId || ''}" />
+          <input type="hidden" name="childName" value="${escapeHTML(childName)}" />
+          <input type="hidden" name="existingGrowthId" value="${existingGrowth.id || ''}" />
+          <input type="hidden" name="existingBloodId" value="${existingBlood.id || ''}" />
+
+          <div class="gcal-clinical-modal-body">
+            ${renderClinicalSectionsMarkup({ existingGrowth, existingBlood, targetDate, prefix: 'modal-' })}
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="clinical-modal-footer">
+            <button class="gcal-btn gcal-btn--secondary" type="button" data-close-cal-modal style="padding:8px 16px; font-size:13px;">
+              Cancel
+            </button>
+            <button class="gcal-btn gcal-btn--create" id="btn-save-clinical-data" type="submit" style="padding:8px 20px; font-size:13px; gap:6px;">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Save &amp; Sync to Sheet
+            </button>
+          </div>
+        </form>
       </div>
     </div>`;
 }
@@ -667,6 +972,10 @@ export function renderEditAppointmentModalMarkup(eventId) {
     { value: 'Completed', label: 'Completed' },
     { value: 'Cancelled', label: 'Cancelled' }
   ].map(s => `<option value="${s.value}" ${s.value.toLowerCase() === (appt.status || 'upcoming').toLowerCase() ? 'selected' : ''}>${s.label}</option>`).join('');
+
+  const specialtyOptions = DOCTOR_SPECIALTIES.map(s => 
+    `<option value="${escapeHTML(s)}" ${s.toLowerCase() === (appt.specialty || '').toLowerCase() ? 'selected' : ''}>${escapeHTML(s)}</option>`
+  ).join('');
 
   return `
     <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
@@ -726,6 +1035,19 @@ export function renderEditAppointmentModalMarkup(eventId) {
               <div class="gcal-popup-row-content">
                 <select class="gcal-popup-select" name="type" required>
                   ${typeOptions}
+                </select>
+              </div>
+            </div>
+
+            <!-- Speciality of doctor (Optional, can be empty) -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <select class="gcal-popup-select" name="specialty">
+                  <option value="">Speciality of doctor</option>
+                  ${specialtyOptions}
                 </select>
               </div>
             </div>

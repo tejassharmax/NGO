@@ -3,9 +3,9 @@ import { getChildren, getChild, getActivities, getPendingDocs, timeAgo, activity
 import { childRows, childTableHeaders } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
-import { getGoogleSheetUrl, getClinicalSheetUrl, getSheetsConfig, getNgoSlug } from './googleSheetsSync.js';
+import { getGoogleSheetUrl, getClinicalSheetUrl, getChildGoogleSheetUrl, getSheetsConfig, getNgoSlug } from './googleSheetsSync.js';
 import { getGoogleDocUrl, getDocsConfig } from './googleDocsSync.js';
-import { calendarCard, renderCalendarGrid, renderDayView, renderBookingForm, computeAppointmentStatus, formatSingleDisplayTime } from './googleCalendar.js';
+import { calendarCard, renderCalendarGrid, renderDayView, renderBookingForm, computeAppointmentStatus, formatSingleDisplayTime, renderClinicalSectionsMarkup } from './googleCalendar.js';
 
 /* ═══════════════════════════════════════════════════════
    NAVIGATION
@@ -13,8 +13,7 @@ import { calendarCard, renderCalendarGrid, renderDayView, renderBookingForm, com
 
 const nav = [
   { section: 'Overview', items: [['dashboard', 'Dashboard', 'grid']] },
-  { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['medicines', 'Prescriptions', 'pill'], ['documents', 'Documents', 'file']] },
-  { section: 'Analytics', items: [['reports', 'Reports', 'chart']] }
+  { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['documents', 'Documents', 'file']] }
 ];
 
 const pageTitles = {
@@ -212,7 +211,7 @@ export function dashboardPage() {
   } else {
     attentionHTML = flaggedChildren.slice(0, 4).map(child => {
       const hs = healthStatus(child);
-      return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
+      return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
     }).join('');
   }
 
@@ -317,15 +316,22 @@ export function childProfilePage() {
           ${icon('trash')}
         </button>
         <div class="document-card__body" style="padding:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px;">
-            <h3 style="font-size:14px; font-weight:600; margin:0;">${d.name || d.title || 'Medical Document'}</h3>
-            <span class="badge badge--success">${d.status || 'Verified'}</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px; gap:8px;">
+            <h3 style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${d.name || d.title || 'Medical Document'}</h3>
+            <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+              ${d.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:13px; height:13px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Local</span>`}
+              <span class="badge badge--success">${d.status || 'Verified'}</span>
+            </div>
           </div>
           <div class="detail-list detail-list--single" style="font-size:13px;">
             <div class="detail-row"><span>Category</span><b>${d.docType || d.category || 'Medical Report'}</b></div>
             <div class="detail-row"><span>Uploaded</span><b>${d.uploadDate || formatDate(d.timestamp) || 'Recently'}</b></div>
           </div>
-          ${d.fileData || d.image ? `<div style="margin-top:12px;"><a class="button button--sm" href="${d.fileData || d.image}" target="_blank" download="${d.name || 'document'}.png">${icon('download')} View / Download</a></div>` : ''}
+          <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+            ${d.driveUrl ? `<a class="button button--sm button--primary" href="${d.driveUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px;">${icon('external')} Open in Drive</a>` : ''}
+            ${d.fileData || d.image ? `<a class="button button--sm ${d.driveUrl ? 'button--ghost' : 'button--primary'}" href="${d.fileData || d.image}" target="_blank" download="${d.name || 'document'}.png" style="display:inline-flex; align-items:center; gap:6px;">${icon('download')} View / Download</a>` : ''}
+            ${!d.driveUrl && (d.fileData || d.image) ? `<button class="button button--sm button--ghost" type="button" data-sync-doc-id="${d.id}" style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')} Sync to Drive</button>` : ''}
+          </div>
         </div>
       </article>
     `).join('')}</div>`;
@@ -357,42 +363,360 @@ export function childProfilePage() {
       </div>`;
   }
 
-  // Growth HTML
-  let growthHTML = '';
+  // Latest values for Growth & Health Summary
+  const curHeight = latestGrowth?.height || child.height || '';
+  const curWeight = latestGrowth?.weight || child.weight || '';
+  const curBmi = latestGrowth?.bmi || (curHeight && curWeight ? +(curWeight / ((curHeight / 100) ** 2)).toFixed(1) : '');
+  const curHealthStatus = latestGrowth?.healthStatus || child.healthStatus || (hs.level === 'critical' ? 'Critical' : hs.level === 'warning' ? 'Review needed' : 'Healthy');
+  const curConditions = latestGrowth?.medicalConditions !== undefined ? latestGrowth.medicalConditions : (child.medicalConditions || '');
+  const curAllergies = latestGrowth?.allergies !== undefined ? latestGrowth.allergies : (child.allergies || '');
+  const curMeds = latestGrowth?.medications !== undefined ? latestGrowth.medications : (child.medications || (meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : ''));
+  const curDental = latestGrowth?.dentalRemarks !== undefined ? latestGrowth.dentalRemarks : (child.dentalRemarks || '');
+  const curHygiene = latestGrowth?.hygieneIndex !== undefined ? latestGrowth.hygieneIndex : (child.hygieneIndex || 'Not Assessed');
+  const defaultDate = latestGrowth?.date || new Date().toISOString().slice(0, 10);
+
+  // Growth History Rows HTML
+  let historyRowsHTML = '';
   if (growth.length === 0) {
-    growthHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('ruler')}</span><h3>No growth records</h3><p>Height, weight, and BMI records will appear here.</p></div>`;
+    historyRowsHTML = `<tr><td colspan="7"><div class="empty-state" style="padding: 28px 12px;"><span class="empty-state__icon">${icon('ruler')}</span><p style="margin:0; font-size:13px; color:var(--color-text-muted);">No records logged yet. Fill out the form above to save the first growth measurement.</p></div></td></tr>`;
   } else {
-    growthHTML = `
-      <div style="display: flex; flex-direction: column; gap: 20px;">
-        <h3 style="font-size:14px; font-weight:600;">Growth Measurements History</h3>
+    historyRowsHTML = growth.map(g => {
+      const gDate = g.date || (g.timestamp ? formatDate(g.timestamp) : '—');
+      const gBmi = g.bmi || (g.height && g.weight ? +(g.weight / ((g.height / 100) ** 2)).toFixed(1) : '—');
+      const bmiBadge = gBmi && gBmi !== '—'
+        ? (gBmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : gBmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>')
+        : '';
+      const gStatus = g.healthStatus || 'Healthy';
+      const statusColor = gStatus === 'Critical' ? 'danger' : gStatus === 'Review needed' ? 'warning' : 'success';
+      const safeGJson = escapeHTML(JSON.stringify(g));
+
+      return `
+        <tr>
+          <td><b style="color:var(--color-primary);">${formatDate(gDate)}</b></td>
+          <td><b>${g.height ? g.height + ' cm' : '—'}</b></td>
+          <td><b>${g.weight ? g.weight + ' kg' : '—'}</b></td>
+          <td>${gBmi} ${bmiBadge}</td>
+          <td><span class="badge badge--${statusColor}">${escapeHTML(gStatus)}</span></td>
+          <td style="font-size:12px; color:var(--color-text-muted); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${escapeHTML([g.medicalConditions, g.dentalRemarks, g.hygieneIndex].filter(Boolean).join(' · ')) || 'None recorded'}
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button class="button button--sm button--secondary" type="button" data-edit-growth-item='${safeGJson}' style="margin-right:6px;">
+              ${icon('pencil')} Edit
+            </button>
+            <button class="icon-button tooltip" type="button" data-tooltip="Delete measurement" data-delete-growth-id="${g.id || g.date}" style="color:var(--color-danger);">
+              ${icon('trash')}
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  // Growth Tab Content HTML
+  let growthHTML = `
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <!-- Health Summary Display Card (The Div) -->
+      <section class="card" id="child-health-summary-card">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 class="card__title">Health summary</h2>
+            <p class="card__caption">Latest vitals and health status (Recorded: <strong style="color:var(--color-primary); font-weight:700;">${formatDate(defaultDate)}</strong>)</p>
+          </div>
+          <button class="button button--secondary button--sm" type="button" data-new-growth-entry="${child.id}">
+            ${icon('plus')} Add / Log Measurement
+          </button>
+        </header>
+        <div class="card__body">
+          <div class="detail-list">
+            <div class="detail-row"><span>Health status</span><b>${escapeHTML(curHealthStatus)}</b></div>
+            <div class="detail-row"><span>Height</span><b>${curHeight ? curHeight + ' cm' : '—'}</b></div>
+            <div class="detail-row"><span>Weight</span><b>${curWeight ? curWeight + ' kg' : '—'}</b></div>
+            <div class="detail-row"><span>BMI</span><b>${curBmi || '—'} ${curBmi ? (curBmi < 16 ? '<span class="badge badge--danger" style="margin-left:4px;">Underweight</span>' : curBmi > 25 ? '<span class="badge badge--warning" style="margin-left:4px;">Overweight</span>' : '<span class="badge badge--success" style="margin-left:4px;">Normal</span>') : ''}</b></div>
+            <div class="detail-row"><span>Medical conditions</span><b>${escapeHTML(curConditions) || 'None reported'}</b></div>
+            <div class="detail-row"><span>Allergies</span><b>${escapeHTML(curAllergies) || 'None reported'}</b></div>
+            <div class="detail-row"><span>Current medications</span><b>${escapeHTML(curMeds) || 'None'}</b></div>
+            <div class="detail-row"><span>Dental remarks</span><b>${escapeHTML(curDental) || 'No remarks recorded'}</b></div>
+            <div class="detail-row"><span>Hygiene Index</span><b>${escapeHTML(curHygiene) || 'Not Assessed'}</b></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Editable Health Summary & Growth Form -->
+      <section class="card" id="child-growth-editor-card">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 class="card__title" id="growth-form-title">Health summary & Growth vitals</h2>
+            <p class="card__caption" id="growth-form-caption">Edit and save date-referenced vitals and health status</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="button button--secondary button--sm" type="button" data-new-growth-entry="${child.id}">
+              ${icon('plus')} New Date Entry
+            </button>
+          </div>
+        </header>
+        <div class="card__body">
+          <form id="child-growth-form" data-child-id="${child.id}" data-child-name="${escapeHTML(child.name)}">
+            <input type="hidden" name="id" id="growth-input-id" value="${latestGrowth?.id || ''}">
+
+            <!-- Date Reference Strip -->
+            <div style="background: var(--color-bg-alt, #f8fafc); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; background: var(--color-primary-bg, #eff6ff); color: var(--color-primary);">
+                  ${icon('calendar')}
+                </span>
+                <div>
+                  <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); display: block; margin-bottom: 2px;">
+                    Measurement Date Reference *
+                  </label>
+                  <input class="input" type="date" name="date" id="growth-input-date" value="${defaultDate}" required style="padding: 4px 8px; font-size: 13px; font-weight: 600; width: 175px;">
+                </div>
+              </div>
+              <div id="growth-date-badge-wrap">
+                <span class="badge badge--blue" id="growth-status-badge">
+                  ${latestGrowth?.date ? `Record Date: ${formatDate(latestGrowth.date)}` : `New Entry`}
+                </span>
+              </div>
+            </div>
+
+            <!-- 2-Column Form Fields Matching Health Summary -->
+            <div class="form-grid--two">
+              <!-- Health Status -->
+              <label class="field">
+                <span class="field__label">Health status</span>
+                <select class="select" name="healthStatus" id="growth-input-status">
+                  <option value="Healthy" ${curHealthStatus === 'Healthy' || curHealthStatus === 'Optimal' ? 'selected' : ''}>Healthy (Optimal)</option>
+                  <option value="Review needed" ${curHealthStatus === 'Review needed' || curHealthStatus === 'Monitor' ? 'selected' : ''}>Review needed (Monitor)</option>
+                  <option value="Critical" ${curHealthStatus === 'Critical' || curHealthStatus === 'Needs attention' ? 'selected' : ''}>Critical (Needs attention)</option>
+                </select>
+              </label>
+
+              <!-- Calculated BMI (live calculation preview) -->
+              <div class="field">
+                <span class="field__label">Calculated BMI</span>
+                <div style="display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 12px; background: var(--color-bg-alt, #f8fafc); border: 1px solid var(--color-border); border-radius: 6px;">
+                  <b id="growth-display-bmi" style="font-size: 15px;">${curBmi || '—'}</b>
+                  <span id="growth-display-bmi-badge">
+                    ${curBmi ? (curBmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : curBmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : ''}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Height -->
+              <label class="field">
+                <span class="field__label">Height (cm) *</span>
+                <input class="input" type="number" step="any" min="0" name="height" id="growth-input-height" placeholder="e.g. 140" value="${curHeight}" required>
+              </label>
+
+              <!-- Weight -->
+              <label class="field">
+                <span class="field__label">Weight (kg) *</span>
+                <input class="input" type="number" step="any" min="0" name="weight" id="growth-input-weight" placeholder="e.g. 35" value="${curWeight}" required>
+              </label>
+
+              <!-- Medical Conditions -->
+              <label class="field">
+                <span class="field__label">Medical conditions</span>
+                <input class="input" type="text" name="medicalConditions" id="growth-input-conditions" placeholder="e.g. Asthma, Diabetes" value="${escapeHTML(curConditions)}">
+              </label>
+
+              <!-- Allergies -->
+              <label class="field">
+                <span class="field__label">Allergies</span>
+                <input class="input" type="text" name="allergies" id="growth-input-allergies" placeholder="e.g. Peanuts, Dust, Penicillin" value="${escapeHTML(curAllergies)}">
+              </label>
+
+              <!-- Current Medications -->
+              <label class="field">
+                <span class="field__label">Current medications</span>
+                <input class="input" type="text" name="medications" id="growth-input-meds" placeholder="e.g. Paracetamol, Multivitamins" value="${escapeHTML(curMeds)}">
+              </label>
+
+              <!-- Dental Remarks -->
+              <label class="field">
+                <span class="field__label">Dental remarks</span>
+                <input class="input" type="text" name="dentalRemarks" id="growth-input-dental" placeholder="e.g. No remarks / Scaling done" value="${escapeHTML(curDental)}">
+              </label>
+
+              <!-- Hygiene Index -->
+              <label class="field form-span-all">
+                <span class="field__label">Oral Hygiene Index</span>
+                <select class="select" name="hygieneIndex" id="growth-input-hygiene">
+                  <option value="SATISFACTORY" ${curHygiene === 'SATISFACTORY' ? 'selected' : ''}>SATISFACTORY</option>
+                  <option value="AVERAGE" ${curHygiene === 'AVERAGE' ? 'selected' : ''}>AVERAGE</option>
+                  <option value="POOR" ${curHygiene === 'POOR' ? 'selected' : ''}>POOR</option>
+                  <option value="Not Assessed" ${curHygiene === 'Not Assessed' || !curHygiene ? 'selected' : ''}>Not Assessed</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--color-border); flex-wrap:wrap; gap:12px;">
+              <span style="font-size:12px; color:var(--color-text-muted);">
+                Saves to database with date reference and live synchronizes to Google Sheets.
+              </span>
+              <div style="display:flex; gap:10px;">
+                <button class="button button--ghost" type="button" id="growth-cancel-edit-btn" style="display:none;" data-cancel-growth-edit>
+                  Cancel
+                </button>
+                <button class="button button--primary" type="submit" id="growth-submit-btn">
+                  ${icon('check')} Save Growth Record
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- History Table by Date -->
+      <section class="card">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h2 class="card__title">Growth & Health History by Date</h2>
+            <p class="card__caption">All recorded vitals and health progression for ${escapeHTML(child.name)}</p>
+          </div>
+        </header>
         <div class="data-table-wrap">
           <table class="data-table">
-            <thead><tr><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Height</th>
+                <th>Weight</th>
+                <th>BMI</th>
+                <th>Status</th>
+                <th>Conditions / Dental</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
             <tbody>
-              ${growth.map(g => `<tr><td>${formatDate(g.date || g.timestamp)}</td><td><b>${g.height} cm</b></td><td><b>${g.weight} kg</b></td><td><span class="badge badge--neutral">${g.bmi || '—'}</span></td><td>${g.bmi ? (g.bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : g.bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : '—'}</td></tr>`).join('')}
+              ${historyRowsHTML}
             </tbody>
           </table>
         </div>
-      </div>`;
-  }
+      </section>
+    </div>
+  `;
 
-  // Medicines HTML
-  let medsHTML = '';
-  if (allMeds.length === 0) {
-    medsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('pill')}</span><h3>No prescriptions logged</h3><p>Medications prescribed for ${child.name} will appear here.</p></div>`;
-  } else {
-    medsHTML = `<div class="document-grid">${allMeds.map(m => `
-      <article class="card document-card"><div class="document-card__body" style="padding:14px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px"><h3 style="font-size:14px; font-weight:600; margin:0">${m.medicineName}</h3>${statusBadge(m.status)}</div><p style="font-size:13px; color:var(--color-text-muted); margin:0 0 4px">${m.dosage}</p><p style="font-size:12px; color:var(--color-text-muted); margin:0">${m.frequency} · ${m.startDate} → ${m.endDate}</p></div></article>
-    `).join('')}</div>`;
-  }
+  // Clinical & Google Sheet Sync HTML
+  const latestBlood = healthRecs[0] || {};
+  const allClinicalHistory = [
+    ...growth.map(g => ({ ...g, entryType: 'checkup', sortDate: g.date || '1970-01-01' })),
+    ...healthRecs.map(h => ({ ...h, entryType: 'blood', sortDate: h.date || '1970-01-01' }))
+  ].sort((a, b) => (new Date(b.sortDate).getTime() || 0) - (new Date(a.sortDate).getTime() || 0));
 
-  // Timeline HTML
-  let timelineHTML = '';
-  if (activities.length === 0) {
-    timelineHTML = `<div class="timeline"><div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>Child registered</b><p>Record created in the health management workspace.</p><time>${child.registeredDate ? formatDate(child.registeredDate) : 'Recently'}</time></div></div></div>`;
-  } else {
-    timelineHTML = `<div class="timeline">${activities.map(a => `<div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>${a.action ? a.action.replace(/_/g, ' ').toUpperCase() : 'ACTIVITY'}</b><p>${a.detail || a.childName}</p><time>${timeAgo(a.timestamp)}</time></div></div>`).join('')}</div>`;
-  }
+  const historyClinicalRowsHTML = allClinicalHistory.length === 0 ? `
+    <tr><td colspan="5" class="empty-state" style="padding: 24px; text-align: center;">No clinical checkups or blood tests recorded yet for ${escapeHTML(child.name)}.</td></tr>
+  ` : allClinicalHistory.map(item => {
+    const isCheckup = item.entryType === 'checkup';
+    const typeBadge = isCheckup
+      ? `<span class="badge badge--blue" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Routine Checkup (Row 3)</span>`
+      : `<span class="badge badge--danger" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> Blood Test (Row 19)</span>`;
+
+    const summaryHTML = isCheckup
+      ? `<span>${[
+          item.temperature ? `${item.temperature}°F` : '',
+          item.bp ? `BP ${item.bp}` : '',
+          item.weight ? `${item.weight}kg` : '',
+          item.pulse ? `${item.pulse}bpm` : '',
+          item.spo2 ? `SpO2 ${item.spo2}%` : ''
+        ].filter(Boolean).join(' · ') || 'Vitals recorded'}</span>`
+      : `<span>${[
+          item.hemoglobin ? `Hb: ${item.hemoglobin} g/dL` : '',
+          item.wbc ? `WBC: ${item.wbc}` : '',
+          item.platelets ? `Platelets: ${item.platelets} Lakhs` : '',
+          item.rbc ? `RBC: ${item.rbc}` : ''
+        ].filter(Boolean).join(' · ') || 'Lab values recorded'}</span>`;
+
+    const detailsHTML = isCheckup
+      ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML(item.eyeCheckup)}` : ''}` || '—'
+      : `${item.rbcMorphology ? `RBC: ${escapeHTML(item.rbcMorphology)} ` : ''}${item.plateletsAdequacy ? `· Platelets: ${escapeHTML(item.plateletsAdequacy)}` : ''}` || '—';
+
+    const rawData = JSON.stringify(item).replace(/"/g, '&quot;');
+
+    return `
+      <tr>
+        <td style="font-weight:600; white-space:nowrap;">${item.date ? formatDate(item.date) : 'Recent'}</td>
+        <td style="white-space:nowrap;">${typeBadge}</td>
+        <td style="font-size:13px;">${summaryHTML}</td>
+        <td style="font-size:12.5px; color:var(--color-text-muted); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detailsHTML}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="button button--ghost button--sm" type="button" data-load-clinical-item="${rawData}" style="display:inline-flex; align-items:center; gap:4px;">
+            ${icon('pencil')} Load into Form
+          </button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  const clinicalHTML = `
+    <!-- Main Data Entry Form -->
+    <section class="card" style="margin-bottom: 24px;">
+      <form id="profile-clinical-data-form" class="clinical-sync-form" style="padding: 24px;">
+        <input type="hidden" name="childId" value="${child.id}" />
+        <input type="hidden" name="childName" value="${escapeHTML(child.name)}" />
+        <input type="hidden" name="existingGrowthId" id="prof-growth-id" value="${latestGrowth?.id || ''}" />
+        <input type="hidden" name="existingBloodId" id="prof-blood-id" value="${latestBlood?.id || ''}" />
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 class="card__title" style="margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Clinical Details &amp; Google Sheet Sync Form
+            </h2>
+            <p class="card__caption" style="margin: 0;">Fill in clinical checkup vitals and blood test parameters. Saving automatically updates both local records and Google Sheets.</p>
+          </div>
+          <button class="button button--primary" id="btn-save-profile-clinical" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Save &amp; Sync to Sheet
+          </button>
+        </div>
+
+        ${renderClinicalSectionsMarkup({
+          existingGrowth: latestGrowth || {},
+          existingBlood: latestBlood || {},
+          targetDate: new Date().toISOString().slice(0, 10),
+          prefix: 'prof-'
+        })}
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--color-border);">
+          <button class="button button--primary" id="btn-save-profile-clinical-bottom" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Save &amp; Sync to Sheet
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- History Table -->
+    <section class="card">
+      <header class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h2 class="card__title">Clinical &amp; Lab History</h2>
+          <p class="card__caption">All routine clinical checkups and blood test reports recorded for ${escapeHTML(child.name)}</p>
+        </div>
+        <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
+      </header>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Measurements / Key Values</th>
+              <th>Clinical Remarks / Prescription</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${historyClinicalRowsHTML}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+
+  const activeTab = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('chm_active_profile_tab')) || 'overview';
 
   return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-open-child-sheet="${child.id}" data-child-name="${escapeHTML(child.name)}" style="display:inline-flex; align-items:center; gap:8px;">${icon('googleSheets')}Open Google Sheet</button><button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
   <section class="card">
@@ -402,7 +726,7 @@ export function childProfilePage() {
         <h1>${child.name}</h1>
         <p>${child.id} · ${age ? age + ' old' : 'Age unknown'}</p>
         <div class="profile-header__meta">
-          ${healthDot(hs.level)} ${statusBadge(child.status)}
+          ${statusBadge(child.status)}
           <span class="badge badge--neutral">${child.gender || 'Not specified'}</span>
           <span class="badge badge--blue">Blood: ${child.blood || 'Unknown'}</span>
           ${hs.flags.length ? `<span class="badge badge--warning">${hs.flags.join(', ')}</span>` : ''}
@@ -414,97 +738,114 @@ export function childProfilePage() {
     </div>
     <div class="profile-tabs">
       <div class="tabs" role="tablist">
-        <button class="tab tab--active" type="button" data-profile-tab="overview">Overview</button>
-        <button class="tab" type="button" data-profile-tab="growth">Growth</button>
-        <button class="tab" type="button" data-profile-tab="medicines">Prescriptions</button>
-        <button class="tab" type="button" data-profile-tab="reports">Reports</button>
-        <button class="tab" type="button" data-profile-tab="documents">Documents (${docs.length})</button>
-        <button class="tab" type="button" data-profile-tab="timeline">Health Timeline</button>
+        <button class="tab ${activeTab === 'overview' ? 'tab--active' : ''}" type="button" data-profile-tab="overview">Overview</button>
+        <button class="tab ${activeTab === 'clinical' ? 'tab--active' : ''}" type="button" data-profile-tab="clinical" style="display:inline-flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Clinical &amp; Sheet Sync
+        </button>
+        <button class="tab ${activeTab === 'growth' ? 'tab--active' : ''}" type="button" data-profile-tab="growth">Growth</button>
+        <button class="tab ${activeTab === 'documents' ? 'tab--active' : ''}" type="button" data-profile-tab="documents">Documents (${docs.length})</button>
       </div>
     </div>
   </section>
 
-  <div class="profile-tab-content-container">
+  <div class="profile-tab-content-container" style="margin-top: 20px;">
     <!-- OVERVIEW TAB -->
-    <div data-tab-panel="overview">
-      <div class="profile-layout">
-        <div class="dashboard-grid">
-          <section class="card">
-            <header class="card__header">
-              <div><h2 class="card__title">Personal information</h2><p class="card__caption">Core child details</p></div>
-              <button class="icon-button icon-button--small" type="button" data-edit="${child.id}">${icon('pencil')}</button>
-            </header>
-            <div class="card__body">
-              <div class="detail-list">
-                <div class="detail-row"><span>Full name</span><b>${child.name}</b></div>
-                <div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div>
-                <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
-                <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Parent / Guardian</span><b>${child.father || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Mother name</span><b>${child.mother || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Contact phone</span><b>${child.phone || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div>
-              </div>
-            </div>
-          </section>
-          <section class="card">
-            <header class="card__header">
-              <div><h2 class="card__title">Health summary</h2><p class="card__caption">Latest vitals and health status</p></div>
-            </header>
-            <div class="card__body">
-              <div class="detail-list">
-                <div class="detail-row"><span>Health status</span><b>${healthDot(hs.level)} ${hs.label}</b></div>
-                <div class="detail-row"><span>Height</span><b>${latestGrowth ? latestGrowth.height + ' cm' : child.height ? child.height + ' cm' : '—'}</b></div>
-                <div class="detail-row"><span>Weight</span><b>${latestGrowth ? latestGrowth.weight + ' kg' : child.weight ? child.weight + ' kg' : '—'}</b></div>
-                <div class="detail-row"><span>BMI</span><b>${latestGrowth && latestGrowth.bmi ? latestGrowth.bmi : '—'}</b></div>
-                <div class="detail-row"><span>Medical conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
-                <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
-                <div class="detail-row"><span>Current medications</span><b>${child.medications || (meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : 'None')}</b></div>
-                <div class="detail-row"><span>Dental remarks</span><b>${child.dentalRemarks || 'No remarks recorded'}</b></div>
-                <div class="detail-row"><span>Hygiene Index</span><b>${child.hygieneIndex || 'Not Assessed'}</b></div>
-              </div>
-            </div>
-          </section>
+    <div data-tab-panel="overview" style="${activeTab === 'overview' ? 'display: block;' : 'display: none;'}">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Personal information</h2><p class="card__caption">Core child details</p></div>
+          <button class="icon-button icon-button--small" type="button" data-edit="${child.id}">${icon('pencil')}</button>
+        </header>
+        <div class="card__body">
+          <div class="detail-list">
+            <div class="detail-row"><span>Full name</span><b>${child.name}</b></div>
+            <div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div>
+            <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
+            <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Parent / Guardian</span><b>${child.father || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Mother name</span><b>${child.mother || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Contact phone</span><b>${child.phone || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <!-- CLINICAL & BLOOD TEST OVERVIEW CARD -->
+      <section class="card" style="margin-top: 20px;">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h2 class="card__title" style="display:flex; align-items:center; gap:8px;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Clinical Checkup &amp; Blood Test Sync
+            </h2>
+            <p class="card__caption">Synced with Google Sheet (Row 3 Routine Checkup &amp; Row 19 Blood Test)</p>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="button button--sm" type="button" data-switch-profile-tab="clinical" style="display:inline-flex; align-items:center; gap:6px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit &amp; Auto-Sync
+            </button>
+            <button class="button button--primary button--sm" type="button" data-open-clinical-modal="" data-child-id="${child.id}" data-child-name="${escapeHTML(child.name)}" style="display:inline-flex; align-items:center; gap:6px;">
+              ${icon('googleSheets')}
+              Sync Modal
+            </button>
+          </div>
+        </header>
+        <div class="card__body">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+            <!-- Routine Checkup Summary (Row 3) -->
+            <div style="background:var(--color-surface-sunken, #f8fafc); border:1px solid var(--color-border); border-radius:8px; padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-weight:600; font-size:13px; color:var(--color-text); display:flex; align-items:center; gap:6px;">
+                  <span style="width:8px; height:8px; border-radius:50%; background:#2563eb;"></span>
+                  Routine Checkup (Row 3)
+                </span>
+                <span style="font-size:12px; color:var(--color-text-muted);">${latestGrowth ? (latestGrowth.date || 'Recent') : 'No records'}</span>
+              </div>
+              <div class="detail-list detail-list--single" style="font-size:13px;">
+                <div class="detail-row"><span>Temperature</span><b>${latestGrowth?.temperature ? latestGrowth.temperature + ' °F' : '—'}</b></div>
+                <div class="detail-row"><span>Blood Pressure</span><b>${latestGrowth?.bp || '—'}</b></div>
+                <div class="detail-row"><span>Weight</span><b>${latestGrowth?.weight ? latestGrowth.weight + ' kg' : '—'}</b></div>
+                <div class="detail-row"><span>Pulse / Rate</span><b>${latestGrowth?.pulse ? latestGrowth.pulse + ' bpm' : '—'}</b></div>
+                <div class="detail-row"><span>SPO2</span><b>${latestGrowth?.spo2 ? latestGrowth.spo2 + ' %' : '—'}</b></div>
+                <div class="detail-row"><span>Eye Checkup</span><b>${latestGrowth?.eyeCheckup || '—'}</b></div>
+              </div>
+            </div>
+
+            <!-- Blood Test Summary (Row 19) -->
+            <div style="background:var(--color-surface-sunken, #f8fafc); border:1px solid var(--color-border); border-radius:8px; padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-weight:600; font-size:13px; color:var(--color-text); display:flex; align-items:center; gap:6px;">
+                  <span style="width:8px; height:8px; border-radius:50%; background:#dc2626;"></span>
+                  Blood Test Report (Row 19)
+                </span>
+                <span style="font-size:12px; color:var(--color-text-muted);">${latestBlood?.date ? latestBlood.date : (latestBlood?.timestamp ? formatDate(latestBlood.timestamp) : 'No records')}</span>
+              </div>
+              <div class="detail-list detail-list--single" style="font-size:13px;">
+                <div class="detail-row"><span>Haemoglobin</span><b>${latestBlood?.hemoglobin ? latestBlood.hemoglobin + ' g/dL' : '—'}</b></div>
+                <div class="detail-row"><span>WBC Count</span><b>${latestBlood?.wbc ? latestBlood.wbc + ' /cumm' : '—'}</b></div>
+                <div class="detail-row"><span>Platelets</span><b>${latestBlood?.platelets ? latestBlood.platelets + ' Lakhs' : '—'}</b></div>
+                <div class="detail-row"><span>RBC Count</span><b>${latestBlood?.rbc ? latestBlood.rbc + ' M/µL' : '—'}</b></div>
+                <div class="detail-row"><span>PCV</span><b>${latestBlood?.pcv ? latestBlood.pcv + ' %' : '—'}</b></div>
+                <div class="detail-row"><span>Platelets Adequacy</span><b>${latestBlood?.plateletsAdequacy || '—'}</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- CLINICAL & SHEET SYNC TAB -->
+    <div data-tab-panel="clinical" style="${activeTab === 'clinical' ? 'display: block;' : 'display: none;'}">
+      ${clinicalHTML}
     </div>
 
     <!-- GROWTH TAB -->
-    <div data-tab-panel="growth" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Growth Tracking History</h2><p class="card__caption">Height, weight, and BMI progression</p></div>
-        </header>
-        <div class="card__body">
-          ${growthHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- MEDICINES TAB -->
-    <div data-tab-panel="medicines" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Prescriptions</h2><p class="card__caption">Prescribed treatments and active prescriptions</p></div>
-        </header>
-        <div class="card__body">
-          ${medsHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- REPORTS TAB -->
-    <div data-tab-panel="reports" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Clinical Health Reports</h2><p class="card__caption">Lab test reports, blood panels, and clinical flags</p></div>
-        </header>
-        <div class="card__body">
-          ${reportsHTML}
-        </div>
-      </section>
+    <div data-tab-panel="growth" style="${activeTab === 'growth' ? 'display: block;' : 'display: none;'}">
+      ${growthHTML}
     </div>
 
     <!-- DOCUMENTS TAB -->
@@ -516,18 +857,6 @@ export function childProfilePage() {
         </header>
         <div class="card__body">
           ${docsHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- HEALTH TIMELINE TAB -->
-    <div data-tab-panel="timeline" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Full Health Timeline</h2><p class="card__caption">Complete audit history for ${child.name}</p></div>
-        </header>
-        <div class="card__body">
-          ${timelineHTML}
         </div>
       </section>
     </div>
@@ -767,6 +1096,7 @@ export function medicinesPage() {
 export function documentsPage() {
   const docs = getUploadedDocs();
   const children = getChildren();
+  const unsyncedCount = docs.filter(d => !d.driveUrl && (d.fileData || d.image)).length;
   let contentHTML = '';
 
   if (docs.length === 0) {
@@ -778,23 +1108,30 @@ export function documentsPage() {
   } else {
     contentHTML = `<div class="document-grid" id="document-grid">
       ${docs.map((doc, idx) => `
-        <article class="card document-card card--interactive" data-document-idx="${idx}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}" style="position:relative;">
+        <article class="card document-card card--interactive" data-document-idx="${idx}" data-doc-id="${doc.id || ''}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}" style="position:relative;">
           <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
             ${icon('trash')}
           </button>
           <div class="document-card__preview" style="position:relative; width:100%; height:140px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
-            ${doc.image || doc.fileData ? `<img src="${doc.image || doc.fileData}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
+            ${doc.image || doc.fileData ? `<img src="${doc.image || doc.fileData}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : `<div style="display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--color-text-muted);">${icon('file')}<span style="font-size:11px;">Cloud Document</span></div>`}
           </div>
           <div class="document-card__body" style="padding-top:12px;">
-            <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center;">
-              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; padding-right:20px;">${doc.name}</h2>
-              ${statusBadge(doc.status || 'Verified')}
+            <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${doc.name}</h2>
+              <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
+                ${doc.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:12px; height:12px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Local</span>`}
+                ${statusBadge(doc.status || 'Verified')}
+              </div>
             </div>
             <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between; align-items:center;">
               <span style="font-weight:600; color:var(--color-text);">${doc.child || doc.childName || doc.student || '—'}</span>
               <span>${doc.docType || doc.category || doc.meta || 'Medical Document'}</span>
             </div>
-            ${doc.image || doc.fileData ? `<div style="margin-top:10px;"><a class="button button--sm" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="width:100%; justify-content:center;">${icon('download')} View / Download</a></div>` : ''}
+            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+              ${doc.driveUrl ? `<a class="button button--sm button--primary" href="${doc.driveUrl}" target="_blank" rel="noopener noreferrer" style="flex:1; justify-content:center; display:inline-flex; align-items:center; gap:6px;">${icon('external')} View in Drive</a>` : ''}
+              ${doc.image || doc.fileData ? `<a class="button button--sm ${doc.driveUrl ? 'button--ghost' : 'button--primary'}" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="flex:1; justify-content:center; display:inline-flex; align-items:center; gap:6px;">${icon('download')} Download</a>` : ''}
+              ${!doc.driveUrl && (doc.image || doc.fileData) ? `<button class="button button--sm button--ghost" type="button" data-sync-doc-id="${doc.id}" style="width:100%; justify-content:center; display:inline-flex; align-items:center; gap:6px; margin-top:2px;">${icon('refresh')} Sync to Google Drive</button>` : ''}
+            </div>
           </div>
         </article>
       `).join('')}
@@ -803,7 +1140,7 @@ export function documentsPage() {
 
   const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
 
-  return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
+  return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button>${unsyncedCount > 0 ? `<button class="button button--ghost" type="button" data-auto-sync-drive style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')}Sync ${unsyncedCount} to Drive</button>` : ''}<a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -867,6 +1204,7 @@ export function settingsPage() {
   const ngoSlug = getNgoSlug(session);
   const sheetsConfig = getSheetsConfig() || {};
   const isConnected = !!sheetsConfig.connected;
+  const isTokenExpired = !!sheetsConfig.tokenExpired;
   const adminEmail = sheetsConfig.adminEmail || 'Admin';
   const masterSheetUrl = getGoogleSheetUrl();
   const clinicalSheetUrl = getClinicalSheetUrl();
@@ -882,46 +1220,68 @@ export function settingsPage() {
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
         <!-- Google Sheets Live Sync Highlight Card (TOP) -->
-        <div class="card" style="padding: 20px; border: 2px solid #0F9D58; background: var(--color-bg); grid-column: 1 / -1; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 157, 88, 0.08);">
+        <div class="card" style="padding: 20px; border: 2px solid ${isTokenExpired ? '#ea4335' : isConnected ? '#0F9D58' : 'var(--color-border)'}; background: var(--color-bg); grid-column: 1 / -1; border-radius: 8px; box-shadow: 0 4px 12px ${isTokenExpired ? 'rgba(234, 67, 53, 0.08)' : 'rgba(15, 157, 88, 0.08)'};">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <b style="font-size: 16px; font-weight: 700; color: #0F9D58; display: flex; align-items: center; gap: 10px;">
+            <b style="font-size: 16px; font-weight: 700; color: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; display: flex; align-items: center; gap: 10px;">
               ${icon('googleSheets')}
               Google Sheets Live Sync
             </b>
-            ${isConnected ? `<span class="badge badge--success">Connected as ${escapeHTML(adminEmail)}</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
-          </div>
-          <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
-            ${isConnected 
-              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
-              : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
+            ${isTokenExpired 
+              ? `<span class="badge" style="background: rgba(234, 67, 53, 0.12); color: #ea4335; border: 1px solid rgba(234, 67, 53, 0.3); font-weight: 700;">⚠️ Authorization Expired</span>`
+              : isConnected 
+                ? `<span class="badge badge--success">Connected as ${escapeHTML(adminEmail)}</span>` 
+                : `<span class="badge badge--neutral">Not Connected</span>`
             }
-          </p>
+          </div>
+
+          ${isTokenExpired ? `
+            <div style="background: rgba(234, 67, 53, 0.08); border-left: 4px solid #ea4335; padding: 12px 14px; border-radius: 4px; margin-bottom: 16px;">
+              <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">Google Workspace Authorization Expired</div>
+              <div style="font-size: 12.5px; color: var(--color-text); line-height: 1.4;">
+                Google OAuth tokens in Testing mode expire periodically. Click <strong>Reconnect Google Sheets Sync</strong> below to refresh authorization and instantly sync your records and Monika Sharma's clinical vitals to Google Sheets.
+              </div>
+            </div>
+          ` : `
+            <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
+              ${isConnected 
+                ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
+                : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
+              }
+            </p>
+          `}
 
           <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-            ${!isConnected ? `
-              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: #0F9D58; border-color: #0F9D58;">
+            ${(!isConnected || isTokenExpired) ? `
+              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; border-color: ${isTokenExpired ? '#ea4335' : '#0F9D58'};">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-                Connect Google Sheets Sync
+                ${isTokenExpired ? 'Reconnect Google Sheets Sync ↗' : 'Connect Google Sheets Sync'}
               </a>
-            ` : `
-              ${clinicalSheetUrl ? `
-                <a href="${escapeHTML(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
-                  ${icon('googleSheets')}
-                  Open Student Medical Records Workbook ↗
-                </a>
-              ` : ''}
-              ${masterSheetUrl ? `
-                <a href="${escapeHTML(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
-                  📄 Master Directory Sheet ↗
-                </a>
-              ` : ''}
+            ` : ''}
+
+            ${clinicalSheetUrl ? `
+              <a href="${escapeHTML(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
+                ${icon('googleSheets')}
+                Open Student Medical Records Workbook ↗
+              </a>
+            ` : ''}
+
+            ${masterSheetUrl ? `
+              <a href="${escapeHTML(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                📄 Master Directory Sheet ↗
+              </a>
+            ` : ''}
+
+            ${isConnected && !isTokenExpired ? `
               <button class="button button--ghost" type="button" data-sync-from-sheets style="font-weight: 600; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
                 ${icon('rotate')} Pull from Sheets
               </button>
+            ` : ''}
+
+            ${isConnected || isTokenExpired ? `
               <button type="button" data-disconnect-google-sheets data-ngo="${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-left: auto; cursor: pointer;">
                 ${icon('trash')} Disconnect
               </button>
-            `}
+            ` : ''}
           </div>
         </div>
 
@@ -1008,7 +1368,7 @@ export function appointmentsPage() {
                   <td>
                     <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text);">
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#70757a" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                      <span>${escapeHTML(a.doctor || 'General Clinic')}</span>
+                      <span>${escapeHTML(a.doctor || 'General Clinic')}${a.specialty ? ` · <span style="font-size:11px; color:var(--color-text-muted);">${escapeHTML(a.specialty)}</span>` : ''}</span>
                     </div>
                   </td>
                   <td>

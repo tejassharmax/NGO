@@ -17,6 +17,7 @@ export function searchAppointments(query = '') {
   return appointments.filter(a => 
     (a.childName && a.childName.toLowerCase().includes(term)) ||
     (a.type && a.type.toLowerCase().includes(term)) ||
+    (a.specialty && a.specialty.toLowerCase().includes(term)) ||
     (a.doctor && a.doctor.toLowerCase().includes(term)) ||
     (a.notes && a.notes.toLowerCase().includes(term)) ||
     (a.date && a.date.includes(term))
@@ -114,7 +115,7 @@ export function getAllSpotlightItems(query = '') {
     ...a,
     spotlightType: 'appointment',
     searchTitle: `${a.childName} — ${a.type}`,
-    searchSubtitle: `${a.date} at ${a.time || '10:00 AM'}${a.doctor ? ` • Dr. ${a.doctor}` : ''}`,
+    searchSubtitle: `${a.date} at ${a.time || '10:00 AM'}${a.doctor ? ` • Dr. ${a.doctor}` : ''}${a.specialty ? ` (${a.specialty})` : ''}`,
     targetUrl: `${pagePath('appointments')}`
   }));
 
