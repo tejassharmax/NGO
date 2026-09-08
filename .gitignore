@@ -9,6 +9,8 @@ node_modules/
 *.json
 !package.json
 !package-lock.json
+!data/db.json
+!data/sheets_config.json
 
 # Google service account key
 sinuous-tine-482007-v3-96edde2df8ba.json

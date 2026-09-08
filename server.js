@@ -756,10 +756,16 @@ app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
     const mergedData = mergeNamespace(clientData, serverData);
 
     if (firestore) {
-      await writeSnapshot(tenant.slug, mergedData, index);
+      try {
+        await writeSnapshot(tenant.slug, mergedData, index);
+      } catch (fsErr) {
+        console.warn(`[Sync] Firestore write failed (${fsErr.message}). Persisting to file store fallback.`);
+        writeFileStore(mergedData);
+      }
     } else {
       writeFileStore(mergedData);
     }
+    writeFileStore(mergedData);
 
     // Immediately sync local CSV backup and trigger Google Sheets sync
     if (mergedData['chm-children']) {
