@@ -312,7 +312,7 @@ export function childProfilePage() {
   } else {
     docsHTML = `<div class="document-grid">${docs.map((d, idx) => `
       <article class="card document-card" style="position:relative;">
-        <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
+        <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-id="${d.id || ''}" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
           ${icon('trash')}
         </button>
         <div class="document-card__body" style="padding:16px;">
@@ -1109,7 +1109,7 @@ export function documentsPage() {
     contentHTML = `<div class="document-grid" id="document-grid">
       ${docs.map((doc, idx) => `
         <article class="card document-card card--interactive" data-document-idx="${idx}" data-doc-id="${doc.id || ''}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}" style="position:relative;">
-          <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
+          <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-id="${doc.id || ''}" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
             ${icon('trash')}
           </button>
           <div class="document-card__preview" style="position:relative; width:100%; height:140px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">

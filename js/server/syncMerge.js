@@ -111,6 +111,20 @@ function mergeNamespace(clientData = {}, serverData = {}) {
       } else {
         merged[key] = '[]';
       }
+    } else if (key === 'chm-documents') {
+      let clientArr = null;
+      try {
+        if (clientData[key] !== undefined && clientData[key] !== null) {
+          clientArr = JSON.parse(clientData[key]);
+        }
+      } catch (e) { }
+      if (Array.isArray(clientArr)) {
+        merged[key] = JSON.stringify(clientArr);
+      } else if (serverData[key]) {
+        merged[key] = serverData[key];
+      } else {
+        merged[key] = '[]';
+      }
     } else if (key.startsWith('chm-')) {
       merged[key] = mergeJSONArrays(clientData[key], serverData[key]);
     } else if (clientData[key] !== undefined && clientData[key] !== null) {

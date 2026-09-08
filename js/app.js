@@ -29,7 +29,6 @@ let renderCurrentPage = null;
 (async () => {
   localStorage.removeItem('sample-students');
   localStorage.removeItem('sample-children');
-  localStorage.setItem('chm-documents', '[]');
   localStorage.setItem('chm-pending-docs', '[]');
 
   // Purge legacy preset mock data and test registrations completely
@@ -943,9 +942,10 @@ document.addEventListener('click', (event) => {
 
   const docCardClick = target.closest('[data-document-idx]');
   if (docCardClick && !target.matches('button, a') && !target.closest('button, a')) {
+    const docId = docCardClick.dataset.docId;
     const idx = docCardClick.dataset.documentIdx;
     const docs = getUploadedDocs();
-    const doc = docs[idx];
+    const doc = (docId && docs.find(d => d.id === docId)) || docs[idx];
     if (doc) {
       modal({
         title: `${doc.name} - ${doc.child || doc.student || '—'}`,
@@ -1375,19 +1375,52 @@ document.addEventListener('click', (event) => {
   }
 
   // Delete uploaded document
-  if (target.closest('[data-delete-doc-idx]')) {
-    const idx = parseInt(target.closest('[data-delete-doc-idx]').dataset.deleteDocIdx, 10);
+  const deleteDocBtn = target.closest('[data-delete-doc-id], [data-delete-doc-idx]');
+  if (deleteDocBtn) {
+    const docId = deleteDocBtn.dataset.deleteDocId;
+    const docIdx = parseInt(deleteDocBtn.dataset.deleteDocIdx, 10);
+    const docs = getUploadedDocs();
+    const targetDoc = (docId && docs.find(d => d.id === docId)) || (typeof docIdx === 'number' && !isNaN(docIdx) ? docs[docIdx] : null);
+    const docName = targetDoc?.name || 'Document';
+    const childName = targetDoc?.child || targetDoc?.childName || '';
+
     modal({
       title: 'Delete Document?',
-      body: 'Are you sure you want to delete this uploaded document?',
+      body: `Are you sure you want to remove <strong>${escapeHTML(docName)}</strong>${childName ? ` for ${escapeHTML(childName)}` : ''} from records?`,
       confirmText: 'Delete',
       confirmClass: 'button--danger',
-      onConfirm: () => {
-        deleteUploadedDoc(idx);
-        toast('Document removed', 'Document deleted from records.');
-        window.setTimeout(() => window.location.reload(), 400);
+      onConfirm: async () => {
+        const identifier = (targetDoc && targetDoc.id) ? targetDoc.id : (docId || docIdx);
+        deleteUploadedDoc(identifier);
+        toast('Document removed', `${docName} deleted from records.`);
+
+        // Visually remove the card from the UI immediately
+        const card = deleteDocBtn.closest('article.document-card');
+        if (card) {
+          card.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+          card.style.opacity = '0';
+          card.style.transform = 'scale(0.95)';
+          setTimeout(() => {
+            card.remove();
+            const grid = document.querySelector('#document-grid');
+            const remaining = grid ? grid.querySelectorAll('article.document-card') : [];
+            if (grid && remaining.length === 0 && typeof renderCurrentPage === 'function') {
+              renderCurrentPage();
+            }
+          }, 220);
+        } else if (typeof renderCurrentPage === 'function') {
+          await renderCurrentPage();
+        }
+
+        // Sync deletion to cloud database so it stays deleted
+        try {
+          await syncWithServer();
+        } catch (e) {
+          console.warn('[Doc Delete] Server sync notice:', e);
+        }
       }
     });
+    return;
   }
 });
 

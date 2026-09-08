@@ -198,10 +198,27 @@ export function updateUploadedDoc(docId, updates) {
   return null;
 }
 
-export function deleteUploadedDoc(index) {
+export function deleteUploadedDoc(idOrIndex) {
   const docs = getUploadedDocs();
-  docs.splice(index, 1);
-  localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+  let deletedDoc = null;
+  let updatedDocs;
+
+  if (typeof idOrIndex === 'string') {
+    deletedDoc = docs.find(d => (d.id && d.id === idOrIndex) || (d.name && d.name === idOrIndex));
+    updatedDocs = docs.filter(d => (d.id || d.name) !== idOrIndex);
+  } else if (typeof idOrIndex === 'number' && !isNaN(idOrIndex)) {
+    deletedDoc = docs[idOrIndex];
+    docs.splice(idOrIndex, 1);
+    updatedDocs = docs;
+  } else {
+    updatedDocs = docs.filter(d => d.id !== idOrIndex);
+  }
+
+  localStorage.setItem(DOCS_KEY, JSON.stringify(updatedDocs));
+  if (deletedDoc) {
+    logActivity('doc_deleted', deletedDoc.child || deletedDoc.childName || 'Child', `Deleted document: ${deletedDoc.name || 'Medical Document'}`);
+  }
+  return updatedDocs;
 }
 
 export function getGrowthRecords(childId) {
