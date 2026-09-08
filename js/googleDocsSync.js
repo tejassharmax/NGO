@@ -164,7 +164,7 @@ export function openGoogleDocsTemplateModal() {
 
   const session = getSession() || {};
   const ngoName = session.ngo || 'Ayusha Nilayam';
-  const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+  const userEmail = session.email || localStorage.getItem('google-user-email') || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
   const children = getChildren() || [];
   const total = children.length;
   const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;

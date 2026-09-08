@@ -43,7 +43,7 @@ function navItem(item, active) {
 export function shell(page, content) {
   const session = getSession() || {};
   const displayName = session.displayName || 'Authorized User';
-  const email = session.email || 'tejassachin2010@gmail.com';
+  const email = session.email || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
   const ngoName = session.ngo || localStorage.getItem('sample-org-name') || 'Ayusha Nilayam';
   const role = session.role || 'Admin';
   const photoURL = session.photoURL;

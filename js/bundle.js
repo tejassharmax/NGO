@@ -34747,7 +34747,7 @@
 
     const session = getSession() || {};
     const ngoName = session.ngo || 'Ayusha Nilayam';
-    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+    const userEmail = session.email || localStorage.getItem('google-user-email') || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
     const children = getChildren() || [];
 
     const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R'];
@@ -34884,7 +34884,7 @@
     document.querySelector('#sheets-sync-modal-overlay')?.remove();
 
     const session = getSession() || {};
-    session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+    session.email || localStorage.getItem('google-user-email') || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
 
     const overlay = document.createElement('div');
     overlay.id = 'sheets-sync-modal-overlay';
@@ -35311,7 +35311,7 @@
 
     const session = getSession() || {};
     const ngoName = session.ngo || 'Ayusha Nilayam';
-    const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+    const userEmail = session.email || localStorage.getItem('google-user-email') || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
     const children = getChildren() || [];
     const total = children.length;
     const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
@@ -36626,7 +36626,7 @@
   function shell(page, content) {
     const session = getSession() || {};
     const displayName = session.displayName || 'Authorized User';
-    const email = session.email || 'tejassachin2010@gmail.com';
+    const email = session.email || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
     const ngoName = session.ngo || localStorage.getItem('sample-org-name') || 'Ayusha Nilayam';
     const role = session.role || 'Admin';
     const photoURL = session.photoURL;
