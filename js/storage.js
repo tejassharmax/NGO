@@ -163,10 +163,10 @@ export function getUploadedDocs() {
   return JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
 }
 
-export function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report', childId = null) {
+export function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report', childId = null, driveFileId = null, driveUrl = null) {
   const docs = getUploadedDocs();
-  docs.unshift({
-    id: `DOC-${Date.now()}`,
+  const newDoc = {
+    id: `DOC-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
     name: docName,
     child: childName,
     childName: childName,
@@ -177,9 +177,25 @@ export function addUploadedDoc(docName, childName, fileData, status = 'Verified'
     status: status,
     image: fileData,
     fileData: fileData,
+    driveFileId: driveFileId || null,
+    driveUrl: driveUrl || null,
     timestamp: Date.now()
-  });
+  };
+  docs.unshift(newDoc);
   localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+  return newDoc;
+}
+
+export function updateUploadedDoc(docId, updates) {
+  if (!docId) return null;
+  const docs = getUploadedDocs();
+  const doc = docs.find(d => d.id === docId);
+  if (doc) {
+    Object.assign(doc, updates);
+    localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+    return doc;
+  }
+  return null;
 }
 
 export function deleteUploadedDoc(index) {
@@ -195,15 +211,64 @@ export function getGrowthRecords(childId) {
 }
 
 export function addGrowthRecord(record) {
+  return saveGrowthRecord(record);
+}
+
+export function saveGrowthRecord(record) {
   const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
-  record.timestamp = Date.now();
+  record.id = record.id || `GW-${Date.now()}`;
+  record.timestamp = record.timestamp || Date.now();
+  record.date = record.date || new Date().toISOString().slice(0, 10);
+  record.height = record.height ? String(record.height).replace(/[^0-9.]/g, '').trim() : '';
+  record.weight = record.weight ? String(record.weight).replace(/[^0-9.]/g, '').trim() : '';
   record.bmi = record.weight && record.height
-    ? +(record.weight / ((record.height / 100) ** 2)).toFixed(1)
+    ? +(Number(record.weight) / ((Number(record.height) / 100) ** 2)).toFixed(1)
     : null;
-  all.unshift(record);
+
+  // Check if an existing record with the same ID or (same childId AND same date) exists
+  const existingIdx = all.findIndex(r => (record.id && r.id === record.id) || (r.childId === record.childId && r.date && r.date === record.date));
+  const vitalsSummary = [record.height && `${record.height}cm`, record.weight && `${record.weight}kg`, record.temperature && `${record.temperature}°F`, record.bp && `BP ${record.bp}`].filter(Boolean).join(', ') || 'Clinical checkup';
+  if (existingIdx !== -1) {
+    all[existingIdx] = { ...all[existingIdx], ...record };
+    logActivity('growth_updated', record.childName || 'Child', `Updated vitals for ${record.date}: ${vitalsSummary}`);
+  } else {
+    all.unshift(record);
+    logActivity('growth_logged', record.childName || 'Child', `New vitals for ${record.date}: ${vitalsSummary}`);
+  }
+
+  // Sort descending by date
+  all.sort((a, b) => (new Date(b.date || b.timestamp).getTime() || 0) - (new Date(a.date || a.timestamp).getTime() || 0));
   localStorage.setItem(GROWTH_KEY, JSON.stringify(all));
-  logActivity('growth_logged', record.childName || 'Child', `Height: ${record.height}cm, Weight: ${record.weight}kg`);
+
+  // If this record belongs to a child, update the child's top-level vitals if it's the latest date
+  if (record.childId) {
+    const children = getChildren();
+    const childIdx = children.findIndex(c => c.id === record.childId);
+    if (childIdx !== -1) {
+      const child = children[childIdx];
+      const childRecords = all.filter(r => r.childId === record.childId);
+      const newest = childRecords[0];
+      if (newest && (newest.id === record.id || newest.date === record.date)) {
+        if (record.height) child.height = record.height;
+        if (record.weight) child.weight = record.weight;
+        if (record.medicalConditions !== undefined) child.medicalConditions = record.medicalConditions;
+        if (record.allergies !== undefined) child.allergies = record.allergies;
+        if (record.medications !== undefined) child.medications = record.medications;
+        if (record.dentalRemarks !== undefined) child.dentalRemarks = record.dentalRemarks;
+        if (record.hygieneIndex !== undefined) child.hygieneIndex = record.hygieneIndex;
+        if (record.healthStatus !== undefined) child.healthStatus = record.healthStatus;
+        updateChild(child);
+      }
+    }
+  }
+
   return record;
+}
+
+export function deleteGrowthRecord(id) {
+  const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
+  const filtered = all.filter(r => r.id !== id && r.date !== id);
+  localStorage.setItem(GROWTH_KEY, JSON.stringify(filtered));
 }
 
 /* ─── Nutrition / Meal Log ─── */
@@ -379,13 +444,30 @@ export function getHealthRecords(childId) {
   return childId ? all.filter(r => r.childId === childId) : all;
 }
 
-export function addHealthRecord(record) {
+export function saveHealthRecord(record) {
   const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
   record.id = record.id || `HR-${Date.now()}`;
-  record.timestamp = Date.now();
-  all.unshift(record);
+  record.timestamp = record.timestamp || Date.now();
+  record.date = record.date || new Date().toISOString().slice(0, 10);
+
+  // Check if an existing record with same ID or (same childId AND same date) exists
+  const existingIdx = all.findIndex(r => (record.id && r.id === record.id) || (r.childId === record.childId && r.date && r.date === record.date));
+  if (existingIdx !== -1) {
+    all[existingIdx] = { ...all[existingIdx], ...record };
+    logActivity('health_record_updated', record.childName || 'Child', `Updated blood test report for ${record.date}`);
+  } else {
+    all.unshift(record);
+    logActivity('health_record_logged', record.childName || 'Child', `New blood test report for ${record.date}`);
+  }
+
+  // Sort descending by date
+  all.sort((a, b) => (new Date(b.date || b.timestamp).getTime() || 0) - (new Date(a.date || a.timestamp).getTime() || 0));
   localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all));
   return record;
+}
+
+export function addHealthRecord(record) {
+  return saveHealthRecord(record);
 }
 
 /* ─── Alerts ─── */

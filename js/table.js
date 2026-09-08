@@ -49,7 +49,7 @@ export function childRows(children) {
       age: `<td data-column="age">${age || '—'}</td>`,
       gender: `<td class="hide-tablet" data-column="gender">${child.gender || '—'}</td>`,
       blood: `<td class="hide-tablet" data-column="blood">${child.blood || '—'}</td>`,
-      status: `<td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>`
+      status: `<td data-column="status">${statusBadge(child.status)}</td>`
     };
 
     const dynamicCells = order.map(col => cellMap[col] || '').join('');

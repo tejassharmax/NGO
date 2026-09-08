@@ -54,6 +54,9 @@ export async function fetchSheetsConfig(ngoSlug) {
     const res = await apiFetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
     if (res.ok) {
       cachedSheetsConfig = await res.json();
+      if (cachedSheetsConfig?.tokenExpired) {
+        cachedSheetsConfig.connected = false;
+      }
       if (cachedSheetsConfig?.childSheetGids) {
         localStorage.setItem('chm_child_sheet_gids', JSON.stringify(cachedSheetsConfig.childSheetGids));
       }
@@ -619,6 +622,11 @@ export async function autoSyncChildToGoogleSheets(child) {
           }
         }
         toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
+      } else if (data && (data.tokenExpired || data.error === 'invalid_grant')) {
+        if (!cachedSheetsConfig) cachedSheetsConfig = {};
+        cachedSheetsConfig.connected = false;
+        cachedSheetsConfig.tokenExpired = true;
+        toast('Google Authorization Expired', 'Google Workspace session expired. Please reconnect in Settings.', 'warning');
       } else if (data && data.message === 'Not connected') {
         console.log('[Google Sheets] Skip auto-sync: NGO is not connected to Google Workspace.');
       }

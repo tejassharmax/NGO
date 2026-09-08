@@ -7,6 +7,7 @@
  */
 
 const { google } = require('googleapis');
+const { Readable } = require('stream');
 
 // Tenant-scoped database access. Reads and writes go to `ngos/{slug}` in
 // Firestore, falling back to data/db.json when no service-account key is present.
@@ -128,7 +129,18 @@ function getAuthUrl(ngoSlug, req = null, state = null) {
  */
 async function getClientForNgo(ngoSlug) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
-  const integration = await getNgoIntegration(safeSlug);
+  let integration = await getNgoIntegration(safeSlug);
+
+  // If this slug has no refresh token, check the sister slug
+  if (!integration || !integration.refresh_token) {
+    const fallbackSlug = safeSlug === 'alex-agape' ? 'ayusha-nilayam' : (safeSlug === 'ayusha-nilayam' ? 'alex-agape' : null);
+    if (fallbackSlug) {
+      const fallbackInteg = await getNgoIntegration(fallbackSlug);
+      if (fallbackInteg && fallbackInteg.refresh_token) {
+        integration = fallbackInteg;
+      }
+    }
+  }
 
   if (!integration || !integration.refresh_token) {
     return null;
@@ -292,6 +304,37 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
   }
 
   const integration = await getNgoIntegration(safeSlug);
+
+  // Pre-validate refresh token to immediately detect expired grant before attempting API calls
+  try {
+    await client.getAccessToken();
+  } catch (tokenErr) {
+    console.error(`[Google OAuth] Access token refresh failed for ${safeSlug}:`, tokenErr.message);
+    if (tokenErr.message?.includes('invalid_grant') || tokenErr.response?.data?.error === 'invalid_grant') {
+      integration.tokenExpired = true;
+      await saveNgoIntegration(safeSlug, integration);
+      const fallbackSlug = safeSlug === 'alex-agape' ? 'ayusha-nilayam' : (safeSlug === 'ayusha-nilayam' ? 'alex-agape' : null);
+      if (fallbackSlug) {
+        const fbIntegration = await getNgoIntegration(fallbackSlug);
+        if (fbIntegration) {
+          fbIntegration.tokenExpired = true;
+          await saveNgoIntegration(fallbackSlug, fbIntegration);
+        }
+      }
+      return {
+        success: false,
+        error: 'invalid_grant',
+        tokenExpired: true,
+        message: 'Google authorization expired. Please reconnect Google Workspace in Settings.'
+      };
+    }
+    return {
+      success: false,
+      error: tokenErr.message,
+      message: 'Failed to authenticate with Google: ' + tokenErr.message
+    };
+  }
+
   const sheets = google.sheets({ version: 'v4', auth: client });
   let sheetId = integration.sheetId;
   const displayName = ngoName || safeSlug.replace(/-/g, ' ');
@@ -395,6 +438,16 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
       requestBody: { values: masterTableData }
     });
   } catch (err1) {
+    if (err1.message?.includes('invalid_grant') || err1.response?.data?.error === 'invalid_grant') {
+      integration.tokenExpired = true;
+      await saveNgoIntegration(safeSlug, integration);
+      return {
+        success: false,
+        error: 'invalid_grant',
+        tokenExpired: true,
+        message: 'Google authorization expired. Please reconnect Google Workspace in Settings.'
+      };
+    }
     if (err1.code === 404 || err1.status === 404) {
       delete integration.sheetId;
       delete integration.spreadsheetUrl;
@@ -464,10 +517,23 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
           childSheetGids[childTabTitle] = gid;
         }
 
-        const childGrowth = allGrowth.filter(g => g.childId === c.id || (g.childName && g.childName.toLowerCase() === (c.name || '').toLowerCase()));
-        const childMeds = allMedicines.filter(m => m.childId === c.id || (m.childName && m.childName.toLowerCase() === (c.name || '').toLowerCase()));
-        const childHealthRecs = allHealthRecords.filter(h => h.childId === c.id || (h.childName && h.childName.toLowerCase() === (c.name || '').toLowerCase()));
-        const childDocs = allUploadedDocs.filter(d => d.childId === c.id || (d.childName && d.childName.toLowerCase() === (c.name || '').toLowerCase()) || (d.child && d.child.toLowerCase() === (c.name || '').toLowerCase()));
+        const childGrowth = allGrowth.filter(g =>
+          (g.childId && c.id && String(g.childId).trim() === String(c.id).trim()) ||
+          (g.childName && c.name && g.childName.trim().toLowerCase() === c.name.trim().toLowerCase())
+        );
+        const childMeds = allMedicines.filter(m =>
+          (m.childId && c.id && String(m.childId).trim() === String(c.id).trim()) ||
+          (m.childName && c.name && m.childName.trim().toLowerCase() === c.name.trim().toLowerCase())
+        );
+        const childHealthRecs = allHealthRecords.filter(h =>
+          (h.childId && c.id && String(h.childId).trim() === String(c.id).trim()) ||
+          (h.childName && c.name && h.childName.trim().toLowerCase() === c.name.trim().toLowerCase())
+        );
+        const childDocs = allUploadedDocs.filter(d =>
+          (d.childId && c.id && String(d.childId).trim() === String(c.id).trim()) ||
+          (d.childName && c.name && d.childName.trim().toLowerCase() === c.name.trim().toLowerCase()) ||
+          (d.child && c.name && d.child.trim().toLowerCase() === c.name.trim().toLowerCase())
+        );
 
         const childSheetData = buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName, childDocs);
         clinicalDataUpdates.push({
@@ -620,6 +686,16 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
 
     } catch (clinErr) {
       console.warn('[Google OAuth] Student Medical Records sync notice:', clinErr.message);
+      if (clinErr.message?.includes('invalid_grant') || clinErr.response?.data?.error === 'invalid_grant') {
+        integration.tokenExpired = true;
+        await saveNgoIntegration(safeSlug, integration);
+        return {
+          success: false,
+          error: 'invalid_grant',
+          tokenExpired: true,
+          message: 'Google authorization expired. Please reconnect Google Workspace in Settings.'
+        };
+      }
       if (clinErr.code === 404 || clinErr.status === 404) {
         delete integration.clinicalSheetId;
         delete integration.clinicalSpreadsheetUrl;
@@ -659,6 +735,23 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
   }
 
   const integration = await getNgoIntegration(safeSlug);
+
+  // Pre-validate token
+  try {
+    await client.getAccessToken();
+  } catch (tokenErr) {
+    if (tokenErr.message?.includes('invalid_grant') || tokenErr.response?.data?.error === 'invalid_grant') {
+      integration.tokenExpired = true;
+      await saveNgoIntegration(safeSlug, integration);
+      return {
+        success: false,
+        error: 'invalid_grant',
+        tokenExpired: true,
+        message: 'Google authorization expired. Please reconnect Google Workspace in Settings.'
+      };
+    }
+  }
+
   const sheetId = integration.sheetId;
 
   if (!sheetId) {
@@ -1051,6 +1144,277 @@ async function syncExecutiveDocToGoogleDocs(reportContent, ngoSlug, ngoName) {
   };
 }
 
+/* ═══════════════════════════════════════════════════════
+   GOOGLE DRIVE CLOUD STORAGE FOR CHILD HEALTH DOCUMENTS
+   ═══════════════════════════════════════════════════════ */
+
+/**
+ * Find or create a folder in Google Drive.
+ * @param {import('google-auth-library').OAuth2Client} authClient
+ * @param {string} folderName
+ * @param {string|null} parentId
+ * @returns {Promise<{id: string, webViewLink: string}>}
+ */
+async function findOrCreateFolder(authClient, folderName, parentId = null) {
+  const drive = google.drive({ version: 'v3', auth: authClient });
+  const escapedName = folderName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  let q = `mimeType = 'application/vnd.google-apps.folder' and name = '${escapedName}' and trashed = false`;
+  if (parentId) {
+    q += ` and '${parentId}' in parents`;
+  }
+
+  try {
+    const listRes = await drive.files.list({
+      q,
+      fields: 'files(id, name, webViewLink)',
+      spaces: 'drive'
+    });
+
+    if (listRes.data.files && listRes.data.files.length > 0) {
+      return {
+        id: listRes.data.files[0].id,
+        webViewLink: listRes.data.files[0].webViewLink
+      };
+    }
+  } catch (searchErr) {
+    console.warn(`[Google Drive] Folder search notice (${folderName}):`, searchErr.message);
+  }
+
+  // Create folder if not found
+  const fileMetadata = {
+    name: folderName,
+    mimeType: 'application/vnd.google-apps.folder',
+    ...(parentId ? { parents: [parentId] } : {})
+  };
+
+  const createRes = await drive.files.create({
+    requestBody: fileMetadata,
+    fields: 'id, name, webViewLink'
+  });
+
+  const folder = createRes.data;
+
+  try {
+    await drive.permissions.create({
+      fileId: folder.id,
+      requestBody: { role: 'reader', type: 'anyone' }
+    });
+  } catch (permErr) {
+    // Restricted by Google Workspace domain policy, fallback to default ownership
+  }
+
+  return {
+    id: folder.id,
+    webViewLink: folder.webViewLink
+  };
+}
+
+/**
+ * Upload a binary buffer as a file to Google Drive.
+ * @param {import('google-auth-library').OAuth2Client} authClient
+ * @param {Buffer} fileBuffer
+ * @param {string} fileName
+ * @param {string} mimeType
+ * @param {string|null} folderId
+ * @returns {Promise<{fileId: string, webViewLink: string, webContentLink: string}>}
+ */
+async function uploadFileToDrive(authClient, fileBuffer, fileName, mimeType, folderId = null) {
+  const drive = google.drive({ version: 'v3', auth: authClient });
+  const escapedName = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+  // Check if a file with this name already exists in this folder to prevent duplicates
+  if (folderId) {
+    try {
+      const existingRes = await drive.files.list({
+        q: `name = '${escapedName}' and '${folderId}' in parents and trashed = false`,
+        fields: 'files(id, name, webViewLink, webContentLink, createdTime)',
+        spaces: 'drive'
+      });
+
+      if (existingRes.data.files && existingRes.data.files.length > 0) {
+        // Sort oldest first as primary
+        existingRes.data.files.sort((a, b) => new Date(a.createdTime || 0) - new Date(b.createdTime || 0));
+        const primaryFile = existingRes.data.files[0];
+        console.log(`[Google Drive] Updating existing file "${fileName}" (${primaryFile.id})`);
+
+        // If duplicate files exist in this folder, clean up the duplicate copies
+        if (existingRes.data.files.length > 1) {
+          for (let i = 1; i < existingRes.data.files.length; i++) {
+            try {
+              await drive.files.delete({ fileId: existingRes.data.files[i].id });
+              console.log(`[Google Drive] Deleted duplicate copy (${existingRes.data.files[i].id})`);
+            } catch (delErr) {}
+          }
+        }
+
+        const stream = Readable.from(fileBuffer);
+        const updateRes = await drive.files.update({
+          fileId: primaryFile.id,
+          media: {
+            mimeType: mimeType || 'application/octet-stream',
+            body: stream
+          },
+          fields: 'id, name, webViewLink, webContentLink'
+        });
+
+        return {
+          fileId: updateRes.data.id,
+          webViewLink: updateRes.data.webViewLink,
+          webContentLink: updateRes.data.webContentLink
+        };
+      }
+    } catch (listErr) {
+      console.warn('[Google Drive] File search notice:', listErr.message);
+    }
+  }
+
+  // Create new file if it does not exist
+  const stream = Readable.from(fileBuffer);
+  const res = await drive.files.create({
+    requestBody: {
+      name: fileName,
+      ...(folderId ? { parents: [folderId] } : {})
+    },
+    media: {
+      mimeType: mimeType || 'application/octet-stream',
+      body: stream
+    },
+    fields: 'id, name, webViewLink, webContentLink'
+  });
+
+  try {
+    await drive.permissions.create({
+      fileId: res.data.id,
+      requestBody: { role: 'reader', type: 'anyone' }
+    });
+  } catch (permErr) {
+    // Restricted by Google Workspace domain policy
+  }
+
+  return {
+    fileId: res.data.id,
+    webViewLink: res.data.webViewLink,
+    webContentLink: res.data.webContentLink
+  };
+}
+
+/**
+ * Upload a child health document into the NGO's Google Drive organized by child name.
+ * Creates: "Child Health Documents — [NGO Name]" / "[Child Name]" / "[File]"
+ * @param {string} ngoSlug
+ * @param {string} childName
+ * @param {Buffer} fileBuffer
+ * @param {string} fileName
+ * @param {string} mimeType
+ * @param {string|null} [ngoDisplayName]
+ * @returns {Promise<object>}
+ */
+async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileName, mimeType, ngoDisplayName = null) {
+  const safeSlug = sanitizeNgoSlug(ngoSlug);
+  const authClient = await getClientForNgo(safeSlug);
+  if (!authClient) {
+    throw new Error('Google Workspace is not connected for this NGO. Please connect Google in Settings.');
+  }
+
+  const integration = await getNgoIntegration(safeSlug);
+  const drive = google.drive({ version: 'v3', auth: authClient });
+
+  let rootFolderId = integration.documentsRootFolderId;
+  let rootFolderUrl = integration.documentsRootFolderUrl;
+
+  // 1. Verify existing stored rootFolderId
+  if (rootFolderId) {
+    try {
+      const getRes = await drive.files.get({ fileId: rootFolderId, fields: 'id, trashed, webViewLink' });
+      if (getRes.data.trashed) {
+        rootFolderId = null;
+      } else {
+        rootFolderUrl = getRes.data.webViewLink || rootFolderUrl;
+      }
+    } catch (e) {
+      rootFolderId = null;
+    }
+  }
+
+  // 2. If no valid rootFolderId, search for ANY existing "Child Health Documents" root folder
+  if (!rootFolderId) {
+    try {
+      const listRoots = await drive.files.list({
+        q: "mimeType = 'application/vnd.google-apps.folder' and name contains 'Child Health Documents' and trashed = false",
+        fields: 'files(id, name, webViewLink, createdTime)',
+        spaces: 'drive'
+      });
+      if (listRoots.data.files && listRoots.data.files.length > 0) {
+        listRoots.data.files.sort((a, b) => new Date(a.createdTime || 0) - new Date(b.createdTime || 0));
+        rootFolderId = listRoots.data.files[0].id;
+        rootFolderUrl = listRoots.data.files[0].webViewLink;
+
+        // If duplicate root folders exist, consolidate subfolders into the primary one
+        if (listRoots.data.files.length > 1) {
+          for (let i = 1; i < listRoots.data.files.length; i++) {
+            const extraRoot = listRoots.data.files[i];
+            try {
+              const subRes = await drive.files.list({
+                q: `'${extraRoot.id}' in parents and trashed = false`,
+                fields: 'files(id, name)'
+              });
+              for (const childItem of (subRes.data.files || [])) {
+                await drive.files.update({
+                  fileId: childItem.id,
+                  addParents: rootFolderId,
+                  removeParents: extraRoot.id,
+                  fields: 'id, parents'
+                });
+              }
+              await drive.files.update({
+                fileId: extraRoot.id,
+                requestBody: { trashed: true }
+              });
+              console.log(`[Google Drive] Merged duplicate root folder ${extraRoot.id} into ${rootFolderId}`);
+            } catch (mergeErr) {
+              console.warn('[Google Drive] Root merge notice:', mergeErr.message);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[Google Drive] Root folder search notice:', e.message);
+    }
+  }
+
+  // 3. If still not found, create a single clean root folder
+  if (!rootFolderId) {
+    const rootFolder = await findOrCreateFolder(authClient, 'Child Health Documents — Ayusha Nilayam', null);
+    rootFolderId = rootFolder.id;
+    rootFolderUrl = rootFolder.webViewLink;
+  }
+
+  // Save root folder ID for this tenant and sister slug
+  integration.documentsRootFolderId = rootFolderId;
+  integration.documentsRootFolderUrl = rootFolderUrl;
+  await saveNgoIntegration(safeSlug, integration);
+  const sisterSlug = safeSlug === 'alex-agape' ? 'ayusha-nilayam' : 'alex-agape';
+  await saveNgoIntegration(sisterSlug, integration);
+
+  // 4. Find or create the child subfolder strictly inside this primary root folder
+  const safeChildName = (childName || 'General Documents').trim();
+  const childFolder = await findOrCreateFolder(authClient, safeChildName, rootFolderId);
+
+  // 5. Upload or update the file in the child folder (preventing duplicate files)
+  const uploadResult = await uploadFileToDrive(authClient, fileBuffer, fileName, mimeType, childFolder.id);
+
+  return {
+    success: true,
+    driveFileId: uploadResult.fileId,
+    driveUrl: uploadResult.webViewLink || uploadResult.webContentLink,
+    webContentLink: uploadResult.webContentLink,
+    childFolderId: childFolder.id,
+    childFolderUrl: childFolder.webViewLink,
+    rootFolderId,
+    rootFolderUrl
+  };
+}
+
 module.exports = {
   buildOAuthClient,
   getAuthUrl,
@@ -1060,5 +1424,8 @@ module.exports = {
   syncChildrenToGoogleSheets,
   pullChildrenFromGoogleSheets,
   deleteChildFromGoogleSheets,
-  syncExecutiveDocToGoogleDocs
+  syncExecutiveDocToGoogleDocs,
+  findOrCreateFolder,
+  uploadFileToDrive,
+  uploadDocumentToChildDrive
 };

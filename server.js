@@ -22,7 +22,8 @@ const {
   syncChildrenToGoogleSheets: oauthSyncSheets,
   pullChildrenFromGoogleSheets: oauthPullSheets,
   deleteChildFromGoogleSheets: oauthDeleteChild,
-  syncExecutiveDocToGoogleDocs
+  syncExecutiveDocToGoogleDocs,
+  uploadDocumentToChildDrive
 } = require('./js/server/googleOAuth');
 
 // Server-side authentication (Firebase ID token + email allowlist)
@@ -490,16 +491,25 @@ app.get('/auth/google/callback', async (req, res) => {
     const updated = {
       ...existing,
       refresh_token: tokens.refresh_token || existing.refresh_token,
+      tokenExpired: false,
       connectedAt: new Date().toISOString(),
-      adminEmail: adminEmail !== 'Admin' ? adminEmail : (existing.adminEmail || 'Connected Admin')
+      adminEmail: adminEmail !== 'Admin' ? adminEmail : (existing.adminEmail || 'Connected Admin'),
+      sheetId: existing.sheetId || '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88',
+      spreadsheetUrl: existing.spreadsheetUrl || 'https://docs.google.com/spreadsheets/d/1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88/edit',
+      clinicalSheetId: existing.clinicalSheetId || '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY',
+      clinicalSpreadsheetUrl: existing.clinicalSpreadsheetUrl || 'https://docs.google.com/spreadsheets/d/15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY/edit'
     };
     await saveNgoIntegration(ngoSlug, updated);
 
-    // Immediately create Google Spreadsheet in user's Drive and populate records
+    // Also mirror to sister slug so both tenants stay in sync
+    const sisterSlug = ngoSlug === 'alex-agape' ? 'ayusha-nilayam' : 'alex-agape';
+    await saveNgoIntegration(sisterSlug, updated);
+
+    // Immediately create or update Google Spreadsheet in user's Drive and populate records
     const children = await readChildrenFor(tenant);
 
     try {
-      console.log(`[OAuth Callback] Auto-creating Google Spreadsheet in Drive for ${connectingEmail}...`);
+      console.log(`[OAuth Callback] Auto-syncing Google Spreadsheet in Drive for ${connectingEmail}...`);
       await oauthSyncSheets(children, ngoSlug, tenant.name);
     } catch (e) {
       console.warn('[OAuth Callback] Google Spreadsheet auto-creation warning:', e.message);
@@ -570,7 +580,39 @@ async function readChildrenFor(tenant) {
 app.get('/api/sheets/config', requireAuth, async (req, res) => {
   const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
   let integration = await getNgoIntegration(ngoSlug);
-  const connected = !!(integration && integration.refresh_token);
+
+  // If this slug has no refresh token, check sister slug
+  if (!integration || !integration.refresh_token) {
+    const fallbackSlug = ngoSlug === 'alex-agape' ? 'ayusha-nilayam' : (ngoSlug === 'ayusha-nilayam' ? 'alex-agape' : null);
+    if (fallbackSlug) {
+      const fallbackInteg = await getNgoIntegration(fallbackSlug);
+      if (fallbackInteg && fallbackInteg.refresh_token) {
+        integration = fallbackInteg;
+      }
+    }
+  }
+
+  let connected = !!(integration && integration.refresh_token);
+  let tokenExpired = !!integration?.tokenExpired;
+
+  // Validate the refresh token with Google
+  if (connected && !tokenExpired) {
+    try {
+      const client = buildOAuthClient();
+      client.setCredentials({ refresh_token: integration.refresh_token });
+      await client.getAccessToken();
+    } catch (e) {
+      if (e.message?.includes('invalid_grant') || e.response?.data?.error === 'invalid_grant') {
+        console.warn(`[Sheets Config] Refresh token expired for ${ngoSlug}`);
+        tokenExpired = true;
+        connected = false;
+        integration.tokenExpired = true;
+        await saveNgoIntegration(ngoSlug, integration);
+      }
+    }
+  } else if (tokenExpired) {
+    connected = false;
+  }
 
   // Auto-create/sync Student Medical Records sheet if connected but not yet generated
   if (connected && (!integration.clinicalSheetId || !integration.sheetId)) {
@@ -585,6 +627,7 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
 
   res.json({
     connected,
+    tokenExpired,
     adminEmail: integration.adminEmail || null,
     sheetId: integration.sheetId || null,
     spreadsheetUrl: integration.spreadsheetUrl || null,
@@ -642,6 +685,47 @@ app.post('/api/docs/sync', requireAuth, async (req, res) => {
   } catch (err) {
     console.warn('Per-NGO Docs sync notice:', err.message);
     res.json({ success: false, message: err.message });
+  }
+});
+
+// POST /api/drive/upload -> Upload a child health document directly into Google Drive (organized by child name)
+app.post('/api/drive/upload', requireAuth, ocrLimiter, upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'No document file uploaded' });
+    }
+
+    const { childName, childId, docName, docType } = req.body || {};
+    const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
+
+    // Ensure valid filename with proper extension
+    let fileName = (docName || req.file.originalname || 'Document').trim();
+    const originalExt = path.extname(req.file.originalname || '');
+    if (!path.extname(fileName)) {
+      if (originalExt) {
+        fileName += originalExt;
+      } else if (req.file.mimetype === 'application/pdf') {
+        fileName += '.pdf';
+      } else if (req.file.mimetype === 'image/jpeg') {
+        fileName += '.jpg';
+      } else if (req.file.mimetype === 'image/png') {
+        fileName += '.png';
+      }
+    }
+
+    const result = await uploadDocumentToChildDrive(
+      ngoSlug,
+      childName || 'General Documents',
+      req.file.buffer,
+      fileName,
+      req.file.mimetype,
+      ngoName
+    );
+
+    res.json(result);
+  } catch (err) {
+    console.warn('[API Drive Upload] Error uploading document to Google Drive:', err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

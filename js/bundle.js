@@ -33,6 +33,10 @@
     printer: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v7H6z"/></svg>',
     googleSheets: '<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>',
     googleDocs: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#4285F4"/><path d="M14 2V8H20L14 2Z" fill="#A1C2FA"/><path d="M16 13H8V11H16V13ZM16 17H8V15H16V17ZM10 9H8V7H10V9Z" fill="white"/></svg>',
+    googleDrive: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7.71 3.5L1.15 15l3.43 6 6.55-11.5-3.42-6z" fill="#0066DA"/><path d="M8.73 15h13.12l-3.43 6H5.3L8.73 15z" fill="#00AC47"/><path d="M18.42 21l3.43-6L15.29 3.5h-6.86l6.56 11.5 3.43 6z" fill="#FFBA00"/></svg>',
+    external: '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
+    refresh: '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>',
+    cloudUpload: '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9"/><path d="m16 16-4-4-4 4"/></svg>',
     mail: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
     moon: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.2 14.5A8.5 8.5 0 0 1 9.5 3.8 8.5 8.5 0 1 0 20.2 14.5Z"/></svg>',
     x: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>',
@@ -66,7 +70,6 @@
     return `index.html#/${page}`;
   };
   const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
-  const healthDot = (level) => `<span class="health-dot health-dot--${level}" aria-label="${level}"></span>`;
 
   const getDefaultsFromPostinstall = () => (undefined);
 
@@ -9358,7 +9361,7 @@
   var EventType;
   var ErrorCode;
   var Stat;
-  var Event;
+  var Event$1;
   var getStatEventTarget;
   var createWebChannelTransport;
   (function() {var h,aa=Object.defineProperty;function ba(a){a=["object"==typeof globalThis&&globalThis,a,"object"==typeof window&&window,"object"==typeof self&&self,"object"==typeof commonjsGlobal&&commonjsGlobal];for(var b=0;b<a.length;++b){var c=a[b];if(c&&c.Math==Math)return c}throw Error("Cannot find global object");}var ca=ba(this);
@@ -9438,7 +9441,7 @@
   a;(a=b&&b.Qb)&&!y(a)&&(this.g.u=a);this.A=b&&b.supportsCrossDomainXhr||false;this.v=b&&b.sendRawJson||false;(b=b&&b.httpSessionIdParam)&&!y(b)&&(this.g.G=b,a=this.h,a!==null&&b in a&&(a=this.h,b in a&&delete a[b]));this.j=new Z(this);}t(Y,C);Y.prototype.m=function(){this.g.l=this.j;this.A&&(this.g.L=true);this.g.connect(this.l,this.h||void 0);};Y.prototype.close=function(){cc(this.g);};
   Y.prototype.o=function(a){var b=this.g;if(typeof a==="string"){var c={};c.__data__=a;a=c;}else this.v&&(c={},c.__data__=ab(a),a=c);b.i.push(new dc(b.Ya++,a));b.I==3&&bc(b);};Y.prototype.N=function(){this.g.l=null;delete this.j;cc(this.g);delete this.g;Y.Z.N.call(this);};
   function cd(a){gb.call(this);a.__headers__&&(this.headers=a.__headers__,this.statusCode=a.__status__,delete a.__headers__,delete a.__status__);var b=a.__sm__;if(b){a:{for(const c in b){a=c;break a}a=void 0;}if(this.i=a)a=this.i,b=b!==null&&a in b?b[a]:void 0;this.data=b;}else this.data=a;}t(cd,gb);function dd(){hb.call(this);this.status=1;}t(dd,hb);function Z(a){this.g=a;}t(Z,ad);Z.prototype.ra=function(){D(this.g,"a");};Z.prototype.qa=function(a){D(this.g,new cd(a));};
-  Z.prototype.pa=function(a){D(this.g,new dd());};Z.prototype.oa=function(){D(this.g,"b");};bd.prototype.createWebChannel=bd.prototype.g;Y.prototype.send=Y.prototype.o;Y.prototype.open=Y.prototype.m;Y.prototype.close=Y.prototype.close;createWebChannelTransport = function(){return new bd};getStatEventTarget = function(){return jb()};Event = I;Stat = {jb:0,mb:1,nb:2,Hb:3,Mb:4,Jb:5,Kb:6,Ib:7,Gb:8,Lb:9,PROXY:10,NOPROXY:11,Eb:12,Ab:13,Bb:14,zb:15,Cb:16,Db:17,fb:18,eb:19,gb:20};ub.NO_ERROR=0;ub.TIMEOUT=8;ub.HTTP_ERROR=6;
+  Z.prototype.pa=function(a){D(this.g,new dd());};Z.prototype.oa=function(){D(this.g,"b");};bd.prototype.createWebChannel=bd.prototype.g;Y.prototype.send=Y.prototype.o;Y.prototype.open=Y.prototype.m;Y.prototype.close=Y.prototype.close;createWebChannelTransport = function(){return new bd};getStatEventTarget = function(){return jb()};Event$1 = I;Stat = {jb:0,mb:1,nb:2,Hb:3,Mb:4,Jb:5,Kb:6,Ib:7,Gb:8,Lb:9,PROXY:10,NOPROXY:11,Eb:12,Ab:13,Bb:14,zb:15,Cb:16,Db:17,fb:18,eb:19,gb:20};ub.NO_ERROR=0;ub.TIMEOUT=8;ub.HTTP_ERROR=6;
   ErrorCode = ub;vb.COMPLETE="complete";EventType = vb;fb.EventType=H;H.OPEN="a";H.CLOSE="b";H.ERROR="c";H.MESSAGE="d";C.prototype.listen=C.prototype.J;WebChannel = fb;X.prototype.listenOnce=X.prototype.K;X.prototype.getLastError=X.prototype.Ha;X.prototype.getLastErrorCode=X.prototype.ya;X.prototype.getStatus=X.prototype.ca;X.prototype.getResponseJson=X.prototype.La;X.prototype.getResponseText=X.prototype.la;
   X.prototype.send=X.prototype.ea;X.prototype.setWithCredentials=X.prototype.Fa;XhrIo = X;}).apply( typeof commonjsGlobal !== 'undefined' ? commonjsGlobal : typeof self !== 'undefined' ? self  : typeof window !== 'undefined' ? window  : {});
 
@@ -21855,7 +21858,7 @@
        */    static rn() {
           if (!__PRIVATE_WebChannelConnection.sn) {
               const e = getStatEventTarget();
-              __PRIVATE_unguardedEventListen(e, Event.STAT_EVENT, (e => {
+              __PRIVATE_unguardedEventListen(e, Event$1.STAT_EVENT, (e => {
                   e.stat === Stat.PROXY ? __PRIVATE_logDebug(Ct, "STAT_EVENT: detected buffering proxy") : e.stat === Stat.NOPROXY && __PRIVATE_logDebug(Ct, "STAT_EVENT: detected no buffering proxy");
               })), __PRIVATE_WebChannelConnection.sn = true;
           }
@@ -33635,10 +33638,10 @@
     return JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
   }
 
-  function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report', childId = null) {
+  function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report', childId = null, driveFileId = null, driveUrl = null) {
     const docs = getUploadedDocs();
-    docs.unshift({
-      id: `DOC-${Date.now()}`,
+    const newDoc = {
+      id: `DOC-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
       name: docName,
       child: childName,
       childName: childName,
@@ -33649,9 +33652,25 @@
       status: status,
       image: fileData,
       fileData: fileData,
+      driveFileId: driveFileId || null,
+      driveUrl: driveUrl || null,
       timestamp: Date.now()
-    });
+    };
+    docs.unshift(newDoc);
     localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+    return newDoc;
+  }
+
+  function updateUploadedDoc(docId, updates) {
+    if (!docId) return null;
+    const docs = getUploadedDocs();
+    const doc = docs.find(d => d.id === docId);
+    if (doc) {
+      Object.assign(doc, updates);
+      localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+      return doc;
+    }
+    return null;
   }
 
   function deleteUploadedDoc(index) {
@@ -33667,15 +33686,64 @@
   }
 
   function addGrowthRecord(record) {
+    return saveGrowthRecord(record);
+  }
+
+  function saveGrowthRecord(record) {
     const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
-    record.timestamp = Date.now();
+    record.id = record.id || `GW-${Date.now()}`;
+    record.timestamp = record.timestamp || Date.now();
+    record.date = record.date || new Date().toISOString().slice(0, 10);
+    record.height = record.height ? String(record.height).replace(/[^0-9.]/g, '').trim() : '';
+    record.weight = record.weight ? String(record.weight).replace(/[^0-9.]/g, '').trim() : '';
     record.bmi = record.weight && record.height
-      ? +(record.weight / ((record.height / 100) ** 2)).toFixed(1)
+      ? +(Number(record.weight) / ((Number(record.height) / 100) ** 2)).toFixed(1)
       : null;
-    all.unshift(record);
+
+    // Check if an existing record with the same ID or (same childId AND same date) exists
+    const existingIdx = all.findIndex(r => (record.id && r.id === record.id) || (r.childId === record.childId && r.date && r.date === record.date));
+    const vitalsSummary = [record.height && `${record.height}cm`, record.weight && `${record.weight}kg`, record.temperature && `${record.temperature}°F`, record.bp && `BP ${record.bp}`].filter(Boolean).join(', ') || 'Clinical checkup';
+    if (existingIdx !== -1) {
+      all[existingIdx] = { ...all[existingIdx], ...record };
+      logActivity('growth_updated', record.childName || 'Child', `Updated vitals for ${record.date}: ${vitalsSummary}`);
+    } else {
+      all.unshift(record);
+      logActivity('growth_logged', record.childName || 'Child', `New vitals for ${record.date}: ${vitalsSummary}`);
+    }
+
+    // Sort descending by date
+    all.sort((a, b) => (new Date(b.date || b.timestamp).getTime() || 0) - (new Date(a.date || a.timestamp).getTime() || 0));
     localStorage.setItem(GROWTH_KEY, JSON.stringify(all));
-    logActivity('growth_logged', record.childName || 'Child', `Height: ${record.height}cm, Weight: ${record.weight}kg`);
+
+    // If this record belongs to a child, update the child's top-level vitals if it's the latest date
+    if (record.childId) {
+      const children = getChildren();
+      const childIdx = children.findIndex(c => c.id === record.childId);
+      if (childIdx !== -1) {
+        const child = children[childIdx];
+        const childRecords = all.filter(r => r.childId === record.childId);
+        const newest = childRecords[0];
+        if (newest && (newest.id === record.id || newest.date === record.date)) {
+          if (record.height) child.height = record.height;
+          if (record.weight) child.weight = record.weight;
+          if (record.medicalConditions !== undefined) child.medicalConditions = record.medicalConditions;
+          if (record.allergies !== undefined) child.allergies = record.allergies;
+          if (record.medications !== undefined) child.medications = record.medications;
+          if (record.dentalRemarks !== undefined) child.dentalRemarks = record.dentalRemarks;
+          if (record.hygieneIndex !== undefined) child.hygieneIndex = record.hygieneIndex;
+          if (record.healthStatus !== undefined) child.healthStatus = record.healthStatus;
+          updateChild(child);
+        }
+      }
+    }
+
     return record;
+  }
+
+  function deleteGrowthRecord(id) {
+    const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
+    const filtered = all.filter(r => r.id !== id && r.date !== id);
+    localStorage.setItem(GROWTH_KEY, JSON.stringify(filtered));
   }
 
   function addMeal(meal) {
@@ -33803,13 +33871,30 @@
     return childId ? all.filter(r => r.childId === childId) : all;
   }
 
-  function addHealthRecord(record) {
+  function saveHealthRecord(record) {
     const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
     record.id = record.id || `HR-${Date.now()}`;
-    record.timestamp = Date.now();
-    all.unshift(record);
+    record.timestamp = record.timestamp || Date.now();
+    record.date = record.date || new Date().toISOString().slice(0, 10);
+
+    // Check if an existing record with same ID or (same childId AND same date) exists
+    const existingIdx = all.findIndex(r => (record.id && r.id === record.id) || (r.childId === record.childId && r.date && r.date === record.date));
+    if (existingIdx !== -1) {
+      all[existingIdx] = { ...all[existingIdx], ...record };
+      logActivity('health_record_updated', record.childName || 'Child', `Updated blood test report for ${record.date}`);
+    } else {
+      all.unshift(record);
+      logActivity('health_record_logged', record.childName || 'Child', `New blood test report for ${record.date}`);
+    }
+
+    // Sort descending by date
+    all.sort((a, b) => (new Date(b.date || b.timestamp).getTime() || 0) - (new Date(a.date || a.timestamp).getTime() || 0));
     localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all));
     return record;
+  }
+
+  function addHealthRecord(record) {
+    return saveHealthRecord(record);
   }
 
   /* ─── Alerts ─── */
@@ -34094,7 +34179,7 @@
     
     const order = getColumnOrder();
     return children.map((child, index) => {
-      const hs = healthStatus(child);
+      healthStatus(child);
       const age = calculateAge(child.dob);
 
       const cellMap = {
@@ -34102,7 +34187,7 @@
         age: `<td data-column="age">${age || '—'}</td>`,
         gender: `<td class="hide-tablet" data-column="gender">${child.gender || '—'}</td>`,
         blood: `<td class="hide-tablet" data-column="blood">${child.blood || '—'}</td>`,
-        status: `<td data-column="status">${healthDot(hs.level)} ${statusBadge(child.status)}</td>`
+        status: `<td data-column="status">${statusBadge(child.status)}</td>`
       };
 
       const dynamicCells = order.map(col => cellMap[col] || '').join('');
@@ -34398,6 +34483,9 @@
       const res = await apiFetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
       if (res.ok) {
         cachedSheetsConfig = await res.json();
+        if (cachedSheetsConfig?.tokenExpired) {
+          cachedSheetsConfig.connected = false;
+        }
         if (cachedSheetsConfig?.childSheetGids) {
           localStorage.setItem('chm_child_sheet_gids', JSON.stringify(cachedSheetsConfig.childSheetGids));
         }
@@ -34950,6 +35038,11 @@
             }
           }
           toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
+        } else if (data && (data.tokenExpired || data.error === 'invalid_grant')) {
+          if (!cachedSheetsConfig) cachedSheetsConfig = {};
+          cachedSheetsConfig.connected = false;
+          cachedSheetsConfig.tokenExpired = true;
+          toast('Google Authorization Expired', 'Google Workspace session expired. Please reconnect in Settings.', 'warning');
         } else if (data && data.message === 'Not connected') {
           console.log('[Google Sheets] Skip auto-sync: NGO is not connected to Google Workspace.');
         }
@@ -35362,6 +35455,21 @@
     { label: '08:00 PM', value: '20:00' }
   ];
 
+  const DOCTOR_SPECIALTIES = [
+    'General Pediatrics',
+    'Pediatric Dentistry / Dental',
+    'Ophthalmology / Eye Specialist',
+    'ENT (Ear, Nose, Throat)',
+    'Dermatology / Skin Care',
+    'Pediatric Orthopedics',
+    'Cardiology',
+    'Neurology',
+    'Nutrition & Dietetics',
+    'Child Psychology / Mental Health',
+    'General Physician',
+    'Other Speciality'
+  ];
+
   /**
    * Build Google Calendar TEMPLATE URL for instant synchronization
    */
@@ -35382,7 +35490,7 @@
         `📋 GROUP APPOINTMENT: All Children — ${appointment.type}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `👥 Target: All Registered Children (${groupCount} Students)\n` +
-        `🩺 Doctor / Title: ${appointment.doctor || 'Routine Healthcare Session'}\n` +
+        `🩺 Doctor / Title: ${appointment.doctor || 'Routine Healthcare Session'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
         `📅 Date: ${appointment.date}\n` +
         `⏰ Time: ${formatSingleDisplayTime(appointment.time || '10:00')}\n\n` +
         `📋 Children Included in this Plan (${groupCount}):\n${childrenNames}\n\n` +
@@ -35392,7 +35500,7 @@
     } else {
       titleStr = `${appointment.childName} — ${appointment.type}`;
       detailsStr =
-        `Doctor: ${appointment.doctor || 'N/A'}\n` +
+        `Doctor: ${appointment.doctor || 'N/A'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
         `Child: ${appointment.childName}\n` +
         `Type: ${appointment.type}\n` +
         `Notes: ${appointment.notes || 'No notes'}\n\n` +
@@ -35478,6 +35586,7 @@
       childId: data.childId,
       childName: data.childName,
       type: data.type,
+      specialty: data.specialty || '',
       date: data.date,
       time: data.time || '10:00',
       doctor: data.doctor || '',
@@ -35699,6 +35808,7 @@
   function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
     const children = getChildren();
     const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
+    const specialtyOptions = DOCTOR_SPECIALTIES.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
     const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
 
     // Format display date
@@ -35742,9 +35852,10 @@
               <option value="ALL">All Children (${children.length})</option>
               ${childOptions}
             </select>
-            <label class="gcal-all-pill" id="cal-all-pill" title="Select all ${children.length} registered children">
+            <label class="gcal-all-pill" id="cal-all-pill" title="Toggle all ${children.length} registered children" role="button" aria-pressed="false" tabindex="0">
               <input type="checkbox" id="cal-all-children-check" name="selectAllChildren" value="true" />
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg class="gcal-all-pill-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none; flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
+              <svg class="gcal-all-pill-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
               <span>All Children</span>
             </label>
           </div>
@@ -35765,6 +35876,19 @@
               <option value="Vaccination">Vaccination</option>
               <option value="Monthly checkup">Monthly Checkup</option>
               <option value="Oral checkup">Oral Checkup</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Speciality of doctor (Optional, can be empty) -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <select class="gcal-popup-select" name="specialty" id="cal-specialty-select">
+              <option value="">Speciality of doctor</option>
+              ${specialtyOptions}
             </select>
           </div>
         </div>
@@ -35888,7 +36012,7 @@
               </div>
               <div class="gcal-popover-info-text">
                 <span class="gcal-popover-info-label">Doctor / Title</span>
-                <span class="gcal-popover-info-val">${escapeHTML(appt.doctor || 'Routine Healthcare')}</span>
+                <span class="gcal-popover-info-val">${escapeHTML(appt.doctor || 'Routine Healthcare')}${appt.specialty ? ` <span style="font-size:12px; opacity:0.85; font-weight:500;">(${escapeHTML(appt.specialty)})</span>` : ''}</span>
               </div>
             </div>
 
@@ -35930,9 +36054,9 @@
 
           <!-- Dual Action Footer -->
           <div class="gcal-popover-footer-dual">
-            <button class="gcal-btn gcal-btn--secondary" type="button" data-edit-event-id="${appt.id}" style="flex:1; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
+            <button class="gcal-btn gcal-btn--secondary" type="button" data-open-clinical-modal="${appt.id}" style="flex:1; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              Edit
+              Edit details
             </button>
             <button class="gcal-btn gcal-btn--create" type="button" data-sync-event-id="${appt.id}" style="flex:1.4; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
@@ -35940,6 +36064,280 @@
             </button>
           </div>
         </div>
+      </div>
+    </div>`;
+  }
+
+  /**
+   * Render Clinical Vitals & Blood Test Report Data Entry Modal
+   * Exactly matches the NGO Google Sheet Child Tab format:
+   * - Row 3: DATE, TEMP(F), B/P, WEIGHT, P/R, SPO2, COMPLAINT, PRESCRIPTION, EYE CHECK UP
+   * - Row 19: DATE, HAEMOGLOBIN, WBC, PLATELETS, RBC, PCV, NEUTROPHIL, LYMPHOCYTES, EOSINOPHILS, MONOCYTES, BASOPHILS, RBC MORPHOLOGY, WBC MORPHOLOGY, PLATELETS ADEQUACY
+   */
+  function renderClinicalSectionsMarkup({ existingGrowth = {}, existingBlood = {}, targetDate = '', prefix = '' } = {}) {
+    const dateVal = targetDate || new Date().toISOString().slice(0, 10);
+    return `
+    <!-- SECTION 1: ROUTINE CLINICAL CHECKUP -->
+    <div class="clinical-section-card" style="margin-bottom: 24px;">
+      <div class="clinical-section-header">
+        <div class="clinical-section-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>Routine Clinical Checkup</span>
+        </div>
+        <span class="clinical-sync-badge">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M4 10h16"/><path d="M10 4v16"/></svg>
+          Syncs to Sheet Row 3
+        </span>
+      </div>
+
+      <div class="clinical-grid-3">
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-date">DATE</label>
+          <input class="clinical-input" id="${prefix}checkup-date" type="date" name="checkup_date" value="${existingGrowth.date || dateVal}" required />
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-temp">TEMP (F)</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}checkup-temp" type="text" name="temperature" placeholder="98.6" value="${escapeHTML(existingGrowth.temperature || existingGrowth.temp || '')}" />
+            <span class="clinical-input-unit">°F</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-bp">B/P</label>
+          <input class="clinical-input" id="${prefix}checkup-bp" type="text" name="bp" placeholder="110/70" value="${escapeHTML(existingGrowth.bp || existingGrowth.bloodPressure || '')}" />
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-weight">WEIGHT</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}checkup-weight" type="number" step="0.1" name="weight" placeholder="32.5" value="${escapeHTML(existingGrowth.weight || '')}" />
+            <span class="clinical-input-unit">kg</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-pulse">P/R</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}checkup-pulse" type="number" name="pulse" placeholder="78" value="${escapeHTML(existingGrowth.pulse || existingGrowth.pulseRate || '')}" />
+            <span class="clinical-input-unit">bpm</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}checkup-spo2">SPO2</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}checkup-spo2" type="number" name="spo2" placeholder="99" value="${escapeHTML(existingGrowth.spo2 || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group clinical-grid-full">
+          <label class="clinical-field-label" for="${prefix}checkup-eye">EYE CHECK UP</label>
+          <input class="clinical-input" id="${prefix}checkup-eye" type="text" name="eyeCheckup" placeholder="e.g. Normal 6/6, Clear vision" value="${escapeHTML(existingGrowth.eyeCheckup || existingGrowth.eyeRemarks || '')}" />
+        </div>
+
+        <div class="clinical-field-group clinical-grid-full">
+          <label class="clinical-field-label" for="${prefix}checkup-complaint">COMPLAINT</label>
+          <textarea class="clinical-textarea" id="${prefix}checkup-complaint" name="complaint" rows="2" placeholder="Presenting complaint or symptoms...">${escapeHTML(existingGrowth.complaint || existingGrowth.symptoms || '')}</textarea>
+        </div>
+
+        <div class="clinical-field-group clinical-grid-full">
+          <label class="clinical-field-label" for="${prefix}checkup-prescription">PRESCRIPTION</label>
+          <textarea class="clinical-textarea" id="${prefix}checkup-prescription" name="prescription" rows="2" placeholder="Prescription, medicines advised, treatment given...">${escapeHTML(existingGrowth.prescription || existingGrowth.medication || '')}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: BLOOD TEST REPORT -->
+    <div class="clinical-section-card">
+      <div class="clinical-section-header">
+        <div class="clinical-section-title">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#dc2626" stroke-width="2.2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+          <span>Blood Test Report</span>
+        </div>
+        <span class="clinical-sync-badge" style="background:#fee2e2; color:#b91c1c;">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M4 10h16"/><path d="M10 4v16"/></svg>
+          Syncs to Sheet Row 19
+        </span>
+      </div>
+
+      <div class="clinical-grid-4">
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-date">DATE</label>
+          <input class="clinical-input" id="${prefix}blood-date" type="date" name="blood_date" value="${existingBlood.date || dateVal}" />
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-hb">HAEMOGLOBIN</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-hb" type="text" name="hemoglobin" placeholder="13.2" value="${escapeHTML(existingBlood.hemoglobin || existingBlood.hb || '')}" />
+            <span class="clinical-input-unit">g/dL</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-wbc">WBC</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-wbc" type="text" name="wbc" placeholder="7500" value="${escapeHTML(existingBlood.wbc || '')}" />
+            <span class="clinical-input-unit">/cumm</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-platelets">PLATELETS</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-platelets" type="text" name="platelets" placeholder="2.5" value="${escapeHTML(existingBlood.platelets || '')}" />
+            <span class="clinical-input-unit">Lakhs</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-rbc">RBC</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-rbc" type="text" name="rbc" placeholder="4.5" value="${escapeHTML(existingBlood.rbc || '')}" />
+            <span class="clinical-input-unit">M/µL</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-pcv">PCV</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-pcv" type="text" name="pcv" placeholder="38" value="${escapeHTML(existingBlood.pcv || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-neutrophil">NEUTROPHIL</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-neutrophil" type="text" name="neutrophil" placeholder="62" value="${escapeHTML(existingBlood.neutrophil || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-lymphocytes">LYMPHOCYTES</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-lymphocytes" type="text" name="lymphocytes" placeholder="30" value="${escapeHTML(existingBlood.lymphocytes || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-eosinophils">EOSINOPHILS</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-eosinophils" type="text" name="eosinophils" placeholder="4" value="${escapeHTML(existingBlood.eosinophils || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-monocytes">MONOCYTES</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-monocytes" type="text" name="monocytes" placeholder="3" value="${escapeHTML(existingBlood.monocytes || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-basophils">BASOPHILS</label>
+          <div class="clinical-input-unit-wrapper">
+            <input class="clinical-input" id="${prefix}blood-basophils" type="text" name="basophils" placeholder="1" value="${escapeHTML(existingBlood.basophils || '')}" />
+            <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-field-group">
+          <label class="clinical-field-label" for="${prefix}blood-platelets-adequacy">PLATELETS ADEQUACY</label>
+          <input class="clinical-input" id="${prefix}blood-platelets-adequacy" type="text" name="plateletsAdequacy" placeholder="Adequate on smear" value="${escapeHTML(existingBlood.plateletsAdequacy || '')}" />
+        </div>
+
+        <div class="clinical-field-group" style="grid-column: span 2;">
+          <label class="clinical-field-label" for="${prefix}blood-rbc-morph">RBC MORPHOLOGY</label>
+          <input class="clinical-input" id="${prefix}blood-rbc-morph" type="text" name="rbcMorphology" placeholder="e.g. Normocytic Normochromic" value="${escapeHTML(existingBlood.rbcMorphology || '')}" />
+        </div>
+
+        <div class="clinical-field-group" style="grid-column: span 2;">
+          <label class="clinical-field-label" for="${prefix}blood-wbc-morph">WBC MORPHOLOGY</label>
+          <input class="clinical-input" id="${prefix}blood-wbc-morph" type="text" name="wbcMorphology" placeholder="e.g. Normal in number and morphology" value="${escapeHTML(existingBlood.wbcMorphology || '')}" />
+        </div>
+      </div>
+    </div>
+  `;
+  }
+
+  function renderClinicalDataModalMarkup(eventId, childIdParam = null, childNameParam = null) {
+    const appointments = getAppointments();
+    const appt = eventId ? appointments.find(a => String(a.id) === String(eventId)) : null;
+
+    const childId = appt ? appt.childId : childIdParam;
+    let childName = appt ? (appt.childName || 'Child') : (childNameParam || 'Child');
+    const targetDate = appt?.date || new Date().toISOString().slice(0, 10);
+
+    if (!childId && !appt) return '';
+
+    if (childId && !appt) {
+      const children = getChildren();
+      const c = children.find(ch => ch.id === childId || (ch.name && ch.name.toLowerCase() === (childNameParam || '').toLowerCase()));
+      if (c) childName = c.name;
+    }
+
+    // Retrieve any existing growth record for this child on this date (or latest)
+    const growthRecords = childId ? getGrowthRecords(childId) : [];
+    const existingGrowth = (appt?.date ? growthRecords.find(g => g.date === targetDate) : null) || growthRecords[0] || {};
+
+    // Retrieve any existing blood test record for this child on this date (or latest)
+    const healthRecords = childId ? getHealthRecords(childId) : [];
+    const existingBlood = (appt?.date ? healthRecords.find(h => h.date === targetDate) : null) || healthRecords[0] || {};
+
+    const subTitle = appt ? `${escapeHTML(appt.type || 'Appointment')} (${appt.date})` : 'Student Medical Records';
+
+    return `
+    <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
+      <div class="gcal-popup-card gcal-clinical-modal-card" role="dialog" aria-modal="true">
+        <!-- Banner Header -->
+        <div class="gcal-popover-banner" style="background-image: url('assets/gcal_event_banner.png'); height: 105px; min-height: 105px;">
+          <div class="gcal-popover-banner-overlay"></div>
+          <button class="gcal-popup-close" type="button" aria-label="Close" data-close-cal-modal style="position:absolute; top:10px; right:12px; z-index:5; color:#fff; background:rgba(0,0,0,0.3); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; border:none; cursor:pointer;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+          <div style="position:absolute; bottom:12px; left:20px; color:#fff; z-index:3;">
+            <div style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.06em; opacity:0.92; margin-bottom:2px; display:flex; align-items:center; gap:6px;">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Clinical Details &amp; Google Sheet Sync
+            </div>
+            <div style="font-size:18px; font-weight:700; text-shadow:0 1px 4px rgba(0,0,0,0.6); display:flex; align-items:center; gap:8px;">
+              <span>${escapeHTML(childName)}</span>
+              ${childId ? `<span style="font-size:11px; font-weight:600; background:rgba(255,255,255,0.25); backdrop-filter:blur(4px); padding:2px 8px; border-radius:10px;">${escapeHTML(childId)}</span>` : ''}
+              <span style="font-size:12px; font-weight:500; opacity:0.85;">· ${subTitle}</span>
+            </div>
+          </div>
+        </div>
+
+        <form id="clinical-data-form" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
+          <input type="hidden" name="appointmentId" value="${appt?.id || ''}" />
+          <input type="hidden" name="childId" value="${childId || ''}" />
+          <input type="hidden" name="childName" value="${escapeHTML(childName)}" />
+          <input type="hidden" name="existingGrowthId" value="${existingGrowth.id || ''}" />
+          <input type="hidden" name="existingBloodId" value="${existingBlood.id || ''}" />
+
+          <div class="gcal-clinical-modal-body">
+            ${renderClinicalSectionsMarkup({ existingGrowth, existingBlood, targetDate, prefix: 'modal-' })}
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="clinical-modal-footer">
+            <button class="gcal-btn gcal-btn--secondary" type="button" data-close-cal-modal style="padding:8px 16px; font-size:13px;">
+              Cancel
+            </button>
+            <button class="gcal-btn gcal-btn--create" id="btn-save-clinical-data" type="submit" style="padding:8px 20px; font-size:13px; gap:6px;">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Save &amp; Sync to Sheet
+            </button>
+          </div>
+        </form>
       </div>
     </div>`;
   }
@@ -35969,6 +36367,10 @@
       { value: 'Completed', label: 'Completed' },
       { value: 'Cancelled', label: 'Cancelled' }
     ].map(s => `<option value="${s.value}" ${s.value.toLowerCase() === (appt.status || 'upcoming').toLowerCase() ? 'selected' : ''}>${s.label}</option>`).join('');
+
+    const specialtyOptions = DOCTOR_SPECIALTIES.map(s => 
+      `<option value="${escapeHTML(s)}" ${s.toLowerCase() === (appt.specialty || '').toLowerCase() ? 'selected' : ''}>${escapeHTML(s)}</option>`
+    ).join('');
 
     return `
     <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
@@ -36028,6 +36430,19 @@
               <div class="gcal-popup-row-content">
                 <select class="gcal-popup-select" name="type" required>
                   ${typeOptions}
+                </select>
+              </div>
+            </div>
+
+            <!-- Speciality of doctor (Optional, can be empty) -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6 6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <select class="gcal-popup-select" name="specialty">
+                  <option value="">Speciality of doctor</option>
+                  ${specialtyOptions}
                 </select>
               </div>
             </div>
@@ -36161,8 +36576,7 @@
 
   const nav = [
     { section: 'Overview', items: [['dashboard', 'Dashboard', 'grid']] },
-    { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['medicines', 'Prescriptions', 'pill'], ['documents', 'Documents', 'file']] },
-    { section: 'Analytics', items: [['reports', 'Reports', 'chart']] }
+    { section: 'Children & Health', items: [['children', 'Children', 'users'], ['appointments', 'Appointments', 'calendar'], ['growth', 'Growth', 'ruler'], ['documents', 'Documents', 'file']] }
   ];
 
   const pageTitles = {
@@ -36355,7 +36769,7 @@
     if (flaggedChildren.length === 0) ; else {
       flaggedChildren.slice(0, 4).map(child => {
         const hs = healthStatus(child);
-        return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${healthDot(hs.level)} ${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
+        return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
       }).join('');
     }
 
@@ -36444,10 +36858,10 @@
     const growth = getGrowthRecords(child.id);
     const latestGrowth = growth[0];
     const meds = getMedicines(child.id).filter(m => m.status === 'Active');
-    const allMeds = getMedicines(child.id);
+    getMedicines(child.id);
     const docs = getUploadedDocs().filter(d => (d.childName && d.childName.toLowerCase() === child.name.toLowerCase()) || d.childId === child.id || (d.child && d.child.toLowerCase() === child.name.toLowerCase()));
     const healthRecs = getHealthRecords(child.id);
-    const activities = getActivities().filter(a => (a.childName && a.childName.toLowerCase() === child.name.toLowerCase()) || (a.detail && a.detail.includes(child.name)));
+    getActivities().filter(a => (a.childName && a.childName.toLowerCase() === child.name.toLowerCase()) || (a.detail && a.detail.includes(child.name)));
 
     // Docs HTML for Documents tab
     let docsHTML = '';
@@ -36460,26 +36874,28 @@
           ${icon('trash')}
         </button>
         <div class="document-card__body" style="padding:16px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px;">
-            <h3 style="font-size:14px; font-weight:600; margin:0;">${d.name || d.title || 'Medical Document'}</h3>
-            <span class="badge badge--success">${d.status || 'Verified'}</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px; gap:8px;">
+            <h3 style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${d.name || d.title || 'Medical Document'}</h3>
+            <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
+              ${d.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:13px; height:13px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Local</span>`}
+              <span class="badge badge--success">${d.status || 'Verified'}</span>
+            </div>
           </div>
           <div class="detail-list detail-list--single" style="font-size:13px;">
             <div class="detail-row"><span>Category</span><b>${d.docType || d.category || 'Medical Report'}</b></div>
             <div class="detail-row"><span>Uploaded</span><b>${d.uploadDate || formatDate(d.timestamp) || 'Recently'}</b></div>
           </div>
-          ${d.fileData || d.image ? `<div style="margin-top:12px;"><a class="button button--sm" href="${d.fileData || d.image}" target="_blank" download="${d.name || 'document'}.png">${icon('download')} View / Download</a></div>` : ''}
+          <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+            ${d.driveUrl ? `<a class="button button--sm button--primary" href="${d.driveUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px;">${icon('external')} Open in Drive</a>` : ''}
+            ${d.fileData || d.image ? `<a class="button button--sm ${d.driveUrl ? 'button--ghost' : 'button--primary'}" href="${d.fileData || d.image}" target="_blank" download="${d.name || 'document'}.png" style="display:inline-flex; align-items:center; gap:6px;">${icon('download')} View / Download</a>` : ''}
+            ${!d.driveUrl && (d.fileData || d.image) ? `<button class="button button--sm button--ghost" type="button" data-sync-doc-id="${d.id}" style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')} Sync to Drive</button>` : ''}
+          </div>
         </div>
       </article>
     `).join('')}</div>`;
     }
-
-    // Health records / reports HTML
-    let reportsHTML = '';
-    if (healthRecs.length === 0 && meds.length === 0) {
-      reportsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('heartPulse')}</span><h3>No lab reports logged</h3><p>Blood test results and clinical lab reports will appear here.</p></div>`;
-    } else {
-      reportsHTML = `
+    if (healthRecs.length === 0 && meds.length === 0) ; else {
+      `
       <div style="display: flex; flex-direction: column; gap: 20px;">
         ${healthRecs.length > 0 ? `
           <div class="data-table-wrap">
@@ -36500,42 +36916,360 @@
       </div>`;
     }
 
-    // Growth HTML
-    let growthHTML = '';
+    // Latest values for Growth & Health Summary
+    const curHeight = latestGrowth?.height || child.height || '';
+    const curWeight = latestGrowth?.weight || child.weight || '';
+    const curBmi = latestGrowth?.bmi || (curHeight && curWeight ? +(curWeight / ((curHeight / 100) ** 2)).toFixed(1) : '');
+    const curHealthStatus = latestGrowth?.healthStatus || child.healthStatus || (hs.level === 'critical' ? 'Critical' : hs.level === 'warning' ? 'Review needed' : 'Healthy');
+    const curConditions = latestGrowth?.medicalConditions !== undefined ? latestGrowth.medicalConditions : (child.medicalConditions || '');
+    const curAllergies = latestGrowth?.allergies !== undefined ? latestGrowth.allergies : (child.allergies || '');
+    const curMeds = latestGrowth?.medications !== undefined ? latestGrowth.medications : (child.medications || (meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : ''));
+    const curDental = latestGrowth?.dentalRemarks !== undefined ? latestGrowth.dentalRemarks : (child.dentalRemarks || '');
+    const curHygiene = latestGrowth?.hygieneIndex !== undefined ? latestGrowth.hygieneIndex : (child.hygieneIndex || 'Not Assessed');
+    const defaultDate = latestGrowth?.date || new Date().toISOString().slice(0, 10);
+
+    // Growth History Rows HTML
+    let historyRowsHTML = '';
     if (growth.length === 0) {
-      growthHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('ruler')}</span><h3>No growth records</h3><p>Height, weight, and BMI records will appear here.</p></div>`;
+      historyRowsHTML = `<tr><td colspan="7"><div class="empty-state" style="padding: 28px 12px;"><span class="empty-state__icon">${icon('ruler')}</span><p style="margin:0; font-size:13px; color:var(--color-text-muted);">No records logged yet. Fill out the form above to save the first growth measurement.</p></div></td></tr>`;
     } else {
-      growthHTML = `
-      <div style="display: flex; flex-direction: column; gap: 20px;">
-        <h3 style="font-size:14px; font-weight:600;">Growth Measurements History</h3>
+      historyRowsHTML = growth.map(g => {
+        const gDate = g.date || (g.timestamp ? formatDate(g.timestamp) : '—');
+        const gBmi = g.bmi || (g.height && g.weight ? +(g.weight / ((g.height / 100) ** 2)).toFixed(1) : '—');
+        const bmiBadge = gBmi && gBmi !== '—'
+          ? (gBmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : gBmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>')
+          : '';
+        const gStatus = g.healthStatus || 'Healthy';
+        const statusColor = gStatus === 'Critical' ? 'danger' : gStatus === 'Review needed' ? 'warning' : 'success';
+        const safeGJson = escapeHTML$1(JSON.stringify(g));
+
+        return `
+        <tr>
+          <td><b style="color:var(--color-primary);">${formatDate(gDate)}</b></td>
+          <td><b>${g.height ? g.height + ' cm' : '—'}</b></td>
+          <td><b>${g.weight ? g.weight + ' kg' : '—'}</b></td>
+          <td>${gBmi} ${bmiBadge}</td>
+          <td><span class="badge badge--${statusColor}">${escapeHTML$1(gStatus)}</span></td>
+          <td style="font-size:12px; color:var(--color-text-muted); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+            ${escapeHTML$1([g.medicalConditions, g.dentalRemarks, g.hygieneIndex].filter(Boolean).join(' · ')) || 'None recorded'}
+          </td>
+          <td style="text-align:right; white-space:nowrap;">
+            <button class="button button--sm button--secondary" type="button" data-edit-growth-item='${safeGJson}' style="margin-right:6px;">
+              ${icon('pencil')} Edit
+            </button>
+            <button class="icon-button tooltip" type="button" data-tooltip="Delete measurement" data-delete-growth-id="${g.id || g.date}" style="color:var(--color-danger);">
+              ${icon('trash')}
+            </button>
+          </td>
+        </tr>
+      `;
+      }).join('');
+    }
+
+    // Growth Tab Content HTML
+    let growthHTML = `
+    <div style="display: flex; flex-direction: column; gap: 24px;">
+      <!-- Health Summary Display Card (The Div) -->
+      <section class="card" id="child-health-summary-card">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 class="card__title">Health summary</h2>
+            <p class="card__caption">Latest vitals and health status (Recorded: <strong style="color:var(--color-primary); font-weight:700;">${formatDate(defaultDate)}</strong>)</p>
+          </div>
+          <button class="button button--secondary button--sm" type="button" data-new-growth-entry="${child.id}">
+            ${icon('plus')} Add / Log Measurement
+          </button>
+        </header>
+        <div class="card__body">
+          <div class="detail-list">
+            <div class="detail-row"><span>Health status</span><b>${escapeHTML$1(curHealthStatus)}</b></div>
+            <div class="detail-row"><span>Height</span><b>${curHeight ? curHeight + ' cm' : '—'}</b></div>
+            <div class="detail-row"><span>Weight</span><b>${curWeight ? curWeight + ' kg' : '—'}</b></div>
+            <div class="detail-row"><span>BMI</span><b>${curBmi || '—'} ${curBmi ? (curBmi < 16 ? '<span class="badge badge--danger" style="margin-left:4px;">Underweight</span>' : curBmi > 25 ? '<span class="badge badge--warning" style="margin-left:4px;">Overweight</span>' : '<span class="badge badge--success" style="margin-left:4px;">Normal</span>') : ''}</b></div>
+            <div class="detail-row"><span>Medical conditions</span><b>${escapeHTML$1(curConditions) || 'None reported'}</b></div>
+            <div class="detail-row"><span>Allergies</span><b>${escapeHTML$1(curAllergies) || 'None reported'}</b></div>
+            <div class="detail-row"><span>Current medications</span><b>${escapeHTML$1(curMeds) || 'None'}</b></div>
+            <div class="detail-row"><span>Dental remarks</span><b>${escapeHTML$1(curDental) || 'No remarks recorded'}</b></div>
+            <div class="detail-row"><span>Hygiene Index</span><b>${escapeHTML$1(curHygiene) || 'Not Assessed'}</b></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Editable Health Summary & Growth Form -->
+      <section class="card" id="child-growth-editor-card">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div>
+            <h2 class="card__title" id="growth-form-title">Health summary & Growth vitals</h2>
+            <p class="card__caption" id="growth-form-caption">Edit and save date-referenced vitals and health status</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <button class="button button--secondary button--sm" type="button" data-new-growth-entry="${child.id}">
+              ${icon('plus')} New Date Entry
+            </button>
+          </div>
+        </header>
+        <div class="card__body">
+          <form id="child-growth-form" data-child-id="${child.id}" data-child-name="${escapeHTML$1(child.name)}">
+            <input type="hidden" name="id" id="growth-input-id" value="${latestGrowth?.id || ''}">
+
+            <!-- Date Reference Strip -->
+            <div style="background: var(--color-bg-alt, #f8fafc); border: 1px solid var(--color-border); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 6px; background: var(--color-primary-bg, #eff6ff); color: var(--color-primary);">
+                  ${icon('calendar')}
+                </span>
+                <div>
+                  <label style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--color-text-muted); display: block; margin-bottom: 2px;">
+                    Measurement Date Reference *
+                  </label>
+                  <input class="input" type="date" name="date" id="growth-input-date" value="${defaultDate}" required style="padding: 4px 8px; font-size: 13px; font-weight: 600; width: 175px;">
+                </div>
+              </div>
+              <div id="growth-date-badge-wrap">
+                <span class="badge badge--blue" id="growth-status-badge">
+                  ${latestGrowth?.date ? `Record Date: ${formatDate(latestGrowth.date)}` : `New Entry`}
+                </span>
+              </div>
+            </div>
+
+            <!-- 2-Column Form Fields Matching Health Summary -->
+            <div class="form-grid--two">
+              <!-- Health Status -->
+              <label class="field">
+                <span class="field__label">Health status</span>
+                <select class="select" name="healthStatus" id="growth-input-status">
+                  <option value="Healthy" ${curHealthStatus === 'Healthy' || curHealthStatus === 'Optimal' ? 'selected' : ''}>Healthy (Optimal)</option>
+                  <option value="Review needed" ${curHealthStatus === 'Review needed' || curHealthStatus === 'Monitor' ? 'selected' : ''}>Review needed (Monitor)</option>
+                  <option value="Critical" ${curHealthStatus === 'Critical' || curHealthStatus === 'Needs attention' ? 'selected' : ''}>Critical (Needs attention)</option>
+                </select>
+              </label>
+
+              <!-- Calculated BMI (live calculation preview) -->
+              <div class="field">
+                <span class="field__label">Calculated BMI</span>
+                <div style="display: flex; align-items: center; gap: 10px; height: 42px; padding: 0 12px; background: var(--color-bg-alt, #f8fafc); border: 1px solid var(--color-border); border-radius: 6px;">
+                  <b id="growth-display-bmi" style="font-size: 15px;">${curBmi || '—'}</b>
+                  <span id="growth-display-bmi-badge">
+                    ${curBmi ? (curBmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : curBmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : ''}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Height -->
+              <label class="field">
+                <span class="field__label">Height (cm) *</span>
+                <input class="input" type="number" step="any" min="0" name="height" id="growth-input-height" placeholder="e.g. 140" value="${curHeight}" required>
+              </label>
+
+              <!-- Weight -->
+              <label class="field">
+                <span class="field__label">Weight (kg) *</span>
+                <input class="input" type="number" step="any" min="0" name="weight" id="growth-input-weight" placeholder="e.g. 35" value="${curWeight}" required>
+              </label>
+
+              <!-- Medical Conditions -->
+              <label class="field">
+                <span class="field__label">Medical conditions</span>
+                <input class="input" type="text" name="medicalConditions" id="growth-input-conditions" placeholder="e.g. Asthma, Diabetes" value="${escapeHTML$1(curConditions)}">
+              </label>
+
+              <!-- Allergies -->
+              <label class="field">
+                <span class="field__label">Allergies</span>
+                <input class="input" type="text" name="allergies" id="growth-input-allergies" placeholder="e.g. Peanuts, Dust, Penicillin" value="${escapeHTML$1(curAllergies)}">
+              </label>
+
+              <!-- Current Medications -->
+              <label class="field">
+                <span class="field__label">Current medications</span>
+                <input class="input" type="text" name="medications" id="growth-input-meds" placeholder="e.g. Paracetamol, Multivitamins" value="${escapeHTML$1(curMeds)}">
+              </label>
+
+              <!-- Dental Remarks -->
+              <label class="field">
+                <span class="field__label">Dental remarks</span>
+                <input class="input" type="text" name="dentalRemarks" id="growth-input-dental" placeholder="e.g. No remarks / Scaling done" value="${escapeHTML$1(curDental)}">
+              </label>
+
+              <!-- Hygiene Index -->
+              <label class="field form-span-all">
+                <span class="field__label">Oral Hygiene Index</span>
+                <select class="select" name="hygieneIndex" id="growth-input-hygiene">
+                  <option value="SATISFACTORY" ${curHygiene === 'SATISFACTORY' ? 'selected' : ''}>SATISFACTORY</option>
+                  <option value="AVERAGE" ${curHygiene === 'AVERAGE' ? 'selected' : ''}>AVERAGE</option>
+                  <option value="POOR" ${curHygiene === 'POOR' ? 'selected' : ''}>POOR</option>
+                  <option value="Not Assessed" ${curHygiene === 'Not Assessed' || !curHygiene ? 'selected' : ''}>Not Assessed</option>
+                </select>
+              </label>
+            </div>
+
+            <!-- Submit Buttons -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:24px; padding-top:16px; border-top:1px solid var(--color-border); flex-wrap:wrap; gap:12px;">
+              <span style="font-size:12px; color:var(--color-text-muted);">
+                Saves to database with date reference and live synchronizes to Google Sheets.
+              </span>
+              <div style="display:flex; gap:10px;">
+                <button class="button button--ghost" type="button" id="growth-cancel-edit-btn" style="display:none;" data-cancel-growth-edit>
+                  Cancel
+                </button>
+                <button class="button button--primary" type="submit" id="growth-submit-btn">
+                  ${icon('check')} Save Growth Record
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- History Table by Date -->
+      <section class="card">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h2 class="card__title">Growth & Health History by Date</h2>
+            <p class="card__caption">All recorded vitals and health progression for ${escapeHTML$1(child.name)}</p>
+          </div>
+        </header>
         <div class="data-table-wrap">
           <table class="data-table">
-            <thead><tr><th>Date</th><th>Height</th><th>Weight</th><th>BMI</th><th>Status</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Height</th>
+                <th>Weight</th>
+                <th>BMI</th>
+                <th>Status</th>
+                <th>Conditions / Dental</th>
+                <th style="text-align:right;">Actions</th>
+              </tr>
+            </thead>
             <tbody>
-              ${growth.map(g => `<tr><td>${formatDate(g.date || g.timestamp)}</td><td><b>${g.height} cm</b></td><td><b>${g.weight} kg</b></td><td><span class="badge badge--neutral">${g.bmi || '—'}</span></td><td>${g.bmi ? (g.bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : g.bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : '—'}</td></tr>`).join('')}
+              ${historyRowsHTML}
             </tbody>
           </table>
         </div>
-      </div>`;
-    }
+      </section>
+    </div>
+  `;
 
-    // Medicines HTML
-    let medsHTML = '';
-    if (allMeds.length === 0) {
-      medsHTML = `<div class="empty-state" style="padding: 36px 24px;"><span class="empty-state__icon">${icon('pill')}</span><h3>No prescriptions logged</h3><p>Medications prescribed for ${child.name} will appear here.</p></div>`;
-    } else {
-      medsHTML = `<div class="document-grid">${allMeds.map(m => `
-      <article class="card document-card"><div class="document-card__body" style="padding:14px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px"><h3 style="font-size:14px; font-weight:600; margin:0">${m.medicineName}</h3>${statusBadge(m.status)}</div><p style="font-size:13px; color:var(--color-text-muted); margin:0 0 4px">${m.dosage}</p><p style="font-size:12px; color:var(--color-text-muted); margin:0">${m.frequency} · ${m.startDate} → ${m.endDate}</p></div></article>
-    `).join('')}</div>`;
-    }
+    // Clinical & Google Sheet Sync HTML
+    const latestBlood = healthRecs[0] || {};
+    const allClinicalHistory = [
+      ...growth.map(g => ({ ...g, entryType: 'checkup', sortDate: g.date || '1970-01-01' })),
+      ...healthRecs.map(h => ({ ...h, entryType: 'blood', sortDate: h.date || '1970-01-01' }))
+    ].sort((a, b) => (new Date(b.sortDate).getTime() || 0) - (new Date(a.sortDate).getTime() || 0));
 
-    // Timeline HTML
-    let timelineHTML = '';
-    if (activities.length === 0) {
-      timelineHTML = `<div class="timeline"><div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>Child registered</b><p>Record created in the health management workspace.</p><time>${child.registeredDate ? formatDate(child.registeredDate) : 'Recently'}</time></div></div></div>`;
-    } else {
-      timelineHTML = `<div class="timeline">${activities.map(a => `<div class="timeline__item"><span class="timeline__dot"></span><div class="timeline__copy"><b>${a.action ? a.action.replace(/_/g, ' ').toUpperCase() : 'ACTIVITY'}</b><p>${a.detail || a.childName}</p><time>${timeAgo(a.timestamp)}</time></div></div>`).join('')}</div>`;
-    }
+    const historyClinicalRowsHTML = allClinicalHistory.length === 0 ? `
+    <tr><td colspan="5" class="empty-state" style="padding: 24px; text-align: center;">No clinical checkups or blood tests recorded yet for ${escapeHTML$1(child.name)}.</td></tr>
+  ` : allClinicalHistory.map(item => {
+      const isCheckup = item.entryType === 'checkup';
+      const typeBadge = isCheckup
+        ? `<span class="badge badge--blue" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Routine Checkup (Row 3)</span>`
+        : `<span class="badge badge--danger" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> Blood Test (Row 19)</span>`;
+
+      const summaryHTML = isCheckup
+        ? `<span>${[
+          item.temperature ? `${item.temperature}°F` : '',
+          item.bp ? `BP ${item.bp}` : '',
+          item.weight ? `${item.weight}kg` : '',
+          item.pulse ? `${item.pulse}bpm` : '',
+          item.spo2 ? `SpO2 ${item.spo2}%` : ''
+        ].filter(Boolean).join(' · ') || 'Vitals recorded'}</span>`
+        : `<span>${[
+          item.hemoglobin ? `Hb: ${item.hemoglobin} g/dL` : '',
+          item.wbc ? `WBC: ${item.wbc}` : '',
+          item.platelets ? `Platelets: ${item.platelets} Lakhs` : '',
+          item.rbc ? `RBC: ${item.rbc}` : ''
+        ].filter(Boolean).join(' · ') || 'Lab values recorded'}</span>`;
+
+      const detailsHTML = isCheckup
+        ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML$1(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML$1(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML$1(item.eyeCheckup)}` : ''}` || '—'
+        : `${item.rbcMorphology ? `RBC: ${escapeHTML$1(item.rbcMorphology)} ` : ''}${item.plateletsAdequacy ? `· Platelets: ${escapeHTML$1(item.plateletsAdequacy)}` : ''}` || '—';
+
+      const rawData = JSON.stringify(item).replace(/"/g, '&quot;');
+
+      return `
+      <tr>
+        <td style="font-weight:600; white-space:nowrap;">${item.date ? formatDate(item.date) : 'Recent'}</td>
+        <td style="white-space:nowrap;">${typeBadge}</td>
+        <td style="font-size:13px;">${summaryHTML}</td>
+        <td style="font-size:12.5px; color:var(--color-text-muted); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detailsHTML}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="button button--ghost button--sm" type="button" data-load-clinical-item="${rawData}" style="display:inline-flex; align-items:center; gap:4px;">
+            ${icon('pencil')} Load into Form
+          </button>
+        </td>
+      </tr>
+    `;
+    }).join('');
+
+    const clinicalHTML = `
+    <!-- Main Data Entry Form -->
+    <section class="card" style="margin-bottom: 24px;">
+      <form id="profile-clinical-data-form" class="clinical-sync-form" style="padding: 24px;">
+        <input type="hidden" name="childId" value="${child.id}" />
+        <input type="hidden" name="childName" value="${escapeHTML$1(child.name)}" />
+        <input type="hidden" name="existingGrowthId" id="prof-growth-id" value="${latestGrowth?.id || ''}" />
+        <input type="hidden" name="existingBloodId" id="prof-blood-id" value="${latestBlood?.id || ''}" />
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 class="card__title" style="margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Clinical Details &amp; Google Sheet Sync Form
+            </h2>
+            <p class="card__caption" style="margin: 0;">Fill in clinical checkup vitals and blood test parameters. Saving automatically updates both local records and Google Sheets.</p>
+          </div>
+          <button class="button button--primary" id="btn-save-profile-clinical" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Save &amp; Sync to Sheet
+          </button>
+        </div>
+
+        ${renderClinicalSectionsMarkup({
+          existingGrowth: latestGrowth || {},
+          existingBlood: latestBlood || {},
+          targetDate: new Date().toISOString().slice(0, 10),
+          prefix: 'prof-'
+        })}
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--color-border);">
+          <button class="button button--primary" id="btn-save-profile-clinical-bottom" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Save &amp; Sync to Sheet
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- History Table -->
+    <section class="card">
+      <header class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h2 class="card__title">Clinical &amp; Lab History</h2>
+          <p class="card__caption">All routine clinical checkups and blood test reports recorded for ${escapeHTML$1(child.name)}</p>
+        </div>
+        <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
+      </header>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Measurements / Key Values</th>
+              <th>Clinical Remarks / Prescription</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${historyClinicalRowsHTML}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+
+    const activeTab = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('chm_active_profile_tab')) || 'overview';
 
     return shell('child-profile', `${heading('Child Health Profile', 'A complete, well-organized health record for this child.', `<button class="button" type="button" data-open-child-sheet="${child.id}" data-child-name="${escapeHTML$1(child.name)}" style="display:inline-flex; align-items:center; gap:8px;">${icon('googleSheets')}Open Google Sheet</button><button class="button" type="button" data-profile-print>${icon('printer')}Print profile</button><button class="button button--primary" type="button" data-edit="${child.id}">${icon('pencil')}Edit profile</button>`)}
   <section class="card">
@@ -36545,7 +37279,7 @@
         <h1>${child.name}</h1>
         <p>${child.id} · ${age ? age + ' old' : 'Age unknown'}</p>
         <div class="profile-header__meta">
-          ${healthDot(hs.level)} ${statusBadge(child.status)}
+          ${statusBadge(child.status)}
           <span class="badge badge--neutral">${child.gender || 'Not specified'}</span>
           <span class="badge badge--blue">Blood: ${child.blood || 'Unknown'}</span>
           ${hs.flags.length ? `<span class="badge badge--warning">${hs.flags.join(', ')}</span>` : ''}
@@ -36557,97 +37291,114 @@
     </div>
     <div class="profile-tabs">
       <div class="tabs" role="tablist">
-        <button class="tab tab--active" type="button" data-profile-tab="overview">Overview</button>
-        <button class="tab" type="button" data-profile-tab="growth">Growth</button>
-        <button class="tab" type="button" data-profile-tab="medicines">Prescriptions</button>
-        <button class="tab" type="button" data-profile-tab="reports">Reports</button>
-        <button class="tab" type="button" data-profile-tab="documents">Documents (${docs.length})</button>
-        <button class="tab" type="button" data-profile-tab="timeline">Health Timeline</button>
+        <button class="tab ${activeTab === 'overview' ? 'tab--active' : ''}" type="button" data-profile-tab="overview">Overview</button>
+        <button class="tab ${activeTab === 'clinical' ? 'tab--active' : ''}" type="button" data-profile-tab="clinical" style="display:inline-flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Clinical &amp; Sheet Sync
+        </button>
+        <button class="tab ${activeTab === 'growth' ? 'tab--active' : ''}" type="button" data-profile-tab="growth">Growth</button>
+        <button class="tab ${activeTab === 'documents' ? 'tab--active' : ''}" type="button" data-profile-tab="documents">Documents (${docs.length})</button>
       </div>
     </div>
   </section>
 
-  <div class="profile-tab-content-container">
+  <div class="profile-tab-content-container" style="margin-top: 20px;">
     <!-- OVERVIEW TAB -->
-    <div data-tab-panel="overview">
-      <div class="profile-layout">
-        <div class="dashboard-grid">
-          <section class="card">
-            <header class="card__header">
-              <div><h2 class="card__title">Personal information</h2><p class="card__caption">Core child details</p></div>
-              <button class="icon-button icon-button--small" type="button" data-edit="${child.id}">${icon('pencil')}</button>
-            </header>
-            <div class="card__body">
-              <div class="detail-list">
-                <div class="detail-row"><span>Full name</span><b>${child.name}</b></div>
-                <div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div>
-                <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
-                <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Parent / Guardian</span><b>${child.father || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Mother name</span><b>${child.mother || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Contact phone</span><b>${child.phone || 'Not specified'}</b></div>
-                <div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div>
-              </div>
-            </div>
-          </section>
-          <section class="card">
-            <header class="card__header">
-              <div><h2 class="card__title">Health summary</h2><p class="card__caption">Latest vitals and health status</p></div>
-            </header>
-            <div class="card__body">
-              <div class="detail-list">
-                <div class="detail-row"><span>Health status</span><b>${healthDot(hs.level)} ${hs.label}</b></div>
-                <div class="detail-row"><span>Height</span><b>${latestGrowth ? latestGrowth.height + ' cm' : child.height ? child.height + ' cm' : '—'}</b></div>
-                <div class="detail-row"><span>Weight</span><b>${latestGrowth ? latestGrowth.weight + ' kg' : child.weight ? child.weight + ' kg' : '—'}</b></div>
-                <div class="detail-row"><span>BMI</span><b>${latestGrowth && latestGrowth.bmi ? latestGrowth.bmi : '—'}</b></div>
-                <div class="detail-row"><span>Medical conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
-                <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
-                <div class="detail-row"><span>Current medications</span><b>${child.medications || (meds.length > 0 ? meds.map(m => m.medicineName).join(', ') : 'None')}</b></div>
-                <div class="detail-row"><span>Dental remarks</span><b>${child.dentalRemarks || 'No remarks recorded'}</b></div>
-                <div class="detail-row"><span>Hygiene Index</span><b>${child.hygieneIndex || 'Not Assessed'}</b></div>
-              </div>
-            </div>
-          </section>
+    <div data-tab-panel="overview" style="${activeTab === 'overview' ? 'display: block;' : 'display: none;'}">
+      <section class="card">
+        <header class="card__header">
+          <div><h2 class="card__title">Personal information</h2><p class="card__caption">Core child details</p></div>
+          <button class="icon-button icon-button--small" type="button" data-edit="${child.id}">${icon('pencil')}</button>
+        </header>
+        <div class="card__body">
+          <div class="detail-list">
+            <div class="detail-row"><span>Full name</span><b>${child.name}</b></div>
+            <div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div>
+            <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
+            <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Parent / Guardian</span><b>${child.father || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Mother name</span><b>${child.mother || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Contact phone</span><b>${child.phone || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <!-- CLINICAL & BLOOD TEST OVERVIEW CARD -->
+      <section class="card" style="margin-top: 20px;">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div>
+            <h2 class="card__title" style="display:flex; align-items:center; gap:8px;">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              Clinical Checkup &amp; Blood Test Sync
+            </h2>
+            <p class="card__caption">Synced with Google Sheet (Row 3 Routine Checkup &amp; Row 19 Blood Test)</p>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button class="button button--sm" type="button" data-switch-profile-tab="clinical" style="display:inline-flex; align-items:center; gap:6px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit &amp; Auto-Sync
+            </button>
+            <button class="button button--primary button--sm" type="button" data-open-clinical-modal="" data-child-id="${child.id}" data-child-name="${escapeHTML$1(child.name)}" style="display:inline-flex; align-items:center; gap:6px;">
+              ${icon('googleSheets')}
+              Sync Modal
+            </button>
+          </div>
+        </header>
+        <div class="card__body">
+          <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap:16px;">
+            <!-- Routine Checkup Summary (Row 3) -->
+            <div style="background:var(--color-surface-sunken, #f8fafc); border:1px solid var(--color-border); border-radius:8px; padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-weight:600; font-size:13px; color:var(--color-text); display:flex; align-items:center; gap:6px;">
+                  <span style="width:8px; height:8px; border-radius:50%; background:#2563eb;"></span>
+                  Routine Checkup (Row 3)
+                </span>
+                <span style="font-size:12px; color:var(--color-text-muted);">${latestGrowth ? (latestGrowth.date || 'Recent') : 'No records'}</span>
+              </div>
+              <div class="detail-list detail-list--single" style="font-size:13px;">
+                <div class="detail-row"><span>Temperature</span><b>${latestGrowth?.temperature ? latestGrowth.temperature + ' °F' : '—'}</b></div>
+                <div class="detail-row"><span>Blood Pressure</span><b>${latestGrowth?.bp || '—'}</b></div>
+                <div class="detail-row"><span>Weight</span><b>${latestGrowth?.weight ? latestGrowth.weight + ' kg' : '—'}</b></div>
+                <div class="detail-row"><span>Pulse / Rate</span><b>${latestGrowth?.pulse ? latestGrowth.pulse + ' bpm' : '—'}</b></div>
+                <div class="detail-row"><span>SPO2</span><b>${latestGrowth?.spo2 ? latestGrowth.spo2 + ' %' : '—'}</b></div>
+                <div class="detail-row"><span>Eye Checkup</span><b>${latestGrowth?.eyeCheckup || '—'}</b></div>
+              </div>
+            </div>
+
+            <!-- Blood Test Summary (Row 19) -->
+            <div style="background:var(--color-surface-sunken, #f8fafc); border:1px solid var(--color-border); border-radius:8px; padding:16px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <span style="font-weight:600; font-size:13px; color:var(--color-text); display:flex; align-items:center; gap:6px;">
+                  <span style="width:8px; height:8px; border-radius:50%; background:#dc2626;"></span>
+                  Blood Test Report (Row 19)
+                </span>
+                <span style="font-size:12px; color:var(--color-text-muted);">${latestBlood?.date ? latestBlood.date : (latestBlood?.timestamp ? formatDate(latestBlood.timestamp) : 'No records')}</span>
+              </div>
+              <div class="detail-list detail-list--single" style="font-size:13px;">
+                <div class="detail-row"><span>Haemoglobin</span><b>${latestBlood?.hemoglobin ? latestBlood.hemoglobin + ' g/dL' : '—'}</b></div>
+                <div class="detail-row"><span>WBC Count</span><b>${latestBlood?.wbc ? latestBlood.wbc + ' /cumm' : '—'}</b></div>
+                <div class="detail-row"><span>Platelets</span><b>${latestBlood?.platelets ? latestBlood.platelets + ' Lakhs' : '—'}</b></div>
+                <div class="detail-row"><span>RBC Count</span><b>${latestBlood?.rbc ? latestBlood.rbc + ' M/µL' : '—'}</b></div>
+                <div class="detail-row"><span>PCV</span><b>${latestBlood?.pcv ? latestBlood.pcv + ' %' : '—'}</b></div>
+                <div class="detail-row"><span>Platelets Adequacy</span><b>${latestBlood?.plateletsAdequacy || '—'}</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- CLINICAL & SHEET SYNC TAB -->
+    <div data-tab-panel="clinical" style="${activeTab === 'clinical' ? 'display: block;' : 'display: none;'}">
+      ${clinicalHTML}
     </div>
 
     <!-- GROWTH TAB -->
-    <div data-tab-panel="growth" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Growth Tracking History</h2><p class="card__caption">Height, weight, and BMI progression</p></div>
-        </header>
-        <div class="card__body">
-          ${growthHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- MEDICINES TAB -->
-    <div data-tab-panel="medicines" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Prescriptions</h2><p class="card__caption">Prescribed treatments and active prescriptions</p></div>
-        </header>
-        <div class="card__body">
-          ${medsHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- REPORTS TAB -->
-    <div data-tab-panel="reports" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Clinical Health Reports</h2><p class="card__caption">Lab test reports, blood panels, and clinical flags</p></div>
-        </header>
-        <div class="card__body">
-          ${reportsHTML}
-        </div>
-      </section>
+    <div data-tab-panel="growth" style="${activeTab === 'growth' ? 'display: block;' : 'display: none;'}">
+      ${growthHTML}
     </div>
 
     <!-- DOCUMENTS TAB -->
@@ -36659,18 +37410,6 @@
         </header>
         <div class="card__body">
           ${docsHTML}
-        </div>
-      </section>
-    </div>
-
-    <!-- HEALTH TIMELINE TAB -->
-    <div data-tab-panel="timeline" style="display: none;">
-      <section class="card">
-        <header class="card__header">
-          <div><h2 class="card__title">Full Health Timeline</h2><p class="card__caption">Complete audit history for ${child.name}</p></div>
-        </header>
-        <div class="card__body">
-          ${timelineHTML}
         </div>
       </section>
     </div>
@@ -36896,6 +37635,7 @@
   function documentsPage() {
     const docs = getUploadedDocs();
     const children = getChildren();
+    const unsyncedCount = docs.filter(d => !d.driveUrl && (d.fileData || d.image)).length;
     let contentHTML = '';
 
     if (docs.length === 0) {
@@ -36907,23 +37647,30 @@
     } else {
       contentHTML = `<div class="document-grid" id="document-grid">
       ${docs.map((doc, idx) => `
-        <article class="card document-card card--interactive" data-document-idx="${idx}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}" style="position:relative;">
+        <article class="card document-card card--interactive" data-document-idx="${idx}" data-doc-id="${doc.id || ''}" data-child-name="${(doc.child || doc.childName || doc.student || '').toLowerCase()}" data-document="${(doc.name || '').toLowerCase()} ${(doc.child || doc.childName || doc.student || '').toLowerCase()}" style="position:relative;">
           <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-idx="${idx}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); backdrop-filter:blur(4px); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.1); cursor:pointer; z-index:2;">
             ${icon('trash')}
           </button>
           <div class="document-card__preview" style="position:relative; width:100%; height:140px; overflow:hidden; background:var(--color-bg-alt); display:flex; align-items:center; justify-content:center; border-radius:6px;">
-            ${doc.image || doc.fileData ? `<img src="${doc.image || doc.fileData}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : icon('file')}
+            ${doc.image || doc.fileData ? `<img src="${doc.image || doc.fileData}" style="width:100%; height:100%; object-fit:cover; border-radius:inherit;" />` : `<div style="display:flex; flex-direction:column; align-items:center; gap:6px; color:var(--color-text-muted);">${icon('file')}<span style="font-size:11px;">Cloud Document</span></div>`}
           </div>
           <div class="document-card__body" style="padding-top:12px;">
-            <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center;">
-              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; padding-right:20px;">${doc.name}</h2>
-              ${statusBadge(doc.status || 'Verified')}
+            <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${doc.name}</h2>
+              <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
+                ${doc.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:12px; height:12px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Local</span>`}
+                ${statusBadge(doc.status || 'Verified')}
+              </div>
             </div>
             <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between; align-items:center;">
               <span style="font-weight:600; color:var(--color-text);">${doc.child || doc.childName || doc.student || '—'}</span>
               <span>${doc.docType || doc.category || doc.meta || 'Medical Document'}</span>
             </div>
-            ${doc.image || doc.fileData ? `<div style="margin-top:10px;"><a class="button button--sm" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="width:100%; justify-content:center;">${icon('download')} View / Download</a></div>` : ''}
+            <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+              ${doc.driveUrl ? `<a class="button button--sm button--primary" href="${doc.driveUrl}" target="_blank" rel="noopener noreferrer" style="flex:1; justify-content:center; display:inline-flex; align-items:center; gap:6px;">${icon('external')} View in Drive</a>` : ''}
+              ${doc.image || doc.fileData ? `<a class="button button--sm ${doc.driveUrl ? 'button--ghost' : 'button--primary'}" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="flex:1; justify-content:center; display:inline-flex; align-items:center; gap:6px;">${icon('download')} Download</a>` : ''}
+              ${!doc.driveUrl && (doc.image || doc.fileData) ? `<button class="button button--sm button--ghost" type="button" data-sync-doc-id="${doc.id}" style="width:100%; justify-content:center; display:inline-flex; align-items:center; gap:6px; margin-top:2px;">${icon('refresh')} Sync to Google Drive</button>` : ''}
+            </div>
           </div>
         </article>
       `).join('')}
@@ -36932,7 +37679,7 @@
 
     const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
 
-    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button><a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
+    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button>${unsyncedCount > 0 ? `<button class="button button--ghost" type="button" data-auto-sync-drive style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')}Sync ${unsyncedCount} to Drive</button>` : ''}<a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -36996,6 +37743,7 @@
     const ngoSlug = getNgoSlug(session);
     const sheetsConfig = getSheetsConfig() || {};
     const isConnected = !!sheetsConfig.connected;
+    const isTokenExpired = !!sheetsConfig.tokenExpired;
     const adminEmail = sheetsConfig.adminEmail || 'Admin';
     const masterSheetUrl = getGoogleSheetUrl();
     const clinicalSheetUrl = getClinicalSheetUrl();
@@ -37011,46 +37759,68 @@
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
         <!-- Google Sheets Live Sync Highlight Card (TOP) -->
-        <div class="card" style="padding: 20px; border: 2px solid #0F9D58; background: var(--color-bg); grid-column: 1 / -1; border-radius: 8px; box-shadow: 0 4px 12px rgba(15, 157, 88, 0.08);">
+        <div class="card" style="padding: 20px; border: 2px solid ${isTokenExpired ? '#ea4335' : isConnected ? '#0F9D58' : 'var(--color-border)'}; background: var(--color-bg); grid-column: 1 / -1; border-radius: 8px; box-shadow: 0 4px 12px ${isTokenExpired ? 'rgba(234, 67, 53, 0.08)' : 'rgba(15, 157, 88, 0.08)'};">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <b style="font-size: 16px; font-weight: 700; color: #0F9D58; display: flex; align-items: center; gap: 10px;">
+            <b style="font-size: 16px; font-weight: 700; color: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; display: flex; align-items: center; gap: 10px;">
               ${icon('googleSheets')}
               Google Sheets Live Sync
             </b>
-            ${isConnected ? `<span class="badge badge--success">Connected as ${escapeHTML$1(adminEmail)}</span>` : `<span class="badge badge--neutral">Not Connected</span>`}
-          </div>
-          <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
-            ${isConnected 
-              ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
-              : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
+            ${isTokenExpired 
+              ? `<span class="badge" style="background: rgba(234, 67, 53, 0.12); color: #ea4335; border: 1px solid rgba(234, 67, 53, 0.3); font-weight: 700;">⚠️ Authorization Expired</span>`
+              : isConnected 
+                ? `<span class="badge badge--success">Connected as ${escapeHTML$1(adminEmail)}</span>` 
+                : `<span class="badge badge--neutral">Not Connected</span>`
             }
-          </p>
+          </div>
+
+          ${isTokenExpired ? `
+            <div style="background: rgba(234, 67, 53, 0.08); border-left: 4px solid #ea4335; padding: 12px 14px; border-radius: 4px; margin-bottom: 16px;">
+              <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">Google Workspace Authorization Expired</div>
+              <div style="font-size: 12.5px; color: var(--color-text); line-height: 1.4;">
+                Google OAuth tokens in Testing mode expire periodically. Click <strong>Reconnect Google Sheets Sync</strong> below to refresh authorization and instantly sync your records and Monika Sharma's clinical vitals to Google Sheets.
+              </div>
+            </div>
+          ` : `
+            <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
+              ${isConnected 
+                ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
+                : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
+              }
+            </p>
+          `}
 
           <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-            ${!isConnected ? `
-              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: #0F9D58; border-color: #0F9D58;">
+            ${(!isConnected || isTokenExpired) ? `
+              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; border-color: ${isTokenExpired ? '#ea4335' : '#0F9D58'};">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-                Connect Google Sheets Sync
+                ${isTokenExpired ? 'Reconnect Google Sheets Sync ↗' : 'Connect Google Sheets Sync'}
               </a>
-            ` : `
-              ${clinicalSheetUrl ? `
-                <a href="${escapeHTML$1(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
-                  ${icon('googleSheets')}
-                  Open Student Medical Records Workbook ↗
-                </a>
-              ` : ''}
-              ${masterSheetUrl ? `
-                <a href="${escapeHTML$1(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
-                  📄 Master Directory Sheet ↗
-                </a>
-              ` : ''}
+            ` : ''}
+
+            ${clinicalSheetUrl ? `
+              <a href="${escapeHTML$1(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
+                ${icon('googleSheets')}
+                Open Student Medical Records Workbook ↗
+              </a>
+            ` : ''}
+
+            ${masterSheetUrl ? `
+              <a href="${escapeHTML$1(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                📄 Master Directory Sheet ↗
+              </a>
+            ` : ''}
+
+            ${isConnected && !isTokenExpired ? `
               <button class="button button--ghost" type="button" data-sync-from-sheets style="font-weight: 600; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
                 ${icon('rotate')} Pull from Sheets
               </button>
+            ` : ''}
+
+            ${isConnected || isTokenExpired ? `
               <button type="button" data-disconnect-google-sheets data-ngo="${encodeURIComponent(ngoSlug)}" class="button button--danger-outline button--sm" style="font-weight: 600; display: inline-flex; align-items: center; gap: 6px; margin-left: auto; cursor: pointer;">
                 ${icon('trash')} Disconnect
               </button>
-            `}
+            ` : ''}
           </div>
         </div>
 
@@ -37137,7 +37907,7 @@
                   <td>
                     <div style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text);">
                       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#70757a" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-                      <span>${escapeHTML$1(a.doctor || 'General Clinic')}</span>
+                      <span>${escapeHTML$1(a.doctor || 'General Clinic')}${a.specialty ? ` · <span style="font-size:11px; color:var(--color-text-muted);">${escapeHTML$1(a.specialty)}</span>` : ''}</span>
                     </div>
                   </td>
                   <td>
@@ -37234,6 +38004,7 @@
     return appointments.filter(a => 
       (a.childName && a.childName.toLowerCase().includes(term)) ||
       (a.type && a.type.toLowerCase().includes(term)) ||
+      (a.specialty && a.specialty.toLowerCase().includes(term)) ||
       (a.doctor && a.doctor.toLowerCase().includes(term)) ||
       (a.notes && a.notes.toLowerCase().includes(term)) ||
       (a.date && a.date.includes(term))
@@ -37331,7 +38102,7 @@
       ...a,
       spotlightType: 'appointment',
       searchTitle: `${a.childName} — ${a.type}`,
-      searchSubtitle: `${a.date} at ${a.time || '10:00 AM'}${a.doctor ? ` • Dr. ${a.doctor}` : ''}`,
+      searchSubtitle: `${a.date} at ${a.time || '10:00 AM'}${a.doctor ? ` • Dr. ${a.doctor}` : ''}${a.specialty ? ` (${a.specialty})` : ''}`,
       targetUrl: `${pagePath('appointments')}`
     }));
 
@@ -37935,6 +38706,189 @@
   }
 
   /**
+   * googleDriveSync.js
+   * Automatic synchronization and upload of child health documents to Google Drive.
+   * Organizes files into: "Child Health Documents — [NGO Name]" / "[Child Name]" / "[File]"
+   */
+
+
+  let isAutoSyncing = false;
+
+  /**
+   * Convert a base64 Data URL into a binary Blob object.
+   * @param {string} dataurl
+   * @returns {Blob|null}
+   */
+  function dataURLtoBlob(dataurl) {
+    if (!dataurl || typeof dataurl !== 'string' || !dataurl.startsWith('data:')) {
+      return null;
+    }
+    try {
+      const arr = dataurl.split(',');
+      const mime = arr[0].match(/:(.*?);/)?.[1] || 'image/png';
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], { type: mime });
+    } catch (err) {
+      console.warn('[Drive Sync] dataURLtoBlob conversion error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Upload a file or blob directly to the backend Google Drive upload endpoint.
+   * @param {File|Blob} fileOrBlob
+   * @param {object} metadata
+   * @param {string} [metadata.childName]
+   * @param {string} [metadata.childId]
+   * @param {string} [metadata.docName]
+   * @param {string} [metadata.docType]
+   * @returns {Promise<object>}
+   */
+  async function uploadDocumentToDrive(fileOrBlob, metadata = {}) {
+    const {
+      childName = 'General Documents',
+      childId = null,
+      docName = 'Medical Document',
+      docType = 'Medical Report'
+    } = metadata;
+
+    const formData = new FormData();
+    const fileName = docName || fileOrBlob.name || 'document';
+
+    formData.append('document', fileOrBlob, fileName);
+    formData.append('childName', childName);
+    if (childId) formData.append('childId', childId);
+    formData.append('docName', fileName);
+    formData.append('docType', docType);
+
+    try {
+      const res = await apiFetch('/api/drive/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.message || `Upload failed with status ${res.status}`);
+      }
+
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('[Google Drive] Upload failed:', err.message);
+      throw err;
+    }
+  }
+
+  const activeSyncDocIds = new Set();
+
+  /**
+   * Synchronize a single stored document record to Google Drive.
+   * @param {object} doc
+   * @returns {Promise<object>}
+   */
+  async function syncSingleDocToDrive(doc) {
+    if (!doc) throw new Error('Document record is required');
+    if (doc.driveUrl) {
+      return { success: true, alreadySynced: true, driveUrl: doc.driveUrl };
+    }
+    if (activeSyncDocIds.has(doc.id)) {
+      return { success: true, inProgress: true };
+    }
+
+    activeSyncDocIds.add(doc.id);
+    try {
+      const dataUrl = doc.fileData || doc.image;
+      if (!dataUrl) {
+        throw new Error('No local document file data to upload');
+      }
+
+      const blob = dataURLtoBlob(dataUrl);
+      if (!blob) {
+        throw new Error('Could not convert document data to binary buffer');
+      }
+
+      const docName = doc.name || doc.title || 'Medical Document';
+      const childName = doc.child || doc.childName || doc.student || 'General Documents';
+      const docType = doc.docType || doc.category || 'Medical Report';
+
+      const res = await uploadDocumentToDrive(blob, {
+        childName,
+        childId: doc.childId,
+        docName,
+        docType
+      });
+
+      if (res && res.success && res.driveUrl) {
+        updateUploadedDoc(doc.id, {
+          driveFileId: res.driveFileId,
+          driveUrl: res.driveUrl,
+          childFolderId: res.childFolderId,
+          childFolderUrl: res.childFolderUrl
+        });
+        return { success: true, driveUrl: res.driveUrl, driveFileId: res.driveFileId };
+      }
+
+      throw new Error(res?.message || 'Failed to sync document to Google Drive');
+    } finally {
+      activeSyncDocIds.delete(doc.id);
+    }
+  }
+
+  /**
+   * Automatically scan stored documents and upload any unsynced documents to Google Drive.
+   * @param {boolean} [showToasts=false]
+   * @returns {Promise<{total: number, synced: number, failed: number}>}
+   */
+  async function autoSyncPendingDocuments(showToasts = false) {
+    if (isAutoSyncing) return { inProgress: true };
+
+    const docs = getUploadedDocs();
+    const unsynced = docs.filter(d => !d.driveUrl && (d.fileData || d.image) && !activeSyncDocIds.has(d.id));
+    if (unsynced.length === 0) {
+      return { total: 0, synced: 0, failed: 0 };
+    }
+
+    isAutoSyncing = true;
+    let synced = 0;
+    let failed = 0;
+
+    if (showToasts) {
+      toast('Google Drive Auto-Sync', `Syncing ${unsynced.length} pending document(s) to Drive...`);
+    }
+
+    for (const doc of unsynced) {
+      // Check again before calling to ensure it wasn't synced concurrently
+      const current = getUploadedDocs().find(d => d.id === doc.id);
+      if (current?.driveUrl) continue;
+
+      try {
+        await syncSingleDocToDrive(doc);
+        synced++;
+      } catch (err) {
+        console.warn(`[Auto-Sync] Could not sync doc ${doc.id} (${doc.name}):`, err.message);
+        failed++;
+      }
+    }
+
+    isAutoSyncing = false;
+
+    if (synced > 0) {
+      if (showToasts) {
+        toast('Google Drive Synced', `Successfully backed up ${synced} document(s) to Google Drive.`);
+      }
+      window.dispatchEvent(new CustomEvent('chm-docs-synced', { detail: { synced, failed } }));
+    }
+
+    return { total: unsynced.length, synced, failed };
+  }
+
+  /**
    * combobox.js
    * Custom accessible combobox component logic.
    */
@@ -38167,6 +39121,9 @@
         fetchDocsConfig().catch(() => {})
       ]);
 
+      // Auto-sync any unsynced local documents to Google Drive in the background
+      autoSyncPendingDocuments(false).catch(() => {});
+
       const app = document.querySelector('#app');
       if (app) {
         app.innerHTML = renderPage(page);
@@ -38212,7 +39169,7 @@
 
   // Document Clicks
   document.addEventListener('click', (event) => {
-    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
+    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-open-clinical-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
     if (!target) return;
 
     if (target.matches('[data-topbar-back]')) {
@@ -38445,6 +39402,21 @@
       if (appt) {
         const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
         modalContainer.innerHTML = renderEditAppointmentModalMarkup(appt.id);
+      }
+      return;
+    }
+
+    const clinicalBtn = target.closest('[data-open-clinical-modal]');
+    if (clinicalBtn) {
+      const id = clinicalBtn.getAttribute('data-open-clinical-modal');
+      const childId = clinicalBtn.getAttribute('data-child-id');
+      const childName = clinicalBtn.getAttribute('data-child-name');
+      const appt = id ? getAppointments().find(a => String(a.id) === String(id)) : null;
+      const modalContainer = document.querySelector('#modal-root') || document.querySelector('#cal-modal-container') || document.body;
+      if (appt) {
+        modalContainer.innerHTML = renderClinicalDataModalMarkup(appt.id);
+      } else if (childId) {
+        modalContainer.innerHTML = renderClinicalDataModalMarkup(null, childId, childName);
       }
       return;
     }
@@ -38880,20 +39852,80 @@
             return;
           }
           const file = fileInput.files[0];
+          toast('Saving document...', 'Saving locally and syncing to Google Drive...');
           const reader = new FileReader();
-          reader.onload = function(e) {
-            addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+          reader.onload = async function(e) {
+            const newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
             logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
-            toast('Document uploaded', `${title} linked to ${childName}'s profile.`);
-            window.setTimeout(() => { window.location.reload(); }, 500);
+
+            try {
+              const driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
+              if (driveRes && driveRes.success && driveRes.driveUrl) {
+                updateUploadedDoc(newDoc.id, {
+                  driveFileId: driveRes.driveFileId,
+                  driveUrl: driveRes.driveUrl,
+                  childFolderId: driveRes.childFolderId,
+                  childFolderUrl: driveRes.childFolderUrl
+                });
+                toast('Google Drive Synced', `${title} backed up in ${childName}'s Google Drive folder.`, 'success');
+              } else {
+                toast('Document saved', `${title} saved locally.`);
+              }
+            } catch (uploadErr) {
+              console.warn('[Drive Upload]', uploadErr);
+              toast('Document saved', `${title} saved locally.`);
+            } finally {
+              window.setTimeout(() => { window.location.reload(); }, 300);
+            }
           };
           reader.readAsDataURL(file);
         }
       });
     }
 
+    // Individual document sync to Google Drive
+    if (target.closest('[data-sync-doc-id]')) {
+      const btn = target.closest('[data-sync-doc-id]');
+      const docId = btn.dataset.syncDocId;
+      const docs = getUploadedDocs();
+      const doc = docs.find(d => d.id === docId);
+      if (doc) {
+        btn.disabled = true;
+        btn.innerHTML = `${icon('refresh')} Syncing...`;
+        toast('Syncing document...', `Uploading ${doc.name} to Google Drive...`);
+        syncSingleDocToDrive(doc)
+          .then(() => {
+            toast('Google Drive Synced', `${doc.name} backed up in Google Drive.`);
+            window.setTimeout(() => window.location.reload(), 500);
+          })
+          .catch(err => {
+            btn.disabled = false;
+            btn.innerHTML = `${icon('refresh')} Sync to Drive`;
+            toast('Sync failed', err.message || 'Could not upload to Google Drive.');
+          });
+      }
+      return;
+    }
+
+    // Bulk auto-sync all documents to Google Drive
+    if (target.closest('[data-auto-sync-drive]')) {
+      const btn = target.closest('[data-auto-sync-drive]');
+      btn.disabled = true;
+      btn.innerHTML = `${icon('refresh')} Syncing...`;
+      autoSyncPendingDocuments(true)
+        .then(res => {
+          window.setTimeout(() => window.location.reload(), 600);
+        })
+        .catch(err => {
+          btn.disabled = false;
+          btn.innerHTML = `${icon('refresh')} Sync to Drive`;
+          toast('Sync failed', err.message);
+        });
+      return;
+    }
+
     const docCardClick = target.closest('[data-document-idx]');
-    if (docCardClick && !target.matches('button, a')) {
+    if (docCardClick && !target.matches('button, a') && !target.closest('button, a')) {
       const idx = docCardClick.dataset.documentIdx;
       const docs = getUploadedDocs();
       const doc = docs[idx];
@@ -39057,13 +40089,169 @@
         const profileContainer = document.querySelector('.profile-tab-content-container');
         if (profileContainer) {
           const panels = Array.from(profileContainer.querySelectorAll('[data-tab-panel]'));
-          const panelNames = ['overview', 'guardian', 'health', 'growth', 'documents', 'timeline', 'notes'];
+          const panelNames = ['overview', 'clinical', 'growth', 'documents'];
           const selectedPanelName = tabBtn.dataset.profileTab || panelNames[index] || 'overview';
+          sessionStorage.setItem('chm_active_profile_tab', selectedPanelName);
           panels.forEach((p) => {
             p.style.display = (p.dataset.tabPanel === selectedPanelName) ? 'block' : 'none';
           });
         }
       }
+    }
+
+    // Switch profile tab from button
+    if (target.closest('[data-switch-profile-tab]')) {
+      const tabName = target.closest('[data-switch-profile-tab]').dataset.switchProfileTab;
+      sessionStorage.setItem('chm_active_profile_tab', tabName);
+      const targetTabBtn = document.querySelector(`.tabs [data-profile-tab="${tabName}"]`);
+      if (targetTabBtn) {
+        targetTabBtn.click();
+      }
+    }
+
+    // Load clinical checkup or blood test item from history table into the profile clinical form
+    const loadClinicalBtn = target.closest('[data-load-clinical-item]');
+    if (loadClinicalBtn) {
+      try {
+        const item = JSON.parse(loadClinicalBtn.getAttribute('data-load-clinical-item'));
+        const form = document.querySelector('#profile-clinical-data-form');
+        if (form && item) {
+          if (item.entryType === 'checkup') {
+            const setVal = (id, val) => { const el = form.querySelector(`#prof-${id}`); if (el) el.value = val || ''; };
+            setVal('checkup-date', item.date);
+            setVal('checkup-temp', item.temperature || item.temp);
+            setVal('checkup-bp', item.bp || item.bloodPressure);
+            setVal('checkup-weight', item.weight);
+            setVal('checkup-pulse', item.pulse || item.pulseRate);
+            setVal('checkup-spo2', item.spo2);
+            setVal('checkup-eye', item.eyeCheckup || item.eyeRemarks);
+            setVal('checkup-complaint', item.complaint || item.symptoms);
+            setVal('checkup-prescription', item.prescription || item.medication);
+            const idInput = form.querySelector('#prof-growth-id');
+            if (idInput) idInput.value = item.id || '';
+            toast('Checkup Loaded', `Loaded checkup measurements from ${item.date || 'record'} into editor.`);
+          } else if (item.entryType === 'blood') {
+            const setVal = (id, val) => { const el = form.querySelector(`#prof-${id}`); if (el) el.value = val || ''; };
+            setVal('blood-date', item.date);
+            setVal('blood-hb', item.hemoglobin || item.hb);
+            setVal('blood-wbc', item.wbc);
+            setVal('blood-platelets', item.platelets);
+            setVal('blood-rbc', item.rbc);
+            setVal('blood-pcv', item.pcv);
+            setVal('blood-neutrophil', item.neutrophil);
+            setVal('blood-lymphocytes', item.lymphocytes);
+            setVal('blood-eosinophils', item.eosinophils);
+            setVal('blood-monocytes', item.monocytes);
+            setVal('blood-basophils', item.basophils);
+            setVal('blood-platelets-adequacy', item.plateletsAdequacy);
+            setVal('blood-rbc-morph', item.rbcMorphology);
+            setVal('blood-wbc-morph', item.wbcMorphology);
+            const idInput = form.querySelector('#prof-blood-id');
+            if (idInput) idInput.value = item.id || '';
+            toast('Blood Report Loaded', `Loaded blood test report from ${item.date || 'record'} into editor.`);
+          }
+          form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } catch (err) {
+        console.error('Failed to load clinical item:', err);
+      }
+    }
+
+    // Edit growth item from history table
+    const editGrowthBtn = target.closest('[data-edit-growth-item]');
+    if (editGrowthBtn) {
+      try {
+        const g = JSON.parse(editGrowthBtn.dataset.editGrowthItem);
+        const form = document.querySelector('#child-growth-form');
+        if (form && g) {
+          if (form.querySelector('#growth-input-id')) form.querySelector('#growth-input-id').value = g.id || '';
+          if (form.querySelector('#growth-input-date')) form.querySelector('#growth-input-date').value = g.date || '';
+          if (form.querySelector('#growth-input-status')) form.querySelector('#growth-input-status').value = g.healthStatus || 'Healthy';
+          if (form.querySelector('#growth-input-height')) form.querySelector('#growth-input-height').value = g.height || '';
+          if (form.querySelector('#growth-input-weight')) form.querySelector('#growth-input-weight').value = g.weight || '';
+          if (form.querySelector('#growth-input-conditions')) form.querySelector('#growth-input-conditions').value = g.medicalConditions || '';
+          if (form.querySelector('#growth-input-allergies')) form.querySelector('#growth-input-allergies').value = g.allergies || '';
+          if (form.querySelector('#growth-input-meds')) form.querySelector('#growth-input-meds').value = g.medications || '';
+          if (form.querySelector('#growth-input-dental')) form.querySelector('#growth-input-dental').value = g.dentalRemarks || '';
+          if (form.querySelector('#growth-input-hygiene')) form.querySelector('#growth-input-hygiene').value = g.hygieneIndex || 'Not Assessed';
+
+          // Calculate and update BMI display
+          const h = parseFloat(g.height);
+          const w = parseFloat(g.weight);
+          const bmi = h && w ? (w / ((h / 100) ** 2)).toFixed(1) : (g.bmi || '—');
+          const bmiDisp = document.querySelector('#growth-display-bmi');
+          if (bmiDisp) bmiDisp.textContent = bmi;
+          const bmiBadge = document.querySelector('#growth-display-bmi-badge');
+          if (bmiBadge) {
+            bmiBadge.innerHTML = bmi && bmi !== '—'
+              ? (bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>')
+              : '';
+          }
+
+          const title = document.querySelector('#growth-form-title');
+          if (title) title.textContent = `Editing Growth Record (${formatDate(g.date)})`;
+          const caption = document.querySelector('#growth-form-caption');
+          if (caption) caption.textContent = `Update the vitals recorded on ${formatDate(g.date)} and click Save.`;
+          const badge = document.querySelector('#growth-status-badge');
+          if (badge) badge.textContent = `Editing: ${formatDate(g.date)}`;
+          const cancelBtn = document.querySelector('#growth-cancel-edit-btn');
+          if (cancelBtn) cancelBtn.style.display = 'inline-flex';
+
+          form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } catch (e) {
+        console.error('Failed to parse growth record item', e);
+      }
+    }
+
+    // Reset/New growth entry
+    if (target.closest('[data-new-growth-entry], [data-cancel-growth-edit]')) {
+      const form = document.querySelector('#child-growth-form');
+      if (form) {
+        form.reset();
+        const idInput = form.querySelector('#growth-input-id');
+        if (idInput) idInput.value = '';
+        const dateInput = form.querySelector('#growth-input-date');
+        if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+        const title = document.querySelector('#growth-form-title');
+        if (title) title.textContent = 'Health summary & Growth vitals';
+        const caption = document.querySelector('#growth-form-caption');
+        if (caption) caption.textContent = 'Edit and save date-referenced vitals and health status';
+        const badge = document.querySelector('#growth-status-badge');
+        if (badge) badge.textContent = 'New Entry';
+        const cancelBtn = document.querySelector('#growth-cancel-edit-btn');
+        if (cancelBtn) cancelBtn.style.display = 'none';
+        const bmiDisp = document.querySelector('#growth-display-bmi');
+        if (bmiDisp) bmiDisp.textContent = '—';
+        const bmiBadge = document.querySelector('#growth-display-bmi-badge');
+        if (bmiBadge) bmiBadge.innerHTML = '';
+        form.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    // Delete growth record
+    const delGrowthBtn = target.closest('[data-delete-growth-id]');
+    if (delGrowthBtn) {
+      const id = delGrowthBtn.dataset.deleteGrowthId;
+      modal$1({
+        title: 'Delete Growth Record?',
+        body: 'Are you sure you want to remove this historical measurement? This will update your local records and sync to cloud database.',
+        confirmText: 'Delete Record',
+        confirmClass: 'button--danger',
+        onConfirm: async () => {
+          deleteGrowthRecord(id);
+          try {
+            await syncWithServer();
+          } catch (e) {
+            console.warn('Sync failed:', e);
+          }
+          sessionStorage.setItem('chm_active_profile_tab', 'growth');
+          toast('Measurement removed', 'Growth entry has been deleted.');
+          if (typeof renderCurrentPage === 'function') {
+            await renderCurrentPage();
+          }
+        }
+      });
     }
     if (target.closest('.settings-nav button')) {
       target.closest('.settings-nav').querySelectorAll('button').forEach((button) => button.classList.toggle('active', button === target));
@@ -39135,12 +40323,31 @@
 
           if (fileInput && fileInput.files && fileInput.files[0]) {
             const file = fileInput.files[0];
+            toast('Saving document...', 'Saving locally and syncing to Google Drive...');
             const reader = new FileReader();
-            reader.onload = function (e) {
-              addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+            reader.onload = async function (e) {
+              const newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
               logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
-              toast('Document uploaded', `${docName} attached to ${childName}.`);
-              window.setTimeout(() => window.location.reload(), 400);
+
+              try {
+                const driveRes = await uploadDocumentToDrive(file, { childName, docName, docType });
+                if (driveRes && driveRes.success && driveRes.driveUrl) {
+                  updateUploadedDoc(newDoc.id, {
+                    driveFileId: driveRes.driveFileId,
+                    driveUrl: driveRes.driveUrl,
+                    childFolderId: driveRes.childFolderId,
+                    childFolderUrl: driveRes.childFolderUrl
+                  });
+                  toast('Google Drive Synced', `${docName} backed up in ${childName}'s Google Drive folder.`, 'success');
+                } else {
+                  toast('Document saved', `${docName} saved locally.`);
+                }
+              } catch (uploadErr) {
+                console.warn('[Drive Upload]', uploadErr);
+                toast('Document saved', `${docName} saved locally.`);
+              } finally {
+                window.setTimeout(() => window.location.reload(), 300);
+              }
             };
             reader.readAsDataURL(file);
           } else {
@@ -39221,7 +40428,26 @@
       currentPage = 1;
       applyTableFilters();
     }
-    if (event.target.matches('[data-document-search]')) applyDocumentFilters();
+    if (event.target.id === 'growth-input-height' || event.target.id === 'growth-input-weight') {
+      const hInput = document.querySelector('#growth-input-height');
+      const wInput = document.querySelector('#growth-input-weight');
+      const bmiDisp = document.querySelector('#growth-display-bmi');
+      const bmiBadge = document.querySelector('#growth-display-bmi-badge');
+      if (hInput && wInput && bmiDisp) {
+        const h = parseFloat(hInput.value);
+        const w = parseFloat(wInput.value);
+        if (h > 0 && w > 0) {
+          const bmi = +(w / ((h / 100) ** 2)).toFixed(1);
+          bmiDisp.textContent = bmi;
+          if (bmiBadge) {
+            bmiBadge.innerHTML = bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>';
+          }
+        } else {
+          bmiDisp.textContent = '—';
+          if (bmiBadge) bmiBadge.innerHTML = '';
+        }
+      }
+    }
   });
 
   // Changes
@@ -39540,14 +40766,29 @@
       } else if (fileName.toLowerCase().includes('blood') || fileName.toLowerCase().includes('cbc') || fileName.toLowerCase().includes('test')) {
         docLabel = 'Blood Test Report';
       }
-      addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel);
+      const ocrDoc = addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel, child.id);
+      if (fileData) {
+        syncSingleDocToDrive(ocrDoc).catch(e => console.warn('[OCR Drive Sync notice]', e.message));
+      }
 
       const addInput = form.querySelector('[data-additional-doc-input]');
       if (addInput && addInput.files && addInput.files[0]) {
         const addFile = addInput.files[0];
         const addReader = new FileReader();
-        addReader.onload = function (e) {
-          addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record');
+        addReader.onload = async function (e) {
+          const addDoc = addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record', child.id);
+          uploadDocumentToDrive(addFile, { childName: child.name, childId: child.id, docName: addFile.name, docType: 'Medical Record' })
+            .then(res => {
+              if (res && res.success && res.driveUrl) {
+                updateUploadedDoc(addDoc.id, {
+                  driveFileId: res.driveFileId,
+                  driveUrl: res.driveUrl,
+                  childFolderId: res.childFolderId,
+                  childFolderUrl: res.childFolderUrl
+                });
+              }
+            })
+            .catch(err => console.warn('[AddDoc Drive Sync notice]', err.message));
         };
         addReader.readAsDataURL(addFile);
       }
@@ -39586,6 +40827,53 @@
         toast('Verified child saved', `${child.name}'s record generated in Google Sheets.`);
         window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
       });
+    });
+
+    // Child Profile: Growth & Health Vitals form (with Date reference)
+    document.addEventListener('submit', async (event) => {
+      const form = event.target;
+      if (!form || form.id !== 'child-growth-form') return;
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const values = Object.fromEntries(new FormData(form));
+      const childId = form.dataset.childId;
+      const childName = form.dataset.childName || 'Child';
+      const child = getChild(childId);
+
+      const record = {
+        id: values.id || `GW-${Date.now()}`,
+        childId,
+        childName,
+        date: values.date,
+        height: values.height ? String(values.height).trim() : '',
+        weight: values.weight ? String(values.weight).trim() : '',
+        healthStatus: values.healthStatus || 'Healthy',
+        medicalConditions: values.medicalConditions || '',
+        allergies: values.allergies || '',
+        medications: values.medications || '',
+        dentalRemarks: values.dentalRemarks || '',
+        hygieneIndex: values.hygieneIndex || 'Not Assessed'
+      };
+
+      saveGrowthRecord(record);
+      if (child) {
+        autoSyncChildToGoogleSheets(child).catch(() => {});
+      }
+
+      // Ensure state is committed to Firebase / Firestore before re-rendering
+      try {
+        await syncWithServer();
+      } catch (e) {
+        console.warn('Sync failed:', e);
+      }
+
+      sessionStorage.setItem('chm_active_profile_tab', 'growth');
+      toast('Health Vitals Saved', `Vitals for ${formatDate(record.date)} saved to Firebase & Google Sheets.`);
+
+      if (typeof renderCurrentPage === 'function') {
+        await renderCurrentPage();
+      }
     });
 
     // Growth form (using delegated submit handler for dynamic form cards)
@@ -39677,12 +40965,12 @@
               date: values.date,
               time: values.time || '10:00',
               doctor: values.doctor || '',
+              specialty: values.specialty || '',
               notes: values.notes || '',
               status: 'Upcoming'
             });
           });
 
-          // Open unified All Children Group Plan in Google Calendar
           const groupCalUrl = buildGoogleCalendarUrl({
             childId: 'ALL',
             childName: 'All Children',
@@ -39690,6 +40978,7 @@
             date: values.date,
             time: values.time || '10:00',
             doctor: values.doctor || '',
+            specialty: values.specialty || '',
             notes: values.notes || '',
             isGroupPlan: true
           }, true, allChildren);
@@ -39708,6 +40997,7 @@
           date: values.date,
           time: values.time || '',
           doctor: values.doctor || '',
+          specialty: values.specialty || '',
           notes: values.notes || ''
         });
       }
@@ -39747,6 +41037,7 @@
         childId: values.childId,
         childName: child ? child.name : (existing ? existing.childName : 'Unknown'),
         type: values.type,
+        specialty: values.specialty || '',
         date: values.date,
         time: values.time || '10:00',
         doctor: values.doctor || '',
@@ -39766,6 +41057,127 @@
       window.setTimeout(() => window.location.reload(), 500);
     });
 
+    // Clinical & Blood Test Data Entry form submit (both modal and profile page inline form)
+    document.addEventListener('submit', async (event) => {
+      const form = event.target;
+      if (!form || (form.id !== 'clinical-data-form' && form.id !== 'profile-clinical-data-form')) return;
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+
+      const isProfileForm = form.id === 'profile-clinical-data-form';
+      const values = Object.fromEntries(new FormData(form));
+      const childId = values.childId;
+      const childName = values.childName || 'Child';
+      const checkupDate = values.checkup_date;
+      const bloodDate = values.blood_date || checkupDate;
+
+      const saveBtns = form.querySelectorAll('button[type="submit"]');
+      saveBtns.forEach(btn => {
+        btn.disabled = true;
+        btn.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" class="spin"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/></svg> Saving &amp; Syncing...`;
+      });
+
+      try {
+        // 1. Routine Clinical Checkup (Row 3 in Google Sheets)
+        const hasGrowthData = values.temperature || values.bp || values.weight || values.pulse || values.spo2 || values.complaint || values.prescription || values.eyeCheckup;
+        if (hasGrowthData || checkupDate) {
+          const growthRecord = {
+            id: values.existingGrowthId || undefined,
+            childId: childId,
+            childName: childName,
+            date: checkupDate,
+            temperature: (values.temperature || '').trim(),
+            bp: (values.bp || '').trim(),
+            weight: (values.weight || '').trim(),
+            pulse: (values.pulse || '').trim(),
+            spo2: (values.spo2 || '').trim(),
+            complaint: (values.complaint || '').trim(),
+            prescription: (values.prescription || '').trim(),
+            eyeCheckup: (values.eyeCheckup || '').trim()
+          };
+          saveGrowthRecord(growthRecord);
+        }
+
+        // 2. Blood Test Report (Row 19 in Google Sheets)
+        const hasBloodData = values.hemoglobin || values.wbc || values.platelets || values.rbc || values.pcv || values.neutrophil || values.lymphocytes || values.eosinophils || values.monocytes || values.basophils || values.rbcMorphology || values.wbcMorphology || values.plateletsAdequacy;
+        if (hasBloodData) {
+          const bloodRecord = {
+            id: values.existingBloodId || undefined,
+            childId: childId,
+            childName: childName,
+            date: bloodDate,
+            recordType: 'Bi-Annual CBC / Blood Test',
+            hemoglobin: (values.hemoglobin || '').trim(),
+            wbc: (values.wbc || '').trim(),
+            platelets: (values.platelets || '').trim(),
+            rbc: (values.rbc || '').trim(),
+            pcv: (values.pcv || '').trim(),
+            neutrophil: (values.neutrophil || '').trim(),
+            lymphocytes: (values.lymphocytes || '').trim(),
+            eosinophils: (values.eosinophils || '').trim(),
+            monocytes: (values.monocytes || '').trim(),
+            basophils: (values.basophils || '').trim(),
+            rbcMorphology: (values.rbcMorphology || '').trim(),
+            wbcMorphology: (values.wbcMorphology || '').trim(),
+            plateletsAdequacy: (values.plateletsAdequacy || '').trim()
+          };
+          saveHealthRecord(bloodRecord);
+        }
+
+        // 3. Immediately trigger server & sheets sync
+        await syncWithServer();
+
+        // Check if Sheets sync succeeded or if re-authorization is needed
+        try {
+          const syncRes = await apiFetch('/api/sheets/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ children: getChildren() })
+          });
+          if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            if (syncData?.tokenExpired || syncData?.error === 'invalid_grant') {
+              toast('Google Authorization Expired', 'Record saved locally, but Google authorization expired. Please click Reconnect in Settings.', 'warning');
+            }
+          }
+        } catch (syncErr) {}
+
+        toast('Clinical Details Saved', `Vitals and lab report saved & syncing to ${childName}'s Google Sheet.`);
+
+        // Close modal if open
+        const modalRoot = document.querySelector('#modal-root');
+        if (modalRoot) modalRoot.replaceChildren();
+        const calModal = document.querySelector('#cal-booking-modal');
+        if (calModal) calModal.remove();
+
+        // If from child profile, re-render current page keeping clinical tab active
+        if (isProfileForm || window.location.hash.includes('child-profile')) {
+          sessionStorage.setItem('chm_active_profile_tab', 'clinical');
+          if (renderCurrentPage) {
+            await renderCurrentPage();
+          }
+          return;
+        }
+
+        // Refresh calendar view if present
+        const calRoot = document.querySelector('[data-calendar-root]');
+        if (calRoot) {
+          const mode = calRoot.getAttribute('data-cal-view-mode') || 'month';
+          const year = parseInt(calRoot.getAttribute('data-cal-year')) || new Date().getFullYear();
+          const month = parseInt(calRoot.getAttribute('data-cal-month')) || new Date().getMonth();
+          const day = parseInt(calRoot.getAttribute('data-cal-day')) || new Date().getDate();
+          updateCalendarView(calRoot, mode, year, month, day);
+        }
+      } catch (err) {
+        console.error('Error saving clinical details:', err);
+        toast('Save Error', 'Failed to save clinical details. Please try again.');
+        saveBtns.forEach(btn => {
+          btn.disabled = false;
+          btn.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Save &amp; Sync to Sheet`;
+        });
+      }
+    });
+
     // Sync Child Select & All Children Pill toggle
     document.addEventListener('change', (event) => {
       const target = event.target;
@@ -39775,9 +41187,11 @@
         if (target.checked) {
           if (select) select.value = 'ALL';
           pill?.classList.add('gcal-all-pill--active');
+          pill?.setAttribute('aria-pressed', 'true');
         } else {
           if (select && select.value === 'ALL') select.value = '';
           pill?.classList.remove('gcal-all-pill--active');
+          pill?.setAttribute('aria-pressed', 'false');
         }
       }
 
@@ -39787,9 +41201,25 @@
         if (target.value === 'ALL') {
           if (checkbox) checkbox.checked = true;
           pill?.classList.add('gcal-all-pill--active');
+          pill?.setAttribute('aria-pressed', 'true');
         } else {
           if (checkbox) checkbox.checked = false;
           pill?.classList.remove('gcal-all-pill--active');
+          pill?.setAttribute('aria-pressed', 'false');
+        }
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === ' ' || event.key === 'Enter') {
+        const pill = event.target.closest('#cal-all-pill');
+        if (pill) {
+          event.preventDefault();
+          const checkbox = pill.querySelector('#cal-all-children-check');
+          if (checkbox) {
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+          }
         }
       }
     });
