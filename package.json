@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "build": "rollup -c",
+    "postinstall": "rollup -c",
     "start": "node server.js",
     "setup:firestore": "node scripts/setupFirestore.js",
     "setup:firestore:dry": "node scripts/setupFirestore.js --dry-run"
