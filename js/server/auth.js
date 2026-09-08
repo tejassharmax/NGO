@@ -159,9 +159,48 @@ async function verifyIdToken(token) {
 }
 
 /**
+ * Check if an email is authorized:
+ * 1. Matches static environment allowlist (fast path)
+ * 2. Or matches an active document in Firebase Firestore `authorized_users` collection
+ * @param {string} email
+ * @returns {Promise<boolean>}
+ */
+async function isAuthorizedEmail(email) {
+  if (!email) return false;
+  const normalized = email.trim().toLowerCase();
+
+  // 1. Static allowlist
+  if (ALLOWED_EMAILS.has(normalized)) return true;
+
+  // 2. Dynamic check in Firestore authorized_users collection
+  try {
+    const { getDb } = require('./firebaseAdmin');
+    const db = getDb();
+    if (db) {
+      const docId = normalized.replace(/[@.]/g, '_');
+      const snap = await db.collection('authorized_users').doc(docId).get();
+      if (snap.exists) {
+        const data = snap.data() || {};
+        const storedEmail = String(data.email || '').trim().toLowerCase();
+        if ((!storedEmail || storedEmail === normalized) && data.active === true) {
+          // Cache this newly verified admin in memory so subsequent API requests are fast
+          ALLOWED_EMAILS.add(normalized);
+          console.log(`[auth] Dynamically authorized admin from Firestore authorized_users: ${normalized} (NGO: ${data.ngo || 'default'})`);
+          return true;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[auth] Dynamic authorization lookup error for ${normalized}:`, err.message);
+  }
+
+  return false;
+}
+
+/**
  * Express middleware: require a valid ID token from an allowlisted account.
  * Responds 401 when the token is missing/invalid and 403 when the verified
- * account is not on the allowlist.
+ * account is not on the allowlist or active in Firestore authorized_users.
  *
  * Off-production, an unauthenticated request arriving over loopback is admitted
  * as LOCAL_DEV_EMAIL so `npm start` needs no browser sign-in. On Render this
@@ -192,13 +231,14 @@ async function requireAuth(req, res, next) {
     return res.status(403).json({ error: 'A verified Google email is required' });
   }
 
-  if (!ALLOWED_EMAILS.has(user.email)) {
+  const authorized = await isAuthorizedEmail(user.email);
+  if (!authorized) {
     console.warn(`[auth] Denied non-allowlisted account: ${user.email}`);
-    return res.status(403).json({ error: 'This account is not authorized' });
+    return res.status(403).json({ error: 'This account is not authorized. Please ask your NGO administrator to add your email in Firebase authorized_users.' });
   }
 
   req.user = user;
   next();
 }
 
-module.exports = { requireAuth, verifyIdToken, ALLOWED_EMAILS, IS_PRODUCTION };
+module.exports = { requireAuth, verifyIdToken, isAuthorizedEmail, ALLOWED_EMAILS, IS_PRODUCTION };

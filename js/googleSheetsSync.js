@@ -311,7 +311,7 @@ export function openGoogleSheetsTemplateModal() {
 
   const session = getSession() || {};
   const ngoName = session.ngo || 'Ayusha Nilayam';
-  const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+  const userEmail = session.email || localStorage.getItem('google-user-email') || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
   const children = getChildren() || [];
 
   const colLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R'];
@@ -448,7 +448,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
   document.querySelector('#sheets-sync-modal-overlay')?.remove();
 
   const session = getSession() || {};
-  const userEmail = session.email || localStorage.getItem('google-user-email') || 'tejassachin2010@gmail.com';
+  const userEmail = session.email || localStorage.getItem('google-user-email') || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
 
   const overlay = document.createElement('div');
   overlay.id = 'sheets-sync-modal-overlay';
