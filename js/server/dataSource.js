@@ -58,8 +58,13 @@ async function readTenant(ngoSlug) {
   if (!isFirestoreEnabled()) {
     return { payload: readFileStore(), index: null, firestore: false };
   }
-  const { payload, index } = await readSnapshot(sanitizeNgoSlug(ngoSlug));
-  return { payload, index, firestore: true };
+  try {
+    const { payload, index } = await readSnapshot(sanitizeNgoSlug(ngoSlug));
+    return { payload, index, firestore: true };
+  } catch (err) {
+    console.warn(`[data] Firestore read failed for "${ngoSlug}" (${err.message}). Falling back to local file store.`);
+    return { payload: readFileStore(), index: null, firestore: false };
+  }
 }
 
 /**
@@ -107,18 +112,24 @@ async function readTenantArrays(ngoSlug, keys) {
 async function writeTenantChildren(ngoSlug, children) {
   const json = JSON.stringify(Array.isArray(children) ? children : []);
 
-  if (!isFirestoreEnabled()) {
+  // Always persist to local file store so data is safe if Firestore quota is exceeded
+  try {
     const store = readFileStore();
     store['chm-children'] = json;
     writeFileStore(store);
-    return;
+  } catch (fileErr) {
+    console.warn('[dataSource] Could not write to local store:', fileErr.message);
   }
 
-  const slug = sanitizeNgoSlug(ngoSlug);
-  // Pass the current index so unchanged children are not rewritten, and so
-  // children missing from `children` are deleted rather than orphaned.
-  const { index } = await readSnapshot(slug);
-  await writeSnapshot(slug, { 'chm-children': json }, index);
+  if (isFirestoreEnabled()) {
+    try {
+      const slug = sanitizeNgoSlug(ngoSlug);
+      const { index } = await readSnapshot(slug);
+      await writeSnapshot(slug, { 'chm-children': json }, index);
+    } catch (fsErr) {
+      console.warn(`[dataSource] Firestore write failed (${fsErr.message}). Persisted to local file store.`);
+    }
+  }
 }
 
 module.exports = {
