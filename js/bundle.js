@@ -35325,10 +35325,16 @@
       return;
     }
 
+    showProgressBar(45);
     toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
-    await autoSyncToGoogleDocs();
-    toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
-    window.open(docUrl, '_blank');
+    try {
+      await autoSyncToGoogleDocs();
+      showProgressBar(100);
+      toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
+      window.open(docUrl, '_blank');
+    } finally {
+      hideProgressBar();
+    }
   }
 
   /**
@@ -39136,9 +39142,17 @@
 
     handleOAuthUrlParams();
 
+    function updateInitialLoader(percent, text) {
+      const bar = document.getElementById('initial-loader-bar');
+      const label = document.getElementById('initial-loader-text');
+      if (bar && percent !== undefined) bar.style.width = `${percent}%`;
+      if (label && text) label.textContent = text;
+    }
+
     function dismissInitialLoader() {
       const loader = document.getElementById('initial-loader');
       if (loader) {
+        updateInitialLoader(100, 'Ready!');
         loader.classList.add('initial-loader--fade-out');
         setTimeout(() => {
           if (loader.parentNode) loader.parentNode.removeChild(loader);
@@ -39149,10 +39163,9 @@
     renderCurrentPage = async function() {
       const isInitialBoot = !!document.getElementById('initial-loader');
       if (!isInitialBoot) {
-        showProgressBar(35);
+        showProgressBar(30);
       } else {
-        const loaderText = document.getElementById('initial-loader-text');
-        if (loaderText) loaderText.textContent = 'Syncing records with Firebase...';
+        updateInitialLoader(25, 'Verifying authorized session...');
       }
 
       const loggedIn = isSessionActive();
@@ -39161,6 +39174,9 @@
         page = 'login';
         if (window.location.hash !== '#/login') {
           window.location.hash = '#/login';
+        }
+        if (isInitialBoot) {
+          updateInitialLoader(85, 'Opening sign-in portal...');
         }
         const app = document.querySelector('#app');
         if (app) {
@@ -39186,7 +39202,9 @@
       }
 
       if (!isInitialBoot) {
-        showProgressBar(65);
+        showProgressBar(50);
+      } else {
+        updateInitialLoader(50, 'Hydrating child health records from Firebase...');
       }
 
       await Promise.all([
@@ -39196,7 +39214,9 @@
       ]);
 
       if (!isInitialBoot) {
-        showProgressBar(90);
+        showProgressBar(85);
+      } else {
+        updateInitialLoader(85, 'Rendering dashboard & health charts...');
       }
 
       // Auto-sync any unsynced local documents to Google Drive in the background

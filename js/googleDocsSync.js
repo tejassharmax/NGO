@@ -8,7 +8,7 @@
 import { getSession } from './session.js';
 import { toast } from './toast.js';
 import { getChildren, getHealthRecords, healthStatus, calculateAge } from './storage.js';
-import { escapeHTML } from './utils.js';
+import { escapeHTML, showProgressBar, hideProgressBar } from './utils.js';
 import { apiFetch } from './apiClient.js';
 
 let cachedDocsConfig = null;
@@ -150,10 +150,16 @@ export async function syncAndOpenGoogleDoc() {
     return;
   }
 
+  showProgressBar(45);
   toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
-  await autoSyncToGoogleDocs();
-  toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
-  window.open(docUrl, '_blank');
+  try {
+    await autoSyncToGoogleDocs();
+    showProgressBar(100);
+    toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
+    window.open(docUrl, '_blank');
+  } finally {
+    hideProgressBar();
+  }
 }
 
 /**
