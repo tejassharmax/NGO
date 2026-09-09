@@ -22,14 +22,16 @@
         left: 0;
         width: 0%;
         height: 3px;
-        background: linear-gradient(90deg, #2563eb, #7c3aed, #06b6d4);
-        box-shadow: 0 0 10px rgba(37, 99, 235, 0.7), 0 0 4px rgba(124, 58, 237, 0.5);
+        background: linear-gradient(90deg, #2563eb, #6366f1, #06b6d4);
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.6), 0 0 4px rgba(99, 102, 241, 0.4);
         z-index: 9999999;
         pointer-events: none;
         opacity: 0;
         transition: width 0.3s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.2s ease;
       }
       .global-progress-bar.active { opacity: 1; }
+
+      /* Light Theme Instant Preloader */
       .initial-loader {
         position: fixed;
         inset: 0;
@@ -40,33 +42,21 @@
         background: #f8fafc;
         color: #0f172a;
         font-family: "Manrope", system-ui, -apple-system, sans-serif;
-        transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      @media (prefers-color-scheme: dark) {
-        .initial-loader { background: #0b0f19; color: #f8fafc; }
+        transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
       }
       .initial-loader__card {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 36px 40px;
-        border-radius: 24px;
-        background: rgba(255, 255, 255, 0.92);
-        border: 1px solid rgba(226, 232, 240, 0.85);
-        box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.6);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        padding: 38px 44px 34px;
+        border-radius: 26px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 20px 45px -12px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.03);
         max-width: 360px;
         width: 88%;
         text-align: center;
         animation: initialPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      }
-      @media (prefers-color-scheme: dark) {
-        .initial-loader__card {
-          background: rgba(23, 34, 52, 0.88);
-          border: 1px solid rgba(36, 49, 70, 0.85);
-          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
       }
       .initial-loader__icon-box {
         position: relative;
@@ -75,18 +65,18 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        margin-bottom: 20px;
+        margin-bottom: 22px;
       }
       .initial-loader__shield {
         width: 58px;
         height: 58px;
         border-radius: 18px;
-        background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+        background: linear-gradient(135deg, #2563eb 0%, #6366f1 100%);
         display: flex;
         align-items: center;
         justify-content: center;
         color: #ffffff;
-        box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.45);
+        box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.38);
         z-index: 2;
         animation: floatShield 3s ease-in-out infinite;
       }
@@ -100,7 +90,7 @@
         position: absolute;
         inset: -4px;
         border-radius: 22px;
-        border: 2px solid rgba(37, 99, 235, 0.3);
+        border: 2px solid rgba(37, 99, 235, 0.22);
         animation: pulseRing 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
         z-index: 1;
       }
@@ -109,50 +99,36 @@
         font-size: 19px;
         font-weight: 700;
         letter-spacing: -0.4px;
-        margin: 0 0 6px 0;
-      }
-      .initial-loader__subtitle {
-        font-size: 12px;
-        font-weight: 500;
-        color: #64748b;
+        color: #0f172a;
         margin: 0 0 22px 0;
-      }
-      @media (prefers-color-scheme: dark) {
-        .initial-loader__subtitle { color: #94a3b8; }
       }
       .initial-loader__track {
         width: 100%;
-        height: 4px;
+        height: 5px;
         border-radius: 999px;
         background: #e2e8f0;
         overflow: hidden;
         position: relative;
-        margin-bottom: 16px;
-      }
-      @media (prefers-color-scheme: dark) {
-        .initial-loader__track { background: #243146; }
+        margin-bottom: 18px;
       }
       .initial-loader__bar {
         position: absolute;
         top: 0;
         bottom: 0;
         left: 0;
-        width: 18%;
+        width: 25%;
         border-radius: 999px;
-        background: linear-gradient(90deg, #2563eb, #7c3aed, #06b6d4);
-        box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+        background: linear-gradient(90deg, #2563eb, #6366f1, #06b6d4);
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.35);
         transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
       }
       .initial-loader__status {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        font-size: 12px;
-        font-weight: 500;
+        font-size: 13px;
+        font-weight: 600;
         color: #64748b;
-      }
-      @media (prefers-color-scheme: dark) {
-        .initial-loader__status { color: #94a3b8; }
       }
       .initial-loader__spinner {
         width: 14px;
@@ -179,11 +155,6 @@
         0% { transform: scale(0.85); opacity: 0.8; }
         100% { transform: scale(1.4); opacity: 0; }
       }
-      @keyframes barSweep {
-        0% { left: -40%; width: 30%; }
-        50% { width: 55%; }
-        100% { left: 100%; width: 30%; }
-      }
     </style>
   </head>
   <body data-page="dashboard">
@@ -204,13 +175,12 @@
           </div>
         </div>
         <div class="initial-loader__title">Child Health Management</div>
-        <div class="initial-loader__subtitle">Secure Workspace & Google Integration</div>
         <div class="initial-loader__track">
           <div id="initial-loader-bar" class="initial-loader__bar"></div>
         </div>
         <div class="initial-loader__status">
           <span class="initial-loader__spinner"></span>
-          <span id="initial-loader-text" class="initial-loader__text">Loading platform & records...</span>
+          <span id="initial-loader-text" class="initial-loader__text">Syncing...</span>
         </div>
       </div>
     </div>
@@ -219,6 +189,6 @@
     <div id="app"></div>
     <div id="modal-root"></div>
     <div id="toast-root" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
-    <script defer src="js/bundle.js?v=2.4.0"></script>
+    <script defer src="js/bundle.js?v=2.5.0"></script>
   </body>
 </html>
