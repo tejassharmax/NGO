@@ -39142,7 +39142,7 @@
 
     handleOAuthUrlParams();
 
-    function updateInitialLoader(percent, text) {
+    function updateInitialLoader(percent, text = 'Syncing...') {
       const bar = document.getElementById('initial-loader-bar');
       const label = document.getElementById('initial-loader-text');
       if (bar && percent !== undefined) bar.style.width = `${percent}%`;
@@ -39152,11 +39152,11 @@
     function dismissInitialLoader() {
       const loader = document.getElementById('initial-loader');
       if (loader) {
-        updateInitialLoader(100, 'Ready!');
+        updateInitialLoader(100, 'Syncing...');
         loader.classList.add('initial-loader--fade-out');
         setTimeout(() => {
           if (loader.parentNode) loader.parentNode.removeChild(loader);
-        }, 400);
+        }, 350);
       }
     }
 
@@ -39165,7 +39165,7 @@
       if (!isInitialBoot) {
         showProgressBar(30);
       } else {
-        updateInitialLoader(25, 'Verifying authorized session...');
+        updateInitialLoader(25, 'Syncing...');
       }
 
       const loggedIn = isSessionActive();
@@ -39176,7 +39176,7 @@
           window.location.hash = '#/login';
         }
         if (isInitialBoot) {
-          updateInitialLoader(85, 'Opening sign-in portal...');
+          updateInitialLoader(85, 'Syncing...');
         }
         const app = document.querySelector('#app');
         if (app) {
@@ -39204,7 +39204,7 @@
       if (!isInitialBoot) {
         showProgressBar(50);
       } else {
-        updateInitialLoader(50, 'Hydrating child health records from Firebase...');
+        updateInitialLoader(50, 'Syncing...');
       }
 
       await Promise.all([
@@ -39216,7 +39216,7 @@
       if (!isInitialBoot) {
         showProgressBar(85);
       } else {
-        updateInitialLoader(85, 'Rendering dashboard & health charts...');
+        updateInitialLoader(85, 'Syncing...');
       }
 
       // Auto-sync any unsynced local documents to Google Drive in the background
