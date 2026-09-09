@@ -105,9 +105,17 @@ let renderCurrentPage = null;
 
   handleOAuthUrlParams();
 
+  function updateInitialLoader(percent, text) {
+    const bar = document.getElementById('initial-loader-bar');
+    const label = document.getElementById('initial-loader-text');
+    if (bar && percent !== undefined) bar.style.width = `${percent}%`;
+    if (label && text) label.textContent = text;
+  }
+
   function dismissInitialLoader() {
     const loader = document.getElementById('initial-loader');
     if (loader) {
+      updateInitialLoader(100, 'Ready!');
       loader.classList.add('initial-loader--fade-out');
       setTimeout(() => {
         if (loader.parentNode) loader.parentNode.removeChild(loader);
@@ -118,10 +126,9 @@ let renderCurrentPage = null;
   renderCurrentPage = async function() {
     const isInitialBoot = !!document.getElementById('initial-loader');
     if (!isInitialBoot) {
-      showProgressBar(35);
+      showProgressBar(30);
     } else {
-      const loaderText = document.getElementById('initial-loader-text');
-      if (loaderText) loaderText.textContent = 'Syncing records with Firebase...';
+      updateInitialLoader(25, 'Verifying authorized session...');
     }
 
     const loggedIn = isSessionActive();
@@ -130,6 +137,9 @@ let renderCurrentPage = null;
       page = 'login';
       if (window.location.hash !== '#/login') {
         window.location.hash = '#/login';
+      }
+      if (isInitialBoot) {
+        updateInitialLoader(85, 'Opening sign-in portal...');
       }
       const app = document.querySelector('#app');
       if (app) {
@@ -155,7 +165,9 @@ let renderCurrentPage = null;
     }
 
     if (!isInitialBoot) {
-      showProgressBar(65);
+      showProgressBar(50);
+    } else {
+      updateInitialLoader(50, 'Hydrating child health records from Firebase...');
     }
 
     await Promise.all([
@@ -165,7 +177,9 @@ let renderCurrentPage = null;
     ]);
 
     if (!isInitialBoot) {
-      showProgressBar(90);
+      showProgressBar(85);
+    } else {
+      updateInitialLoader(85, 'Rendering dashboard & health charts...');
     }
 
     // Auto-sync any unsynced local documents to Google Drive in the background

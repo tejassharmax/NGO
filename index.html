@@ -137,11 +137,11 @@
         top: 0;
         bottom: 0;
         left: 0;
-        width: 40%;
+        width: 18%;
         border-radius: 999px;
         background: linear-gradient(90deg, #2563eb, #7c3aed, #06b6d4);
-        animation: barSweep 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
         box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+        transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1);
       }
       .initial-loader__status {
         display: inline-flex;
@@ -206,7 +206,7 @@
         <div class="initial-loader__title">Child Health Management</div>
         <div class="initial-loader__subtitle">Secure Workspace & Google Integration</div>
         <div class="initial-loader__track">
-          <div class="initial-loader__bar"></div>
+          <div id="initial-loader-bar" class="initial-loader__bar"></div>
         </div>
         <div class="initial-loader__status">
           <span class="initial-loader__spinner"></span>
