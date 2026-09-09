@@ -326,7 +326,12 @@
     <!-- Top Route Progress Bar -->
     <div id="global-progress-bar" class="global-progress-bar" aria-hidden="true"></div>
 
-    <!-- Instant Preloader (Paints immediately, eliminates white screen) -->
+    <!-- Instant Preloader (Paints immediately on initial cold boot, eliminates white screen) -->
+    <script>
+      if (sessionStorage.getItem('chm_session_booted')) {
+        document.write('<style>#initial-loader { display: none !important; }</style>');
+      }
+    </script>
     <div id="initial-loader" class="initial-loader" aria-label="Loading Child Health Management Platform">
       <div class="initial-loader__card">
         <div class="initial-loader__typewriter-box">
@@ -351,6 +356,6 @@
     <div id="app"></div>
     <div id="modal-root"></div>
     <div id="toast-root" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
-    <script defer src="js/bundle.js?v=2.6.0"></script>
+    <script defer src="js/bundle.js?v=2.7.0"></script>
   </body>
 </html>

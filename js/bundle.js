@@ -66,8 +66,8 @@
   const escapeHTML$1 = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
   const formatDate = (date) => { try { return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date)); } catch { return date || ''; } };
   const pagePath = (page) => {
-    if (!page || page === 'dashboard') return 'index.html#/';
-    return `index.html#/${page}`;
+    if (!page || page === 'dashboard') return '#/';
+    return `#/${page}`;
   };
   const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
 
@@ -33701,9 +33701,9 @@
     let deletedDoc = null;
     let updatedDocs;
 
-    if (typeof idOrIndex === 'string') {
+    if (typeof idOrIndex === 'string' && idOrIndex.trim()) {
       deletedDoc = docs.find(d => (d.id && d.id === idOrIndex) || (d.name && d.name === idOrIndex));
-      updatedDocs = docs.filter(d => (d.id || d.name) !== idOrIndex);
+      updatedDocs = docs.filter(d => d.id !== idOrIndex && d.name !== idOrIndex);
     } else if (typeof idOrIndex === 'number' && !isNaN(idOrIndex)) {
       deletedDoc = docs[idOrIndex];
       docs.splice(idOrIndex, 1);
@@ -34124,8 +34124,13 @@
     return false;
   }
 
+  let syncPending = false;
+
   async function syncWithServer() {
-    if (isSyncing) return;
+    if (isSyncing) {
+      syncPending = true;
+      return;
+    }
     try {
       isSyncing = true;
       showProgressBar(45);
@@ -34163,6 +34168,10 @@
     } finally {
       isSyncing = false;
       hideProgressBar();
+      if (syncPending) {
+        syncPending = false;
+        syncWithServer().catch(() => {});
+      }
     }
   }
 
@@ -39150,6 +39159,7 @@
     }
 
     function dismissInitialLoader() {
+      sessionStorage.setItem('chm_session_booted', '1');
       const loader = document.getElementById('initial-loader');
       if (loader) {
         updateInitialLoader(100, 'Syncing...');
@@ -40492,15 +40502,21 @@
               card.remove();
               const grid = document.querySelector('#document-grid');
               const remaining = grid ? grid.querySelectorAll('article.document-card') : [];
-              if (grid && remaining.length === 0 && typeof renderCurrentPage === 'function') {
-                renderCurrentPage();
+              if (grid && remaining.length === 0) {
+                const cardBody = grid.closest('.card__body') || grid.parentElement;
+                if (cardBody) {
+                  cardBody.innerHTML = `
+                  <div class="empty-state" style="padding:48px 24px">
+                    <span class="empty-state__icon">${icon('file')}</span>
+                    <h3>No health documents uploaded yet</h3>
+                    <p>Click "Upload document" to attach medical reports or use Google Cloud Vision API.</p>
+                  </div>`;
+                }
               }
             }, 220);
-          } else if (typeof renderCurrentPage === 'function') {
-            await renderCurrentPage();
           }
 
-          // Sync deletion to cloud database so it stays deleted
+          // Sync deletion immediately to cloud database so it stays deleted
           try {
             await syncWithServer();
           } catch (e) {
