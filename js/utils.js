@@ -63,8 +63,8 @@ export const initials = (name) => name.split(' ').map((item) => item[0]).join(''
 export const escapeHTML = (value = '') => String(value).replace(/[&<>'"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[c]);
 export const formatDate = (date) => { try { return new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date)); } catch { return date || ''; } };
 export const pagePath = (page) => {
-  if (!page || page === 'dashboard') return 'index.html#/';
-  return `index.html#/${page}`;
+  if (!page || page === 'dashboard') return '#/';
+  return `#/${page}`;
 };
 export const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
 export const healthDot = (level) => `<span class="health-dot health-dot--${level}" aria-label="${level}"></span>`;

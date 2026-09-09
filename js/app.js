@@ -113,6 +113,7 @@ let renderCurrentPage = null;
   }
 
   function dismissInitialLoader() {
+    sessionStorage.setItem('chm_session_booted', '1');
     const loader = document.getElementById('initial-loader');
     if (loader) {
       updateInitialLoader(100, 'Syncing...');
@@ -1455,15 +1456,21 @@ document.addEventListener('click', (event) => {
             card.remove();
             const grid = document.querySelector('#document-grid');
             const remaining = grid ? grid.querySelectorAll('article.document-card') : [];
-            if (grid && remaining.length === 0 && typeof renderCurrentPage === 'function') {
-              renderCurrentPage();
+            if (grid && remaining.length === 0) {
+              const cardBody = grid.closest('.card__body') || grid.parentElement;
+              if (cardBody) {
+                cardBody.innerHTML = `
+                  <div class="empty-state" style="padding:48px 24px">
+                    <span class="empty-state__icon">${icon('file')}</span>
+                    <h3>No health documents uploaded yet</h3>
+                    <p>Click "Upload document" to attach medical reports or use Google Cloud Vision API.</p>
+                  </div>`;
+              }
             }
           }, 220);
-        } else if (typeof renderCurrentPage === 'function') {
-          await renderCurrentPage();
         }
 
-        // Sync deletion to cloud database so it stays deleted
+        // Sync deletion immediately to cloud database so it stays deleted
         try {
           await syncWithServer();
         } catch (e) {

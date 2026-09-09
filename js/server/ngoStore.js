@@ -442,6 +442,7 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
             type: 'delete',
             ref: root.collection(collectionName).doc(docId)
           });
+          stored.delete(docId);
         }
       });
     }

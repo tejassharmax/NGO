@@ -204,9 +204,9 @@ export function deleteUploadedDoc(idOrIndex) {
   let deletedDoc = null;
   let updatedDocs;
 
-  if (typeof idOrIndex === 'string') {
+  if (typeof idOrIndex === 'string' && idOrIndex.trim()) {
     deletedDoc = docs.find(d => (d.id && d.id === idOrIndex) || (d.name && d.name === idOrIndex));
-    updatedDocs = docs.filter(d => (d.id || d.name) !== idOrIndex);
+    updatedDocs = docs.filter(d => d.id !== idOrIndex && d.name !== idOrIndex);
   } else if (typeof idOrIndex === 'number' && !isNaN(idOrIndex)) {
     deletedDoc = docs[idOrIndex];
     docs.splice(idOrIndex, 1);
@@ -701,8 +701,13 @@ export async function hydrateFromServer() {
   return false;
 }
 
+let syncPending = false;
+
 export async function syncWithServer() {
-  if (isSyncing) return;
+  if (isSyncing) {
+    syncPending = true;
+    return;
+  }
   try {
     isSyncing = true;
     showProgressBar(45);
@@ -740,6 +745,10 @@ export async function syncWithServer() {
   } finally {
     isSyncing = false;
     hideProgressBar();
+    if (syncPending) {
+      syncPending = false;
+      syncWithServer().catch(() => {});
+    }
   }
 }
 
