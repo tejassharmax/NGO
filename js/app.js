@@ -5,7 +5,7 @@ import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlig
 import { toast } from './toast.js';
 import { modal, closeModal } from './modal.js';
 import { saveChild } from './form.js';
-import { pagePath, icon, escapeHTML, formatDate } from './utils.js';
+import { pagePath, icon, escapeHTML, formatDate, showProgressBar, hideProgressBar } from './utils.js';
 import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
 import { getAuthorizedUser } from './firestore.js';
@@ -105,7 +105,25 @@ let renderCurrentPage = null;
 
   handleOAuthUrlParams();
 
+  function dismissInitialLoader() {
+    const loader = document.getElementById('initial-loader');
+    if (loader) {
+      loader.classList.add('initial-loader--fade-out');
+      setTimeout(() => {
+        if (loader.parentNode) loader.parentNode.removeChild(loader);
+      }, 400);
+    }
+  }
+
   renderCurrentPage = async function() {
+    const isInitialBoot = !!document.getElementById('initial-loader');
+    if (!isInitialBoot) {
+      showProgressBar(35);
+    } else {
+      const loaderText = document.getElementById('initial-loader-text');
+      if (loaderText) loaderText.textContent = 'Syncing records with Firebase...';
+    }
+
     const loggedIn = isSessionActive();
 
     if (!loggedIn) {
@@ -117,6 +135,8 @@ let renderCurrentPage = null;
       if (app) {
         app.innerHTML = renderPage('login');
       }
+      dismissInitialLoader();
+      hideProgressBar();
       return;
     }
 
@@ -129,7 +149,13 @@ let renderCurrentPage = null;
     const deprecatedPages = ['emergency', 'expenses', 'nutrition', 'export'];
     if (deprecatedPages.includes(page)) {
       window.location.hash = '#/dashboard';
+      dismissInitialLoader();
+      hideProgressBar();
       return;
+    }
+
+    if (!isInitialBoot) {
+      showProgressBar(65);
     }
 
     await Promise.all([
@@ -137,6 +163,10 @@ let renderCurrentPage = null;
       fetchSheetsConfig().catch(() => {}),
       fetchDocsConfig().catch(() => {})
     ]);
+
+    if (!isInitialBoot) {
+      showProgressBar(90);
+    }
 
     // Auto-sync any unsynced local documents to Google Drive in the background
     autoSyncPendingDocuments(false).catch(() => {});
@@ -167,6 +197,8 @@ let renderCurrentPage = null;
     }
 
     enableColumnResize();
+    dismissInitialLoader();
+    hideProgressBar();
   };
 
   if (window.location.href.includes('google_connected=true')) {
@@ -177,6 +209,7 @@ let renderCurrentPage = null;
 
   // Always listen for hash changes
   window.addEventListener('hashchange', () => {
+    showProgressBar(25);
     if (renderCurrentPage) renderCurrentPage();
   });
 

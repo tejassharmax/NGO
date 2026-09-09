@@ -9,7 +9,7 @@
 import { getSession } from './session.js';
 import { toast } from './toast.js';
 import { getChildren, calculateAge, logActivity } from './storage.js';
-import { escapeHTML, icon } from './utils.js';
+import { escapeHTML, icon, showProgressBar, hideProgressBar } from './utils.js';
 import { apiFetch } from './apiClient.js';
 
 export const EXACT_SHEET_COLUMNS = [
@@ -677,6 +677,7 @@ export async function pullChildrenFromGoogleSheets(options = {}) {
   if (!options.silent) {
     toast('Syncing with Google Sheets', 'Checking for newly added children and updates in Google Sheets...');
   }
+  showProgressBar(50);
 
   try {
     const res = await apiFetch('/api/sheets/pull', {
@@ -717,6 +718,8 @@ export async function pullChildrenFromGoogleSheets(options = {}) {
     if (!options.silent) {
       toast('Sync Error', 'Failed to connect to Google Sheets server.');
     }
+  } finally {
+    hideProgressBar();
   }
   return { success: false };
 }
