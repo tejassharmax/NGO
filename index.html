@@ -8,18 +8,217 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/global.css?v=2.3.0" />
-    <link rel="stylesheet" href="css/layout.css?v=2.3.0" />
-    <link rel="stylesheet" href="css/components.css?v=2.3.0" />
-    <link rel="stylesheet" href="css/pages.css?v=2.3.0" />
-    <link rel="stylesheet" href="css/animations.css?v=2.3.0" />
-    <link rel="stylesheet" href="css/responsive.css?v=2.3.0" />
+    <link rel="stylesheet" href="css/global.css?v=2.4.0" />
+    <link rel="stylesheet" href="css/layout.css?v=2.4.0" />
+    <link rel="stylesheet" href="css/components.css?v=2.4.0" />
+    <link rel="stylesheet" href="css/pages.css?v=2.4.0" />
+    <link rel="stylesheet" href="css/animations.css?v=2.4.0" />
+    <link rel="stylesheet" href="css/responsive.css?v=2.4.0" />
+    <style>
+      /* Critical preloader & route progress bar styles (rendered immediately in first paint) */
+      .global-progress-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 0%;
+        height: 3px;
+        background: linear-gradient(90deg, #2563eb, #7c3aed, #06b6d4);
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.7), 0 0 4px rgba(124, 58, 237, 0.5);
+        z-index: 9999999;
+        pointer-events: none;
+        opacity: 0;
+        transition: width 0.3s cubic-bezier(0.1, 0.9, 0.2, 1), opacity 0.2s ease;
+      }
+      .global-progress-bar.active { opacity: 1; }
+      .initial-loader {
+        position: fixed;
+        inset: 0;
+        z-index: 999999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        color: #0f172a;
+        font-family: "Manrope", system-ui, -apple-system, sans-serif;
+        transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1), transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @media (prefers-color-scheme: dark) {
+        .initial-loader { background: #0b0f19; color: #f8fafc; }
+      }
+      .initial-loader__card {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 36px 40px;
+        border-radius: 24px;
+        background: rgba(255, 255, 255, 0.92);
+        border: 1px solid rgba(226, 232, 240, 0.85);
+        box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.6);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        max-width: 360px;
+        width: 88%;
+        text-align: center;
+        animation: initialPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+      @media (prefers-color-scheme: dark) {
+        .initial-loader__card {
+          background: rgba(23, 34, 52, 0.88);
+          border: 1px solid rgba(36, 49, 70, 0.85);
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+      }
+      .initial-loader__icon-box {
+        position: relative;
+        width: 76px;
+        height: 76px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+      }
+      .initial-loader__shield {
+        width: 58px;
+        height: 58px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.45);
+        z-index: 2;
+        animation: floatShield 3s ease-in-out infinite;
+      }
+      .initial-loader__shield svg {
+        width: 28px;
+        height: 28px;
+        stroke: #ffffff;
+        fill: none;
+      }
+      .initial-loader__pulse-ring {
+        position: absolute;
+        inset: -4px;
+        border-radius: 22px;
+        border: 2px solid rgba(37, 99, 235, 0.3);
+        animation: pulseRing 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        z-index: 1;
+      }
+      .initial-loader__pulse-ring--delay { animation-delay: 1.2s; }
+      .initial-loader__title {
+        font-size: 19px;
+        font-weight: 700;
+        letter-spacing: -0.4px;
+        margin: 0 0 6px 0;
+      }
+      .initial-loader__subtitle {
+        font-size: 12px;
+        font-weight: 500;
+        color: #64748b;
+        margin: 0 0 22px 0;
+      }
+      @media (prefers-color-scheme: dark) {
+        .initial-loader__subtitle { color: #94a3b8; }
+      }
+      .initial-loader__track {
+        width: 100%;
+        height: 4px;
+        border-radius: 999px;
+        background: #e2e8f0;
+        overflow: hidden;
+        position: relative;
+        margin-bottom: 16px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .initial-loader__track { background: #243146; }
+      }
+      .initial-loader__bar {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        width: 40%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #2563eb, #7c3aed, #06b6d4);
+        animation: barSweep 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+      }
+      .initial-loader__status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 500;
+        color: #64748b;
+      }
+      @media (prefers-color-scheme: dark) {
+        .initial-loader__status { color: #94a3b8; }
+      }
+      .initial-loader__spinner {
+        width: 14px;
+        height: 14px;
+        border: 2px solid rgba(37, 99, 235, 0.2);
+        border-top-color: #2563eb;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      .initial-loader--fade-out {
+        opacity: 0;
+        transform: scale(1.02);
+        pointer-events: none;
+      }
+      @keyframes initialPop {
+        from { opacity: 0; transform: translateY(12px) scale(0.96); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+      }
+      @keyframes floatShield {
+        0%, 100% { transform: translateY(0); }
+        50% { transform: translateY(-4px); }
+      }
+      @keyframes pulseRing {
+        0% { transform: scale(0.85); opacity: 0.8; }
+        100% { transform: scale(1.4); opacity: 0; }
+      }
+      @keyframes barSweep {
+        0% { left: -40%; width: 30%; }
+        50% { width: 55%; }
+        100% { left: 100%; width: 30%; }
+      }
+    </style>
   </head>
   <body data-page="dashboard">
+    <!-- Top Route Progress Bar -->
+    <div id="global-progress-bar" class="global-progress-bar" aria-hidden="true"></div>
+
+    <!-- Instant Preloader (Paints immediately, eliminates white screen) -->
+    <div id="initial-loader" class="initial-loader" aria-label="Loading Child Health Management Platform">
+      <div class="initial-loader__card">
+        <div class="initial-loader__icon-box">
+          <div class="initial-loader__pulse-ring"></div>
+          <div class="initial-loader__pulse-ring initial-loader__pulse-ring--delay"></div>
+          <div class="initial-loader__shield">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              <path d="M12 8v8M8 12h8"/>
+            </svg>
+          </div>
+        </div>
+        <div class="initial-loader__title">Child Health Management</div>
+        <div class="initial-loader__subtitle">Secure Workspace & Google Integration</div>
+        <div class="initial-loader__track">
+          <div class="initial-loader__bar"></div>
+        </div>
+        <div class="initial-loader__status">
+          <span class="initial-loader__spinner"></span>
+          <span id="initial-loader-text" class="initial-loader__text">Loading platform & records...</span>
+        </div>
+      </div>
+    </div>
+
     <a class="skip-link" href="#app-main">Skip to content</a>
     <div id="app"></div>
     <div id="modal-root"></div>
     <div id="toast-root" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
-    <script defer src="js/bundle.js?v=2.3.0"></script>
+    <script defer src="js/bundle.js?v=2.4.0"></script>
   </body>
 </html>

@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════════════════ */
 
 import { apiFetch } from './apiClient.js';
+import { showProgressBar, hideProgressBar } from './utils.js';
 
 const CHILDREN_KEY = 'chm-children';
 const ACTIVITY_KEY = 'chm-activity';
@@ -704,6 +705,7 @@ export async function syncWithServer() {
   if (isSyncing) return;
   try {
     isSyncing = true;
+    showProgressBar(45);
     const keys = [
       CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
       NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
@@ -737,6 +739,7 @@ export async function syncWithServer() {
     console.warn('Sync failed (offline or server starting):', err);
   } finally {
     isSyncing = false;
+    hideProgressBar();
   }
 }
 

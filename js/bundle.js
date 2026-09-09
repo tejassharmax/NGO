@@ -71,6 +71,29 @@
   };
   const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
 
+  let progressBarTimer = null;
+
+  function showProgressBar(percent = 65) {
+    const bar = document.getElementById('global-progress-bar');
+    if (!bar) return;
+    if (progressBarTimer) clearTimeout(progressBarTimer);
+    bar.classList.add('active');
+    bar.style.width = `${percent}%`;
+  }
+
+  function hideProgressBar() {
+    const bar = document.getElementById('global-progress-bar');
+    if (!bar) return;
+    bar.style.width = '100%';
+    if (progressBarTimer) clearTimeout(progressBarTimer);
+    progressBarTimer = setTimeout(() => {
+      bar.classList.remove('active');
+      setTimeout(() => {
+        bar.style.width = '0%';
+      }, 200);
+    }, 250);
+  }
+
   const getDefaultsFromPostinstall = () => (undefined);
 
   /**
@@ -34105,6 +34128,7 @@
     if (isSyncing) return;
     try {
       isSyncing = true;
+      showProgressBar(45);
       const keys = [
         CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
         NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
@@ -34138,6 +34162,7 @@
       console.warn('Sync failed (offline or server starting):', err);
     } finally {
       isSyncing = false;
+      hideProgressBar();
     }
   }
 
@@ -35113,6 +35138,7 @@
     if (!options.silent) {
       toast('Syncing with Google Sheets', 'Checking for newly added children and updates in Google Sheets...');
     }
+    showProgressBar(50);
 
     try {
       const res = await apiFetch('/api/sheets/pull', {
@@ -35153,6 +35179,8 @@
       if (!options.silent) {
         toast('Sync Error', 'Failed to connect to Google Sheets server.');
       }
+    } finally {
+      hideProgressBar();
     }
     return { success: false };
   }
@@ -39108,7 +39136,25 @@
 
     handleOAuthUrlParams();
 
+    function dismissInitialLoader() {
+      const loader = document.getElementById('initial-loader');
+      if (loader) {
+        loader.classList.add('initial-loader--fade-out');
+        setTimeout(() => {
+          if (loader.parentNode) loader.parentNode.removeChild(loader);
+        }, 400);
+      }
+    }
+
     renderCurrentPage = async function() {
+      const isInitialBoot = !!document.getElementById('initial-loader');
+      if (!isInitialBoot) {
+        showProgressBar(35);
+      } else {
+        const loaderText = document.getElementById('initial-loader-text');
+        if (loaderText) loaderText.textContent = 'Syncing records with Firebase...';
+      }
+
       const loggedIn = isSessionActive();
 
       if (!loggedIn) {
@@ -39120,6 +39166,8 @@
         if (app) {
           app.innerHTML = renderPage('login');
         }
+        dismissInitialLoader();
+        hideProgressBar();
         return;
       }
 
@@ -39132,7 +39180,13 @@
       const deprecatedPages = ['emergency', 'expenses', 'nutrition', 'export'];
       if (deprecatedPages.includes(page)) {
         window.location.hash = '#/dashboard';
+        dismissInitialLoader();
+        hideProgressBar();
         return;
+      }
+
+      if (!isInitialBoot) {
+        showProgressBar(65);
       }
 
       await Promise.all([
@@ -39140,6 +39194,10 @@
         fetchSheetsConfig().catch(() => {}),
         fetchDocsConfig().catch(() => {})
       ]);
+
+      if (!isInitialBoot) {
+        showProgressBar(90);
+      }
 
       // Auto-sync any unsynced local documents to Google Drive in the background
       autoSyncPendingDocuments(false).catch(() => {});
@@ -39170,6 +39228,8 @@
       }
 
       enableColumnResize();
+      dismissInitialLoader();
+      hideProgressBar();
     };
 
     if (window.location.href.includes('google_connected=true')) {
@@ -39180,6 +39240,7 @@
 
     // Always listen for hash changes
     window.addEventListener('hashchange', () => {
+      showProgressBar(25);
       if (renderCurrentPage) renderCurrentPage();
     });
 

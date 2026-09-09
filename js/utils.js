@@ -68,3 +68,26 @@ export const pagePath = (page) => {
 };
 export const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
 export const healthDot = (level) => `<span class="health-dot health-dot--${level}" aria-label="${level}"></span>`;
+
+let progressBarTimer = null;
+
+export function showProgressBar(percent = 65) {
+  const bar = document.getElementById('global-progress-bar');
+  if (!bar) return;
+  if (progressBarTimer) clearTimeout(progressBarTimer);
+  bar.classList.add('active');
+  bar.style.width = `${percent}%`;
+}
+
+export function hideProgressBar() {
+  const bar = document.getElementById('global-progress-bar');
+  if (!bar) return;
+  bar.style.width = '100%';
+  if (progressBarTimer) clearTimeout(progressBarTimer);
+  progressBarTimer = setTimeout(() => {
+    bar.classList.remove('active');
+    setTimeout(() => {
+      bar.style.width = '0%';
+    }, 200);
+  }, 250);
+}
