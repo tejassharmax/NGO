@@ -33937,6 +33937,12 @@
     return saveHealthRecord(record);
   }
 
+  function deleteHealthRecord(id) {
+    const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+    const filtered = all.filter(r => r.id !== id && r.date !== id);
+    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(filtered));
+  }
+
   /* ─── Alerts ─── */
 
   function getAlerts() {
@@ -34127,6 +34133,10 @@
   let syncPending = false;
 
   async function syncWithServer() {
+    if (syncDebounceTimer) {
+      clearTimeout(syncDebounceTimer);
+      syncDebounceTimer = null;
+    }
     if (isSyncing) {
       syncPending = true;
       return;
@@ -36347,13 +36357,13 @@
       if (c) childName = c.name;
     }
 
-    // Retrieve any existing growth record for this child on this date (or latest)
+    // Retrieve any existing growth record for this child on this date (only if explicitly matching this date)
     const growthRecords = childId ? getGrowthRecords(childId) : [];
-    const existingGrowth = (appt?.date ? growthRecords.find(g => g.date === targetDate) : null) || growthRecords[0] || {};
+    const existingGrowth = (targetDate ? growthRecords.find(g => g.date === targetDate) : null) || {};
 
-    // Retrieve any existing blood test record for this child on this date (or latest)
+    // Retrieve any existing blood test record for this child on this date (only if explicitly matching this date)
     const healthRecords = childId ? getHealthRecords(childId) : [];
-    const existingBlood = (appt?.date ? healthRecords.find(h => h.date === targetDate) : null) || healthRecords[0] || {};
+    const existingBlood = (targetDate ? healthRecords.find(h => h.date === targetDate) : null) || {};
 
     const subTitle = appt ? `${escapeHTML(appt.type || 'Appointment')} (${appt.date})` : 'Student Medical Records';
 
@@ -37260,6 +37270,9 @@
           <button class="button button--ghost button--sm" type="button" data-load-clinical-item="${rawData}" style="display:inline-flex; align-items:center; gap:4px;">
             ${icon('pencil')} Load into Form
           </button>
+          <button class="icon-button tooltip" type="button" data-tooltip="Delete entry" data-delete-clinical-item="${item.id}" data-clinical-type="${item.entryType}" style="color:var(--color-danger); margin-left:6px;">
+            ${icon('trash')}
+          </button>
         </td>
       </tr>
     `;
@@ -37271,8 +37284,8 @@
       <form id="profile-clinical-data-form" class="clinical-sync-form" style="padding: 24px;">
         <input type="hidden" name="childId" value="${child.id}" />
         <input type="hidden" name="childName" value="${escapeHTML$1(child.name)}" />
-        <input type="hidden" name="existingGrowthId" id="prof-growth-id" value="${latestGrowth?.id || ''}" />
-        <input type="hidden" name="existingBloodId" id="prof-blood-id" value="${latestBlood?.id || ''}" />
+        <input type="hidden" name="existingGrowthId" id="prof-growth-id" value="" />
+        <input type="hidden" name="existingBloodId" id="prof-blood-id" value="" />
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; gap: 12px;">
           <div>
@@ -37288,9 +37301,19 @@
           </button>
         </div>
 
+        <div id="prof-edit-banner" style="display: none; margin-bottom: 18px; padding: 10px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #1d4ed8; font-weight: 600;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span id="prof-edit-banner-text">Editing historical clinical entry</span>
+          </div>
+          <button type="button" class="button button--ghost button--sm" id="prof-cancel-edit-btn" style="color: #1d4ed8; font-size: 12px; padding: 4px 12px; border-color: #bfdbfe;">
+            Cancel &amp; New Entry
+          </button>
+        </div>
+
         ${renderClinicalSectionsMarkup({
-          existingGrowth: latestGrowth || {},
-          existingBlood: latestBlood || {},
+          existingGrowth: {},
+          existingBlood: {},
           targetDate: new Date().toISOString().slice(0, 10),
           prefix: 'prof-'
         })}
@@ -40265,11 +40288,70 @@
             if (idInput) idInput.value = item.id || '';
             toast('Blood Report Loaded', `Loaded blood test report from ${item.date || 'record'} into editor.`);
           }
+
+          // Toggle edit mode banner
+          const banner = form.querySelector('#prof-edit-banner');
+          const bannerText = form.querySelector('#prof-edit-banner-text');
+          if (banner) banner.style.display = 'flex';
+          if (bannerText) {
+            bannerText.textContent = item.entryType === 'checkup'
+              ? `Editing Routine Checkup from ${item.date || 'selected date'}`
+              : `Editing Blood Test Report from ${item.date || 'selected date'}`;
+          }
+
           form.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       } catch (err) {
         console.error('Failed to load clinical item:', err);
       }
+      return;
+    }
+
+    // Cancel edit mode in profile clinical form -> return to clean new entry
+    const cancelEditBtn = target.closest('#prof-cancel-edit-btn');
+    if (cancelEditBtn) {
+      const form = document.querySelector('#profile-clinical-data-form');
+      if (form) {
+        form.reset();
+        const idGrowth = form.querySelector('#prof-growth-id');
+        if (idGrowth) idGrowth.value = '';
+        const idBlood = form.querySelector('#prof-blood-id');
+        if (idBlood) idBlood.value = '';
+        const todayDate = new Date().toISOString().slice(0, 10);
+        const dateCheckup = form.querySelector('#prof-checkup-date');
+        if (dateCheckup) dateCheckup.value = todayDate;
+        const dateBlood = form.querySelector('#prof-blood-date');
+        if (dateBlood) dateBlood.value = todayDate;
+        const banner = form.querySelector('#prof-edit-banner');
+        if (banner) banner.style.display = 'none';
+        toast('New Entry Mode', 'Form reset to record a new checkup.');
+      }
+      return;
+    }
+
+    // Delete clinical checkup or blood test entry
+    const deleteClinicalBtn = target.closest('[data-delete-clinical-item]');
+    if (deleteClinicalBtn) {
+      const id = deleteClinicalBtn.getAttribute('data-delete-clinical-item');
+      const type = deleteClinicalBtn.getAttribute('data-clinical-type') || 'checkup';
+      modal$1({
+        title: 'Delete Clinical Record?',
+        body: '<p>Are you sure you want to permanently delete this clinical record? This change will automatically sync to Google Sheets.</p>',
+        confirmText: 'Delete Record',
+        confirmClass: 'button--danger',
+        onConfirm: async () => {
+          if (type === 'checkup') {
+            deleteGrowthRecord(id);
+          } else {
+            deleteHealthRecord(id);
+          }
+          await syncWithServer();
+          toast('Record Deleted', 'Clinical record deleted and syncing to Google Sheet.');
+          sessionStorage.setItem('chm_active_profile_tab', 'clinical');
+          if (renderCurrentPage) await renderCurrentPage();
+        }
+      });
+      return;
     }
 
     // Edit growth item from history table
@@ -41233,10 +41315,13 @@
 
       try {
         // 1. Routine Clinical Checkup (Row 3 in Google Sheets)
+        const rawGrowthId = (values.existingGrowthId || '').trim();
+        const rawBloodId = (values.existingBloodId || '').trim();
+
         const hasGrowthData = values.temperature || values.bp || values.weight || values.pulse || values.spo2 || values.complaint || values.prescription || values.eyeCheckup;
         if (hasGrowthData || checkupDate) {
           const growthRecord = {
-            id: values.existingGrowthId || undefined,
+            id: rawGrowthId || undefined,
             childId: childId,
             childName: childName,
             date: checkupDate,
@@ -41256,7 +41341,7 @@
         const hasBloodData = values.hemoglobin || values.wbc || values.platelets || values.rbc || values.pcv || values.neutrophil || values.lymphocytes || values.eosinophils || values.monocytes || values.basophils || values.rbcMorphology || values.wbcMorphology || values.plateletsAdequacy;
         if (hasBloodData) {
           const bloodRecord = {
-            id: values.existingBloodId || undefined,
+            id: rawBloodId || undefined,
             childId: childId,
             childName: childName,
             date: bloodDate,
@@ -41278,25 +41363,18 @@
           saveHealthRecord(bloodRecord);
         }
 
-        // 3. Immediately trigger server & sheets sync
+        // 3. Immediately trigger server & sheets sync (serialized on backend)
         await syncWithServer();
 
-        // Check if Sheets sync succeeded or if re-authorization is needed
-        try {
-          const syncRes = await apiFetch('/api/sheets/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ children: getChildren() })
-          });
-          if (syncRes.ok) {
-            const syncData = await syncRes.json();
-            if (syncData?.tokenExpired || syncData?.error === 'invalid_grant') {
-              toast('Google Authorization Expired', 'Record saved locally, but Google authorization expired. Please click Reconnect in Settings.', 'warning');
-            }
-          }
-        } catch (syncErr) {}
-
         toast('Clinical Details Saved', `Vitals and lab report saved & syncing to ${childName}'s Google Sheet.`);
+
+        // Reset hidden IDs and edit banner
+        const growthIdInput = form.querySelector('#prof-growth-id');
+        if (growthIdInput) growthIdInput.value = '';
+        const bloodIdInput = form.querySelector('#prof-blood-id');
+        if (bloodIdInput) bloodIdInput.value = '';
+        const banner = form.querySelector('#prof-edit-banner');
+        if (banner) banner.style.display = 'none';
 
         // Close modal if open
         const modalRoot = document.querySelector('#modal-root');

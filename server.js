@@ -488,16 +488,22 @@ app.get('/auth/google/callback', async (req, res) => {
     console.log(`[OAuth Callback] Successfully authenticated connecting admin: ${connectingEmail} for NGO: ${ngoSlug}`);
 
     const existing = await getNgoIntegration(ngoSlug);
+    const connectingAccount = (adminEmail !== 'Admin' ? adminEmail : (connectingEmail || '')).trim().toLowerCase();
+    const isNewAccount = existing.adminEmail && existing.adminEmail.toLowerCase() !== connectingAccount;
+    const isLegacySheet = existing.sheetId === '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88' || existing.clinicalSheetId === '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY';
+
     const updated = {
       ...existing,
       refresh_token: tokens.refresh_token || existing.refresh_token,
       tokenExpired: false,
       connectedAt: new Date().toISOString(),
-      adminEmail: adminEmail !== 'Admin' ? adminEmail : (existing.adminEmail || 'Connected Admin'),
-      sheetId: existing.sheetId || '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88',
-      spreadsheetUrl: existing.spreadsheetUrl || 'https://docs.google.com/spreadsheets/d/1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88/edit',
-      clinicalSheetId: existing.clinicalSheetId || '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY',
-      clinicalSpreadsheetUrl: existing.clinicalSpreadsheetUrl || 'https://docs.google.com/spreadsheets/d/15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY/edit'
+      adminEmail: connectingAccount || existing.adminEmail || 'ayushahome@gmail.com',
+      secondaryEmail: 'tejassachin2010@gmail.com',
+      sheetId: (isNewAccount || isLegacySheet) ? null : (existing.sheetId || null),
+      spreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.spreadsheetUrl || null),
+      clinicalSheetId: (isNewAccount || isLegacySheet) ? null : (existing.clinicalSheetId || null),
+      clinicalSpreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.clinicalSpreadsheetUrl || null),
+      childSheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.childSheetGids || {})
     };
     await saveNgoIntegration(ngoSlug, updated);
 
@@ -629,6 +635,7 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
     connected,
     tokenExpired,
     adminEmail: integration.adminEmail || null,
+    secondaryEmail: integration.secondaryEmail || null,
     sheetId: integration.sheetId || null,
     spreadsheetUrl: integration.spreadsheetUrl || null,
     clinicalSheetId: integration.clinicalSheetId || null,

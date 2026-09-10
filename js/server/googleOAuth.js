@@ -41,15 +41,33 @@ async function getNgoIntegration(ngoSlug) {
   // someone to click through the consent screen.
   if (!data.refresh_token && process.env.GOOGLE_OAUTH_REFRESH_TOKEN) {
     data.refresh_token = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
-    data.adminEmail = process.env.GOOGLE_OAUTH_ADMIN_EMAIL || 'Authorized Admin';
-    if (process.env.GOOGLE_SPREADSHEET_ID && !data.sheetId) {
+    data.adminEmail = process.env.GOOGLE_OAUTH_ADMIN_EMAIL || 'ayushahome@gmail.com';
+    if (process.env.GOOGLE_SPREADSHEET_ID && !data.sheetId && process.env.GOOGLE_SPREADSHEET_ID !== '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88') {
       data.sheetId = process.env.GOOGLE_SPREADSHEET_ID;
       data.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${data.sheetId}/edit`;
     }
-    if (process.env.GOOGLE_CLINICAL_SPREADSHEET_ID && !data.clinicalSheetId) {
+    if (process.env.GOOGLE_CLINICAL_SPREADSHEET_ID && !data.clinicalSheetId && process.env.GOOGLE_CLINICAL_SPREADSHEET_ID !== '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY') {
       data.clinicalSheetId = process.env.GOOGLE_CLINICAL_SPREADSHEET_ID;
       data.clinicalSpreadsheetUrl = `https://docs.google.com/spreadsheets/d/${data.clinicalSheetId}/edit`;
     }
+  }
+
+  // Sanitize any legacy hardcoded spreadsheet IDs so fresh sheets are created under ayushahome@gmail.com
+  if (data.sheetId === '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88') {
+    data.sheetId = null;
+    data.spreadsheetUrl = null;
+    data.childSheetGids = {};
+  }
+  if (data.clinicalSheetId === '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY') {
+    data.clinicalSheetId = null;
+    data.clinicalSpreadsheetUrl = null;
+    data.childSheetGids = {};
+  }
+  if (!data.adminEmail || data.adminEmail === 'Connected Admin' || data.adminEmail === 'Authorized Admin') {
+    data.adminEmail = 'ayushahome@gmail.com';
+  }
+  if (!data.secondaryEmail) {
+    data.secondaryEmail = 'tejassachin2010@gmail.com';
   }
 
   return data;
@@ -192,6 +210,12 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
   const childName = (c.name || 'CHILD').toUpperCase();
   const clinicHeader = 'DR.BLESSY — GOOD SHEPHERD CLINIC';
 
+  const padRow = (r, len = 14) => {
+    const copy = Array.isArray(r) ? [...r] : [];
+    while (copy.length < len) copy.push('');
+    return copy;
+  };
+
   // Row 1: Child Name (Col A), Clinic Header (Col D)
   const row1 = [childName, '', '', clinicHeader];
   const row2 = [];
@@ -201,8 +225,10 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
 
   const checkupRows = [];
 
-  // Real growth / checkup measurements ONLY if they exist
-  (growthList || []).forEach(g => {
+  // Real growth / checkup measurements sorted chronologically descending (newest first)
+  const sortedGrowth = [...(growthList || [])].sort((a, b) => (new Date(b.date || b.timestamp || 0).getTime()) - (new Date(a.date || a.timestamp || 0).getTime()));
+
+  sortedGrowth.forEach(g => {
     if (g.date || g.weight || g.temperature || g.bp) {
       const matchingDoc = (uploadedDocsList || []).find(d =>
         (d.childId === c.id || (d.childName && d.childName.toLowerCase() === (c.name || '').toLowerCase()) || (d.child && d.child.toLowerCase() === (c.name || '').toLowerCase())) &&
@@ -246,7 +272,9 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
   ];
 
   const bloodRows = [];
-  (healthRecList || []).forEach(hr => {
+  const sortedHealth = [...(healthRecList || [])].sort((a, b) => (new Date(b.date || b.timestamp || 0).getTime()) - (new Date(a.date || a.timestamp || 0).getTime()));
+
+  sortedHealth.forEach(hr => {
     if (hr.date || hr.hemoglobin || hr.wbc || hr.platelets) {
       const matchingDoc = (uploadedDocsList || []).find(d =>
         (d.childId === c.id || (d.childName && d.childName.toLowerCase() === (c.name || '').toLowerCase()) || (d.child && d.child.toLowerCase() === (c.name || '').toLowerCase())) &&
@@ -279,23 +307,68 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
   }
 
   return [
-    row1,                  // Row 1
-    row2,                  // Row 2
-    checkupHeader,         // Row 3
-    ...checkupRows,        // Rows 4 to 15
-    spacerRow1,            // Row 16
-    bloodReportTitleRow,   // Row 17
-    spacerRow2,            // Row 18
-    bloodReportHeaderRow,  // Row 19
-    ...bloodRows           // Rows 20 to 27
+    padRow(row1),
+    padRow(row2),
+    padRow(checkupHeader),
+    ...checkupRows.map(r => padRow(r)),
+    padRow(spacerRow1),
+    padRow(bloodReportTitleRow),
+    padRow(spacerRow2),
+    padRow(bloodReportHeaderRow),
+    ...bloodRows.map(r => padRow(r))
   ];
+}
+
+/**
+ * Ensure spreadsheet has proper sharing permissions so authorized staff can open directly
+ * without ever getting blocked by a "Request Access" prompt.
+ */
+async function ensureSpreadsheetSharing(authClient, spreadsheetId, secondaryEmails = []) {
+  if (!spreadsheetId || !authClient) return;
+  const drive = google.drive({ version: 'v3', auth: authClient });
+
+  // 1. Grant 'writer' to anyone with the link so any authorized NGO staff can open and edit immediately
+  try {
+    await drive.permissions.create({
+      fileId: spreadsheetId,
+      requestBody: { role: 'writer', type: 'anyone' }
+    });
+  } catch (err) {
+    try {
+      await drive.permissions.create({
+        fileId: spreadsheetId,
+        requestBody: { role: 'reader', type: 'anyone' }
+      });
+    } catch (e2) {}
+  }
+
+  // 2. Explicitly share with secondary admin emails (e.g. tejassachin2010@gmail.com) as Editor without sending notification spam
+  const targets = Array.isArray(secondaryEmails) ? secondaryEmails : [secondaryEmails];
+  for (const email of targets) {
+    if (!email || typeof email !== 'string') continue;
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail.includes('@')) continue;
+    try {
+      await drive.permissions.create({
+        fileId: spreadsheetId,
+        sendNotificationEmail: false,
+        requestBody: {
+          role: 'writer',
+          type: 'user',
+          emailAddress: cleanEmail
+        }
+      });
+    } catch (userPermErr) {
+      // Ignore if permission already exists or user is already owner
+    }
+  }
 }
 
 /**
  * Sync children records to the NGO's own Google Sheet.
  * Creates Master Overview tab + dedicated individual child tabs matching the NGO clinical format.
  */
-async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
+async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
   const client = await getClientForNgo(safeSlug);
 
@@ -384,6 +457,15 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     console.log(`[Google OAuth] Created Student Medical Records Spreadsheet: ${integration.clinicalSpreadsheetUrl}`);
   }
 
+  // Ensure both spreadsheets are shared with link access and secondary admin (tejassachin2010@gmail.com)
+  const secondaryList = ['tejassachin2010@gmail.com', integration.secondaryEmail, integration.adminEmail];
+  if (sheetId) {
+    ensureSpreadsheetSharing(client, sheetId, secondaryList).catch(() => {});
+  }
+  if (clinicalSheetId) {
+    ensureSpreadsheetSharing(client, clinicalSheetId, secondaryList).catch(() => {});
+  }
+
   // Load auxiliary data (growth, medicines, health records, uploaded documents)
   // from this NGO's database, not the old global blob.
   const aux = await readTenantArrays(safeSlug, [
@@ -452,7 +534,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
       delete integration.sheetId;
       delete integration.spreadsheetUrl;
       await saveNgoIntegration(safeSlug, integration);
-      return syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
+      return syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName);
     }
   }
 
@@ -701,7 +783,7 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
         delete integration.clinicalSpreadsheetUrl;
         delete integration.childSheetGids;
         await saveNgoIntegration(safeSlug, integration);
-        return syncChildrenToGoogleSheets(children, ngoSlug, ngoName);
+        return syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName);
       }
     }
   }
@@ -719,6 +801,59 @@ async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
     childSheetGids,
     count: cleanChildren.length
   };
+}
+
+// Per-NGO sync queue to prevent concurrent overlapping Google Sheets batch updates
+const ngoSyncQueues = new Map(); // slug -> { active: boolean, pending: boolean, lastArgs: any, lastResult: any }
+
+/**
+ * Public entrypoint for syncing children to Google Sheets.
+ * Serializes executions per NGO so concurrent writes never race or overwrite each other.
+ */
+async function syncChildrenToGoogleSheets(children, ngoSlug, ngoName) {
+  const safeSlug = sanitizeNgoSlug(ngoSlug);
+  let queue = ngoSyncQueues.get(safeSlug);
+  if (!queue) {
+    queue = { active: false, pending: false, lastArgs: null, lastResult: null };
+    ngoSyncQueues.set(safeSlug, queue);
+  }
+
+  // If another sync is currently running for this NGO, coalesce this request
+  if (queue.active) {
+    queue.pending = true;
+    queue.lastArgs = { children, ngoName };
+    // Wait for the active sync (and any coalesced run) to complete
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        if (!queue.active && !queue.pending) {
+          clearInterval(checkInterval);
+          resolve(queue.lastResult || { success: true });
+        }
+      }, 300);
+    });
+  }
+
+  queue.active = true;
+  try {
+    let result = await syncChildrenToGoogleSheetsInternal(children, safeSlug, ngoName);
+    queue.lastResult = result;
+
+    // While we were syncing, did another sync request arrive?
+    while (queue.pending) {
+      queue.pending = false;
+      const { children: pendingChildren, ngoName: pendingNgoName } = queue.lastArgs || {};
+      queue.lastArgs = null;
+      // Small pause to let any in-flight database writes settle
+      await new Promise(r => setTimeout(r, 400));
+      result = await syncChildrenToGoogleSheetsInternal(pendingChildren || children, safeSlug, pendingNgoName || ngoName);
+      queue.lastResult = result;
+    }
+
+    return result;
+  } finally {
+    queue.active = false;
+    queue.pending = false;
+  }
 }
 
 /**

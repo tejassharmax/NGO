@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, getGrowthRecords, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, saveHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, getGrowthRecords, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
 import { updateChildTable, childRows, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
@@ -1219,11 +1219,70 @@ document.addEventListener('click', (event) => {
           if (idInput) idInput.value = item.id || '';
           toast('Blood Report Loaded', `Loaded blood test report from ${item.date || 'record'} into editor.`);
         }
+
+        // Toggle edit mode banner
+        const banner = form.querySelector('#prof-edit-banner');
+        const bannerText = form.querySelector('#prof-edit-banner-text');
+        if (banner) banner.style.display = 'flex';
+        if (bannerText) {
+          bannerText.textContent = item.entryType === 'checkup'
+            ? `Editing Routine Checkup from ${item.date || 'selected date'}`
+            : `Editing Blood Test Report from ${item.date || 'selected date'}`;
+        }
+
         form.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     } catch (err) {
       console.error('Failed to load clinical item:', err);
     }
+    return;
+  }
+
+  // Cancel edit mode in profile clinical form -> return to clean new entry
+  const cancelEditBtn = target.closest('#prof-cancel-edit-btn');
+  if (cancelEditBtn) {
+    const form = document.querySelector('#profile-clinical-data-form');
+    if (form) {
+      form.reset();
+      const idGrowth = form.querySelector('#prof-growth-id');
+      if (idGrowth) idGrowth.value = '';
+      const idBlood = form.querySelector('#prof-blood-id');
+      if (idBlood) idBlood.value = '';
+      const todayDate = new Date().toISOString().slice(0, 10);
+      const dateCheckup = form.querySelector('#prof-checkup-date');
+      if (dateCheckup) dateCheckup.value = todayDate;
+      const dateBlood = form.querySelector('#prof-blood-date');
+      if (dateBlood) dateBlood.value = todayDate;
+      const banner = form.querySelector('#prof-edit-banner');
+      if (banner) banner.style.display = 'none';
+      toast('New Entry Mode', 'Form reset to record a new checkup.');
+    }
+    return;
+  }
+
+  // Delete clinical checkup or blood test entry
+  const deleteClinicalBtn = target.closest('[data-delete-clinical-item]');
+  if (deleteClinicalBtn) {
+    const id = deleteClinicalBtn.getAttribute('data-delete-clinical-item');
+    const type = deleteClinicalBtn.getAttribute('data-clinical-type') || 'checkup';
+    modal({
+      title: 'Delete Clinical Record?',
+      body: '<p>Are you sure you want to permanently delete this clinical record? This change will automatically sync to Google Sheets.</p>',
+      confirmText: 'Delete Record',
+      confirmClass: 'button--danger',
+      onConfirm: async () => {
+        if (type === 'checkup') {
+          deleteGrowthRecord(id);
+        } else {
+          deleteHealthRecord(id);
+        }
+        await syncWithServer();
+        toast('Record Deleted', 'Clinical record deleted and syncing to Google Sheet.');
+        sessionStorage.setItem('chm_active_profile_tab', 'clinical');
+        if (renderCurrentPage) await renderCurrentPage();
+      }
+    });
+    return;
   }
 
   // Edit growth item from history table
@@ -2187,10 +2246,13 @@ function initFormListeners() {
 
     try {
       // 1. Routine Clinical Checkup (Row 3 in Google Sheets)
+      const rawGrowthId = (values.existingGrowthId || '').trim();
+      const rawBloodId = (values.existingBloodId || '').trim();
+
       const hasGrowthData = values.temperature || values.bp || values.weight || values.pulse || values.spo2 || values.complaint || values.prescription || values.eyeCheckup;
       if (hasGrowthData || checkupDate) {
         const growthRecord = {
-          id: values.existingGrowthId || undefined,
+          id: rawGrowthId || undefined,
           childId: childId,
           childName: childName,
           date: checkupDate,
@@ -2210,7 +2272,7 @@ function initFormListeners() {
       const hasBloodData = values.hemoglobin || values.wbc || values.platelets || values.rbc || values.pcv || values.neutrophil || values.lymphocytes || values.eosinophils || values.monocytes || values.basophils || values.rbcMorphology || values.wbcMorphology || values.plateletsAdequacy;
       if (hasBloodData) {
         const bloodRecord = {
-          id: values.existingBloodId || undefined,
+          id: rawBloodId || undefined,
           childId: childId,
           childName: childName,
           date: bloodDate,
@@ -2232,25 +2294,18 @@ function initFormListeners() {
         saveHealthRecord(bloodRecord);
       }
 
-      // 3. Immediately trigger server & sheets sync
+      // 3. Immediately trigger server & sheets sync (serialized on backend)
       await syncWithServer();
 
-      // Check if Sheets sync succeeded or if re-authorization is needed
-      try {
-        const syncRes = await apiFetch('/api/sheets/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ children: getChildren() })
-        });
-        if (syncRes.ok) {
-          const syncData = await syncRes.json();
-          if (syncData?.tokenExpired || syncData?.error === 'invalid_grant') {
-            toast('Google Authorization Expired', 'Record saved locally, but Google authorization expired. Please click Reconnect in Settings.', 'warning');
-          }
-        }
-      } catch (syncErr) {}
-
       toast('Clinical Details Saved', `Vitals and lab report saved & syncing to ${childName}'s Google Sheet.`);
+
+      // Reset hidden IDs and edit banner
+      const growthIdInput = form.querySelector('#prof-growth-id');
+      if (growthIdInput) growthIdInput.value = '';
+      const bloodIdInput = form.querySelector('#prof-blood-id');
+      if (bloodIdInput) bloodIdInput.value = '';
+      const banner = form.querySelector('#prof-edit-banner');
+      if (banner) banner.style.display = 'none';
 
       // Close modal if open
       const modalRoot = document.querySelector('#modal-root');
