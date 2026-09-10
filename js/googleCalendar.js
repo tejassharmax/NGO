@@ -889,13 +889,13 @@ export function renderClinicalDataModalMarkup(eventId, childIdParam = null, chil
     if (c) childName = c.name;
   }
 
-  // Retrieve any existing growth record for this child on this date (or latest)
+  // Retrieve any existing growth record for this child on this date (only if explicitly matching this date)
   const growthRecords = childId ? getGrowthRecords(childId) : [];
-  const existingGrowth = (appt?.date ? growthRecords.find(g => g.date === targetDate) : null) || growthRecords[0] || {};
+  const existingGrowth = (targetDate ? growthRecords.find(g => g.date === targetDate) : null) || {};
 
-  // Retrieve any existing blood test record for this child on this date (or latest)
+  // Retrieve any existing blood test record for this child on this date (only if explicitly matching this date)
   const healthRecords = childId ? getHealthRecords(childId) : [];
-  const existingBlood = (appt?.date ? healthRecords.find(h => h.date === targetDate) : null) || healthRecords[0] || {};
+  const existingBlood = (targetDate ? healthRecords.find(h => h.date === targetDate) : null) || {};
 
   const subTitle = appt ? `${escapeHTML(appt.type || 'Appointment')} (${appt.date})` : 'Student Medical Records';
 

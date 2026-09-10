@@ -488,6 +488,12 @@ export function addHealthRecord(record) {
   return saveHealthRecord(record);
 }
 
+export function deleteHealthRecord(id) {
+  const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+  const filtered = all.filter(r => r.id !== id && r.date !== id);
+  localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(filtered));
+}
+
 /* ─── Alerts ─── */
 
 export function getAlerts() {
@@ -704,6 +710,10 @@ export async function hydrateFromServer() {
 let syncPending = false;
 
 export async function syncWithServer() {
+  if (syncDebounceTimer) {
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = null;
+  }
   if (isSyncing) {
     syncPending = true;
     return;
