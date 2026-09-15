@@ -842,6 +842,7 @@ document.addEventListener('click', (event) => {
         applyTableFilters();
         toast('Child removed', `The record for ${childName} has been removed.`);
         await autoSyncDeleteChildFromGoogleSheets(id, childName);
+        await syncWithServer();
         if (typeof renderCurrentPage === 'function') {
           renderCurrentPage();
         } else {

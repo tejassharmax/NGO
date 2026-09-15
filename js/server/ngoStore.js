@@ -297,6 +297,18 @@ function updateSnapshotMemoryCache(ngoSlug, patchPayload = {}, patchIndex = null
   });
 }
 
+/**
+ * Invalidate in-memory snapshot cache for an NGO (or all NGOs).
+ * Forces next read to query fresh state from Firestore.
+ */
+function clearSnapshotMemoryCache(ngoSlug) {
+  if (ngoSlug) {
+    snapshotMemoryCache.delete(sanitizeNgoSlug(ngoSlug));
+  } else {
+    snapshotMemoryCache.clear();
+  }
+}
+
 /* ───────────────────────────────────────────────────────
    READ
    ─────────────────────────────────────────────────────── */
@@ -515,6 +527,7 @@ module.exports = {
   readSnapshot,
   writeSnapshot,
   updateSnapshotMemoryCache,
+  clearSnapshotMemoryCache,
   DEFAULT_NGO,
   COLLECTION_NAMES,
   SCALAR_FIELDS

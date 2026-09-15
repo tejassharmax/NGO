@@ -12,6 +12,7 @@ const { Readable } = require('stream');
 // Tenant-scoped database access. Reads and writes go to `ngos/{slug}` in
 // Firestore, falling back to data/db.json when no service-account key is present.
 const { readTenantArrays, writeTenantChildren } = require('./dataSource');
+const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
 
 // Where the refresh token and the created sheet/doc IDs live. Firestore-backed so
 // the Google connection is not lost every time the host restarts.
@@ -1102,7 +1103,40 @@ async function deleteChildFromGoogleSheets(childId, ngoSlug, ngoName) {
   const targetChild = currentChildren.find(c => c.id === childId || c.name?.toLowerCase() === childId.toLowerCase());
   const remainingChildren = currentChildren.filter(c => c.id !== childId && c.name?.toLowerCase() !== childId.toLowerCase());
 
-  // Update this NGO's roster with the remaining children
+  // Explicitly remove child document and related records from Cloud Firestore if active
+  if (isFirestoreEnabled()) {
+    try {
+      const db = getDb();
+      if (db) {
+        const root = db.collection('ngos').doc(safeSlug);
+        const childrenCol = root.collection('children');
+        const idsToDelete = new Set([childId]);
+        if (targetChild && targetChild.id) idsToDelete.add(targetChild.id);
+
+        for (const tid of idsToDelete) {
+          const safeDocId = String(tid).replace(/\//g, '_').trim();
+          await childrenCol.doc(safeDocId).delete().catch(() => {});
+        }
+
+        // Clean up child-specific clinical records in Firestore
+        const subcollections = ['growth', 'healthRecords', 'appointments', 'documents'];
+        for (const sub of subcollections) {
+          for (const cid of idsToDelete) {
+            const snap = await root.collection(sub).where('childId', '==', cid).get().catch(() => ({ empty: true }));
+            if (snap && !snap.empty) {
+              const b = db.batch();
+              snap.forEach(d => b.delete(d.ref));
+              await b.commit().catch(() => {});
+            }
+          }
+        }
+      }
+    } catch (fsDelErr) {
+      console.warn('[Google OAuth] Direct Firestore child deletion notice:', fsDelErr.message);
+    }
+  }
+
+  // Update this NGO's roster with the remaining children (also removes unreferenced child docs)
   await writeTenantChildren(safeSlug, remainingChildren);
 
   // Update local CSV backup

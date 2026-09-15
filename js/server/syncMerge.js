@@ -102,9 +102,13 @@ function mergeNamespace(clientData = {}, serverData = {}) {
 
   SYNC_KEYS.forEach(key => {
     if (key === 'chm-children') {
-      let clientArr = [];
-      try { clientArr = JSON.parse(clientData[key] || '[]'); } catch (e) { }
-      if (Array.isArray(clientArr) && clientArr.length > 0) {
+      let clientArr = null;
+      try {
+        if (clientData[key] !== undefined && clientData[key] !== null) {
+          clientArr = JSON.parse(clientData[key]);
+        }
+      } catch (e) { }
+      if (Array.isArray(clientArr)) {
         merged[key] = JSON.stringify(clientArr);
       } else if (serverData[key]) {
         merged[key] = serverData[key];

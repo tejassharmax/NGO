@@ -17,7 +17,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
-const { readSnapshot, writeSnapshot, updateSnapshotMemoryCache, sanitizeNgoSlug } = require('./ngoStore');
+const { readSnapshot, writeSnapshot, updateSnapshotMemoryCache, clearSnapshotMemoryCache, sanitizeNgoSlug } = require('./ngoStore');
 const { SYNC_KEYS } = require('./syncMerge');
 
 const DB_FILE = path.join(__dirname, '../../data/db.json');
@@ -109,7 +109,8 @@ async function readTenantArrays(ngoSlug, keys) {
  * the delete-child endpoint. Deliberately narrow: it writes only `chm-children`
  * so it can never clobber records it never read.
  *
- * Writes directly to Firestore using batch operations without requiring prior reads.
+ * Writes directly to Firestore using batch operations and explicitly DELETES
+ * any child document no longer in the updated roster.
  *
  * @param {string} ngoSlug
  * @param {object[]} children
@@ -126,20 +127,55 @@ async function writeTenantChildren(ngoSlug, children) {
       const db = getDb();
       if (db) {
         const root = db.collection('ngos').doc(slug);
-        const batch = db.batch();
+        const childrenCol = root.collection('children');
+
+        // Fetch existing documents in Firestore to find any removed children
+        const snap = await childrenCol.get();
+        const keepDocIds = new Set();
+        const operations = [];
 
         safeChildren.forEach((c, idx) => {
           if (c && c.id) {
             const safeDocId = String(c.id).replace(/\//g, '_').trim();
-            const docRef = root.collection('children').doc(safeDocId);
-            batch.set(docRef, { ...c, _seq: idx }, { merge: true });
+            keepDocIds.add(safeDocId);
+            operations.push({
+              type: 'set',
+              ref: childrenCol.doc(safeDocId),
+              data: { ...c, _seq: idx }
+            });
           }
         });
 
-        await batch.commit();
-        console.log(`[dataSource] Persisted ${safeChildren.length} children directly to Firestore (ngos/${slug}/children).`);
+        // Any document currently in Firestore not in keepDocIds MUST BE DELETED!
+        let deletedCount = 0;
+        snap.forEach(doc => {
+          if (!keepDocIds.has(doc.id)) {
+            operations.push({
+              type: 'delete',
+              ref: doc.ref
+            });
+            deletedCount++;
+          }
+        });
 
-        // Synchronize in-memory snapshot cache immediately
+        // Commit in safe batch chunks
+        const BATCH_SIZE = 400;
+        for (let i = 0; i < operations.length; i += BATCH_SIZE) {
+          const batch = db.batch();
+          operations.slice(i, i + BATCH_SIZE).forEach(op => {
+            if (op.type === 'delete') {
+              batch.delete(op.ref);
+            } else {
+              batch.set(op.ref, op.data);
+            }
+          });
+          await batch.commit();
+        }
+
+        console.log(`[dataSource] Persisted ${safeChildren.length} children to Firestore (ngos/${slug}/children). Explicitly deleted ${deletedCount} removed child doc(s).`);
+
+        // Invalidate in-memory cache and seed with fresh payload
+        clearSnapshotMemoryCache(slug);
         updateSnapshotMemoryCache(slug, { 'chm-children': json });
       }
     } catch (fsErr) {
