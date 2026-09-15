@@ -59,6 +59,22 @@ export function deleteChild(id) {
   if (child) {
     logActivity('child_removed', child.name, 'Child record removed');
   }
+
+  // Clean up child-specific records across localStorage so they don't linger
+  ['chm-growth', 'chm-appointments', 'chm-medicines', 'chm-alerts', 'chm-health-records', 'chm-documents'].forEach(key => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          const filtered = arr.filter(item => item && item.childId !== id);
+          if (filtered.length !== arr.length) {
+            localStorage.setItem(key, JSON.stringify(filtered));
+          }
+        }
+      }
+    } catch (e) {}
+  });
 }
 
 export function getChild(id) {
