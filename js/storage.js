@@ -707,11 +707,47 @@ export async function hydrateFromServer() {
     if (res.ok) {
       const serverData = await res.json();
       if (serverData && typeof serverData === 'object') {
+        let hasLocalChangesToPush = false;
         Object.keys(serverData).forEach(k => {
           if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
+            if (k.startsWith('chm-')) {
+              // Safely merge server array with local array so offline/unsynced local entries are never lost
+              const localRaw = localStorage.getItem(k);
+              if (localRaw) {
+                try {
+                  const localArr = JSON.parse(localRaw);
+                  const serverArr = JSON.parse(serverData[k]);
+                  if (Array.isArray(localArr) && Array.isArray(serverArr) && localArr.length > 0) {
+                    const itemMap = new Map();
+                    const keyFn = item => {
+                      if (!item) return '';
+                      if (item.childId && item.date && item.time && item.type) return `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
+                      if (item.id) return String(item.id);
+                      if (item.childId && item.date) return `${item.childId}_${item.date}_${item.recordType || ''}`;
+                      return JSON.stringify(item);
+                    };
+                    serverArr.forEach(item => { if (item) itemMap.set(keyFn(item), item); });
+                    localArr.forEach(item => {
+                      if (!item) return;
+                      const id = keyFn(item);
+                      if (!itemMap.has(id)) {
+                        hasLocalChangesToPush = true;
+                      }
+                      itemMap.set(id, item);
+                    });
+                    const merged = Array.from(itemMap.values());
+                    originalSetItem(k, JSON.stringify(merged));
+                    return;
+                  }
+                } catch (e) { }
+              }
+            }
             originalSetItem(k, serverData[k]);
           }
         });
+        if (hasLocalChangesToPush) {
+          setTimeout(() => { syncWithServer().catch(() => {}); }, 600);
+        }
         return true;
       }
     }

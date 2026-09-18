@@ -1,6 +1,6 @@
 {
   "name": "child-health-management",
-  "version": "2.9.2",
+  "version": "2.9.3",
   "description": "NGO Child Health Management Platform with Medical Document OCR",
   "main": "server.js",
   "scripts": {
