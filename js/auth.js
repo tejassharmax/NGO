@@ -72,7 +72,7 @@ export async function loginWithGoogle() {
       return {
         success: false,
         errorCode: 'UNAUTHORIZED_DOMAIN',
-        message: 'Domain Authorization Required:\nPlease add "ngo-4xde.onrender.com" to Authorized Domains in Firebase Console -> Authentication -> Settings -> Authorized Domains.'
+        message: `Domain Authorization Required:\nPlease add "${window.location.hostname}" to Authorized Domains in Firebase Console -> Authentication -> Settings -> Authorized Domains.`
       };
     }
 
