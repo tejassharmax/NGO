@@ -51,28 +51,3 @@ export async function apiFetch(path, options = {}) {
 
   return fetch(path, { ...options, headers });
 }
-
-/**
- * apiFetch for JSON request/response pairs.
- * Returns null when the request fails or the user is not authorized, so callers
- * can degrade gracefully instead of throwing.
- * @param {string} path
- * @param {any} body
- * @returns {Promise<any|null>}
- */
-export async function apiPostJSON(path, body) {
-  const res = await apiFetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
-      console.warn(`[api] ${path} rejected: not authorized.`);
-    }
-    return null;
-  }
-
-  return res.json();
-}

@@ -1,4 +1,4 @@
-import { icon, initials, pagePath, statusBadge, healthDot } from './utils.js';
+import { icon, initials, pagePath, statusBadge, escapeHTML } from './utils.js';
 import { healthStatus, calculateAge, getChildren } from './storage.js';
 
 export const DEFAULT_COLUMN_ORDER = ['child', 'age', 'gender', 'blood', 'status'];
@@ -45,20 +45,20 @@ export function childRows(children) {
     const age = calculateAge(child.dob);
 
     const cellMap = {
-      child: `<td data-column="child"><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name" style="display:inline-flex; align-items:center; gap:6px;">${child.name}<button class="icon-button icon-button--small tooltip" data-tooltip="Open in Google Sheets" type="button" aria-label="Open ${child.name}'s Google Sheet" data-open-child-sheet="${child.id}" data-child-name="${child.name}" style="width:22px; height:22px; min-width:22px; padding:2px; border:none; background:transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.85; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">${icon('googleSheets')}</button></span><span class="table-person__id">${child.id}</span></div></a></td>`,
+      child: `<td data-column="child"><a class="table-person" href="${pagePath('child-profile')}?id=${escapeHTML(child.id)}"><span class="table-avatar">${escapeHTML(initials(child.name))}</span><div class="table-person__info"><span class="table-person__name" style="display:inline-flex; align-items:center; gap:6px;">${escapeHTML(child.name)}<button class="icon-button icon-button--small tooltip" data-tooltip="Open in Google Sheets" type="button" aria-label="Open ${escapeHTML(child.name)}'s Google Sheet" data-open-child-sheet="${escapeHTML(child.id)}" data-child-name="${escapeHTML(child.name)}" style="width:22px; height:22px; min-width:22px; padding:2px; border:none; background:transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.85; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">${icon('googleSheets')}</button></span><span class="table-person__id">${escapeHTML(child.id)}</span></div></a></td>`,
       age: `<td data-column="age">${age || '—'}</td>`,
-      gender: `<td class="hide-tablet" data-column="gender">${child.gender || '—'}</td>`,
-      blood: `<td class="hide-tablet" data-column="blood">${child.blood || '—'}</td>`,
-      status: `<td data-column="status">${statusBadge(child.status)}</td>`
+      gender: `<td class="hide-tablet" data-column="gender">${escapeHTML(child.gender || '—')}</td>`,
+      blood: `<td class="hide-tablet" data-column="blood">${escapeHTML(child.blood || '—')}</td>`,
+      status: `<td data-column="status">${statusBadge(escapeHTML(child.status || 'Active'))}</td>`
     };
 
     const dynamicCells = order.map(col => cellMap[col] || '').join('');
 
-    return `<tr draggable="true" data-child-id="${child.id}" data-index="${index}">
+    return `<tr draggable="true" data-child-id="${escapeHTML(child.id)}" data-index="${index}">
     <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">${icon('gripVertical')}</span></td>
-    <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
+    <td><label class="checkbox"><input type="checkbox" aria-label="Select ${escapeHTML(child.name)}" data-select-row="${escapeHTML(child.id)}"><span class="sr-only">Select</span></label></td>
     ${dynamicCells}
-    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
+    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${escapeHTML(child.name)}" href="${pagePath('child-profile')}?id=${escapeHTML(child.id)}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${escapeHTML(child.name)}" data-edit="${escapeHTML(child.id)}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${escapeHTML(child.name)}" data-delete="${escapeHTML(child.id)}">${icon('trash')}</button></div></td>
   </tr>`;
   }).join('');
 }

@@ -4,8 +4,6 @@
  * Protects against brute-force, scraping, and endpoint abuse.
  */
 
-const requestCounts = new Map();
-
 /**
  * Creates an Express rate-limiting middleware.
  * @param {object} options
@@ -18,6 +16,10 @@ function createRateLimiter(options = {}) {
   const max = options.max || 30; // 30 requests default
   const message = options.message || 'Too many requests. Please try again later.';
 
+  // One counter map per limiter. A shared map made every limiter count every
+  // limited request, so routine syncs used up the document-upload allowance.
+  const requestCounts = new Map();
+
   // Housekeeping interval to clear expired entries every 2 minutes
   setInterval(() => {
     const now = Date.now();
@@ -29,7 +31,10 @@ function createRateLimiter(options = {}) {
   }, 120000).unref();
 
   return (req, res, next) => {
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+    // req.ip honours the app's `trust proxy` setting, so behind one proxy it is the
+    // real client address. The raw X-Forwarded-For header is client-controlled
+    // and let anyone reset their own limit by sending a different value.
+    const ip = req.ip || req.socket.remoteAddress || '127.0.0.1';
     const now = Date.now();
 
     let record = requestCounts.get(ip);

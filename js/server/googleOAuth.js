@@ -18,6 +18,14 @@ const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
 // the Google connection is not lost every time the host restarts.
 const { loadIntegration, saveIntegration } = require('./integrationStore');
 
+const {
+  REGISTER_HEADERS,
+  currentMonthKey,
+  monthTabTitle,
+  parseMonthTabTitle,
+  buildMonthlyRegister
+} = require('./monthlyRegister');
+
 /**
  * Sanitize NGO slug for filename safety
  */
@@ -88,7 +96,7 @@ async function saveNgoIntegration(ngoSlug, data) {
  * Build OAuth2 client instance using environment variables
  */
 function buildOAuthClient(req = null) {
-  require('dotenv').config();
+  // Environment is loaded once at startup by server.js.
   const clientId = (process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
 
@@ -195,6 +203,25 @@ function cleanCell(val) {
     return "'" + str;
   }
   return str;
+}
+
+/**
+ * Free text typed by staff (notes, prescriptions) must never run as a formula.
+ * Unlike cleanCell this has no HYPERLINK exception, since nothing here is an
+ * app-generated link.
+ */
+function plainTextCell(val) {
+  const str = val === null || val === undefined ? '' : String(val).trim();
+  return /^[=+\-@]/.test(str) ? "'" + str : str;
+}
+
+/**
+ * Text pulled back from a spreadsheet anyone with the link can edit. Angle
+ * brackets are removed so a cell like `<img onerror=...>` can never become markup
+ * when the app renders the imported child record.
+ */
+function stripMarkup(val) {
+  return String(val === null || val === undefined ? '' : val).replace(/[<>]/g, '').trim();
 }
 
 function formatCellLink(text, url) {
@@ -366,6 +393,160 @@ async function ensureSpreadsheetSharing(authClient, spreadsheetId, secondaryEmai
 }
 
 /**
+ * File 3: the Monthly Checkup Register workbook — one tab per month ("September 2026"),
+ * newest first, listing every child's visits that month. Rewritten in full on every
+ * sync, like the child tabs, because the app is the source of truth.
+ *
+ * Failures are contained here so a problem with this workbook never blocks the
+ * Master Directory or Student Medical Records sync.
+ *
+ * @returns {Promise<Record<string, number>>} 'YYYY-MM' -> tab gid
+ */
+async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, displayName, data, shareWith) {
+  const register = buildMonthlyRegister(data);
+  const thisMonth = currentMonthKey();
+
+  let monthlySheetId = integration.monthlySheetId;
+  if (!monthlySheetId) {
+    console.log(`[Google OAuth] Creating Monthly Checkup Register Spreadsheet for NGO (${safeSlug})...`);
+    const createRes = await sheets.spreadsheets.create({
+      requestBody: {
+        properties: { title: `${displayName} — Monthly Checkup Register` },
+        sheets: [{ properties: { title: monthTabTitle(thisMonth) } }]
+      }
+    });
+    monthlySheetId = createRes.data.spreadsheetId;
+    integration.monthlySheetId = monthlySheetId;
+    integration.monthlySpreadsheetUrl = createRes.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${monthlySheetId}/edit`;
+    await saveNgoIntegration(safeSlug, integration);
+    ensureSpreadsheetSharing(client, monthlySheetId, shareWith).catch(() => {});
+    console.log(`[Google OAuth] Created Monthly Checkup Register: ${integration.monthlySpreadsheetUrl}`);
+  }
+
+  let meta;
+  try {
+    meta = await sheets.spreadsheets.get({ spreadsheetId: monthlySheetId });
+  } catch (err) {
+    // Workbook deleted from Drive: forget it and build a fresh one next time round.
+    if (err.code === 404 || err.status === 404) {
+      delete integration.monthlySheetId;
+      delete integration.monthlySpreadsheetUrl;
+      delete integration.monthlySheetGids;
+      await saveNgoIntegration(safeSlug, integration);
+      return syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, displayName, data, shareWith);
+    }
+    throw err;
+  }
+
+  const tabs = new Map(); // title -> { gid, index }
+  (meta.data.sheets || []).forEach(s => tabs.set(s.properties.title, { gid: s.properties.sheetId, index: s.properties.index }));
+
+  // Months to write: every month with visits, the current month (so staff always
+  // see this month's tab), and any month tab already in the workbook, which gets
+  // rewritten rather than left stale if its last record was deleted.
+  const monthKeys = new Set([...register.keys(), thisMonth]);
+  tabs.forEach((_, title) => {
+    const key = parseMonthTabTitle(title);
+    if (key) monthKeys.add(key);
+  });
+  const orderedMonths = Array.from(monthKeys).sort().reverse(); // newest first
+
+  const addRequests = orderedMonths
+    .filter(key => !tabs.has(monthTabTitle(key)))
+    .map(key => ({ addSheet: { properties: { title: monthTabTitle(key) } } }));
+  if (addRequests.length > 0) {
+    const addRes = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: monthlySheetId,
+      requestBody: { requests: addRequests }
+    });
+    (addRes.data.replies || []).forEach(reply => {
+      const props = reply.addSheet?.properties;
+      if (props) tabs.set(props.title, { gid: props.sheetId, index: props.index });
+    });
+  }
+
+  const titles = orderedMonths.map(monthTabTitle);
+  await sheets.spreadsheets.values.batchClear({
+    spreadsheetId: monthlySheetId,
+    requestBody: { ranges: titles.map(t => `'${t}'!A1:Z`) }
+  });
+
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: monthlySheetId,
+    requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data: orderedMonths.map(key => {
+        const rows = (register.get(key) || []).map(r => r.map(plainTextCell));
+        return {
+          range: `'${monthTabTitle(key)}'!A1`,
+          values: [REGISTER_HEADERS, ...(rows.length ? rows : [['No checkups recorded this month.']])]
+        };
+      })
+    }
+  });
+
+  const monthlySheetGids = {};
+  const layoutRequests = [];
+  orderedMonths.forEach((key, position) => {
+    const tab = tabs.get(monthTabTitle(key));
+    if (!tab) return;
+    const gid = tab.gid;
+    monthlySheetGids[key] = gid;
+
+    if (tab.index !== position) {
+      layoutRequests.push({ updateSheetProperties: { properties: { sheetId: gid, index: position }, fields: 'index' } });
+    }
+    layoutRequests.push({
+      updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' }
+    });
+    [200, 190, 320, 320, 120].forEach((width, col) => {
+      layoutRequests.push({
+        updateDimensionProperties: {
+          range: { sheetId: gid, dimension: 'COLUMNS', startIndex: col, endIndex: col + 1 },
+          properties: { pixelSize: width },
+          fields: 'pixelSize'
+        }
+      });
+    });
+    layoutRequests.push({
+      repeatCell: {
+        range: { sheetId: gid, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: REGISTER_HEADERS.length },
+        cell: { userEnteredFormat: { textFormat: { bold: true, fontSize: 10 }, backgroundColor: { red: 0.95, green: 0.96, blue: 0.98 } } },
+        fields: 'userEnteredFormat(textFormat,backgroundColor)'
+      }
+    });
+    // Wrap long prescriptions and notes instead of letting them spill across cells.
+    layoutRequests.push({
+      repeatCell: {
+        range: { sheetId: gid, startRowIndex: 1, startColumnIndex: 2, endColumnIndex: 4 },
+        cell: { userEnteredFormat: { wrapStrategy: 'WRAP', verticalAlignment: 'TOP' } },
+        fields: 'userEnteredFormat(wrapStrategy,verticalAlignment)'
+      }
+    });
+    layoutRequests.push({
+      repeatCell: {
+        range: { sheetId: gid, startRowIndex: 1, startColumnIndex: 4, endColumnIndex: 5 },
+        cell: { userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'dd mmm yyyy' } } },
+        fields: 'userEnteredFormat.numberFormat'
+      }
+    });
+  });
+
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: monthlySheetId,
+      requestBody: { requests: layoutRequests }
+    });
+  } catch (fmtErr) {
+    console.warn('[Google OAuth] Monthly register formatting notice:', fmtErr.message);
+  }
+
+  const visitCount = Array.from(register.values()).reduce((n, rows) => n + rows.length, 0);
+  console.log(`[Google OAuth] Synced Monthly Checkup Register: ${visitCount} visit(s) across ${orderedMonths.length} month tab(s) (${monthlySheetId})`);
+  return monthlySheetGids;
+}
+
+/**
  * Sync children records to the NGO's own Google Sheet.
  * Creates Master Overview tab + dedicated individual child tabs matching the NGO clinical format.
  */
@@ -470,12 +651,13 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   // Load auxiliary data (growth, medicines, health records, uploaded documents)
   // from this NGO's database, not the old global blob.
   const aux = await readTenantArrays(safeSlug, [
-    'chm-growth', 'chm-medicines', 'chm-health-records', 'chm-documents'
+    'chm-growth', 'chm-medicines', 'chm-health-records', 'chm-documents', 'chm-appointments'
   ]);
   const allGrowth = aux['chm-growth'];
   const allMedicines = aux['chm-medicines'];
   const allHealthRecords = aux['chm-health-records'];
   const allUploadedDocs = aux['chm-documents'];
+  const allAppointments = aux['chm-appointments'];
 
   // Master Directory header and rows
   const overviewHeaders = [
@@ -789,6 +971,18 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
     }
   }
 
+  // C. Sync File 3: Monthly Checkup Register (one tab per month, all children)
+  try {
+    integration.monthlySheetGids = await syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, displayName, {
+      children: cleanChildren,
+      appointments: allAppointments,
+      growth: allGrowth,
+      medicines: allMedicines
+    }, secondaryList);
+  } catch (monthlyErr) {
+    console.warn('[Google OAuth] Monthly Checkup Register sync notice:', monthlyErr.message);
+  }
+
   // Save gid map and URLs to integration config
   integration.childSheetGids = childSheetGids;
   await saveNgoIntegration(safeSlug, integration);
@@ -799,6 +993,8 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
     spreadsheetUrl: integration.spreadsheetUrl,
     clinicalSheetId: integration.clinicalSheetId,
     clinicalSpreadsheetUrl: integration.clinicalSpreadsheetUrl,
+    monthlySheetId: integration.monthlySheetId || null,
+    monthlySpreadsheetUrl: integration.monthlySpreadsheetUrl || null,
     childSheetGids,
     count: cleanChildren.length
   };
@@ -954,13 +1150,13 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
-        let name = (nameCol >= 0 && row[nameCol]) ? String(row[nameCol]).trim() : '';
+        let name = (nameCol >= 0 && row[nameCol]) ? stripMarkup(row[nameCol]) : '';
         if (!name || IGNORED_NAMES.includes(name.toLowerCase())) continue;
 
         // Strip leading clean quote if present
         if (name.startsWith("'")) name = name.slice(1).trim();
 
-        let id = (idCol >= 0 && row[idCol]) ? String(row[idCol]).trim() : '';
+        let id = (idCol >= 0 && row[idCol]) ? stripMarkup(row[idCol]) : '';
         if (id.startsWith("'")) id = id.slice(1).trim();
         if (!id || id === '—' || id === 'CH-0000') {
           id = `CH-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -968,7 +1164,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
         const cleanVal = (col) => {
           if (col < 0 || !row[col]) return '';
-          let v = String(row[col]).trim();
+          let v = stripMarkup(row[col]);
           if (v.startsWith("'")) v = v.slice(1).trim();
           return v;
         };
@@ -1138,14 +1334,6 @@ async function deleteChildFromGoogleSheets(childId, ngoSlug, ngoName) {
 
   // Update this NGO's roster with the remaining children (also removes unreferenced child docs)
   await writeTenantChildren(safeSlug, remainingChildren);
-
-  // Update local CSV backup
-  try {
-    const { updateLocalCSVExport } = require('../../server');
-    if (typeof updateLocalCSVExport === 'function') {
-      updateLocalCSVExport(remainingChildren);
-    }
-  } catch (e) { }
 
   // Sync remaining children to Google Sheets Master Directory (Sheet1)
   const client = await getClientForNgo(safeSlug);

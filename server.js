@@ -8,9 +8,9 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const express = require('express');
 const multer = require('multer');
-// @google-cloud/vision is required lazily, only when ENABLE_VISION_OCR is set.
-const { google } = require('googleapis');
-require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
+require('dotenv').config({ quiet: true });
 
 // Per-NGO OAuth Integration Module
 const {
@@ -29,70 +29,11 @@ const {
 // Server-side authentication (Firebase ID token + email allowlist)
 const { requireAuth, ALLOWED_EMAILS } = require('./js/server/auth');
 
-// Modularized OCR Engine & Rate Limiting
-const { performOCR, parseOCRText } = require('./js/server/ocrParser');
 const { createRateLimiter } = require('./js/server/rateLimiter');
 
 // Rate Limiters
 const apiLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Too many API calls. Please wait a minute.' });
-const ocrLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: 'Too many document uploads. Please wait a minute.' });
-
-/**
- * Google Cloud Vision client — DISABLED.
- *
- * OCR runs entirely on the bundled Tesseract engine: js/server/ocrParser.js falls
- * back to it whenever this is null, so document upload and field parsing keep
- * working with no Google Cloud credential at all.
- *
- * WHY IT IS OFF
- * Vision needs a service-account key, which is gitignored and so cannot exist on
- * Render. Worse, the previous code constructed a client from the key *path*
- * without checking the file was there, which made every OCR request fail inside
- * the Vision library instead of reaching the Tesseract fallback. Off is the honest
- * default, and it drops a paid API plus a second Google Cloud project from the
- * deployment.
- *
- * TO RE-ENABLE
- * Set ENABLE_VISION_OCR=true and exactly one credential:
- *   GOOGLE_VISION_CREDENTIALS      full service-account JSON — for Render and any
- *                                  other host with an ephemeral filesystem
- *   GOOGLE_APPLICATION_CREDENTIALS path to a key file — for local development
- */
-const VISION_ENABLED = String(process.env.ENABLE_VISION_OCR || '').toLowerCase() === 'true';
-
-let visionClient = null;
-if (VISION_ENABLED) {
-  try {
-    // Required lazily so the disabled path never loads the Vision SDK, which
-    // measurably shortens cold start on a free Render instance.
-    const vision = require('@google-cloud/vision');
-    const nodeFs = require('fs');
-    const inlineKey = (process.env.GOOGLE_VISION_CREDENTIALS || '').trim();
-    const keyFile = (process.env.GOOGLE_APPLICATION_CREDENTIALS || '').trim();
-
-    if (inlineKey) {
-      const parsed = JSON.parse(inlineKey);
-      visionClient = new vision.ImageAnnotatorClient({
-        credentials: { client_email: parsed.client_email, private_key: parsed.private_key },
-        projectId: parsed.project_id
-      });
-      console.log(`[Vision] Enabled with inline credentials for project "${parsed.project_id}"`);
-    } else if (keyFile && nodeFs.existsSync(keyFile)) {
-      visionClient = new vision.ImageAnnotatorClient({ keyFilename: keyFile });
-      console.log(`[Vision] Enabled with key file ${keyFile}`);
-    } else {
-      console.warn(
-        '[Vision] ENABLE_VISION_OCR=true but no usable credential was found. ' +
-        'Set GOOGLE_VISION_CREDENTIALS or GOOGLE_APPLICATION_CREDENTIALS. Using Tesseract.'
-      );
-    }
-  } catch (e) {
-    console.warn('[Vision] Initialization failed, OCR will use Tesseract:', e.message);
-    visionClient = null;
-  }
-} else {
-  console.log('[Vision] Disabled. OCR uses the bundled Tesseract engine.');
-}
+const uploadLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: 'Too many document uploads. Please wait a minute.' });
 
 const app = express();
 
@@ -128,57 +69,30 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static frontend files with no-cache for code files to prevent stale bundles
-app.use(express.static(__dirname, {
-  etag: true,
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-    }
+/*
+ * Static frontend. ONLY the files the browser needs are served.
+ *
+ * This used to be `express.static(__dirname)`, which published the whole project
+ * folder: data/db.json (every child's medical record), serviceAccountKey.json
+ * (Firebase admin key), data/integrations/*.json (Google refresh tokens) and the
+ * server source were all downloadable by anyone, without signing in.
+ */
+const noCacheCode = (res, filePath) => {
+  if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
   }
-}));
-app.use('/pages', express.static('pages', { maxAge: 0 }));
-
-
-/* ═══════════════════════════════════════════════════════
-   API ENDPOINT
-   ═══════════════════════════════════════════════════════ */
-
-app.post('/api/ocr', requireAuth, ocrLimiter, upload.single('document'), async (req, res) => {
-  try {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-
-    console.log(`\n[OCR] Processing: ${req.file.originalname} (${req.file.mimetype}, ${(req.file.size / 1024).toFixed(0)} KB)`);
-
-    const { text: rawText, confidence, fields } = await performOCR(req.file.buffer, visionClient, __dirname);
-
-    if (!rawText || rawText.trim().length === 0) {
-      console.warn('[OCR] No text detected');
-      return res.status(422).json({ error: 'No text detected in this document.' });
-    }
-
-    const parsedData = parseOCRText(rawText);
-
-    if (!parsedData.firstName && !parsedData.idNumber && !parsedData.dob && !parsedData.father && !parsedData.mother && !parsedData.hemoglobin && !parsedData.rbc) {
-      console.warn('[OCR] Could not extract identifiable fields');
-      return res.status(422).json({
-        error: 'Could not extract valid information from this document. Please ensure the image is clear and is a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).'
-      });
-    }
-
-    res.json({
-      success: true,
-      confidence: Math.round(confidence),
-      data: parsedData
-    });
-  } catch (error) {
-    console.error('[OCR] Processing error:', error);
-    res.status(500).json({ error: 'Failed to process document. Check backend logs.' });
-  }
-});
-
+};
+const sendPublicFile = (relativePath) => (req, res) => {
+  noCacheCode(res, relativePath);
+  res.sendFile(path.join(__dirname, relativePath));
+};
+app.get(['/', '/index.html'], sendPublicFile('index.html'));
+app.get('/js/bundle.js', sendPublicFile('js/bundle.js'));
+app.get('/google-logo.png', sendPublicFile('google-logo.png'));
+app.use('/css', express.static(path.join(__dirname, 'css'), { etag: true, setHeaders: noCacheCode }));
+app.use('/assets', express.static(path.join(__dirname, 'assets'), { etag: true }));
 
 
 
@@ -194,9 +108,6 @@ app.post('/api/ocr', requireAuth, ocrLimiter, upload.single('document'), async (
    every admin and lives on an ephemeral disk, so it is a development
    convenience, not a deployment target.
    ─────────────────────────────────────────────────────── */
-const fs = require('fs');
-const path = require('path');
-
 const { isFirestoreEnabled, getStatus: firestoreStatus } = require('./js/server/firebaseAdmin');
 const { mergeNamespace } = require('./js/server/syncMerge');
 const { resolveNgoForEmail, writeSnapshot } = require('./js/server/ngoStore');
@@ -254,173 +165,6 @@ app.get('/api/health', requireAuth, async (req, res) => {
     email: req.user ? req.user.email : null
   });
 });
-
-/* ═══════════════════════════════════════════════════════
-   AUTOMATIC GOOGLE SHEETS SYNC SERVICE
-   ═══════════════════════════════════════════════════════ */
-
-const SHEETS_CONFIG_FILE = path.join(DB_DIR, 'sheets_config.json');
-
-function getSheetsConfig() {
-  try {
-    if (fs.existsSync(SHEETS_CONFIG_FILE)) {
-      return JSON.parse(fs.readFileSync(SHEETS_CONFIG_FILE, 'utf8'));
-    }
-  } catch (e) { }
-  return {
-    sheetId: process.env.GOOGLE_SHEET_ID || '',
-    autoSync: true,
-    lastSynced: null,
-    status: 'Ready'
-  };
-}
-
-function saveSheetsConfig(config) {
-  try {
-    fs.writeFileSync(SHEETS_CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
-  } catch (e) {
-    console.error('Failed to save sheets config:', e);
-  }
-}
-
-// Format child objects into tabular array for Google Sheets
-function formatChildrenForSheet(children) {
-  const headers = [
-    'Child ID', 'Full Name', 'Gender', 'Date of Birth', 'Blood Group',
-    'Father Name', 'Mother Name', 'Phone Number', 'Address', 'ID / Aadhaar Number',
-    'Height (cm)', 'Weight (kg)', 'Medical Conditions', 'Allergies',
-    'Current Medications', 'Dental Remarks', 'Oral Hygiene Index',
-    'Emergency Contact', 'Emergency Phone', 'Registered Date', 'Status'
-  ];
-
-  const rows = children.map(c => [
-    c.id || '',
-    c.name || '',
-    c.gender || '',
-    c.dob || '',
-    c.blood || '',
-    c.father || '',
-    c.mother || '',
-    c.phone || '',
-    c.address || '',
-    c.idNumber || '',
-    c.height || '',
-    c.weight || '',
-    c.medicalConditions || '',
-    c.allergies || '',
-    c.medications || 'None',
-    c.dentalRemarks || 'None',
-    c.hygieneIndex || 'Not Assessed',
-    c.emergencyContact || '',
-    c.emergencyPhone || '',
-    c.registeredDate || '',
-    c.status || 'Active'
-  ]);
-
-  return [headers, ...rows];
-}
-
-// Automatically save a synchronized CSV export file locally for sheets sync backup
-function updateLocalCSVExport(children) {
-  try {
-    const tableData = formatChildrenForSheet(children);
-    const csvContent = tableData.map(row =>
-      row.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',')
-    ).join('\n');
-
-    const csvPath = path.join(DB_DIR, 'google_sheets_live_sync.csv');
-    fs.writeFileSync(csvPath, csvContent, 'utf8');
-    console.log(`✓ Synchronized local Google Sheets CSV backup (${children.length} records)`);
-  } catch (err) {
-    console.warn('Failed to save local CSV export:', err.message);
-  }
-}
-
-async function syncChildrenToGoogleSheets(children) {
-  if (!Array.isArray(children)) return { success: false, message: 'Invalid children data' };
-
-  // Always keep local CSV live export updated immediately
-  updateLocalCSVExport(children);
-
-  const config = getSheetsConfig();
-  const tableData = formatChildrenForSheet(children);
-
-  const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
-  const keyFileExists = keyPath && fs.existsSync(keyPath);
-
-  if (!keyFileExists) {
-    config.lastSynced = new Date().toISOString();
-    config.status = 'Connected';
-    config.count = children.length;
-    saveSheetsConfig(config);
-    return {
-      success: true,
-      message: 'Google Sheets live backup synchronized',
-      count: children.length,
-      lastSynced: config.lastSynced
-    };
-  }
-
-  try {
-    const auth = new google.auth.GoogleAuth({
-      keyFile: keyPath,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive'],
-    });
-
-    const sheets = google.sheets({ version: 'v4', auth });
-    let sheetId = config.sheetId || process.env.GOOGLE_SHEET_ID;
-
-    // Create a Google Spreadsheet automatically if none exists
-    if (!sheetId) {
-      console.log('  → Creating new Google Spreadsheet for NGO Child Health Records...');
-      const createRes = await sheets.spreadsheets.create({
-        requestBody: {
-          properties: { title: 'NGO Child Health Management — Master Records' },
-        },
-      });
-      sheetId = createRes.data.spreadsheetId;
-      config.sheetId = sheetId;
-      saveSheetsConfig(config);
-      console.log(`  ✓ Created Google Spreadsheet: https://docs.google.com/spreadsheets/d/${sheetId}`);
-    }
-
-    // Clear and write updated rows
-    await sheets.spreadsheets.values.clear({
-      spreadsheetId: sheetId,
-      range: 'Sheet1!A1:Z5000',
-    });
-
-    await sheets.spreadsheets.values.update({
-      spreadsheetId: sheetId,
-      range: 'Sheet1!A1',
-      valueInputOption: 'USER_ENTERED',
-      requestBody: { values: tableData },
-    });
-
-    config.lastSynced = new Date().toISOString();
-    config.status = 'Connected';
-    config.count = children.length;
-    saveSheetsConfig(config);
-
-    console.log(`✓ Google Sheets Auto-Sync success: ${children.length} records synced to Google Sheet (${sheetId})`);
-    return {
-      success: true,
-      sheetId,
-      url: `https://docs.google.com/spreadsheets/d/${sheetId}`,
-      count: children.length,
-      lastSynced: config.lastSynced
-    };
-  } catch (err) {
-    config.status = 'Connected (Live Backup Active)';
-    config.lastError = err.message;
-    saveSheetsConfig(config);
-    return {
-      success: true,
-      message: 'Google Sheets backup active',
-      count: children.length
-    };
-  }
-}
 
 /* ═══════════════════════════════════════════════════════
    PER-NGO GOOGLE WORKSPACE OAUTH ROUTES & ENDPOINTS
@@ -503,7 +247,10 @@ app.get('/auth/google/callback', async (req, res) => {
       spreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.spreadsheetUrl || null),
       clinicalSheetId: (isNewAccount || isLegacySheet) ? null : (existing.clinicalSheetId || null),
       clinicalSpreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.clinicalSpreadsheetUrl || null),
-      childSheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.childSheetGids || {})
+      childSheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.childSheetGids || {}),
+      monthlySheetId: (isNewAccount || isLegacySheet) ? null : (existing.monthlySheetId || null),
+      monthlySpreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.monthlySpreadsheetUrl || null),
+      monthlySheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.monthlySheetGids || {})
     };
     await saveNgoIntegration(ngoSlug, updated);
 
@@ -544,6 +291,9 @@ app.all('/api/google/disconnect', requireAuth, async (req, res) => {
     delete existing.clinicalSheetId;
     delete existing.clinicalSpreadsheetUrl;
     delete existing.childSheetGids;
+    delete existing.monthlySheetId;
+    delete existing.monthlySpreadsheetUrl;
+    delete existing.monthlySheetGids;
     delete existing.docId;
     delete existing.documentUrl;
     await saveNgoIntegration(ngoSlug, existing);
@@ -621,7 +371,7 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
   }
 
   // Auto-create/sync Student Medical Records sheet if connected but not yet generated
-  if (connected && (!integration.clinicalSheetId || !integration.sheetId)) {
+  if (connected && (!integration.clinicalSheetId || !integration.sheetId || !integration.monthlySheetId)) {
     try {
       const children = await readChildrenFor({ slug: ngoSlug });
       await oauthSyncSheets(children, ngoSlug, ngoName);
@@ -640,6 +390,8 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
     spreadsheetUrl: integration.spreadsheetUrl || null,
     clinicalSheetId: integration.clinicalSheetId || null,
     clinicalSpreadsheetUrl: integration.clinicalSpreadsheetUrl || null,
+    monthlySpreadsheetUrl: integration.monthlySpreadsheetUrl || null,
+    monthlySheetGids: integration.monthlySheetGids || {},
     childSheetGids: integration.childSheetGids || {}
   });
 });
@@ -696,7 +448,7 @@ app.post('/api/docs/sync', requireAuth, async (req, res) => {
 });
 
 // POST /api/drive/upload -> Upload a child health document directly into Google Drive (organized by child name)
-app.post('/api/drive/upload', requireAuth, ocrLimiter, upload.single('document'), async (req, res) => {
+app.post('/api/drive/upload', requireAuth, uploadLimiter, upload.single('document'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No document file uploaded' });
@@ -774,12 +526,11 @@ app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
     }
     writeFileStore(mergedData);
 
-    // Immediately sync local CSV backup and trigger Google Sheets sync
+    // Trigger the Google Sheets sync in the background
     if (mergedData['chm-children']) {
       try {
         const children = JSON.parse(mergedData['chm-children']);
         if (Array.isArray(children)) {
-          updateLocalCSVExport(children);
           // The tenant comes from the verified token, not the request body.
           oauthSyncSheets(children, tenant.slug, tenant.name).catch(err => {
             console.warn('[Sync] Background Google Sheets auto-sync notice:', err.message);
@@ -804,7 +555,6 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`[Server] NGO Platform running on http://localhost:${PORT}`);
-  console.log(`[Server] Image preprocessing: sharp enabled`);
   console.log(`[Server] Security & rate limiting middleware active`);
   // Touch the Admin SDK now so the active database is visible in the boot log
   // instead of only appearing on the first sync request.

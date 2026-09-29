@@ -67,8 +67,6 @@ export const pagePath = (page) => {
   return `#/${page}`;
 };
 export const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
-export const healthDot = (level) => `<span class="health-dot health-dot--${level}" aria-label="${level}"></span>`;
-
 let progressBarTimer = null;
 
 export function showProgressBar(percent = 65) {

@@ -174,9 +174,10 @@ async function writeTenantChildren(ngoSlug, children) {
 
         console.log(`[dataSource] Persisted ${safeChildren.length} children to Firestore (ngos/${slug}/children). Explicitly deleted ${deletedCount} removed child doc(s).`);
 
-        // Invalidate in-memory cache and seed with fresh payload
+        // Drop the cached snapshot entirely. Re-seeding it with only chm-children
+        // left every other collection empty in the cache, so a Sheets sync inside
+        // the next 60s rewrote each child's tab with no checkups.
         clearSnapshotMemoryCache(slug);
-        updateSnapshotMemoryCache(slug, { 'chm-children': json });
       }
     } catch (fsErr) {
       console.warn(`[dataSource] Direct Firestore write warning (${fsErr.message}). Persisting to emergency local store.`);

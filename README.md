@@ -1,20 +1,23 @@
 # Child Health Management Platform
 
-A production-style frontend prototype for an NGO child health management workspace, built with HTML5, CSS3, and vanilla ES modules with a Node.js/Express OCR backend.
+An NGO child health management workspace: a vanilla ES-module frontend served by a Node.js/Express backend, with Firebase sign-in, Firestore storage, and Google Sheets, Drive and Calendar sync.
 
-Open [index.html](index.html) in a modern browser, or run `npm start` to launch the Express server with OCR capabilities.
+Run `npm install` (which also builds `js/bundle.js`) and then `npm start`, and open http://localhost:3000. See [DEPLOYMENT.md](DEPLOYMENT.md) for hosting.
 
 ## Key Modules
 
-- **Health Monitoring Dashboard** — Overview of children's health status with automated alerts
-- **Children Registry** — Register, search, and manage child profiles with health baselines
-- **Growth Tracking** — Track height, weight, and BMI with visual growth charts
-- **Nutrition Tracker** — Log daily meals and monitor dietary patterns
-- **Medicine Management** — Track prescriptions, dosages, and treatment completion
-- **Appointments & Reminders** — Schedule and track medical appointments
-- **Emergency Contacts** — Quick-access directory for hospitals, doctors, and guardians
-- **Sponsor Management** — Track sponsors, contributions, and child sponsorship
-- **Expense Management** — Log and categorise expenses with monthly reports
-- **Document Management** — Upload and organise medical reports, Aadhaar, and school documents
-- **Medical Document OCR** — Extract patient data from lab reports, Aadhaar cards, and birth certificates
-- **Analytics & Reports** — Monthly health, nutrition, and expenditure summaries
+- **Dashboard** — Children count, records and the appointment calendar at a glance
+- **Children Registry** — Register, search, reorder and manage child profiles
+- **Clinical Checkups & Blood Tests** — Vitals, complaints, prescriptions and CBC reports per child
+- **Growth Tracking** — Height, weight and BMI history
+- **Appointments** — Calendar booking (including vaccinations with a free-text vaccine name), synced to Google Calendar
+- **Documents** — Upload medical reports, certificates and ID documents to Google Drive, organised by child
+- **Reports** — Health status, checkup coverage, registration trend and gender distribution
+
+## Google Sheets
+
+Connecting Google Workspace in Settings creates and keeps three spreadsheets in sync:
+
+- **Child Health Records** — the master directory, one row per child
+- **Student Medical Records** — one tab per child with checkups and blood tests
+- **Monthly Checkup Register** — one tab per month listing every child's visits (name, checkup type, prescription, notes, date)

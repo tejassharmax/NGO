@@ -1,24 +1,22 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addPendingDoc, getActivities, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, getGrowthRecords, addMeal, addMedicine, addAppointment, deleteAppointment, addEmergencyContact, deleteEmergencyContact, addExpense, getAppointments, getMedicines, updateAppointment, updateMedicine, healthStatus, calculateAge, addHealthRecord, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, addSponsor, reorderChildren } from './storage.js';
-import { updateChildTable, childRows, setColumnOrder } from './table.js';
+import { deleteChild, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren } from './storage.js';
+import { updateChildTable, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
 import { modal, closeModal } from './modal.js';
 import { saveChild } from './form.js';
 import { pagePath, icon, escapeHTML, formatDate, showProgressBar, hideProgressBar } from './utils.js';
 import { initChart } from './chart.js';
-import { loginWithGoogle, logoutUser, initAuthListener } from './auth.js';
-import { getAuthorizedUser } from './firestore.js';
-import { saveSession, clearSession, isSessionActive } from './session.js';
-import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, copyAndOpenGoogleSheets, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets, autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
-import { openGoogleDocsTemplateModal, syncAndOpenGoogleDoc, fetchDocsConfig } from './googleDocsSync.js';
+import { loginWithGoogle, logoutUser } from './auth.js';
+import { isSessionActive } from './session.js';
+import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets, autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
+import { fetchDocsConfig } from './googleDocsSync.js';
 import { uploadDocumentToDrive, syncSingleDocToDrive, autoSyncPendingDocuments } from './googleDriveSync.js';
-import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, renderEditAppointmentModalMarkup, renderClinicalDataModalMarkup, buildGoogleCalendarUrl, buildGoogleTasksUrl, formatSingleDisplayTime } from './googleCalendar.js';
+import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, renderEditAppointmentModalMarkup, renderClinicalDataModalMarkup, buildGoogleCalendarUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
 import { apiFetch } from './apiClient.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
-let activeDocFilter = 'All';
 let currentPage = 1;
 const itemsPerPage = 5;
 let page = 'dashboard';
@@ -191,7 +189,6 @@ let renderCurrentPage = null;
       app.innerHTML = renderPage(page);
       applyColumnVisibility();
       initFormListeners();
-      initOCRProcessing();
       if (page === 'children') {
         initDragReorder();
         initColumnDragReorder();
@@ -237,16 +234,13 @@ let renderCurrentPage = null;
 
 // Document Clicks
 document.addEventListener('click', (event) => {
-  const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-open-clinical-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
+  const target = event.target.closest('button, a, input[data-global-search], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-open-clinical-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
   if (!target) return;
 
   if (target.matches('[data-topbar-back]')) {
     const prevPageMap = {
       'child-profile': 'children',
       'register-child': 'children',
-      'ocr-review': 'ocr-upload',
-      'ocr-details': 'ocr-review',
-      'ocr-processing': 'ocr-upload',
       'children': 'dashboard',
       'documents': 'dashboard',
       'reports': 'dashboard',
@@ -412,28 +406,6 @@ document.addEventListener('click', (event) => {
       }
     });
   }
-
-  const toggleServiceBtn = target.closest('[data-toggle-google-service]');
-  if (toggleServiceBtn) {
-    const service = toggleServiceBtn.dataset.toggleGoogleService;
-    const key = `google-${service}-connected`;
-    const isConnected = localStorage.getItem(key) === 'true';
-    const serviceName = service === 'drive' ? 'Google Drive' : service === 'sheets' ? 'Google Sheets' : 'Google Calendar';
-
-    if (isConnected) {
-      localStorage.setItem(key, 'false');
-      toast(`${serviceName} Disconnected`, 'Service disconnected from workspace.');
-    } else {
-      localStorage.setItem(key, 'true');
-      toast(`${serviceName} Connected`, `Successfully connected to workspace account.`);
-    }
-
-    window.setTimeout(() => {
-      window.location.reload();
-    }, 400);
-  }
-
-
 
   // ─── Open Event Details Popover Card ───
   const deleteBtn = target.closest('[data-delete-event-id]');
@@ -676,18 +648,6 @@ document.addEventListener('click', (event) => {
     const childName = childSheetBtn.dataset.childName;
     openChildGoogleSheet(childId, childName);
     return;
-  }
-
-  if (target.closest('[data-open-sheets-template]')) {
-    openGoogleSheetsTemplateModal();
-  }
-
-  if (target.closest('[data-open-docs-template]')) {
-    openGoogleDocsTemplateModal();
-  }
-
-  if (target.closest('[data-sync-google-doc]')) {
-    syncAndOpenGoogleDoc();
   }
 
   const syncSheetsBtn = target.closest('[data-sync-from-sheets]');
@@ -1011,24 +971,13 @@ document.addEventListener('click', (event) => {
     }
   }
 
-  if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
-    exportChildrenToExcel();
-  }
-
-  if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
   if (target.matches('[data-report-print], [data-profile-print]')) window.print();
-  if (target.matches('[data-apply-report]')) toast('Report updated', 'Your report now reflects the selected filters.');
 
   if (target.matches('[data-save-settings]')) {
     const orgNameInput = document.querySelector('input[name="schoolName"]')?.value.trim() || 'An Organisation';
     const orgCodeInput = document.querySelector('input[name="schoolCode"]')?.value.trim() || 'ORG-IND-01';
     const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
     const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
-
-    const sheetInput = document.querySelector('#admin-google-sheet-input')?.value.trim();
-    if (sheetInput) {
-      localStorage.setItem('google_sheet_url', sheetInput);
-    }
 
     localStorage.setItem('sample-org-name', orgNameInput);
     localStorage.setItem('sample-org-code', orgCodeInput);
@@ -1037,17 +986,6 @@ document.addEventListener('click', (event) => {
 
     toast('Settings saved', 'Your workspace preferences and Google Sheet connection are up to date.');
     window.setTimeout(() => { window.location.reload(); }, 600);
-  }
-
-  if (target.matches('[data-2fa]')) toast('Security configuration', 'Two-factor authentication configuration would open here.');
-  if (target.matches('[data-upload-document]')) toast('Choose a document', 'Use Smart Upload for guided document extraction.');
-
-  if (target.matches('[data-filter-docs]')) {
-    const statuses = ['All', 'Pending', 'Verified'];
-    const currIdx = statuses.indexOf(activeDocFilter);
-    activeDocFilter = statuses[(currIdx + 1) % statuses.length];
-    target.innerHTML = `${icon('filter')}Status: ${activeDocFilter}`;
-    applyDocumentFilters();
   }
 
   if (target.closest('[data-add-measurement]')) {
@@ -1095,52 +1033,6 @@ document.addEventListener('click', (event) => {
     if (form) {
       form.remove();
       toast('Form removed', 'Measurement form was removed.');
-    }
-  }
-
-  if (target.matches('[data-activity]')) toast('Activity feed', 'Your activity history is up to date.');
-  if (target.matches('[data-start-ocr]')) document.querySelector('[data-upload-input]')?.click();
-  if (target.matches('[data-upload-zone]')) document.querySelector('[data-upload-input]')?.click();
-  if (target.matches('[data-ocr-back]')) window.history.back();
-
-  if (target.matches('[data-ocr-continue]')) {
-    if (document.querySelector('[data-ocr-confirm]')?.checked) {
-      const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-      const formFields = document.querySelectorAll('form.card input, form.card select');
-      formFields.forEach(field => {
-        if (field.name) {
-          ocrData[field.name] = field.value;
-        }
-      });
-      localStorage.setItem('ocr-parsed-data', JSON.stringify(ocrData));
-      window.location.href = pagePath('ocr-details');
-    } else {
-      toast('Review required', 'Confirm that you have checked the extracted details before continuing.');
-    }
-  }
-
-  if (target.matches('[data-ocr-rotate], [data-ocr-rotate] *')) {
-    const img = document.querySelector('.document-preview-img');
-    if (img) {
-      let rotation = parseInt(img.dataset.rotation || '0', 10);
-      rotation = (rotation + 90) % 360;
-      img.dataset.rotation = String(rotation);
-      img.style.transform = `rotate(${rotation}deg)`;
-    } else {
-      toast('Preview not active', 'No document image is currently loaded to rotate.');
-    }
-  }
-
-  if (target.matches('[data-ocr-fullscreen], [data-ocr-fullscreen] *')) {
-    const wrapper = document.querySelector('.document-preview-img-wrap') || document.querySelector('.document-sheet');
-    if (wrapper) {
-      if (document.fullscreenElement) {
-        document.exitFullscreen();
-      } else {
-        wrapper.requestFullscreen?.() || wrapper.webkitRequestFullscreen?.() || wrapper.msRequestFullscreen?.();
-      }
-    } else {
-      toast('Preview not active', 'No document preview is loaded to maximize.');
     }
   }
 
@@ -1362,13 +1254,14 @@ document.addEventListener('click', (event) => {
   const delGrowthBtn = target.closest('[data-delete-growth-id]');
   if (delGrowthBtn) {
     const id = delGrowthBtn.dataset.deleteGrowthId;
+    const growthChildId = delGrowthBtn.dataset.childId;
     modal({
       title: 'Delete Growth Record?',
       body: 'Are you sure you want to remove this historical measurement? This will update your local records and sync to cloud database.',
       confirmText: 'Delete Record',
       confirmClass: 'button--danger',
       onConfirm: async () => {
-        deleteGrowthRecord(id);
+        deleteGrowthRecord(id, growthChildId);
         try {
           await syncWithServer();
         } catch (e) {
@@ -1385,12 +1278,6 @@ document.addEventListener('click', (event) => {
   if (target.closest('.settings-nav button')) {
     target.closest('.settings-nav').querySelectorAll('button').forEach((button) => button.classList.toggle('active', button === target));
     toast(`${target.textContent.trim()} settings`, 'This section is ready for configuration.');
-  }
-
-  // Delete emergency contact
-  if (target.matches('[data-delete-contact]')) {
-    const contactId = target.dataset.deleteContact;
-    modal({ title: 'Remove contact?', body: 'This will permanently remove this emergency contact.', confirmText: 'Remove', confirmClass: 'button--danger', onConfirm: () => { deleteEmergencyContact(contactId); toast('Contact removed', 'Emergency contact has been deleted.'); window.setTimeout(() => window.location.reload(), 500); } });
   }
 
   // Dismiss health alert
@@ -1523,7 +1410,7 @@ document.addEventListener('click', (event) => {
                   <div class="empty-state" style="padding:48px 24px">
                     <span class="empty-state__icon">${icon('file')}</span>
                     <h3>No health documents uploaded yet</h3>
-                    <p>Click "Upload document" to attach medical reports or use Google Cloud Vision API.</p>
+                    <p>Click "Upload document" to attach medical reports, certificates or ID documents.</p>
                   </div>`;
               }
             }
@@ -1625,36 +1512,6 @@ document.addEventListener('change', (event) => {
     applyTableFilters();
   }
   if (event.target.matches('#select-all')) document.querySelectorAll('[data-select-row]').forEach((input) => { input.checked = event.target.checked; });
-  if (event.target.matches('[data-upload-input]') && event.target.files?.length) {
-    processUploadedFile(event.target.files[0]);
-  }
-});
-
-// Drag & Drop
-document.addEventListener('dragover', (event) => {
-  const zone = event.target.closest('[data-upload-zone]');
-  if (zone) {
-    event.preventDefault();
-    zone.classList.add('is-dragging');
-  }
-});
-
-document.addEventListener('dragleave', (event) => {
-  const zone = event.target.closest('[data-upload-zone]');
-  if (zone && !zone.contains(event.relatedTarget)) {
-    zone.classList.remove('is-dragging');
-  }
-});
-
-document.addEventListener('drop', (event) => {
-  const zone = event.target.closest('[data-upload-zone]');
-  if (zone) {
-    event.preventDefault();
-    zone.classList.remove('is-dragging');
-    if (event.dataTransfer.files?.length) {
-      processUploadedFile(event.dataTransfer.files[0]);
-    }
-  }
 });
 
 // ─── Drag-and-Drop Row Reorder (Apple-style) ───
@@ -1914,89 +1771,6 @@ function initFormListeners() {
     });
   });
 
-  // OCR additional form
-  document.addEventListener('submit', (event) => {
-    const form = event.target;
-    if (!form || form.id !== 'ocr-additional-form') return;
-    event.preventDefault();
-    if (!form.reportValidity()) return;
-    const child = saveChild(form);
-    logActivity('doc_processed', child.name, 'OCR-verified child saved');
-    addPendingDoc('Health record', child.name);
-
-    const fileData = localStorage.getItem('ocr-upload-file');
-    const fileName = localStorage.getItem('ocr-upload-filename') || 'Medical Document';
-    let docLabel = 'Medical Report';
-    if (fileName.toLowerCase().includes('aadhaar') || fileName.toLowerCase().includes('aadhar')) {
-      docLabel = 'Aadhaar Card';
-    } else if (fileName.toLowerCase().includes('birth') || fileName.toLowerCase().includes('cert')) {
-      docLabel = 'Birth Certificate';
-    } else if (fileName.toLowerCase().includes('blood') || fileName.toLowerCase().includes('cbc') || fileName.toLowerCase().includes('test')) {
-      docLabel = 'Blood Test Report';
-    }
-    const ocrDoc = addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel, child.id);
-    if (fileData) {
-      syncSingleDocToDrive(ocrDoc).catch(e => console.warn('[OCR Drive Sync notice]', e.message));
-    }
-
-    const addInput = form.querySelector('[data-additional-doc-input]');
-    if (addInput && addInput.files && addInput.files[0]) {
-      const addFile = addInput.files[0];
-      const addReader = new FileReader();
-      addReader.onload = async function (e) {
-        const addDoc = addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record', child.id);
-        uploadDocumentToDrive(addFile, { childName: child.name, childId: child.id, docName: addFile.name, docType: 'Medical Record' })
-          .then(res => {
-            if (res && res.success && res.driveUrl) {
-              updateUploadedDoc(addDoc.id, {
-                driveFileId: res.driveFileId,
-                driveUrl: res.driveUrl,
-                childFolderId: res.childFolderId,
-                childFolderUrl: res.childFolderUrl
-              });
-            }
-          })
-          .catch(err => console.warn('[AddDoc Drive Sync notice]', err.message));
-      };
-      addReader.readAsDataURL(addFile);
-    }
-
-    // Save blood report test results to health records
-    const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-    if (ocrData.isBloodReport || ocrData.hemoglobin || ocrData.rbc) {
-      addHealthRecord({
-        childId: child.id,
-        childName: child.name,
-        type: 'cbc',
-        date: new Date().toISOString().slice(0, 10),
-        hemoglobin: ocrData.hemoglobin || '',
-        wbc: ocrData.wbc || '',
-        rbc: ocrData.rbc || '',
-        platelets: ocrData.platelets || '',
-        pcv: ocrData.pcv || ''
-      });
-
-      const alerts = [];
-      if (ocrData.hemoglobin && parseFloat(ocrData.hemoglobin) < 11.0) {
-        alerts.push('Low Hemoglobin (Anemia risk)');
-      }
-      if (ocrData.rbc && parseFloat(ocrData.rbc) > 4.8) {
-        alerts.push('High RBC Count');
-      }
-
-      if (alerts.length > 0) {
-        logActivity('health_alert', child.name, `Abnormal blood values: ${alerts.join(', ')}`);
-      } else {
-        logActivity('health_alert', child.name, `Normal blood test processed`);
-      }
-    }
-
-    showSheetsSyncLoader(child.name, () => {
-      toast('Verified child saved', `${child.name}'s record generated in Google Sheets.`);
-      window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
-    });
-  });
-
   // Child Profile: Growth & Health Vitals form (with Date reference)
   document.addEventListener('submit', async (event) => {
     const form = event.target;
@@ -2064,26 +1838,6 @@ function initFormListeners() {
     }
   });
 
-  // Meal form
-  document.addEventListener('submit', (event) => {
-    const form = event.target;
-    if (!form || form.id !== 'meal-form') return;
-    event.preventDefault();
-    if (!form.reportValidity()) return;
-    const values = Object.fromEntries(new FormData(form));
-    const child = getChild(values.childId);
-    addMeal({
-      childId: values.childId,
-      childName: child ? child.name : 'Unknown',
-      mealType: values.mealType,
-      date: values.date,
-      description: values.description,
-      calories: values.calories || ''
-    });
-    toast('Meal logged', 'Nutrition entry has been saved.');
-    window.setTimeout(() => window.location.reload(), 500);
-  });
-
   // Medicine form
   document.addEventListener('submit', (event) => {
     const form = event.target;
@@ -2120,6 +1874,7 @@ function initFormListeners() {
     }
 
     const values = Object.fromEntries(new FormData(form));
+    const vaccineName = values.type === 'Vaccination' ? (values.vaccineName || '').trim() : '';
     const isAllChildren = values.childId === 'ALL' || values.selectAllChildren === 'true';
 
     if (isAllChildren) {
@@ -2134,6 +1889,7 @@ function initFormListeners() {
             time: values.time || '10:00',
             doctor: values.doctor || '',
             specialty: values.specialty || '',
+            vaccineName,
             notes: values.notes || '',
             status: 'Upcoming'
           });
@@ -2147,6 +1903,7 @@ function initFormListeners() {
           time: values.time || '10:00',
           doctor: values.doctor || '',
           specialty: values.specialty || '',
+          vaccineName,
           notes: values.notes || '',
           isGroupPlan: true
         }, true, allChildren);
@@ -2166,6 +1923,7 @@ function initFormListeners() {
         time: values.time || '',
         doctor: values.doctor || '',
         specialty: values.specialty || '',
+        vaccineName,
         notes: values.notes || ''
       });
     }
@@ -2206,6 +1964,7 @@ function initFormListeners() {
       childName: child ? child.name : (existing ? existing.childName : 'Unknown'),
       type: values.type,
       specialty: values.specialty || '',
+      vaccineName: values.type === 'Vaccination' ? (values.vaccineName || '').trim() : '',
       date: values.date,
       time: values.time || '10:00',
       doctor: values.doctor || '',
@@ -2359,6 +2118,11 @@ function initFormListeners() {
       }
     }
 
+    if (target && target.name === 'type' && target.closest('#cal-booking-form, #cal-edit-appointment-form')) {
+      const vaccineRow = target.closest('form').querySelector('#cal-vaccine-row');
+      if (vaccineRow) vaccineRow.hidden = target.value !== 'Vaccination';
+    }
+
     if (target && target.id === 'cal-child-select') {
       const checkbox = document.querySelector('#cal-all-children-check');
       const pill = document.querySelector('#cal-all-pill');
@@ -2406,192 +2170,12 @@ function initFormListeners() {
       displayEl.textContent = `${displayDate}${displayTime ? ` · ${displayTime}` : ''}`;
     }
   });
-
-  // Emergency contact form
-  document.addEventListener('submit', (event) => {
-    const form = event.target;
-    if (!form || form.id !== 'emergency-form') return;
-    event.preventDefault();
-    if (!form.reportValidity()) return;
-    const values = Object.fromEntries(new FormData(form));
-    addEmergencyContact({
-      name: values.name,
-      type: values.type,
-      phone: values.phone,
-      specialty: values.specialty || '',
-      address: values.address || ''
-    });
-    toast('Contact added', 'Emergency contact has been saved.');
-    window.setTimeout(() => window.location.reload(), 500);
-  });
-
-  // Sponsor form
-  document.addEventListener('submit', (event) => {
-    const form = event.target;
-    if (!form || form.id !== 'sponsor-form') return;
-    event.preventDefault();
-    if (!form.reportValidity()) return;
-    const formData = new FormData(form);
-    const values = Object.fromEntries(formData);
-    addSponsor({
-      name: values.name,
-      phone: values.phone || '',
-      email: values.email || '',
-      totalContribution: parseFloat(values.contribution) || 0,
-      childrenIds: []
-    });
-    toast('Sponsor registered', 'Sponsor record has been created.');
-    window.setTimeout(() => window.location.reload(), 500);
-  });
-
-  // Expense form
-  document.addEventListener('submit', (event) => {
-    const form = event.target;
-    if (!form || form.id !== 'expense-form') return;
-    event.preventDefault();
-    if (!form.reportValidity()) return;
-    const values = Object.fromEntries(new FormData(form));
-    const child = values.childId ? getChild(values.childId) : null;
-    addExpense({
-      date: values.date,
-      category: values.category,
-      amount: values.amount,
-      description: values.description,
-      childId: values.childId || '',
-      childName: child ? child.name : ''
-    });
-    toast('Expense logged', 'Transaction has been recorded.');
-    window.setTimeout(() => window.location.reload(), 500);
-  });
-
-  // Login form (triggers Google Auth flow)
-  document.addEventListener('submit', (event) => {
-    const form = event.target;
-    if (!form || !form.matches('[data-login-form]')) return;
-    event.preventDefault();
-    toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
-    loginWithGoogle().then((res) => {
-      if (res.success) {
-        toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
-        window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
-      } else if (res.errorCode === 'ACCESS_DENIED') {
-        modal({
-          title: 'Access Denied',
-          body: `<div style="text-align:center; padding:16px 8px;">
-              <div style="font-size:44px; margin-bottom:8px;">🚫</div>
-              <p style="font-size:15px; color:var(--color-text); margin-bottom:8px;"><strong>Unauthorized Google Account</strong></p>
-              <p style="font-size:13.5px; color:var(--color-text-muted); line-height:1.5;">${res.message || 'Your email is not on the authorized administrator allowlist.'}</p>
-            </div>`,
-          onConfirm: () => { window.location.reload(); }
-        });
-      } else {
-        toast('Authentication Info', res.message || 'Google Sign-In popup closed.');
-      }
-    });
-  });
 }
 
 document.addEventListener('keydown', (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openGlobalSearch(); }
   if (event.key === 'Escape') closeModal();
 });
-
-// OCR processing backend fetch logic
-function initOCRProcessing() {
-  if (page !== 'ocr-processing' || window.__ocrStarted) return;
-  window.__ocrStarted = true;
-  const fileData = localStorage.getItem('ocr-upload-file');
-  const fileName = localStorage.getItem('ocr-upload-filename') || 'document.png';
-  const fileType = localStorage.getItem('ocr-upload-filetype') || 'image/png';
-
-  if (fileData) {
-    const progressBar = document.querySelector('.ocr-progress-bar');
-    const progressPctText = document.querySelector('.ocr-progress-pct');
-    const progressStatusText = document.querySelector('.ocr-progress-status');
-    let currentProgress = 0;
-
-    const statusSteps = [
-      { min: 0, text: 'Preprocessing image & normalizing contrast...' },
-      { min: 20, text: 'Scanning text with Tesseract multi-pass OCR...' },
-      { min: 45, text: 'Extracting document fields (Name, DOB, ID)...' },
-      { min: 70, text: 'Verifying confidence scores & structuring draft...' },
-      { min: 88, text: 'Finalizing review draft...' }
-    ];
-
-    const progressTimer = window.setInterval(() => {
-      if (currentProgress < 92) {
-        currentProgress += Math.floor(Math.random() * 5) + 3;
-        if (currentProgress > 92) currentProgress = 92;
-        if (progressBar) progressBar.style.width = `${currentProgress}%`;
-        if (progressPctText) progressPctText.textContent = `${currentProgress}%`;
-
-        const step = statusSteps.filter(s => currentProgress >= s.min).pop();
-        if (step && progressStatusText) {
-          progressStatusText.textContent = step.text;
-        }
-      }
-    }, 180);
-
-    fetch(fileData)
-      .then(res => res.blob())
-      .then(blob => {
-        const file = new File([blob], fileName, { type: fileType });
-        const formData = new FormData();
-        formData.append('document', file);
-
-        const startTime = Date.now();
-
-        apiFetch('/api/ocr', {
-          method: 'POST',
-          body: formData
-        })
-          .then(response => {
-            if (!response.ok) throw new Error('OCR API failed');
-            return response.json();
-          })
-          .then(result => {
-            window.clearInterval(progressTimer);
-            if (result.success) {
-              if (progressBar) progressBar.style.width = '100%';
-              if (progressPctText) progressPctText.textContent = '100%';
-
-              localStorage.setItem('ocr-parsed-data', JSON.stringify(result.data));
-              const name = [result.data.firstName, result.data.lastName].filter(Boolean).join(' ') || 'Unknown';
-              logActivity('doc_processed', name, 'Document extracted via OCR');
-
-              const elapsed = Date.now() - startTime;
-              const remaining = Math.max(0, 1000 - elapsed);
-              window.setTimeout(() => {
-                window.location.href = pagePath('ocr-review');
-              }, remaining);
-            } else {
-              throw new Error(result.error || 'Extraction failed');
-            }
-          })
-          .catch(err => {
-            window.clearInterval(progressTimer);
-            console.error('Live OCR failed:', err);
-            localStorage.removeItem('ocr-parsed-data');
-
-            modal({
-              title: 'Extraction Failed',
-              body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
-              confirmText: 'Try Again',
-              onConfirm: () => {
-                window.location.href = pagePath('ocr-upload');
-              }
-            });
-
-            const processingContainer = document.querySelector('.ocr-processing');
-            if (processingContainer) {
-              processingContainer.innerHTML = `<span class="ocr-processing__sample" style="color:var(--color-danger)">${icon('alertCircle') || '⚠️'}</span><h2>Extraction failed</h2><p>Please try again with a clearer image.</p>`;
-            }
-          });
-      });
-  } else {
-    window.setTimeout(() => { window.location.href = pagePath('ocr-review'); }, 1850);
-  }
-}
 
 // ─── Core Helpers ───
 
@@ -2820,114 +2404,5 @@ function applyColumnVisibility() {
     document.querySelectorAll(`[data-column="${colId}"]`).forEach(el => {
       el.style.display = visible ? '' : 'none';
     });
-  });
-}
-
-function applyDocumentFilters() {
-  const searchVal = document.querySelector('[data-document-search]')?.value.toLowerCase().trim() || '';
-  document.querySelectorAll('.document-card').forEach((card) => {
-    const text = card.dataset.document || '';
-    const matchesSearch = text.includes(searchVal);
-    const badge = card.querySelector('.badge');
-    const statusBadgeText = badge ? badge.textContent.trim() : '';
-    const matchesStatus = (activeDocFilter === 'All') ||
-      (activeDocFilter === 'Pending' && statusBadgeText.includes('Pending')) ||
-      (activeDocFilter === 'Verified' && (statusBadgeText.includes('Verified') || statusBadgeText.includes('Active')));
-    card.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
-  });
-}
-
-function processUploadedFile(file) {
-  if (!file.type.startsWith('image/')) {
-    toast('Unsupported file format', 'Please upload a clean image file (JPG or PNG).');
-    return;
-  }
-
-  toast('Document received', 'Starting a secure draft extraction.');
-
-  const reader = new FileReader();
-  reader.onload = function (e) {
-    const img = new Image();
-    img.onload = function () {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-
-      try {
-        const pngDataUrl = canvas.toDataURL('image/png');
-        localStorage.setItem('ocr-upload-file', pngDataUrl);
-        localStorage.setItem('ocr-upload-filename', file.name.replace(/\.[^/.]+$/, "") + '.png');
-        localStorage.setItem('ocr-upload-filetype', 'image/png');
-      } catch (err) {
-        console.warn('Canvas conversion failed, saving original:', err);
-        localStorage.setItem('ocr-upload-file', e.target.result);
-        localStorage.setItem('ocr-upload-filename', file.name);
-        localStorage.setItem('ocr-upload-filetype', file.type);
-      }
-      window.setTimeout(() => { window.location.href = pagePath('ocr-processing'); }, 500);
-    };
-    img.onerror = function () {
-      console.warn('Image loading failed, saving original:', file.name);
-      localStorage.setItem('ocr-upload-file', e.target.result);
-      localStorage.setItem('ocr-upload-filename', file.name);
-      localStorage.setItem('ocr-upload-filetype', file.type);
-      window.setTimeout(() => { window.location.href = pagePath('ocr-processing'); }, 500);
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
-
-// ─── SheetJS Excel Export Logic ───
-function loadSheetJS(callback) {
-  if (window.XLSX) {
-    callback();
-    return;
-  }
-  toast('Preparing export', 'Loading the secure Excel engine...');
-  const script = document.createElement('script');
-  script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-  script.onload = () => callback();
-  script.onerror = () => toast('Export failed', 'Could not load the Excel export library. Please check your internet connection.');
-  document.head.appendChild(script);
-}
-
-function exportChildrenToExcel() {
-  const children = getChildren();
-  if (children.length === 0) {
-    toast('No data to export', 'Register some children first.');
-    return;
-  }
-
-  loadSheetJS(() => {
-    const data = children.map(c => ({
-      'Child ID': c.id || '',
-      'Name': c.name || '',
-      'Date of Birth': c.dob || '',
-      'Age': calculateAge(c.dob) || '',
-      'Gender': c.gender || '',
-      'Blood Group': c.blood || '',
-      'Father / Guardian': c.father || '',
-      'Mother': c.mother || '',
-      'Phone': c.phone || '',
-      'Registration Date': c.registeredDate || '',
-      'Height (cm)': c.height || '',
-      'Weight (kg)': c.weight || '',
-      'Medical Conditions': c.medicalConditions || '',
-      'Allergies': c.allergies || '',
-      'Address': c.address || '',
-      'Health Status': healthStatus(c).label,
-      'Verification Status': c.status || 'Active'
-    }));
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Children Health Records");
-    XLSX.writeFile(wb, "ChildCare_Health_Records.xlsx");
-
-    logActivity('export_created', 'Excel file', 'Exported all children health data to Excel');
-    toast('Export complete', 'Your children health records Excel file has been downloaded.');
   });
 }
