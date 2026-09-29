@@ -66,12 +66,12 @@ export function getQuickCommands(query = '') {
       actionType: 'navigate'
     },
     {
-      id: 'cmd-ocr',
-      title: 'Upload Health Documents (OCR)',
-      subtitle: 'Smart auto-extraction for immunization cards & lab tests',
+      id: 'cmd-documents',
+      title: 'Upload Health Documents',
+      subtitle: 'Store reports, certificates & ID documents in Google Drive',
       iconSvg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
-      badge: 'OCR AI',
-      url: `${pagePath('ocr-upload')}`,
+      badge: 'Drive',
+      url: `${pagePath('documents')}`,
       actionType: 'navigate'
     },
     {
@@ -403,10 +403,4 @@ export function globalSearchMarkup(query = '') {
       </div>
     </div>
   `;
-}
-
-// Backward compatibility helper
-export function renderSearchResultsList(query = '') {
-  const data = getAllSpotlightItems(query);
-  return renderSpotlightItemsHTML(data.all, 0, 'all');
 }

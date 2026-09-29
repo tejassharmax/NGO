@@ -36,11 +36,19 @@ const ALLOWED_EMAILS = new Set(
 
 /**
  * True when this process is serving real traffic, in which case the local
- * development bypass below must never engage. Render sets RENDER=true on every
- * service automatically, so a deploy is covered even if NODE_ENV is unset.
+ * development bypass below must never engage.
  */
 const IS_PRODUCTION =
   process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
+
+/**
+ * The loopback sign-in bypass is opt-in: it runs only when NODE_ENV is exactly
+ * "development". It used to be on whenever NODE_ENV was not "production", which
+ * is unsafe on shared hosting (cPanel/Passenger) where the web server forwards
+ * every visitor's request to the app over loopback — a host that forgot to set
+ * NODE_ENV would have treated every visitor as signed in.
+ */
+const LOCAL_BYPASS_ENABLED = process.env.NODE_ENV === 'development' && !IS_PRODUCTION;
 
 /** Account the local bypass assumes. Only ever used off-production. */
 const LOCAL_DEV_EMAIL =
@@ -212,7 +220,7 @@ async function requireAuth(req, res, next) {
   const match = header.match(/^Bearer\s+(.+)$/i);
 
   if (!match) {
-    if (!IS_PRODUCTION && isLoopbackPeer(req)) {
+    if (LOCAL_BYPASS_ENABLED && isLoopbackPeer(req)) {
       req.user = { email: LOCAL_DEV_EMAIL, emailVerified: true };
       return next();
     }

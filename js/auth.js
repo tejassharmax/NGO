@@ -4,7 +4,7 @@
  */
 
 import { auth, googleProvider } from './firebase-config.js';
-import { signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { getAuthorizedUser } from './firestore.js';
 import { saveSession, clearSession } from './session.js';
 
@@ -120,37 +120,4 @@ export async function logoutUser() {
   } finally {
     clearSession();
   }
-}
-
-/**
- * Monitor Firebase Authentication State Persistence
- * @param {Function} callback 
- */
-export function initAuthListener(callback) {
-  return onAuthStateChanged(auth, async (fbUser) => {
-    if (fbUser && fbUser.email) {
-      const email = fbUser.email.toLowerCase();
-      const userDoc = await getAuthorizedUser(email);
-
-      if (userDoc && userDoc.active) {
-        const sessionUser = {
-          uid: fbUser.uid,
-          displayName: fbUser.displayName || 'Authorized User',
-          email: email,
-          photoURL: fbUser.photoURL || null,
-          ngo: userDoc.ngo || 'Partner NGO',
-          role: userDoc.role || 'Admin'
-        };
-        saveSession(sessionUser);
-        if (callback) callback(sessionUser);
-      } else {
-        await firebaseSignOut(auth);
-        clearSession();
-        if (callback) callback(null);
-      }
-    } else {
-      clearSession();
-      if (callback) callback(null);
-    }
-  });
 }

@@ -16,9 +16,35 @@
 const SYNC_KEYS = [
   'chm-children', 'chm-activity', 'chm-pending-docs', 'chm-documents', 'chm-growth',
   'chm-nutrition', 'chm-medicines', 'chm-appointments', 'chm-emergency',
-  'chm-expenses', 'chm-alerts', 'chm-health-records',
+  'chm-expenses', 'chm-alerts', 'chm-health-records', 'chm-deleted',
   'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
 ];
+
+/**
+ * Deletion markers. Union-merged collections cannot express a delete on their own:
+ * a record missing from one device's payload looks the same as one it never had,
+ * so the server copy would bring it straight back. A tombstone
+ * `{ id: '<key>:<recordId>', key, recordId, deletedAt }` in `chm-deleted` says the
+ * record is gone for every device.
+ */
+const TOMBSTONE_KEY = 'chm-deleted';
+
+/**
+ * Tombstoned record ids, grouped by collection key.
+ * @param {string} tombstonesJSON
+ * @returns {Map<string, Set<string>>}
+ */
+function tombstonesByKey(tombstonesJSON) {
+  const byKey = new Map();
+  let list = [];
+  try { list = JSON.parse(tombstonesJSON || '[]'); } catch (e) { }
+  (Array.isArray(list) ? list : []).forEach(t => {
+    if (!t || !t.key || t.recordId === undefined || t.recordId === null) return;
+    if (!byKey.has(t.key)) byKey.set(t.key, new Set());
+    byKey.get(t.key).add(String(t.recordId));
+  });
+  return byKey;
+}
 
 /** Array-valued keys, i.e. everything that becomes a Firestore subcollection. */
 const COLLECTION_KEYS = SYNC_KEYS.filter(k => k.startsWith('chm-'));
@@ -39,16 +65,20 @@ const DISALLOWED_MOCK_NAMES = [
 const LOG_CAP = 100;
 
 /**
- * Stable identity for an item inside a synced array. Appointments get a
- * composite key so the same slot cannot be duplicated across devices.
+ * Stable identity for an item inside a synced array.
+ *
+ * `id` comes first. Keying appointments on child/date/time/type meant editing any
+ * of those produced a second copy, and Firestore (which stores by id) then kept
+ * whichever copy was written last. The composite key survives only as a fallback
+ * for legacy appointments that were saved without an id.
  * @param {object} item
  * @returns {string}
  */
 function itemKey(item) {
+  if (item.id) return String(item.id);
   if (item.childId && item.date && item.time && item.type) {
     return `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
   }
-  if (item.id) return String(item.id);
   return JSON.stringify(item);
 }
 
@@ -138,6 +168,16 @@ function mergeNamespace(clientData = {}, serverData = {}) {
     }
   });
 
+  // Drop every record that any device has deleted.
+  tombstonesByKey(merged[TOMBSTONE_KEY]).forEach((ids, key) => {
+    if (!merged[key] || key === TOMBSTONE_KEY) return;
+    try {
+      const arr = JSON.parse(merged[key]);
+      if (!Array.isArray(arr)) return;
+      merged[key] = JSON.stringify(arr.filter(item => !(item && item.id !== undefined && ids.has(String(item.id)))));
+    } catch (e) { }
+  });
+
   return merged;
 }
 
@@ -145,7 +185,9 @@ module.exports = {
   SYNC_KEYS,
   COLLECTION_KEYS,
   SCALAR_KEYS,
+  TOMBSTONE_KEY,
   DISALLOWED_MOCK_NAMES,
+  tombstonesByKey,
   mergeJSONArrays,
   mergeNamespace
 };

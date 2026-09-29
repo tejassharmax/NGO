@@ -15,10 +15,10 @@ const NUTRITION_KEY = 'chm-nutrition';
 const MEDICINES_KEY = 'chm-medicines';
 const APPOINTMENTS_KEY = 'chm-appointments';
 const EMERGENCY_KEY = 'chm-emergency';
-const SPONSORS_KEY = 'chm-sponsors';
 const EXPENSES_KEY = 'chm-expenses';
 const ALERTS_KEY = 'chm-alerts';
 const HEALTH_RECORDS_KEY = 'chm-health-records';
+const DELETED_KEY = 'chm-deleted';
 
 /* ─── Children (was Students) ─── */
 
@@ -29,14 +29,6 @@ export function getChildren() {
     data = localStorage.getItem(CHILDREN_KEY);
   }
   return JSON.parse(data || '[]');
-}
-
-export function addChild(child) {
-  const children = getChildren();
-  children.unshift(child);
-  localStorage.setItem(CHILDREN_KEY, JSON.stringify(children));
-  logActivity('child_added', child.name, 'New child registered');
-  return child;
 }
 
 export function updateChild(child) {
@@ -69,12 +61,45 @@ export function deleteChild(id) {
         if (Array.isArray(arr)) {
           const filtered = arr.filter(item => item && item.childId !== id);
           if (filtered.length !== arr.length) {
+            // Documents are client-authoritative on the server; the rest need tombstones.
+            if (key !== DOCS_KEY) recordDeletions(key, arr.filter(item => item && item.childId === id));
             localStorage.setItem(key, JSON.stringify(filtered));
           }
         }
       }
     } catch (e) {}
   });
+}
+
+/* ─── Deletion tombstones ─── */
+
+/**
+ * Remember that records were deleted so the sync server drops them on every
+ * device. Without this, union-merging with the server copy brought deleted
+ * appointments and checkups straight back. See js/server/syncMerge.js.
+ * @param {string} key  collection key, e.g. 'chm-appointments'
+ * @param {object[]} items  the records being deleted (records without an id are skipped)
+ */
+function recordDeletions(key, items) {
+  const ids = (items || []).map(i => i && i.id).filter(recordId => recordId !== undefined && recordId !== null && recordId !== '');
+  if (ids.length === 0) return;
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem(DELETED_KEY) || '[]'); } catch (e) { }
+  if (!Array.isArray(list)) list = [];
+  const known = new Set(list.map(t => t && t.id));
+  const deletedAt = new Date().toISOString();
+  ids.forEach(recordId => {
+    const tombstoneId = `${key}:${recordId}`;
+    if (!known.has(tombstoneId)) list.push({ id: tombstoneId, key, recordId: String(recordId), deletedAt });
+  });
+  localStorage.setItem(DELETED_KEY, JSON.stringify(list));
+}
+
+/** Drop tombstoned records from a collection array. */
+function withoutDeleted(key, arr, tombstones) {
+  const ids = new Set(tombstones.filter(t => t && t.key === key).map(t => String(t.recordId)));
+  if (ids.size === 0) return arr;
+  return arr.filter(item => !(item && item.id !== undefined && ids.has(String(item.id))));
 }
 
 export function getChild(id) {
@@ -115,64 +140,7 @@ export function timeAgo(timestamp) {
   return `${days} day${days !== 1 ? 's' : ''} ago`;
 }
 
-export function activityIcon(type) {
-  const map = {
-    'doc_processed': 'scan',
-    'child_added': 'users',
-    'child_updated': 'pencil',
-    'child_removed': 'trash',
-    'doc_verified': 'check',
-    'doc_uploaded': 'upload',
-    'export_created': 'download',
-    'growth_logged': 'chart',
-    'meal_logged': 'apple',
-    'medicine_added': 'pill',
-    'appointment_added': 'calendar',
-    'expense_logged': 'wallet',
-    'sponsor_added': 'heart',
-    'health_alert': 'alertCircle'
-  };
-  return map[type] || 'clock';
-}
-
-export function activityLabel(type) {
-  const map = {
-    'doc_processed': 'Document processed',
-    'child_added': 'New child registered',
-    'child_updated': 'Profile updated',
-    'child_removed': 'Child removed',
-    'doc_verified': 'Record verified',
-    'doc_uploaded': 'Document uploaded',
-    'export_created': 'Export created',
-    'growth_logged': 'Growth recorded',
-    'meal_logged': 'Meal logged',
-    'medicine_added': 'Medicine prescribed',
-    'appointment_added': 'Appointment scheduled',
-    'expense_logged': 'Expense recorded',
-    'sponsor_added': 'Sponsor added',
-    'health_alert': 'Health alert'
-  };
-  return map[type] || 'Activity';
-}
-
 /* ─── Pending Documents ─── */
-
-export function getPendingDocs() {
-  return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
-}
-
-export function addPendingDoc(docName, childName) {
-  const docs = getPendingDocs();
-  docs.unshift({ docName, childName, timestamp: Date.now() });
-  if (docs.length > 20) docs.length = 20;
-  localStorage.setItem(PENDING_KEY, JSON.stringify(docs));
-}
-
-export function removePendingDoc(index) {
-  const docs = getPendingDocs();
-  docs.splice(index, 1);
-  localStorage.setItem(PENDING_KEY, JSON.stringify(docs));
-}
 
 /* ─── Uploaded Documents ─── */
 
@@ -299,34 +267,19 @@ export function saveGrowthRecord(record) {
   return record;
 }
 
-export function deleteGrowthRecord(id) {
+/**
+ * Delete a checkup/growth record by id. Legacy records without an id are addressed
+ * by date, which is only unique per child — so a date match is limited to childId,
+ * never applied across every child's records on that day.
+ */
+export function deleteGrowthRecord(id, childId) {
   const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
-  const filtered = all.filter(r => r.id !== id && r.date !== id);
-  localStorage.setItem(GROWTH_KEY, JSON.stringify(filtered));
+  const matches = (r) => (r.id && r.id === id) || (!r.id && r.date === id && (!childId || r.childId === childId));
+  recordDeletions(GROWTH_KEY, all.filter(matches));
+  localStorage.setItem(GROWTH_KEY, JSON.stringify(all.filter(r => !matches(r))));
 }
 
 /* ─── Nutrition / Meal Log ─── */
-
-export function getMeals(childId, dateStr) {
-  const all = JSON.parse(localStorage.getItem(NUTRITION_KEY) || '[]');
-  let filtered = all;
-  if (childId) filtered = filtered.filter(m => m.childId === childId);
-  if (dateStr) filtered = filtered.filter(m => m.date === dateStr);
-  return filtered;
-}
-
-export function getAllMeals() {
-  return JSON.parse(localStorage.getItem(NUTRITION_KEY) || '[]');
-}
-
-export function addMeal(meal) {
-  const all = JSON.parse(localStorage.getItem(NUTRITION_KEY) || '[]');
-  meal.timestamp = Date.now();
-  all.unshift(meal);
-  localStorage.setItem(NUTRITION_KEY, JSON.stringify(all));
-  logActivity('meal_logged', meal.childName || 'Child', `${meal.mealType}: ${meal.description}`);
-  return meal;
-}
 
 /* ─── Medicine Management ─── */
 
@@ -342,14 +295,6 @@ export function addMedicine(med) {
   all.unshift(med);
   localStorage.setItem(MEDICINES_KEY, JSON.stringify(all));
   logActivity('medicine_added', med.childName || 'Child', `${med.medicineName} — ${med.dosage}`);
-  return med;
-}
-
-export function updateMedicine(med) {
-  const all = JSON.parse(localStorage.getItem(MEDICINES_KEY) || '[]');
-  const idx = all.findIndex(m => m.id === med.id);
-  if (idx !== -1) all[idx] = med;
-  localStorage.setItem(MEDICINES_KEY, JSON.stringify(all));
   return med;
 }
 
@@ -394,81 +339,10 @@ export function updateAppointment(appt) {
 
 export function deleteAppointment(id) {
   const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+  recordDeletions(APPOINTMENTS_KEY, all.filter(a => String(a.id) === String(id)));
   const filtered = all.filter(a => String(a.id) !== String(id));
   localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(filtered));
   return true;
-}
-
-/* ─── Emergency Contacts ─── */
-
-export function getEmergencyContacts() {
-  return JSON.parse(localStorage.getItem(EMERGENCY_KEY) || '[]');
-}
-
-export function addEmergencyContact(contact) {
-  const all = getEmergencyContacts();
-  contact.id = contact.id || `EMC-${Date.now()}`;
-  contact.timestamp = Date.now();
-  all.unshift(contact);
-  localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
-  return contact;
-}
-
-export function deleteEmergencyContact(id) {
-  const all = getEmergencyContacts().filter(c => c.id !== id);
-  localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
-}
-
-/* ─── Sponsors ─── */
-
-export function getSponsors() {
-  return JSON.parse(localStorage.getItem(SPONSORS_KEY) || '[]');
-}
-
-export function addSponsor(sponsor) {
-  const all = getSponsors();
-  sponsor.id = sponsor.id || `SP-${Date.now()}`;
-  sponsor.timestamp = Date.now();
-  all.unshift(sponsor);
-  localStorage.setItem(SPONSORS_KEY, JSON.stringify(all));
-  logActivity('sponsor_added', sponsor.name, 'New sponsor registered');
-  return sponsor;
-}
-
-export function updateSponsor(sponsor) {
-  const all = getSponsors();
-  const idx = all.findIndex(s => s.id === sponsor.id);
-  if (idx !== -1) all[idx] = sponsor;
-  localStorage.setItem(SPONSORS_KEY, JSON.stringify(all));
-  return sponsor;
-}
-
-export function deleteSponsor(id) {
-  const all = getSponsors().filter(s => s.id !== id);
-  localStorage.setItem(SPONSORS_KEY, JSON.stringify(all));
-}
-
-/* ─── Expenses ─── */
-
-export function getExpenses(month) {
-  const all = JSON.parse(localStorage.getItem(EXPENSES_KEY) || '[]');
-  if (month) return all.filter(e => e.date && e.date.startsWith(month));
-  return all;
-}
-
-export function addExpense(expense) {
-  const all = JSON.parse(localStorage.getItem(EXPENSES_KEY) || '[]');
-  expense.id = expense.id || `EXP-${Date.now()}`;
-  expense.timestamp = Date.now();
-  all.unshift(expense);
-  localStorage.setItem(EXPENSES_KEY, JSON.stringify(all));
-  logActivity('expense_logged', expense.category || 'Expense', `₹${expense.amount} — ${expense.description}`);
-  return expense;
-}
-
-export function deleteExpense(id) {
-  const all = JSON.parse(localStorage.getItem(EXPENSES_KEY) || '[]').filter(e => e.id !== id);
-  localStorage.setItem(EXPENSES_KEY, JSON.stringify(all));
 }
 
 /* ─── Health Records (Lab results, test reports) ─── */
@@ -500,14 +374,11 @@ export function saveHealthRecord(record) {
   return record;
 }
 
-export function addHealthRecord(record) {
-  return saveHealthRecord(record);
-}
-
 export function deleteHealthRecord(id) {
   const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
-  const filtered = all.filter(r => r.id !== id && r.date !== id);
-  localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(filtered));
+  const matches = (r) => r.id === id;
+  recordDeletions(HEALTH_RECORDS_KEY, all.filter(matches));
+  localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all.filter(r => !matches(r))));
 }
 
 /* ─── Alerts ─── */
@@ -600,16 +471,6 @@ export function getAlerts() {
   return alerts;
 }
 
-export function addAlert(alert) {
-  const all = getAlerts();
-  alert.id = alert.id || `ALR-${Date.now()}`;
-  alert.timestamp = Date.now();
-  all.unshift(alert);
-  if (all.length > 100) all.length = 100;
-  localStorage.setItem(ALERTS_KEY, JSON.stringify(all));
-  return alert;
-}
-
 export function dismissAlert(id) {
   const all = getAlerts().map(a => a.id === id ? { ...a, dismissed: true } : a);
   localStorage.setItem(ALERTS_KEY, JSON.stringify(all));
@@ -630,22 +491,6 @@ export function calculateAge(dob) {
     return `${months} mo`;
   }
   return `${years} yr`;
-}
-
-export function ageGroup(dob) {
-  if (!dob) return 'Unknown';
-  const birth = new Date(dob);
-  if (isNaN(birth.getTime())) return 'Unknown';
-  const now = new Date();
-  let years = now.getFullYear() - birth.getFullYear();
-  const m = now.getMonth() - birth.getMonth();
-  if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) years--;
-  if (years < 1) return '0–1 years';
-  if (years < 3) return '1–3 years';
-  if (years < 5) return '3–5 years';
-  if (years < 8) return '5–8 years';
-  if (years < 12) return '8–12 years';
-  return '12+ years';
 }
 
 /* ─── Health Status Calculator ─── */
@@ -685,7 +530,6 @@ function seedDatabase() {
   localStorage.setItem(MEDICINES_KEY, JSON.stringify([]));
   localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify([]));
   localStorage.setItem(EMERGENCY_KEY, JSON.stringify([]));
-  localStorage.setItem(SPONSORS_KEY, JSON.stringify([]));
   localStorage.setItem(EXPENSES_KEY, JSON.stringify([]));
   localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify([]));
   localStorage.setItem(ACTIVITY_KEY, JSON.stringify([]));
@@ -708,6 +552,9 @@ export async function hydrateFromServer() {
       const serverData = await res.json();
       if (serverData && typeof serverData === 'object') {
         let hasLocalChangesToPush = false;
+        // Deletions known to either side, so a stale local copy is not revived below.
+        const parseList = (raw) => { try { const v = JSON.parse(raw || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+        const tombstones = [...parseList(serverData[DELETED_KEY]), ...parseList(localStorage.getItem(DELETED_KEY))];
         Object.keys(serverData).forEach(k => {
           if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
             if (k.startsWith('chm-')) {
@@ -719,10 +566,12 @@ export async function hydrateFromServer() {
                   const serverArr = JSON.parse(serverData[k]);
                   if (Array.isArray(localArr) && Array.isArray(serverArr) && localArr.length > 0) {
                     const itemMap = new Map();
+                    // Same identity rule as the server (js/server/syncMerge.js): id first,
+                    // so an edited appointment replaces its old copy instead of duplicating.
                     const keyFn = item => {
                       if (!item) return '';
-                      if (item.childId && item.date && item.time && item.type) return `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
                       if (item.id) return String(item.id);
+                      if (item.childId && item.date && item.time && item.type) return `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
                       if (item.childId && item.date) return `${item.childId}_${item.date}_${item.recordType || ''}`;
                       return JSON.stringify(item);
                     };
@@ -735,7 +584,7 @@ export async function hydrateFromServer() {
                       }
                       itemMap.set(id, item);
                     });
-                    const merged = Array.from(itemMap.values());
+                    const merged = withoutDeleted(k, Array.from(itemMap.values()), tombstones);
                     originalSetItem(k, JSON.stringify(merged));
                     return;
                   }
@@ -776,7 +625,7 @@ export async function syncWithServer() {
     const keys = [
       CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
       NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
-      EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY,
+      EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY, DELETED_KEY,
       'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
     ];
 

@@ -6,7 +6,7 @@
  */
 
 import { getAppointments, addAppointment } from './storage.js';
-import { getChildren, calculateAge, getGrowthRecords, getHealthRecords } from './storage.js';
+import { getChildren, getGrowthRecords, getHealthRecords } from './storage.js';
 import { toast } from './toast.js';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -72,11 +72,12 @@ export function buildGoogleCalendarUrl(appointment, isGroupPlan = false, allChil
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
       `Created from Child Health Management App`;
   } else {
-    titleStr = `${appointment.childName} — ${appointment.type}`;
+    titleStr = `${appointment.childName} — ${appointment.type}${appointment.vaccineName ? ` (${appointment.vaccineName})` : ''}`;
     detailsStr =
       `Doctor: ${appointment.doctor || 'N/A'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
       `Child: ${appointment.childName}\n` +
       `Type: ${appointment.type}\n` +
+      (appointment.vaccineName ? `Vaccination: ${appointment.vaccineName}\n` : '') +
       `Notes: ${appointment.notes || 'No notes'}\n\n` +
       `Created from Child Health Management App`;
   }
@@ -98,36 +99,6 @@ export function buildGoogleCalendarUrl(appointment, isGroupPlan = false, allChil
 
   const dates = `${dateStr}T${startTime}/${dateStr}T${endTime}`;
   return `${base}&text=${title}&dates=${dates}&details=${details}&sf=true&output=xml`;
-}
-
-/**
- * Build Google Tasks & Reminders URL for device notification sync
- */
-export function buildGoogleTasksUrl(reminder) {
-  const base = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-  const title = encodeURIComponent(`🔔 REMINDER: ${reminder.childName} — ${reminder.type || reminder.title || 'Health Task'}`);
-  const details = encodeURIComponent(
-    `📱 GOOGLE TASKS & DEVICE REMINDER\n` +
-    `Child: ${reminder.childName}\n` +
-    `Task Type: ${reminder.type || 'Reminder'}\n` +
-    `Notes: ${reminder.doctor || reminder.notes || 'Healthcare Task'}\n\n` +
-    `⚠️ Sync Notice: Notification alert will ring on all connected devices signed into your Google Account (Android, iOS, PC, Mac).`
-  );
-
-  const dateStr = (reminder.date || new Date().toISOString().slice(0, 10)).replace(/-/g, '');
-  let startTime = '100000';
-  let endTime = '103000';
-
-  if (reminder.time) {
-    const parsed = parseTime(reminder.time);
-    if (parsed) {
-      startTime = parsed.start;
-      endTime = parsed.end;
-    }
-  }
-
-  const dates = `${dateStr}T${startTime}/${dateStr}T${endTime}`;
-  return `${base}&text=${title}&dates=${dates}&details=${details}&remind=true&sf=true&output=xml`;
 }
 
 export function parseHoursAndMinutes(timeStr) {
@@ -192,6 +163,7 @@ export function bookAppointment(data) {
     childName: data.childName,
     type: data.type,
     specialty: data.specialty || '',
+    vaccineName: data.vaccineName || '',
     date: data.date,
     time: data.time || '10:00',
     doctor: data.doctor || '',
@@ -485,6 +457,16 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
           </div>
         </div>
 
+        <!-- Vaccination name (free text, shown only for Vaccination appointments) -->
+        <div class="gcal-popup-row" id="cal-vaccine-row" hidden>
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2l4 4M17 7l3-3M19 9l-8.7 8.7a2 2 0 0 1-2.8 0l-1.2-1.2a2 2 0 0 1 0-2.8L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <input class="gcal-popup-text-input" name="vaccineName" id="cal-vaccine-name" type="text" placeholder="Vaccination name" autocomplete="off" />
+          </div>
+        </div>
+
         <!-- Speciality of doctor (Optional, can be empty) -->
         <div class="gcal-popup-row">
           <div class="gcal-popup-icon">
@@ -621,13 +603,24 @@ export function renderEventDetailsModalMarkup(eventId) {
               </div>
             </div>
 
+            ${appt.vaccineName ? `
             <div class="gcal-popover-info-item">
               <div class="gcal-popover-info-icon">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2"><path d="M18 2l4 4M17 7l3-3M19 9l-8.7 8.7a2 2 0 0 1-2.8 0l-1.2-1.2a2 2 0 0 1 0-2.8L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/></svg>
               </div>
               <div class="gcal-popover-info-text">
-                <span class="gcal-popover-info-label">Notification</span>
-                <span class="gcal-popover-info-val">30 mins before</span>
+                <span class="gcal-popover-info-label">Vaccination</span>
+                <span class="gcal-popover-info-val">${escapeHTML(appt.vaccineName)}</span>
+              </div>
+            </div>` : ''}
+
+            <div class="gcal-popover-info-item">
+              <div class="gcal-popover-info-icon">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div class="gcal-popover-info-text">
+                <span class="gcal-popover-info-label">Checkup record</span>
+                <span class="gcal-popover-info-val">${appt.childId && getGrowthRecords(appt.childId).some(g => g.date === appt.date) ? 'Recorded for this date' : 'Not recorded yet'}</span>
               </div>
             </div>
           </div>
@@ -1039,6 +1032,16 @@ export function renderEditAppointmentModalMarkup(eventId) {
               </div>
             </div>
 
+            <!-- Vaccination name (free text, shown only for Vaccination appointments) -->
+            <div class="gcal-popup-row" id="cal-vaccine-row" ${(appt.type || '').toLowerCase() === 'vaccination' ? '' : 'hidden'}>
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2l4 4M17 7l3-3M19 9l-8.7 8.7a2 2 0 0 1-2.8 0l-1.2-1.2a2 2 0 0 1 0-2.8L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <input class="gcal-popup-text-input" name="vaccineName" id="cal-vaccine-name" type="text" placeholder="Vaccination name" value="${escapeHTML(appt.vaccineName || '')}" autocomplete="off" />
+              </div>
+            </div>
+
             <!-- Speciality of doctor (Optional, can be empty) -->
             <div class="gcal-popup-row">
               <div class="gcal-popup-icon">
@@ -1173,8 +1176,4 @@ export function updateCalendarView(root, viewMode, year, month, day) {
   if (container) {
     container.innerHTML = isMonthView ? renderCalendarGrid(year, month, day) : renderDayView(year, month, day);
   }
-}
-
-export function getMonthName(month) {
-  return MONTH_NAMES[month];
 }

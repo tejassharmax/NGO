@@ -1,4 +1,4 @@
-import { getChildren, getGrowthRecords, getExpenses } from './storage.js';
+import { getChildren } from './storage.js';
 
 export function getChartData() {
   const children = getChildren();

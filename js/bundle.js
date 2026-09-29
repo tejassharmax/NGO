@@ -70,7 +70,6 @@
     return `#/${page}`;
   };
   const statusBadge = (status) => `<span class="badge badge--${status === 'Active' || status === 'Verified' ? 'success' : status === 'Pending' ? 'warning' : status === 'Critical' ? 'danger' : 'neutral'}"><i class="badge__dot"></i>${status}</span>`;
-
   let progressBarTimer = null;
 
   function showProgressBar(percent = 65) {
@@ -33566,10 +33565,10 @@
   const MEDICINES_KEY = 'chm-medicines';
   const APPOINTMENTS_KEY = 'chm-appointments';
   const EMERGENCY_KEY = 'chm-emergency';
-  const SPONSORS_KEY = 'chm-sponsors';
   const EXPENSES_KEY = 'chm-expenses';
   const ALERTS_KEY = 'chm-alerts';
   const HEALTH_RECORDS_KEY = 'chm-health-records';
+  const DELETED_KEY = 'chm-deleted';
 
   /* ─── Children (was Students) ─── */
 
@@ -33612,12 +33611,45 @@
           if (Array.isArray(arr)) {
             const filtered = arr.filter(item => item && item.childId !== id);
             if (filtered.length !== arr.length) {
+              // Documents are client-authoritative on the server; the rest need tombstones.
+              if (key !== DOCS_KEY) recordDeletions(key, arr.filter(item => item && item.childId === id));
               localStorage.setItem(key, JSON.stringify(filtered));
             }
           }
         }
       } catch (e) {}
     });
+  }
+
+  /* ─── Deletion tombstones ─── */
+
+  /**
+   * Remember that records were deleted so the sync server drops them on every
+   * device. Without this, union-merging with the server copy brought deleted
+   * appointments and checkups straight back. See js/server/syncMerge.js.
+   * @param {string} key  collection key, e.g. 'chm-appointments'
+   * @param {object[]} items  the records being deleted (records without an id are skipped)
+   */
+  function recordDeletions(key, items) {
+    const ids = (items || []).map(i => i && i.id).filter(recordId => recordId !== undefined && recordId !== null && recordId !== '');
+    if (ids.length === 0) return;
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(DELETED_KEY) || '[]'); } catch (e) { }
+    if (!Array.isArray(list)) list = [];
+    const known = new Set(list.map(t => t && t.id));
+    const deletedAt = new Date().toISOString();
+    ids.forEach(recordId => {
+      const tombstoneId = `${key}:${recordId}`;
+      if (!known.has(tombstoneId)) list.push({ id: tombstoneId, key, recordId: String(recordId), deletedAt });
+    });
+    localStorage.setItem(DELETED_KEY, JSON.stringify(list));
+  }
+
+  /** Drop tombstoned records from a collection array. */
+  function withoutDeleted(key, arr, tombstones) {
+    const ids = new Set(tombstones.filter(t => t && t.key === key).map(t => String(t.recordId)));
+    if (ids.size === 0) return arr;
+    return arr.filter(item => !(item && item.id !== undefined && ids.has(String(item.id))));
   }
 
   function getChild(id) {
@@ -33659,17 +33691,6 @@
   }
 
   /* ─── Pending Documents ─── */
-
-  function getPendingDocs() {
-    return JSON.parse(localStorage.getItem(PENDING_KEY) || '[]');
-  }
-
-  function addPendingDoc(docName, childName) {
-    const docs = getPendingDocs();
-    docs.unshift({ docName, childName, timestamp: Date.now() });
-    if (docs.length > 20) docs.length = 20;
-    localStorage.setItem(PENDING_KEY, JSON.stringify(docs));
-  }
 
   /* ─── Uploaded Documents ─── */
 
@@ -33796,20 +33817,19 @@
     return record;
   }
 
-  function deleteGrowthRecord(id) {
+  /**
+   * Delete a checkup/growth record by id. Legacy records without an id are addressed
+   * by date, which is only unique per child — so a date match is limited to childId,
+   * never applied across every child's records on that day.
+   */
+  function deleteGrowthRecord(id, childId) {
     const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
-    const filtered = all.filter(r => r.id !== id && r.date !== id);
-    localStorage.setItem(GROWTH_KEY, JSON.stringify(filtered));
+    const matches = (r) => (r.id && r.id === id) || (!r.id && r.date === id && (!childId || r.childId === childId));
+    recordDeletions(GROWTH_KEY, all.filter(matches));
+    localStorage.setItem(GROWTH_KEY, JSON.stringify(all.filter(r => !matches(r))));
   }
 
-  function addMeal(meal) {
-    const all = JSON.parse(localStorage.getItem(NUTRITION_KEY) || '[]');
-    meal.timestamp = Date.now();
-    all.unshift(meal);
-    localStorage.setItem(NUTRITION_KEY, JSON.stringify(all));
-    logActivity('meal_logged', meal.childName || 'Child', `${meal.mealType}: ${meal.description}`);
-    return meal;
-  }
+  /* ─── Nutrition / Meal Log ─── */
 
   /* ─── Medicine Management ─── */
 
@@ -33869,55 +33889,10 @@
 
   function deleteAppointment(id) {
     const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+    recordDeletions(APPOINTMENTS_KEY, all.filter(a => String(a.id) === String(id)));
     const filtered = all.filter(a => String(a.id) !== String(id));
     localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(filtered));
     return true;
-  }
-
-  /* ─── Emergency Contacts ─── */
-
-  function getEmergencyContacts() {
-    return JSON.parse(localStorage.getItem(EMERGENCY_KEY) || '[]');
-  }
-
-  function addEmergencyContact(contact) {
-    const all = getEmergencyContacts();
-    contact.id = contact.id || `EMC-${Date.now()}`;
-    contact.timestamp = Date.now();
-    all.unshift(contact);
-    localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
-    return contact;
-  }
-
-  function deleteEmergencyContact(id) {
-    const all = getEmergencyContacts().filter(c => c.id !== id);
-    localStorage.setItem(EMERGENCY_KEY, JSON.stringify(all));
-  }
-
-  /* ─── Sponsors ─── */
-
-  function getSponsors() {
-    return JSON.parse(localStorage.getItem(SPONSORS_KEY) || '[]');
-  }
-
-  function addSponsor(sponsor) {
-    const all = getSponsors();
-    sponsor.id = sponsor.id || `SP-${Date.now()}`;
-    sponsor.timestamp = Date.now();
-    all.unshift(sponsor);
-    localStorage.setItem(SPONSORS_KEY, JSON.stringify(all));
-    logActivity('sponsor_added', sponsor.name, 'New sponsor registered');
-    return sponsor;
-  }
-
-  function addExpense(expense) {
-    const all = JSON.parse(localStorage.getItem(EXPENSES_KEY) || '[]');
-    expense.id = expense.id || `EXP-${Date.now()}`;
-    expense.timestamp = Date.now();
-    all.unshift(expense);
-    localStorage.setItem(EXPENSES_KEY, JSON.stringify(all));
-    logActivity('expense_logged', expense.category || 'Expense', `₹${expense.amount} — ${expense.description}`);
-    return expense;
   }
 
   /* ─── Health Records (Lab results, test reports) ─── */
@@ -33949,14 +33924,11 @@
     return record;
   }
 
-  function addHealthRecord(record) {
-    return saveHealthRecord(record);
-  }
-
   function deleteHealthRecord(id) {
     const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
-    const filtered = all.filter(r => r.id !== id && r.date !== id);
-    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(filtered));
+    const matches = (r) => r.id === id;
+    recordDeletions(HEALTH_RECORDS_KEY, all.filter(matches));
+    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all.filter(r => !matches(r))));
   }
 
   /* ─── Alerts ─── */
@@ -34108,7 +34080,6 @@
     localStorage.setItem(MEDICINES_KEY, JSON.stringify([]));
     localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify([]));
     localStorage.setItem(EMERGENCY_KEY, JSON.stringify([]));
-    localStorage.setItem(SPONSORS_KEY, JSON.stringify([]));
     localStorage.setItem(EXPENSES_KEY, JSON.stringify([]));
     localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify([]));
     localStorage.setItem(ACTIVITY_KEY, JSON.stringify([]));
@@ -34131,6 +34102,9 @@
         const serverData = await res.json();
         if (serverData && typeof serverData === 'object') {
           let hasLocalChangesToPush = false;
+          // Deletions known to either side, so a stale local copy is not revived below.
+          const parseList = (raw) => { try { const v = JSON.parse(raw || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
+          const tombstones = [...parseList(serverData[DELETED_KEY]), ...parseList(localStorage.getItem(DELETED_KEY))];
           Object.keys(serverData).forEach(k => {
             if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
               if (k.startsWith('chm-')) {
@@ -34142,10 +34116,12 @@
                     const serverArr = JSON.parse(serverData[k]);
                     if (Array.isArray(localArr) && Array.isArray(serverArr) && localArr.length > 0) {
                       const itemMap = new Map();
+                      // Same identity rule as the server (js/server/syncMerge.js): id first,
+                      // so an edited appointment replaces its old copy instead of duplicating.
                       const keyFn = item => {
                         if (!item) return '';
-                        if (item.childId && item.date && item.time && item.type) return `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
                         if (item.id) return String(item.id);
+                        if (item.childId && item.date && item.time && item.type) return `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
                         if (item.childId && item.date) return `${item.childId}_${item.date}_${item.recordType || ''}`;
                         return JSON.stringify(item);
                       };
@@ -34158,7 +34134,7 @@
                         }
                         itemMap.set(id, item);
                       });
-                      const merged = Array.from(itemMap.values());
+                      const merged = withoutDeleted(k, Array.from(itemMap.values()), tombstones);
                       originalSetItem(k, JSON.stringify(merged));
                       return;
                     }
@@ -34199,7 +34175,7 @@
       const keys = [
         CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
         NUTRITION_KEY, MEDICINES_KEY, APPOINTMENTS_KEY, EMERGENCY_KEY,
-        EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY,
+        EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY, DELETED_KEY,
         'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
       ];
 
@@ -34299,20 +34275,20 @@
       const age = calculateAge(child.dob);
 
       const cellMap = {
-        child: `<td data-column="child"><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><div class="table-person__info"><span class="table-person__name" style="display:inline-flex; align-items:center; gap:6px;">${child.name}<button class="icon-button icon-button--small tooltip" data-tooltip="Open in Google Sheets" type="button" aria-label="Open ${child.name}'s Google Sheet" data-open-child-sheet="${child.id}" data-child-name="${child.name}" style="width:22px; height:22px; min-width:22px; padding:2px; border:none; background:transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.85; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">${icon('googleSheets')}</button></span><span class="table-person__id">${child.id}</span></div></a></td>`,
+        child: `<td data-column="child"><a class="table-person" href="${pagePath('child-profile')}?id=${escapeHTML$1(child.id)}"><span class="table-avatar">${escapeHTML$1(initials(child.name))}</span><div class="table-person__info"><span class="table-person__name" style="display:inline-flex; align-items:center; gap:6px;">${escapeHTML$1(child.name)}<button class="icon-button icon-button--small tooltip" data-tooltip="Open in Google Sheets" type="button" aria-label="Open ${escapeHTML$1(child.name)}'s Google Sheet" data-open-child-sheet="${escapeHTML$1(child.id)}" data-child-name="${escapeHTML$1(child.name)}" style="width:22px; height:22px; min-width:22px; padding:2px; border:none; background:transparent; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; opacity:0.85; transition:opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.85'">${icon('googleSheets')}</button></span><span class="table-person__id">${escapeHTML$1(child.id)}</span></div></a></td>`,
         age: `<td data-column="age">${age || '—'}</td>`,
-        gender: `<td class="hide-tablet" data-column="gender">${child.gender || '—'}</td>`,
-        blood: `<td class="hide-tablet" data-column="blood">${child.blood || '—'}</td>`,
-        status: `<td data-column="status">${statusBadge(child.status)}</td>`
+        gender: `<td class="hide-tablet" data-column="gender">${escapeHTML$1(child.gender || '—')}</td>`,
+        blood: `<td class="hide-tablet" data-column="blood">${escapeHTML$1(child.blood || '—')}</td>`,
+        status: `<td data-column="status">${statusBadge(escapeHTML$1(child.status || 'Active'))}</td>`
       };
 
       const dynamicCells = order.map(col => cellMap[col] || '').join('');
 
-      return `<tr draggable="true" data-child-id="${child.id}" data-index="${index}">
+      return `<tr draggable="true" data-child-id="${escapeHTML$1(child.id)}" data-index="${index}">
     <td class="drag-handle-cell"><span class="drag-handle" title="Drag to reorder">${icon('gripVertical')}</span></td>
-    <td><label class="checkbox"><input type="checkbox" aria-label="Select ${child.name}" data-select-row="${child.id}"><span class="sr-only">Select</span></label></td>
+    <td><label class="checkbox"><input type="checkbox" aria-label="Select ${escapeHTML$1(child.name)}" data-select-row="${escapeHTML$1(child.id)}"><span class="sr-only">Select</span></label></td>
     ${dynamicCells}
-    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${child.name}" href="${pagePath('child-profile')}?id=${child.id}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${child.name}" data-edit="${child.id}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${child.name}" data-delete="${child.id}">${icon('trash')}</button></div></td>
+    <td><div class="table-actions"><a class="icon-button icon-button--small tooltip" data-tooltip="View" aria-label="View ${escapeHTML$1(child.name)}" href="${pagePath('child-profile')}?id=${escapeHTML$1(child.id)}">${icon('eye')}</a><button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${escapeHTML$1(child.name)}" data-edit="${escapeHTML$1(child.id)}">${icon('pencil')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Delete" type="button" aria-label="Delete ${escapeHTML$1(child.name)}" data-delete="${escapeHTML$1(child.id)}">${icon('trash')}</button></div></td>
   </tr>`;
     }).join('');
   }
@@ -34548,6 +34524,18 @@
     window.setTimeout(remove, 4200);
   }
 
+  function closeModal() { document.querySelector('#modal-root').replaceChildren(); }
+
+  function modal({ title, body, confirmText = 'Confirm', confirmClass = 'button--primary', onConfirm }) {
+    const root = document.querySelector('#modal-root');
+    const safeTitle = escapeHTML$1(title);
+    root.innerHTML = `<div class="modal-backdrop" role="presentation"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal__header"><div><h2 id="modal-title" class="modal__title">${safeTitle}</h2></div><button class="icon-button icon-button--small" type="button" aria-label="Close dialog" data-modal-close>${icon('x')}</button></header><div class="modal__body">${body}</div><footer class="modal__footer"><button class="button" type="button" data-modal-close>Cancel</button><button class="button ${confirmClass}" type="button" data-modal-confirm>${confirmText}</button></footer></section></div>`;
+    root.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', closeModal));
+    root.querySelector('.modal-backdrop').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
+    root.querySelector('[data-modal-confirm]').addEventListener('click', () => { onConfirm?.(); closeModal(); });
+    root.querySelector('[data-modal-close]')?.focus();
+  }
+
   /**
    * googleSheetsSync.js
    * Automatic Google Sheets generation and real-time record synchronization service.
@@ -34613,6 +34601,9 @@
           localStorage.setItem(`google_sheet_url_${slug}`, cachedSheetsConfig.spreadsheetUrl);
           localStorage.setItem('google_sheet_url', cachedSheetsConfig.spreadsheetUrl);
         }
+        if (cachedSheetsConfig?.monthlySpreadsheetUrl) {
+          localStorage.setItem(`google_monthly_sheet_url_${slug}`, cachedSheetsConfig.monthlySpreadsheetUrl);
+        }
         return cachedSheetsConfig;
       }
     } catch (err) {
@@ -34646,6 +34637,20 @@
     const ngoSlug = getNgoSlug(session);
     const savedUrl = localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
     return cachedSheetsConfig?.clinicalSpreadsheetUrl || savedUrl || null;
+  }
+
+  /**
+   * Get live view link to the Monthly Checkup Register workbook ("Ayusha Nilayam — Monthly Checkup Register"),
+   * opened on the current month's tab when its gid is known.
+   */
+  function getMonthlySheetUrl() {
+    const ngoSlug = getNgoSlug(getSession() || {});
+    const url = cachedSheetsConfig?.monthlySpreadsheetUrl || localStorage.getItem(`google_monthly_sheet_url_${ngoSlug}`);
+    if (!url) return null;
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const gid = cachedSheetsConfig?.monthlySheetGids?.[monthKey];
+    return gid !== undefined ? `${url.split('#')[0].replace(/\/edit.*$/, '/edit')}#gid=${gid}` : url;
   }
 
   /**
@@ -35140,6 +35145,7 @@
             cachedSheetsConfig.sheetId = data.sheetId || cachedSheetsConfig.sheetId;
             cachedSheetsConfig.clinicalSpreadsheetUrl = data.clinicalSpreadsheetUrl || cachedSheetsConfig.clinicalSpreadsheetUrl;
             cachedSheetsConfig.clinicalSheetId = data.clinicalSheetId || cachedSheetsConfig.clinicalSheetId;
+            cachedSheetsConfig.monthlySpreadsheetUrl = data.monthlySpreadsheetUrl || cachedSheetsConfig.monthlySpreadsheetUrl;
             if (data.childSheetGids) {
               cachedSheetsConfig.childSheetGids = data.childSheetGids;
               localStorage.setItem('chm_child_sheet_gids', JSON.stringify(data.childSheetGids));
@@ -35257,302 +35263,6 @@
   }
 
   /**
-   * googleDocsSync.js
-   * Real-time Executive Health Report synchronization to Google Docs.
-   * Automatically formats and updates executive health summaries, audit statistics,
-   * WHO growth metrics, and child clinical logs directly into the live Google Doc.
-   */
-
-
-  let cachedDocsConfig = null;
-
-  /**
-   * Fetch Docs config for the current NGO from backend API
-   */
-  async function fetchDocsConfig(ngoSlug) {
-    const session = getSession() || {};
-    const slug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
-    try {
-      const res = await apiFetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
-      if (res.ok) {
-        cachedDocsConfig = await res.json();
-        return cachedDocsConfig;
-      }
-    } catch (err) {
-      console.warn('[Google Docs] Config fetch warning:', err);
-    }
-    return cachedDocsConfig || { connected: false };
-  }
-
-  /**
-   * Get live view link to the Google Doc report (returns null if not connected)
-   */
-  function getGoogleDocUrl() {
-    return cachedDocsConfig?.documentUrl || null;
-  }
-
-  /**
-   * Generate formatted executive report document text
-   */
-  function generateExecutiveDocContent() {
-    const session = getSession() || {};
-    const ngoName = session.ngo || 'Ayusha Nilayam';
-    const children = getChildren() || [];
-    const total = children.length;
-    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
-    const healthyCount = total - flaggedCount;
-    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
-    const healthRecords = getHealthRecords() || [];
-
-    const timestamp = new Date().toLocaleString('en-IN', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-
-    let reportText = `========================================================================\n`;
-    reportText += `       EXECUTIVE CHILD HEALTH AUDIT REPORT — ${ngoName.toUpperCase()}\n`;
-    reportText += `       Auto-Synced Live Document | ${timestamp}\n`;
-    reportText += `========================================================================\n\n`;
-
-    reportText += `1. EXECUTIVE HEALTH SUMMARY\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-    reportText += `• Total Registered Children : ${total}\n`;
-    reportText += `• Optimal Health Status     : ${healthyCount} children (${healthyPct}%)\n`;
-    reportText += `• Health Alerts / Flagged   : ${flaggedCount} children\n`;
-    reportText += `• Verified Clinical Records : ${healthRecords.length} lab test reports\n`;
-    reportText += `• Audited Status            : Verified & Compliant\n\n`;
-
-    reportText += `2. REGISTERED CHILD ROSTER & CLINICAL METRICS\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-    reportText += `ID         | Name                     | Age | Gender | Status  | Height  | Weight  | Medications          | Hygiene\n`;
-    reportText += `------------------------------------------------------------------------\n`;
-
-    children.forEach(c => {
-      const age = calculateAge(c.dob) || c.age || '—';
-      const id = String(c.id || 'CH-0000').padEnd(10, ' ');
-      const name = String(c.name || 'Child').slice(0, 24).padEnd(24, ' ');
-      const ageStr = String(age).slice(0, 3).padEnd(4, ' ');
-      const gender = String(c.gender || '—').slice(0, 6).padEnd(7, ' ');
-      const status = String(c.status || 'Active').slice(0, 7).padEnd(8, ' ');
-      const h = String(c.height ? `${c.height}cm` : '—').padEnd(8, ' ');
-      const w = String(c.weight ? `${c.weight}kg` : '—').padEnd(8, ' ');
-      const meds = String(c.medications || 'None').slice(0, 20).padEnd(20, ' ');
-      const hygiene = String(c.hygieneIndex || 'N/A');
-
-      reportText += `${id} | ${name} | ${ageStr} | ${gender} | ${status} | ${h} | ${w} | ${meds} | ${hygiene}\n`;
-    });
-
-    reportText += `\n------------------------------------------------------------------------\n`;
-    reportText += `End of Live Synced Report | Child Health Management Platform\n`;
-
-    return reportText;
-  }
-
-  /**
-   * Automatically sync executive report to Google Docs in background via OAuth API
-   */
-  async function autoSyncToGoogleDocs() {
-    const session = getSession() || {};
-    const ngoSlug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
-    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
-    const reportContent = generateExecutiveDocContent();
-
-    try {
-      const res = await apiFetch('/api/docs/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reportContent, ngo: ngoSlug, ngoName })
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.success) {
-          if (data.documentUrl) {
-            if (!cachedDocsConfig) cachedDocsConfig = { connected: true };
-            cachedDocsConfig.connected = true;
-            cachedDocsConfig.documentUrl = data.documentUrl;
-          }
-          console.log('[Google Docs] Executive report live synced.');
-        } else if (data && data.message === 'Not connected') {
-          console.log('[Google Docs] Skip auto-sync: NGO is not connected to Google Workspace.');
-        }
-      }
-    } catch (err) {
-      console.warn('[Google Docs] OAuth sync notice:', err);
-    }
-  }
-
-  /**
-   * Trigger live API sync to Google Docs and open document
-   */
-  async function syncAndOpenGoogleDoc() {
-    const docUrl = getGoogleDocUrl();
-    if (!docUrl) {
-      toast('Google Workspace Not Connected', 'Please connect your Google Account in Settings first.');
-      return;
-    }
-
-    showProgressBar(45);
-    toast('Syncing to Google Docs...', 'Pushing live report update directly to Google Docs...');
-    try {
-      await autoSyncToGoogleDocs();
-      showProgressBar(100);
-      toast('Google Doc Synced!', 'Opening live executive report in Google Docs...');
-      window.open(docUrl, '_blank');
-    } finally {
-      hideProgressBar();
-    }
-  }
-
-  /**
-   * Display interactive Google Docs Live Report Viewer Modal
-   */
-  function openGoogleDocsTemplateModal() {
-    document.querySelector('#google-docs-view-modal')?.remove();
-
-    const session = getSession() || {};
-    const ngoName = session.ngo || 'Ayusha Nilayam';
-    const userEmail = session.email || localStorage.getItem('google-user-email') || localStorage.getItem('sample-org-email') || 'admin@organisation.org';
-    const children = getChildren() || [];
-    const total = children.length;
-    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
-    const healthyCount = total - flaggedCount;
-    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
-
-    const rowsHTML = children.map((c, idx) => `
-    <tr style="${idx % 2 === 1 ? 'background:#f8fafc;' : 'background:#ffffff;'}">
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-family:monospace; font-size:12px; font-weight:700; color:#1a73e8;">${escapeHTML$1(c.id || 'CH-0000')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:13px; font-weight:600; color:#1e293b;">${escapeHTML$1(c.name || 'Child')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${calculateAge(c.dob) || c.age || '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.gender || '—')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.height ? `${c.height} cm` : '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${c.weight ? `${c.weight} kg` : '—'}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.medications || 'None')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.dentalRemarks || '—')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px; color:#475569;">${escapeHTML$1(c.hygieneIndex || 'N/A')}</td>
-      <td style="padding:10px 14px; border:1px solid #e2e8f0; font-size:12.5px;">
-        <span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11.5px; font-weight:600; background:#dcfce7; color:#15803d;">
-          ${escapeHTML$1(c.status || 'Active')}
-        </span>
-      </td>
-    </tr>
-  `).join('');
-
-    const modalHTML = `
-    <div id="google-docs-view-modal" style="position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:fadeIn 0.2s ease;">
-      <div class="card" style="width:min(1100px, 94vw); height:min(780px, 92vh); display:flex; flex-direction:column; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 25px 50px -12px rgba(0,0,0,0.4); border:1px solid #cbd5e1;">
-        
-        <!-- Google Docs Header Bar -->
-        <div style="display:flex; align-items:center; justify-content:space-between; padding:16px 24px; background:linear-gradient(135deg, #1a73e8 0%, #1557b0 100%); color:white; box-shadow:0 2px 8px rgba(0,0,0,0.12);">
-          <div style="display:flex; align-items:center; gap:14px;">
-            <div style="width:40px; height:40px; border-radius:8px; background:white; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 6px rgba(0,0,0,0.15); overflow:hidden;">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" fill="#4285F4"/><path d="M14 2V8H20L14 2Z" fill="#A1C2FA"/><path d="M16 13H8V11H16V13ZM16 17H8V15H16V17ZM10 9H8V7H10V9Z" fill="white"/></svg>
-            </div>
-            <div>
-              <div style="font-weight:700; font-size:16px; display:flex; align-items:center; gap:10px; color:white;">
-                Child_Health_Executive_Report_${ngoName.replace(/[^a-zA-Z0-9]/g, '_')}
-                <span style="font-size:11px; background:rgba(255,255,255,0.22); backdrop-filter:blur(4px); padding:3px 10px; border-radius:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px;">
-                  <span style="width:6px; height:6px; border-radius:50%; background:#60a5fa; box-shadow:0 0 6px #60a5fa;"></span>
-                  Live Auto-Synced Google Doc
-                </span>
-              </div>
-              <div style="font-size:12px; color:rgba(255,255,255,0.9); margin-top:2px;">
-                Connected Account: <b>${escapeHTML$1(userEmail)}</b> • Real-time Executive Report
-              </div>
-            </div>
-          </div>
-          
-          <div style="display:flex; align-items:center; gap:12px;">
-            <button id="modal-edit-doc-url-btn" class="button" style="background:rgba(255,255,255,0.18); color:white; border:1px solid rgba(255,255,255,0.3); font-weight:600; font-size:12.5px; padding:9px 14px; border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              Set Doc URL
-            </button>
-            <button id="modal-sync-doc-btn" class="button" style="background:#ffffff; color:#1a73e8; border:0; font-weight:700; font-size:13px; padding:10px 18px; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,0.15); display:inline-flex; align-items:center; gap:8px;">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-              Open Live Google Doc
-            </button>
-            <button id="modal-close-docs-btn" style="background:rgba(255,255,255,0.15); border:0; color:white; border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; line-height:1;">&times;</button>
-          </div>
-        </div>
-
-        <!-- Document Body Preview -->
-        <div style="flex:1; overflow-y:auto; padding:28px 36px; background:#f8fafc;">
-          
-          <!-- Document Sheet Paper -->
-          <div style="max-width:900px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:40px 48px; box-shadow:0 4px 20px rgba(0,0,0,0.05);">
-            
-            <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #1a73e8; padding-bottom:16px; margin-bottom:24px;">
-              <div>
-                <h1 style="font-size:22px; font-weight:800; color:#0f172a; margin:0 0 4px 0; letter-spacing:-0.02em;">CHILD HEALTH EXECUTIVE REPORT</h1>
-                <p style="font-size:13px; color:#64748b; margin:0; font-weight:600;">NGO: ${escapeHTML$1(ngoName)} • Live Auto-Synced Document</p>
-              </div>
-              <span style="font-size:11px; background:#eff6ff; color:#1a73e8; font-weight:700; padding:6px 12px; border-radius:20px; border:1px solid #bfdbfe;">
-                Status: Updated Today
-              </span>
-            </div>
-
-            <!-- Stats Bar -->
-            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; margin-bottom:28px;">
-              <div style="background:#f1f5f9; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#1a73e8;">${total}</div>
-                <div style="font-size:12px; color:#475569; font-weight:600; margin-top:2px;">Total Registered Children</div>
-              </div>
-              <div style="background:#ecfdf5; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#15803d;">${healthyPct}%</div>
-                <div style="font-size:12px; color:#166534; font-weight:600; margin-top:2px;">Optimal Health (${healthyCount} children)</div>
-              </div>
-              <div style="background:#fffbeb; padding:16px; border-radius:8px; text-align:center;">
-                <div style="font-size:24px; font-weight:800; color:#b45309;">${flaggedCount}</div>
-                <div style="font-size:12px; color:#92400e; font-weight:600; margin-top:2px;">Health Alerts / Flagged</div>
-              </div>
-            </div>
-
-            <!-- Table -->
-            <h3 style="font-size:15px; font-weight:700; color:#1e293b; margin:0 0 14px 0;">Audited Clinical Roster</h3>
-            <table style="width:100%; border-collapse:collapse; text-align:left;">
-              <thead>
-                <tr style="background:#f1f5f9; color:#475569; font-size:12px; font-weight:700;">
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Child ID</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Name</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Age</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Gender</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Height</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Weight</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Medications</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Dental</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Hygiene</th>
-                  <th style="padding:10px 14px; border:1px solid #cbd5e1;">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${rowsHTML}
-              </tbody>
-            </table>
-
-          </div>
-
-        </div>
-
-      </div>
-    </div>
-  `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    document.querySelector('#modal-close-docs-btn')?.addEventListener('click', () => {
-      document.querySelector('#google-docs-view-modal')?.remove();
-    });
-
-    document.querySelector('#modal-sync-doc-btn')?.addEventListener('click', () => {
-      syncAndOpenGoogleDoc();
-    });
-  }
-
-  /**
    * googleCalendar.js
    * Google Calendar-grade interactive appointment management.
    * Features full-width Month View with event chips, Day View timeline grid,
@@ -35623,11 +35333,12 @@
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `Created from Child Health Management App`;
     } else {
-      titleStr = `${appointment.childName} — ${appointment.type}`;
+      titleStr = `${appointment.childName} — ${appointment.type}${appointment.vaccineName ? ` (${appointment.vaccineName})` : ''}`;
       detailsStr =
         `Doctor: ${appointment.doctor || 'N/A'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
         `Child: ${appointment.childName}\n` +
         `Type: ${appointment.type}\n` +
+        (appointment.vaccineName ? `Vaccination: ${appointment.vaccineName}\n` : '') +
         `Notes: ${appointment.notes || 'No notes'}\n\n` +
         `Created from Child Health Management App`;
     }
@@ -35712,6 +35423,7 @@
       childName: data.childName,
       type: data.type,
       specialty: data.specialty || '',
+      vaccineName: data.vaccineName || '',
       date: data.date,
       time: data.time || '10:00',
       doctor: data.doctor || '',
@@ -36005,6 +35717,16 @@
           </div>
         </div>
 
+        <!-- Vaccination name (free text, shown only for Vaccination appointments) -->
+        <div class="gcal-popup-row" id="cal-vaccine-row" hidden>
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2l4 4M17 7l3-3M19 9l-8.7 8.7a2 2 0 0 1-2.8 0l-1.2-1.2a2 2 0 0 1 0-2.8L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/></svg>
+          </div>
+          <div class="gcal-popup-row-content">
+            <input class="gcal-popup-text-input" name="vaccineName" id="cal-vaccine-name" type="text" placeholder="Vaccination name" autocomplete="off" />
+          </div>
+        </div>
+
         <!-- Speciality of doctor (Optional, can be empty) -->
         <div class="gcal-popup-row">
           <div class="gcal-popup-icon">
@@ -36141,13 +35863,24 @@
               </div>
             </div>
 
+            ${appt.vaccineName ? `
             <div class="gcal-popover-info-item">
               <div class="gcal-popover-info-icon">
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2"><path d="M18 2l4 4M17 7l3-3M19 9l-8.7 8.7a2 2 0 0 1-2.8 0l-1.2-1.2a2 2 0 0 1 0-2.8L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/></svg>
               </div>
               <div class="gcal-popover-info-text">
-                <span class="gcal-popover-info-label">Notification</span>
-                <span class="gcal-popover-info-val">30 mins before</span>
+                <span class="gcal-popover-info-label">Vaccination</span>
+                <span class="gcal-popover-info-val">${escapeHTML(appt.vaccineName)}</span>
+              </div>
+            </div>` : ''}
+
+            <div class="gcal-popover-info-item">
+              <div class="gcal-popover-info-icon">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#16a34a" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              </div>
+              <div class="gcal-popover-info-text">
+                <span class="gcal-popover-info-label">Checkup record</span>
+                <span class="gcal-popover-info-val">${appt.childId && getGrowthRecords(appt.childId).some(g => g.date === appt.date) ? 'Recorded for this date' : 'Not recorded yet'}</span>
               </div>
             </div>
           </div>
@@ -36559,6 +36292,16 @@
               </div>
             </div>
 
+            <!-- Vaccination name (free text, shown only for Vaccination appointments) -->
+            <div class="gcal-popup-row" id="cal-vaccine-row" ${(appt.type || '').toLowerCase() === 'vaccination' ? '' : 'hidden'}>
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 2l4 4M17 7l3-3M19 9l-8.7 8.7a2 2 0 0 1-2.8 0l-1.2-1.2a2 2 0 0 1 0-2.8L15 5M9 11l4 4M5 19l-3 3M14 4l6 6"/></svg>
+              </div>
+              <div class="gcal-popup-row-content">
+                <input class="gcal-popup-text-input" name="vaccineName" id="cal-vaccine-name" type="text" placeholder="Vaccination name" value="${escapeHTML(appt.vaccineName || '')}" autocomplete="off" />
+              </div>
+            </div>
+
             <!-- Speciality of doctor (Optional, can be empty) -->
             <div class="gcal-popup-row">
               <div class="gcal-popup-icon">
@@ -36710,10 +36453,6 @@
     appointments: 'Appointments',
     'child-profile': 'Child Health Profile',
     'register-child': 'Register child',
-    'ocr-upload': 'Google Cloud Vision API Extraction',
-    'ocr-review': 'Review extracted information',
-    'ocr-details': 'Additional details',
-    'ocr-processing': 'Processing document',
     documents: 'Health records & documents',
     reports: 'Health reports',
     settings: 'Settings'
@@ -36780,14 +36519,15 @@
 
     return `<div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
-      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
+      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">${escapeHTML$1(ngoName)}</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
       <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
       <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML$1(ngoName)}</span><span class="workspace-user__role">${escapeHTML$1(role)}</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
     <main class="app-main" id="app-main">
       <header class="topbar">
+        <button class="icon-button u-mobile-only" type="button" data-open-sidebar aria-label="Open navigation">${icon('menu')}</button>
         ${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}
-        <div class="topbar__crumbs"><span>Demo</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
+        <div class="topbar__crumbs"><span>${escapeHTML$1(ngoName)}</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
         <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
         <div class="topbar__actions">
           <button class="icon-button" data-theme-toggle type="button" aria-label="Toggle color theme" style="cursor: pointer;">
@@ -36849,9 +36589,11 @@
 
   function getDynamicGreeting() {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning, Admin';
-    if (hour < 17) return 'Good afternoon, Admin';
-    return 'Good evening, Admin';
+    const session = getSession() || {};
+    const firstName = escapeHTML$1(String(session.displayName || '').trim().split(/\s+/)[0] || 'there');
+    if (hour < 12) return `Good morning, ${firstName}`;
+    if (hour < 17) return `Good afternoon, ${firstName}`;
+    return `Good evening, ${firstName}`;
   }
 
   const statCard = (label, value, glyph, color = 'blue') => `
@@ -36898,7 +36640,7 @@
       }).join('');
     }
 
-    return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
+    return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <div class="stat-grid">
     ${statCard('Total Children', totalChildren.toLocaleString(), 'users', 'blue')}
     ${statCard('Growth Records', growthCount.toLocaleString(), 'ruler', 'amber')}
@@ -37082,7 +36824,7 @@
             <button class="button button--sm button--secondary" type="button" data-edit-growth-item='${safeGJson}' style="margin-right:6px;">
               ${icon('pencil')} Edit
             </button>
-            <button class="icon-button tooltip" type="button" data-tooltip="Delete measurement" data-delete-growth-id="${g.id || g.date}" style="color:var(--color-danger);">
+            <button class="icon-button tooltip" type="button" data-tooltip="Delete measurement" data-delete-growth-id="${escapeHTML$1(g.id || g.date)}" data-child-id="${escapeHTML$1(g.childId || '')}" style="color:var(--color-danger);">
               ${icon('trash')}
             </button>
           </td>
@@ -37564,13 +37306,8 @@
   }
 
   function registerChildPage() {
-    const method = getURLParam('method');
     const editId = getURLParam('edit');
     const child = editId ? getChild(editId) : null;
-
-    if (method !== 'manual' && !editId) {
-      return shell('register-child', `${heading('Register a child', 'Choose the quickest, most reliable way to start a new child record.')}<section class="card"><div class="card__body"><div class="method-grid"><article class="method-card card card--interactive"><span class="method-card__icon">${icon('pencil')}</span><div><h2 class="card__title">Enter details manually</h2><p>Start with a clean, guided form. Best when information is already at hand.</p></div><a class="button" href="${pagePath('register-child')}?method=manual">Start manual entry ${icon('arrowRight')}</a></article><article class="method-card card card--interactive"><span class="method-card__icon">${icon('scan')}</span><div><h2 class="card__title">Google Cloud Vision API Document Upload</h2><p>Extract information automatically from medical documents using Cloud Vision API, then verify before saving.</p></div><a class="button button--primary" href="${pagePath('ocr-upload')}">Upload document ${icon('arrowRight')}</a></article></div></div></section>`);
-    }
 
     let firstName = '', lastName = '', email = '', father = '', phone = '', blood = '';
     if (child) {
@@ -37634,57 +37371,6 @@
   </div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML$1(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML$1(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
-  }
-
-  /* ═══════════════════════════════════════════════════════
-     GOOGLE CLOUD VISION API EXTRACTION PAGES
-     ═══════════════════════════════════════════════════════ */
-
-  function ocrUploadPage() {
-    return shell('ocr-upload', `${heading('Google Cloud Vision API Extraction', 'Upload a medical document (Blood Reports, Prescriptions, Medical Certificates, Vaccination Records, Aadhaar). Google Cloud Vision API will extract structured fields for review.', `<a class="button button--ghost" href="${pagePath('register-child')}">Cancel</a>`)}<div class="form-layout"><section class="card"><div class="card__body"><div class="upload-zone" data-upload-zone><span class="upload-zone__icon">${icon('upload')}</span><h2 class="card__title">Drop a medical document here</h2><p>Choose a file from your device. Google Cloud Vision API will scan and extract health & child details.</p><button class="button button--primary" type="button" data-start-ocr>${icon('file')}Choose document</button><input class="sr-only" type="file" accept=".jpg,.jpeg,.png" data-upload-input><span class="upload-zone__formats">JPG or PNG · Up to 15 MB</span></div></div><div style="padding:16px; background:var(--color-bg-alt); border-top:1px solid var(--color-border);"><b style="font-size:13px; display:block; margin-bottom:8px;">Supported Document Types:</b><div style="display:flex; flex-wrap:wrap; gap:8px;"><span class="badge badge--blue">Blood Reports</span><span class="badge badge--blue">Prescriptions</span><span class="badge badge--blue">Handwritten Medical Notes</span><span class="badge badge--blue">Medical Certificates</span><span class="badge badge--blue">Vaccination Records</span></div></div></section>${steps(0, true)}</div>`);
-  }
-
-  function ocrProcessingPage() {
-    return shell('ocr-processing', `${heading('Processing with Google Cloud Vision API', 'Extracted details will be prepared for your verification before any record is updated.')}<section class="card"><div class="ocr-processing"><div class="ocr-processing__orbit" style="box-shadow: 0 0 25px rgba(59, 130, 246, 0.35);">${icon('scan')}</div><h2>Google Cloud Vision API Scanning</h2><p>Performing multi-pass document OCR and extracting health vital data for review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span class="ocr-progress-status" style="font-weight: 600; color: var(--color-primary);">Analyzing image contrast with Google Cloud Vision API...</span><span class="ocr-progress-pct" style="font-weight: 700;">0%</span></div><div class="progress" style="height: 10px;"><div class="progress__bar ocr-progress-bar" style="width: 0%; transition: width 0.25s ease-out;"></div></div></div></div></section>`);
-  }
-
-  function ocrReviewPage() {
-    const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-    const firstName = ocrData.firstName || '';
-    const lastName = ocrData.lastName || '';
-    const dob = ocrData.dob || '';
-    const blood = ocrData.blood || '';
-    const father = ocrData.father || '';
-    const mother = ocrData.mother || '';
-    const phone = ocrData.phone || '';
-    const idNumber = ocrData.idNumber || '';
-    const gender = ocrData.gender || '';
-
-    const uploadedFile = localStorage.getItem('ocr-upload-file');
-    let previewHTML = '';
-    if (uploadedFile) {
-      previewHTML = `<div class="document-preview-img-wrap" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#f3f4f6; position:relative; min-height:360px;">
-      <img class="document-preview-img" src="${uploadedFile}" alt="Uploaded document" style="max-width:100%; max-height:100%; object-fit:contain; transition:transform 0.2s ease;" data-rotation="0">
-    </div>`;
-    } else {
-      previewHTML = `<div class="document-sheet"><div class="document-sheet__brand">GOOGLE CLOUD VISION OCR</div><div class="document-sheet__title">EXTRACTED HEALTH RECORD FORM</div><div class="document-sheet__line document-sheet__line--wide"></div><div class="document-sheet__line document-sheet__line--half"></div><div class="document-sheet__table"><div class="document-sheet__cell"><b>CHILD NAME</b><span>${firstName} ${lastName}</span></div><div class="document-sheet__cell"><b>DATE OF BIRTH</b><span>${dob}</span></div><div class="document-sheet__cell"><b>PARENT'S NAME</b><span>${father}</span></div><div class="document-sheet__cell"><b>BLOOD GROUP</b><span>${blood}</span></div><div class="document-sheet__cell"><b>PHONE</b><span>${phone}</span></div><div class="document-sheet__cell"><b>ID NUMBER</b><span>${idNumber}</span></div></div></div>`;
-    }
-
-    return shell('ocr-review', `${heading('Review Cloud Vision API Extracted Data', 'Check the values below against the document before continuing.', `<button class="button" type="button" data-ocr-back>Back</button><button class="button button--primary" type="button" data-ocr-continue>Continue to details ${icon('arrowRight')}</button>`)}<div class="form-layout"><div class="review-layout"><section class="card document-preview"><div class="document-toolbar"><span class="badge badge--blue">Cloud Vision Scan</span><div class="document-toolbar__controls"><button class="icon-button icon-button--small tooltip" data-tooltip="Rotate" type="button" data-ocr-rotate>${icon('rotate')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Fullscreen" type="button" data-ocr-fullscreen>${icon('maximize')}</button></div></div>${previewHTML}</section><form class="card"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Extracted fields</h2><p>Review the values detected by Cloud Vision API.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">First name</span><input class="input" value="${firstName}" name="firstName"></label><label class="field"><span class="field__label">Last name</span><input class="input" value="${lastName}" name="lastName"></label><label class="field"><span class="field__label">Date of birth</span><input class="input" value="${dob}" name="date"></label><label class="field"><span class="field__label">Gender</span><input class="input" value="${gender}" name="gender"></label><label class="field"><span class="field__label">Blood group</span><input class="input" value="${blood}" name="blood"></label><label class="field"><span class="field__label">ID number</span><input class="input" value="${idNumber}" name="idNumber"></label><label class="field form-span-all"><span class="field__label">Parent / guardian</span><input class="input" value="${father}" name="father"></label><label class="field form-span-all"><span class="field__label">Mother name</span><input class="input" value="${mother}" name="mother"></label></div></section><section class="form-section"><label class="checkbox"><input type="checkbox" data-ocr-confirm required><span>I've checked the extracted details against the original document.</span></label></section></form></div>${steps(2, true)}</div>`);
-  }
-
-  function ocrDetailsPage() {
-    const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-    const firstName = ocrData.firstName || '';
-    const lastName = ocrData.lastName || '';
-    const father = ocrData.father || '';
-    const mother = ocrData.mother || '';
-    const gender = ocrData.gender || '';
-    const blood = ocrData.blood || '';
-    const phone = ocrData.phone || '';
-    const idNumber = ocrData.idNumber || '';
-
-    return shell('ocr-details', `${heading('Additional details', 'Complete remaining health details before saving.', `<a class="button" href="${pagePath('ocr-review')}">Back</a><button class="button button--primary" type="submit" form="ocr-additional-form">Save child record</button>`)}<div class="form-layout"><form class="card" id="ocr-additional-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Registration & contact</h2><p>Complete any additional details for this record.</p></div><div class="form-grid--two">${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', mother)}${field('Mobile number *', 'phone', 'e.g. +91 98221 40393', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email')}${field('Height (cm)', 'height', 'e.g. 140', 'number', '', '', 'step="any" min="0"')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', '', 'step="any" min="0"')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes"></textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin"></textarea></label><label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode"></textarea></label><label class="field form-span-all"><span class="field__label">Upload Additional Medical Records / Reports</span><input class="input" type="file" name="additionalDoc" accept=".jpg,.jpeg,.png,.pdf" data-additional-doc-input><span style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">Upload blood test reports, immunization records, or medical certificates.</span></label></div></section><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Final verification</h2><p>You're about to create the child record.</p></div><label class="checkbox"><input type="checkbox" required><span>I confirm the information is accurate and complete.</span></label></section><input type="hidden" name="firstName" value="${firstName}"><input type="hidden" name="lastName" value="${lastName}"><input type="hidden" name="father" value="${father}"><input type="hidden" name="gender" value="${gender}"><input type="hidden" name="blood" value="${blood}"><input type="hidden" name="idNumber" value="${idNumber}"><input type="hidden" name="dob" value="${ocrData.dob || ''}"></form>${steps(3, true)}</div>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -37780,7 +37466,7 @@
       contentHTML = `<div class="empty-state" style="padding:48px 24px">
       <span class="empty-state__icon">${icon('file')}</span>
       <h3>No health documents uploaded yet</h3>
-      <p>Click "Upload document" to attach medical reports or use Google Cloud Vision API.</p>
+      <p>Click "Upload document" to attach medical reports, certificates or ID documents.</p>
     </div>`;
     } else {
       contentHTML = `<div class="document-grid" id="document-grid">
@@ -37817,7 +37503,7 @@
 
     const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
 
-    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button>${unsyncedCount > 0 ? `<button class="button button--ghost" type="button" data-auto-sync-drive style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')}Sync ${unsyncedCount} to Drive</button>` : ''}<a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
+    return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button>${unsyncedCount > 0 ? `<button class="button button--ghost" type="button" data-auto-sync-drive style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')}Sync ${unsyncedCount} to Drive</button>` : ''}`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -37837,16 +37523,24 @@
     const malePct = total > 0 ? Math.round((males / total) * 100) : 0;
     const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
 
-    return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
-  <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length || 4}</div><p class="report-card__caption">verified lab test reports</p></article></div>
-  
+    // Checkup coverage: children with a checkup or measurement in the last 90 days.
+    const growthRecords = getGrowthRecords();
+    const cutoff = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const thisMonth = new Date().toISOString().slice(0, 7);
+    const recentlySeen = new Set(growthRecords.filter(g => g.date && g.date >= cutoff).map(g => g.childId));
+    const recentCount = children.filter(c => recentlySeen.has(c.id)).length;
+    const checkupsThisMonth = growthRecords.filter(g => (g.date || '').startsWith(thisMonth)).length;
+    const neverSeen = children.filter(c => !growthRecords.some(g => g.childId === c.id)).length;
+
+    return shell('reports', `${heading('Health reports & analytics', 'Summary of children\u2019s health status and clinical records.', `<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
+  <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length}</div><p class="report-card__caption">lab test reports on file</p></article></div>
+
   <section class="card section-gap" style="margin-top: 24px;">
     <header class="card__header">
       <div>
         <h2 class="card__title">NGO Health Platform Executive Summary</h2>
-        <p class="card__caption">Audited health status and growth tracking overview</p>
+        <p class="card__caption">Health status and checkup coverage, as of ${formatDate(new Date())}</p>
       </div>
-      <span class="badge badge--success">${icon('check')} Audited & Verified</span>
     </header>
     <div class="card__body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; padding: 20px 0;">
       <div>
@@ -37860,10 +37554,12 @@
       </div>
       <div>
         <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-success);">
-          ${icon('ruler')} Growth Tracking Performance
+          ${icon('ruler')} Checkup Coverage
         </h3>
         <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
-          Regular assessments ensure height, weight, and BMI progression are monitored according to WHO standards.
+          <b>${recentCount} out of ${total} children</b> had a checkup or measurement in the last 90 days.
+          <b>${checkupsThisMonth}</b> checkup record(s) this month.
+          ${neverSeen > 0 ? `<b>${neverSeen} child(ren)</b> have no checkup recorded yet.` : 'Every child has at least one checkup on record.'}
         </p>
       </div>
     </div>
@@ -37885,6 +37581,7 @@
     const adminEmail = sheetsConfig.adminEmail || 'Admin';
     const masterSheetUrl = getGoogleSheetUrl();
     const clinicalSheetUrl = getClinicalSheetUrl();
+    const monthlySheetUrl = getMonthlySheetUrl();
 
     return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
   <div class="settings-layout">
@@ -37915,7 +37612,7 @@
             <div style="background: rgba(234, 67, 53, 0.08); border-left: 4px solid #ea4335; padding: 12px 14px; border-radius: 4px; margin-bottom: 16px;">
               <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">Google Workspace Authorization Expired</div>
               <div style="font-size: 12.5px; color: var(--color-text); line-height: 1.4;">
-                Google OAuth tokens in Testing mode expire periodically. Click <strong>Reconnect Google Sheets Sync</strong> below to refresh authorization and instantly sync your records and Monika Sharma's clinical vitals to Google Sheets.
+                Google OAuth tokens in Testing mode expire periodically. Click <strong>Reconnect Google Sheets Sync</strong> below to refresh authorization and resume syncing your records to Google Sheets.
               </div>
             </div>
           ` : `
@@ -37942,6 +37639,12 @@
               </a>
             ` : ''}
 
+            ${monthlySheetUrl ? `
+              <a href="${escapeHTML$1(monthlySheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                📅 Monthly Checkup Register ↗
+              </a>
+            ` : ''}
+
             ${masterSheetUrl ? `
               <a href="${escapeHTML$1(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
                 📄 Master Directory Sheet ↗
@@ -37964,20 +37667,13 @@
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Authentication</b>
-            <span class="badge badge--success">Connected</span>
+            <b style="font-size: 14px; font-weight: 600;">Signed-in account</b>
+            <span class="badge badge--success">${escapeHTML$1(session.role || 'Admin')}</span>
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">OAuth 2.0 GIS Authentication active. Firestore verified account.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active Account Provider</button>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Cloud Vision API</b>
-            <span class="badge badge--blue">Connected</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Medical document OCR extraction for blood reports, prescriptions & certificates.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active OCR Provider</button>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">
+            ${escapeHTML$1(session.email || 'Unknown account')} · ${escapeHTML$1(session.ngo || 'No NGO assigned')}
+            ${session.loginTimestamp ? `<br>Signed in ${escapeHTML$1(formatDate(session.loginTimestamp))}` : ''}
+          </p>
         </div>
       </div>
     </section>
@@ -38113,10 +37809,6 @@
       'child-profile': childProfilePage,
       'child_profile': childProfilePage,
       'register-child': registerChildPage,
-      'ocr-upload': ocrUploadPage,
-      'ocr-processing': ocrProcessingPage,
-      'ocr-review': ocrReviewPage,
-      'ocr-details': ocrDetailsPage,
       documents: documentsPage,
       reports: reportsPage,
       settings: settingsPage,
@@ -38191,12 +37883,12 @@
         actionType: 'navigate'
       },
       {
-        id: 'cmd-ocr',
-        title: 'Upload Health Documents (OCR)',
-        subtitle: 'Smart auto-extraction for immunization cards & lab tests',
+        id: 'cmd-documents',
+        title: 'Upload Health Documents',
+        subtitle: 'Store reports, certificates & ID documents in Google Drive',
         iconSvg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
-        badge: 'OCR AI',
-        url: `${pagePath('ocr-upload')}`,
+        badge: 'Drive',
+        url: `${pagePath('documents')}`,
         actionType: 'navigate'
       },
       {
@@ -38528,16 +38220,126 @@
   `;
   }
 
-  function closeModal() { document.querySelector('#modal-root').replaceChildren(); }
+  /**
+   * googleDocsSync.js
+   * Real-time Executive Health Report synchronization to Google Docs.
+   * Automatically formats and updates executive health summaries, audit statistics,
+   * WHO growth metrics, and child clinical logs directly into the live Google Doc.
+   */
 
-  function modal$1({ title, body, confirmText = 'Confirm', confirmClass = 'button--primary', onConfirm }) {
-    const root = document.querySelector('#modal-root');
-    const safeTitle = escapeHTML$1(title);
-    root.innerHTML = `<div class="modal-backdrop" role="presentation"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header class="modal__header"><div><h2 id="modal-title" class="modal__title">${safeTitle}</h2></div><button class="icon-button icon-button--small" type="button" aria-label="Close dialog" data-modal-close>${icon('x')}</button></header><div class="modal__body">${body}</div><footer class="modal__footer"><button class="button" type="button" data-modal-close>Cancel</button><button class="button ${confirmClass}" type="button" data-modal-confirm>${confirmText}</button></footer></section></div>`;
-    root.querySelectorAll('[data-modal-close]').forEach((button) => button.addEventListener('click', closeModal));
-    root.querySelector('.modal-backdrop').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeModal(); });
-    root.querySelector('[data-modal-confirm]').addEventListener('click', () => { onConfirm?.(); closeModal(); });
-    root.querySelector('[data-modal-close]')?.focus();
+
+  let cachedDocsConfig = null;
+
+  /**
+   * Fetch Docs config for the current NGO from backend API
+   */
+  async function fetchDocsConfig(ngoSlug) {
+    const session = getSession() || {};
+    const slug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
+    try {
+      const res = await apiFetch(`/api/docs/config?ngo=${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        cachedDocsConfig = await res.json();
+        return cachedDocsConfig;
+      }
+    } catch (err) {
+      console.warn('[Google Docs] Config fetch warning:', err);
+    }
+    return cachedDocsConfig || { connected: false };
+  }
+
+  /**
+   * Generate formatted executive report document text
+   */
+  function generateExecutiveDocContent() {
+    const session = getSession() || {};
+    const ngoName = session.ngo || 'Ayusha Nilayam';
+    const children = getChildren() || [];
+    const total = children.length;
+    const flaggedCount = children.filter(c => healthStatus(c).level !== 'good').length;
+    const healthyCount = total - flaggedCount;
+    const healthyPct = total > 0 ? Math.round((healthyCount / total) * 100) : 0;
+    const healthRecords = getHealthRecords() || [];
+
+    const timestamp = new Date().toLocaleString('en-IN', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    let reportText = `========================================================================\n`;
+    reportText += `       EXECUTIVE CHILD HEALTH AUDIT REPORT — ${ngoName.toUpperCase()}\n`;
+    reportText += `       Auto-Synced Live Document | ${timestamp}\n`;
+    reportText += `========================================================================\n\n`;
+
+    reportText += `1. EXECUTIVE HEALTH SUMMARY\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+    reportText += `• Total Registered Children : ${total}\n`;
+    reportText += `• Optimal Health Status     : ${healthyCount} children (${healthyPct}%)\n`;
+    reportText += `• Health Alerts / Flagged   : ${flaggedCount} children\n`;
+    reportText += `• Lab Test Reports on File  : ${healthRecords.length}\n\n`;
+
+    reportText += `2. REGISTERED CHILD ROSTER & CLINICAL METRICS\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+    reportText += `ID         | Name                     | Age | Gender | Status  | Height  | Weight  | Medications          | Hygiene\n`;
+    reportText += `------------------------------------------------------------------------\n`;
+
+    children.forEach(c => {
+      const age = calculateAge(c.dob) || c.age || '—';
+      const id = String(c.id || 'CH-0000').padEnd(10, ' ');
+      const name = String(c.name || 'Child').slice(0, 24).padEnd(24, ' ');
+      const ageStr = String(age).slice(0, 3).padEnd(4, ' ');
+      const gender = String(c.gender || '—').slice(0, 6).padEnd(7, ' ');
+      const status = String(c.status || 'Active').slice(0, 7).padEnd(8, ' ');
+      const h = String(c.height ? `${c.height}cm` : '—').padEnd(8, ' ');
+      const w = String(c.weight ? `${c.weight}kg` : '—').padEnd(8, ' ');
+      const meds = String(c.medications || 'None').slice(0, 20).padEnd(20, ' ');
+      const hygiene = String(c.hygieneIndex || 'N/A');
+
+      reportText += `${id} | ${name} | ${ageStr} | ${gender} | ${status} | ${h} | ${w} | ${meds} | ${hygiene}\n`;
+    });
+
+    reportText += `\n------------------------------------------------------------------------\n`;
+    reportText += `End of Live Synced Report | Child Health Management Platform\n`;
+
+    return reportText;
+  }
+
+  /**
+   * Automatically sync executive report to Google Docs in background via OAuth API
+   */
+  async function autoSyncToGoogleDocs() {
+    const session = getSession() || {};
+    const ngoSlug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
+    const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
+    const reportContent = generateExecutiveDocContent();
+
+    try {
+      const res = await apiFetch('/api/docs/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reportContent, ngo: ngoSlug, ngoName })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.success) {
+          if (data.documentUrl) {
+            if (!cachedDocsConfig) cachedDocsConfig = { connected: true };
+            cachedDocsConfig.connected = true;
+            cachedDocsConfig.documentUrl = data.documentUrl;
+          }
+          console.log('[Google Docs] Executive report live synced.');
+        } else if (data && data.message === 'Not connected') {
+          console.log('[Google Docs] Skip auto-sync: NGO is not connected to Google Workspace.');
+        }
+      }
+    } catch (err) {
+      console.warn('[Google Docs] OAuth sync notice:', err);
+    }
   }
 
   function collectChild(form) {
@@ -39139,7 +38941,6 @@
   }
 
   let activeSort = { field: 'name', direction: 'asc' };
-  let activeDocFilter = 'All';
   let currentPage = 1;
   const itemsPerPage = 5;
   let page = 'dashboard';
@@ -39200,7 +39001,7 @@
         } else if (urlParams.has('google_error')) {
           const errType = urlParams.get('google_error');
           if (errType === 'unauthorized') {
-            modal$1({
+            modal({
               title: 'Account Authorization Notice',
               body: `
               <div style="text-align:center; padding:12px 8px;">
@@ -39312,7 +39113,6 @@
         app.innerHTML = renderPage(page);
         applyColumnVisibility();
         initFormListeners();
-        initOCRProcessing();
         if (page === 'children') {
           initDragReorder();
           initColumnDragReorder();
@@ -39358,16 +39158,13 @@
 
   // Document Clicks
   document.addEventListener('click', (event) => {
-    const target = event.target.closest('button, a, input[data-global-search], [data-upload-zone], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-open-clinical-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
+    const target = event.target.closest('button, a, input[data-global-search], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-open-clinical-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
     if (!target) return;
 
     if (target.matches('[data-topbar-back]')) {
       const prevPageMap = {
         'child-profile': 'children',
         'register-child': 'children',
-        'ocr-review': 'ocr-upload',
-        'ocr-details': 'ocr-review',
-        'ocr-processing': 'ocr-upload',
         'children': 'dashboard',
         'documents': 'dashboard',
         'reports': 'dashboard',
@@ -39515,7 +39312,7 @@
           window.location.hash = '#/';
           if (renderCurrentPage) renderCurrentPage();
         } else if (res.errorCode === 'ACCESS_DENIED') {
-          modal$1({
+          modal({
             title: 'Access Denied',
             body: `<div style="text-align:center; padding:16px 8px;">
               <div style="font-size:44px; margin-bottom:8px;">🚫</div>
@@ -39533,28 +39330,6 @@
         }
       });
     }
-
-    const toggleServiceBtn = target.closest('[data-toggle-google-service]');
-    if (toggleServiceBtn) {
-      const service = toggleServiceBtn.dataset.toggleGoogleService;
-      const key = `google-${service}-connected`;
-      const isConnected = localStorage.getItem(key) === 'true';
-      const serviceName = service === 'drive' ? 'Google Drive' : service === 'sheets' ? 'Google Sheets' : 'Google Calendar';
-
-      if (isConnected) {
-        localStorage.setItem(key, 'false');
-        toast(`${serviceName} Disconnected`, 'Service disconnected from workspace.');
-      } else {
-        localStorage.setItem(key, 'true');
-        toast(`${serviceName} Connected`, `Successfully connected to workspace account.`);
-      }
-
-      window.setTimeout(() => {
-        window.location.reload();
-      }, 400);
-    }
-
-
 
     // ─── Open Event Details Popover Card ───
     const deleteBtn = target.closest('[data-delete-event-id]');
@@ -39799,18 +39574,6 @@
       return;
     }
 
-    if (target.closest('[data-open-sheets-template]')) {
-      openGoogleSheetsTemplateModal();
-    }
-
-    if (target.closest('[data-open-docs-template]')) {
-      openGoogleDocsTemplateModal();
-    }
-
-    if (target.closest('[data-sync-google-doc]')) {
-      syncAndOpenGoogleDoc();
-    }
-
     const syncSheetsBtn = target.closest('[data-sync-from-sheets]');
     if (syncSheetsBtn) {
       event.preventDefault();
@@ -39838,7 +39601,7 @@
     if (disconnectSheetsBtn) {
       event.preventDefault();
       const ngoSlug = disconnectSheetsBtn.getAttribute('data-ngo') || 'ayusha-nilayam';
-      modal$1({
+      modal({
         title: 'Disconnect Google Sheets?',
         body: `
         <div style="text-align:center; padding:12px 8px;">
@@ -39914,7 +39677,7 @@
           <span>${col.label}</span>
         </label>
       `).join('');
-      modal$1({
+      modal({
         title: 'Configure columns',
         body: `<div style="display:flex; flex-direction:column; gap:4px; padding: 10px 0;">
           <p style="margin-bottom:12px; font-size:12px; color:var(--color-text-muted);">Toggle columns or reorder them by dragging column headers in the table.</p>
@@ -39953,7 +39716,7 @@
       const id = target.dataset.delete;
       const child = getChildren().find((item) => item.id === id);
       const childName = child?.name || 'child';
-      modal$1({
+      modal({
         title: `Remove ${childName}?`,
         body: 'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
         confirmText: 'Remove child',
@@ -40004,7 +39767,7 @@
       const childId = uploadProfileBtn.dataset.uploadProfileDoc;
       const childName = uploadProfileBtn.dataset.childName || 'Child';
 
-      modal$1({
+      modal({
         title: `Upload Document for ${childName}`,
         body: `
         <form id="profile-doc-upload-form" class="form-layout" style="display:flex; flex-direction:column; gap:14px;">
@@ -40121,7 +39884,7 @@
       const docs = getUploadedDocs();
       const doc = (docId && docs.find(d => d.id === docId)) || docs[idx];
       if (doc) {
-        modal$1({
+        modal({
           title: `${doc.name} - ${doc.child || doc.student || '—'}`,
           body: doc.image
             ? `<div style="text-align:center; max-height: 70vh; overflow: auto;"><img src="${doc.image}" style="max-width:100%; max-height: 55vh; object-fit:contain; border-radius:6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /></div>`
@@ -40132,24 +39895,13 @@
       }
     }
 
-    if (target.matches('[data-bulk-export], [data-report-export], [data-create-export]')) {
-      exportChildrenToExcel();
-    }
-
-    if (target.matches('[data-report-email]')) toast('Report queued for email', 'A secure report link will be delivered to your inbox.');
     if (target.matches('[data-report-print], [data-profile-print]')) window.print();
-    if (target.matches('[data-apply-report]')) toast('Report updated', 'Your report now reflects the selected filters.');
 
     if (target.matches('[data-save-settings]')) {
       const orgNameInput = document.querySelector('input[name="schoolName"]')?.value.trim() || 'An Organisation';
       const orgCodeInput = document.querySelector('input[name="schoolCode"]')?.value.trim() || 'ORG-IND-01';
       const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
       const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
-
-      const sheetInput = document.querySelector('#admin-google-sheet-input')?.value.trim();
-      if (sheetInput) {
-        localStorage.setItem('google_sheet_url', sheetInput);
-      }
 
       localStorage.setItem('sample-org-name', orgNameInput);
       localStorage.setItem('sample-org-code', orgCodeInput);
@@ -40158,17 +39910,6 @@
 
       toast('Settings saved', 'Your workspace preferences and Google Sheet connection are up to date.');
       window.setTimeout(() => { window.location.reload(); }, 600);
-    }
-
-    if (target.matches('[data-2fa]')) toast('Security configuration', 'Two-factor authentication configuration would open here.');
-    if (target.matches('[data-upload-document]')) toast('Choose a document', 'Use Smart Upload for guided document extraction.');
-
-    if (target.matches('[data-filter-docs]')) {
-      const statuses = ['All', 'Pending', 'Verified'];
-      const currIdx = statuses.indexOf(activeDocFilter);
-      activeDocFilter = statuses[(currIdx + 1) % statuses.length];
-      target.innerHTML = `${icon('filter')}Status: ${activeDocFilter}`;
-      applyDocumentFilters();
     }
 
     if (target.closest('[data-add-measurement]')) {
@@ -40216,52 +39957,6 @@
       if (form) {
         form.remove();
         toast('Form removed', 'Measurement form was removed.');
-      }
-    }
-
-    if (target.matches('[data-activity]')) toast('Activity feed', 'Your activity history is up to date.');
-    if (target.matches('[data-start-ocr]')) document.querySelector('[data-upload-input]')?.click();
-    if (target.matches('[data-upload-zone]')) document.querySelector('[data-upload-input]')?.click();
-    if (target.matches('[data-ocr-back]')) window.history.back();
-
-    if (target.matches('[data-ocr-continue]')) {
-      if (document.querySelector('[data-ocr-confirm]')?.checked) {
-        const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-        const formFields = document.querySelectorAll('form.card input, form.card select');
-        formFields.forEach(field => {
-          if (field.name) {
-            ocrData[field.name] = field.value;
-          }
-        });
-        localStorage.setItem('ocr-parsed-data', JSON.stringify(ocrData));
-        window.location.href = pagePath('ocr-details');
-      } else {
-        toast('Review required', 'Confirm that you have checked the extracted details before continuing.');
-      }
-    }
-
-    if (target.matches('[data-ocr-rotate], [data-ocr-rotate] *')) {
-      const img = document.querySelector('.document-preview-img');
-      if (img) {
-        let rotation = parseInt(img.dataset.rotation || '0', 10);
-        rotation = (rotation + 90) % 360;
-        img.dataset.rotation = String(rotation);
-        img.style.transform = `rotate(${rotation}deg)`;
-      } else {
-        toast('Preview not active', 'No document image is currently loaded to rotate.');
-      }
-    }
-
-    if (target.matches('[data-ocr-fullscreen], [data-ocr-fullscreen] *')) {
-      const wrapper = document.querySelector('.document-preview-img-wrap') || document.querySelector('.document-sheet');
-      if (wrapper) {
-        if (document.fullscreenElement) {
-          document.exitFullscreen();
-        } else {
-          wrapper.requestFullscreen?.() || wrapper.webkitRequestFullscreen?.() || wrapper.msRequestFullscreen?.();
-        }
-      } else {
-        toast('Preview not active', 'No document preview is loaded to maximize.');
       }
     }
 
@@ -40387,7 +40082,7 @@
     if (deleteClinicalBtn) {
       const id = deleteClinicalBtn.getAttribute('data-delete-clinical-item');
       const type = deleteClinicalBtn.getAttribute('data-clinical-type') || 'checkup';
-      modal$1({
+      modal({
         title: 'Delete Clinical Record?',
         body: '<p>Are you sure you want to permanently delete this clinical record? This change will automatically sync to Google Sheets.</p>',
         confirmText: 'Delete Record',
@@ -40483,13 +40178,14 @@
     const delGrowthBtn = target.closest('[data-delete-growth-id]');
     if (delGrowthBtn) {
       const id = delGrowthBtn.dataset.deleteGrowthId;
-      modal$1({
+      const growthChildId = delGrowthBtn.dataset.childId;
+      modal({
         title: 'Delete Growth Record?',
         body: 'Are you sure you want to remove this historical measurement? This will update your local records and sync to cloud database.',
         confirmText: 'Delete Record',
         confirmClass: 'button--danger',
         onConfirm: async () => {
-          deleteGrowthRecord(id);
+          deleteGrowthRecord(id, growthChildId);
           try {
             await syncWithServer();
           } catch (e) {
@@ -40508,12 +40204,6 @@
       toast(`${target.textContent.trim()} settings`, 'This section is ready for configuration.');
     }
 
-    // Delete emergency contact
-    if (target.matches('[data-delete-contact]')) {
-      const contactId = target.dataset.deleteContact;
-      modal$1({ title: 'Remove contact?', body: 'This will permanently remove this emergency contact.', confirmText: 'Remove', confirmClass: 'button--danger', onConfirm: () => { deleteEmergencyContact(contactId); toast('Contact removed', 'Emergency contact has been deleted.'); window.setTimeout(() => window.location.reload(), 500); } });
-    }
-
     // Dismiss health alert
     if (target.closest('[data-dismiss-alert]')) {
       const alertId = target.closest('[data-dismiss-alert]').dataset.dismissAlert;
@@ -40528,7 +40218,7 @@
       const selectedFilter = document.querySelector('[data-child-document-filter]')?.value || '';
       const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name} (${c.id})</option>`).join('');
 
-      modal$1({
+      modal({
         title: 'Upload Document for Child',
         body: `
           <form id="direct-doc-form" style="display:flex; flex-direction:column; gap:14px;">
@@ -40617,7 +40307,7 @@
       const docName = targetDoc?.name || 'Document';
       const childName = targetDoc?.child || targetDoc?.childName || '';
 
-      modal$1({
+      modal({
         title: 'Delete Document?',
         body: `Are you sure you want to remove <strong>${escapeHTML$1(docName)}</strong>${childName ? ` for ${escapeHTML$1(childName)}` : ''} from records?`,
         confirmText: 'Delete',
@@ -40644,7 +40334,7 @@
                   <div class="empty-state" style="padding:48px 24px">
                     <span class="empty-state__icon">${icon('file')}</span>
                     <h3>No health documents uploaded yet</h3>
-                    <p>Click "Upload document" to attach medical reports or use Google Cloud Vision API.</p>
+                    <p>Click "Upload document" to attach medical reports, certificates or ID documents.</p>
                   </div>`;
                 }
               }
@@ -40746,36 +40436,6 @@
       applyTableFilters();
     }
     if (event.target.matches('#select-all')) document.querySelectorAll('[data-select-row]').forEach((input) => { input.checked = event.target.checked; });
-    if (event.target.matches('[data-upload-input]') && event.target.files?.length) {
-      processUploadedFile(event.target.files[0]);
-    }
-  });
-
-  // Drag & Drop
-  document.addEventListener('dragover', (event) => {
-    const zone = event.target.closest('[data-upload-zone]');
-    if (zone) {
-      event.preventDefault();
-      zone.classList.add('is-dragging');
-    }
-  });
-
-  document.addEventListener('dragleave', (event) => {
-    const zone = event.target.closest('[data-upload-zone]');
-    if (zone && !zone.contains(event.relatedTarget)) {
-      zone.classList.remove('is-dragging');
-    }
-  });
-
-  document.addEventListener('drop', (event) => {
-    const zone = event.target.closest('[data-upload-zone]');
-    if (zone) {
-      event.preventDefault();
-      zone.classList.remove('is-dragging');
-      if (event.dataTransfer.files?.length) {
-        processUploadedFile(event.dataTransfer.files[0]);
-      }
-    }
   });
 
   // ─── Drag-and-Drop Row Reorder (Apple-style) ───
@@ -41035,89 +40695,6 @@
       });
     });
 
-    // OCR additional form
-    document.addEventListener('submit', (event) => {
-      const form = event.target;
-      if (!form || form.id !== 'ocr-additional-form') return;
-      event.preventDefault();
-      if (!form.reportValidity()) return;
-      const child = saveChild(form);
-      logActivity('doc_processed', child.name, 'OCR-verified child saved');
-      addPendingDoc('Health record', child.name);
-
-      const fileData = localStorage.getItem('ocr-upload-file');
-      const fileName = localStorage.getItem('ocr-upload-filename') || 'Medical Document';
-      let docLabel = 'Medical Report';
-      if (fileName.toLowerCase().includes('aadhaar') || fileName.toLowerCase().includes('aadhar')) {
-        docLabel = 'Aadhaar Card';
-      } else if (fileName.toLowerCase().includes('birth') || fileName.toLowerCase().includes('cert')) {
-        docLabel = 'Birth Certificate';
-      } else if (fileName.toLowerCase().includes('blood') || fileName.toLowerCase().includes('cbc') || fileName.toLowerCase().includes('test')) {
-        docLabel = 'Blood Test Report';
-      }
-      const ocrDoc = addUploadedDoc(docLabel, child.name, fileData, 'Verified', docLabel, child.id);
-      if (fileData) {
-        syncSingleDocToDrive(ocrDoc).catch(e => console.warn('[OCR Drive Sync notice]', e.message));
-      }
-
-      const addInput = form.querySelector('[data-additional-doc-input]');
-      if (addInput && addInput.files && addInput.files[0]) {
-        const addFile = addInput.files[0];
-        const addReader = new FileReader();
-        addReader.onload = async function (e) {
-          const addDoc = addUploadedDoc(addFile.name.replace(/\.[^/.]+$/, ""), child.name, e.target.result, 'Verified', 'Medical Record', child.id);
-          uploadDocumentToDrive(addFile, { childName: child.name, childId: child.id, docName: addFile.name, docType: 'Medical Record' })
-            .then(res => {
-              if (res && res.success && res.driveUrl) {
-                updateUploadedDoc(addDoc.id, {
-                  driveFileId: res.driveFileId,
-                  driveUrl: res.driveUrl,
-                  childFolderId: res.childFolderId,
-                  childFolderUrl: res.childFolderUrl
-                });
-              }
-            })
-            .catch(err => console.warn('[AddDoc Drive Sync notice]', err.message));
-        };
-        addReader.readAsDataURL(addFile);
-      }
-
-      // Save blood report test results to health records
-      const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-      if (ocrData.isBloodReport || ocrData.hemoglobin || ocrData.rbc) {
-        addHealthRecord({
-          childId: child.id,
-          childName: child.name,
-          type: 'cbc',
-          date: new Date().toISOString().slice(0, 10),
-          hemoglobin: ocrData.hemoglobin || '',
-          wbc: ocrData.wbc || '',
-          rbc: ocrData.rbc || '',
-          platelets: ocrData.platelets || '',
-          pcv: ocrData.pcv || ''
-        });
-
-        const alerts = [];
-        if (ocrData.hemoglobin && parseFloat(ocrData.hemoglobin) < 11.0) {
-          alerts.push('Low Hemoglobin (Anemia risk)');
-        }
-        if (ocrData.rbc && parseFloat(ocrData.rbc) > 4.8) {
-          alerts.push('High RBC Count');
-        }
-
-        if (alerts.length > 0) {
-          logActivity('health_alert', child.name, `Abnormal blood values: ${alerts.join(', ')}`);
-        } else {
-          logActivity('health_alert', child.name, `Normal blood test processed`);
-        }
-      }
-
-      showSheetsSyncLoader(child.name, () => {
-        toast('Verified child saved', `${child.name}'s record generated in Google Sheets.`);
-        window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
-      });
-    });
-
     // Child Profile: Growth & Health Vitals form (with Date reference)
     document.addEventListener('submit', async (event) => {
       const form = event.target;
@@ -41185,26 +40762,6 @@
       }
     });
 
-    // Meal form
-    document.addEventListener('submit', (event) => {
-      const form = event.target;
-      if (!form || form.id !== 'meal-form') return;
-      event.preventDefault();
-      if (!form.reportValidity()) return;
-      const values = Object.fromEntries(new FormData(form));
-      const child = getChild(values.childId);
-      addMeal({
-        childId: values.childId,
-        childName: child ? child.name : 'Unknown',
-        mealType: values.mealType,
-        date: values.date,
-        description: values.description,
-        calories: values.calories || ''
-      });
-      toast('Meal logged', 'Nutrition entry has been saved.');
-      window.setTimeout(() => window.location.reload(), 500);
-    });
-
     // Medicine form
     document.addEventListener('submit', (event) => {
       const form = event.target;
@@ -41241,6 +40798,7 @@
       }
 
       const values = Object.fromEntries(new FormData(form));
+      const vaccineName = values.type === 'Vaccination' ? (values.vaccineName || '').trim() : '';
       const isAllChildren = values.childId === 'ALL' || values.selectAllChildren === 'true';
 
       if (isAllChildren) {
@@ -41255,6 +40813,7 @@
               time: values.time || '10:00',
               doctor: values.doctor || '',
               specialty: values.specialty || '',
+              vaccineName,
               notes: values.notes || '',
               status: 'Upcoming'
             });
@@ -41268,6 +40827,7 @@
             time: values.time || '10:00',
             doctor: values.doctor || '',
             specialty: values.specialty || '',
+            vaccineName,
             notes: values.notes || '',
             isGroupPlan: true
           }, true, allChildren);
@@ -41287,6 +40847,7 @@
           time: values.time || '',
           doctor: values.doctor || '',
           specialty: values.specialty || '',
+          vaccineName,
           notes: values.notes || ''
         });
       }
@@ -41327,6 +40888,7 @@
         childName: child ? child.name : (existing ? existing.childName : 'Unknown'),
         type: values.type,
         specialty: values.specialty || '',
+        vaccineName: values.type === 'Vaccination' ? (values.vaccineName || '').trim() : '',
         date: values.date,
         time: values.time || '10:00',
         doctor: values.doctor || '',
@@ -41480,6 +41042,11 @@
         }
       }
 
+      if (target && target.name === 'type' && target.closest('#cal-booking-form, #cal-edit-appointment-form')) {
+        const vaccineRow = target.closest('form').querySelector('#cal-vaccine-row');
+        if (vaccineRow) vaccineRow.hidden = target.value !== 'Vaccination';
+      }
+
       if (target && target.id === 'cal-child-select') {
         const checkbox = document.querySelector('#cal-all-children-check');
         const pill = document.querySelector('#cal-all-pill');
@@ -41527,192 +41094,12 @@
         displayEl.textContent = `${displayDate}${displayTime ? ` · ${displayTime}` : ''}`;
       }
     });
-
-    // Emergency contact form
-    document.addEventListener('submit', (event) => {
-      const form = event.target;
-      if (!form || form.id !== 'emergency-form') return;
-      event.preventDefault();
-      if (!form.reportValidity()) return;
-      const values = Object.fromEntries(new FormData(form));
-      addEmergencyContact({
-        name: values.name,
-        type: values.type,
-        phone: values.phone,
-        specialty: values.specialty || '',
-        address: values.address || ''
-      });
-      toast('Contact added', 'Emergency contact has been saved.');
-      window.setTimeout(() => window.location.reload(), 500);
-    });
-
-    // Sponsor form
-    document.addEventListener('submit', (event) => {
-      const form = event.target;
-      if (!form || form.id !== 'sponsor-form') return;
-      event.preventDefault();
-      if (!form.reportValidity()) return;
-      const formData = new FormData(form);
-      const values = Object.fromEntries(formData);
-      addSponsor({
-        name: values.name,
-        phone: values.phone || '',
-        email: values.email || '',
-        totalContribution: parseFloat(values.contribution) || 0,
-        childrenIds: []
-      });
-      toast('Sponsor registered', 'Sponsor record has been created.');
-      window.setTimeout(() => window.location.reload(), 500);
-    });
-
-    // Expense form
-    document.addEventListener('submit', (event) => {
-      const form = event.target;
-      if (!form || form.id !== 'expense-form') return;
-      event.preventDefault();
-      if (!form.reportValidity()) return;
-      const values = Object.fromEntries(new FormData(form));
-      const child = values.childId ? getChild(values.childId) : null;
-      addExpense({
-        date: values.date,
-        category: values.category,
-        amount: values.amount,
-        description: values.description,
-        childId: values.childId || '',
-        childName: child ? child.name : ''
-      });
-      toast('Expense logged', 'Transaction has been recorded.');
-      window.setTimeout(() => window.location.reload(), 500);
-    });
-
-    // Login form (triggers Google Auth flow)
-    document.addEventListener('submit', (event) => {
-      const form = event.target;
-      if (!form || !form.matches('[data-login-form]')) return;
-      event.preventDefault();
-      toast('Opening Google Authentication', 'Please complete sign-in using the Google popup window...');
-      loginWithGoogle().then((res) => {
-        if (res.success) {
-          toast('Firebase Authentication Success', `Logged in as ${res.user.displayName} (${res.user.ngo})`);
-          window.setTimeout(() => { window.location.href = pagePath('dashboard'); }, 850);
-        } else if (res.errorCode === 'ACCESS_DENIED') {
-          modal$1({
-            title: 'Access Denied',
-            body: `<div style="text-align:center; padding:16px 8px;">
-              <div style="font-size:44px; margin-bottom:8px;">🚫</div>
-              <p style="font-size:15px; color:var(--color-text); margin-bottom:8px;"><strong>Unauthorized Google Account</strong></p>
-              <p style="font-size:13.5px; color:var(--color-text-muted); line-height:1.5;">${res.message || 'Your email is not on the authorized administrator allowlist.'}</p>
-            </div>`,
-            onConfirm: () => { window.location.reload(); }
-          });
-        } else {
-          toast('Authentication Info', res.message || 'Google Sign-In popup closed.');
-        }
-      });
-    });
   }
 
   document.addEventListener('keydown', (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openGlobalSearch(); }
     if (event.key === 'Escape') closeModal();
   });
-
-  // OCR processing backend fetch logic
-  function initOCRProcessing() {
-    if (page !== 'ocr-processing' || window.__ocrStarted) return;
-    window.__ocrStarted = true;
-    const fileData = localStorage.getItem('ocr-upload-file');
-    const fileName = localStorage.getItem('ocr-upload-filename') || 'document.png';
-    const fileType = localStorage.getItem('ocr-upload-filetype') || 'image/png';
-
-    if (fileData) {
-      const progressBar = document.querySelector('.ocr-progress-bar');
-      const progressPctText = document.querySelector('.ocr-progress-pct');
-      const progressStatusText = document.querySelector('.ocr-progress-status');
-      let currentProgress = 0;
-
-      const statusSteps = [
-        { min: 0, text: 'Preprocessing image & normalizing contrast...' },
-        { min: 20, text: 'Scanning text with Tesseract multi-pass OCR...' },
-        { min: 45, text: 'Extracting document fields (Name, DOB, ID)...' },
-        { min: 70, text: 'Verifying confidence scores & structuring draft...' },
-        { min: 88, text: 'Finalizing review draft...' }
-      ];
-
-      const progressTimer = window.setInterval(() => {
-        if (currentProgress < 92) {
-          currentProgress += Math.floor(Math.random() * 5) + 3;
-          if (currentProgress > 92) currentProgress = 92;
-          if (progressBar) progressBar.style.width = `${currentProgress}%`;
-          if (progressPctText) progressPctText.textContent = `${currentProgress}%`;
-
-          const step = statusSteps.filter(s => currentProgress >= s.min).pop();
-          if (step && progressStatusText) {
-            progressStatusText.textContent = step.text;
-          }
-        }
-      }, 180);
-
-      fetch(fileData)
-        .then(res => res.blob())
-        .then(blob => {
-          const file = new File([blob], fileName, { type: fileType });
-          const formData = new FormData();
-          formData.append('document', file);
-
-          const startTime = Date.now();
-
-          apiFetch('/api/ocr', {
-            method: 'POST',
-            body: formData
-          })
-            .then(response => {
-              if (!response.ok) throw new Error('OCR API failed');
-              return response.json();
-            })
-            .then(result => {
-              window.clearInterval(progressTimer);
-              if (result.success) {
-                if (progressBar) progressBar.style.width = '100%';
-                if (progressPctText) progressPctText.textContent = '100%';
-
-                localStorage.setItem('ocr-parsed-data', JSON.stringify(result.data));
-                const name = [result.data.firstName, result.data.lastName].filter(Boolean).join(' ') || 'Unknown';
-                logActivity('doc_processed', name, 'Document extracted via OCR');
-
-                const elapsed = Date.now() - startTime;
-                const remaining = Math.max(0, 1000 - elapsed);
-                window.setTimeout(() => {
-                  window.location.href = pagePath('ocr-review');
-                }, remaining);
-              } else {
-                throw new Error(result.error || 'Extraction failed');
-              }
-            })
-            .catch(err => {
-              window.clearInterval(progressTimer);
-              console.error('Live OCR failed:', err);
-              localStorage.removeItem('ocr-parsed-data');
-
-              modal$1({
-                title: 'Extraction Failed',
-                body: '<p>The system could not identify or extract valid information from this document. Please ensure it is a clear scan of a supported document (e.g. Aadhaar Card, Birth Certificate, Blood Test Report).</p>',
-                confirmText: 'Try Again',
-                onConfirm: () => {
-                  window.location.href = pagePath('ocr-upload');
-                }
-              });
-
-              const processingContainer = document.querySelector('.ocr-processing');
-              if (processingContainer) {
-                processingContainer.innerHTML = `<span class="ocr-processing__sample" style="color:var(--color-danger)">${icon('alertCircle') || '⚠️'}</span><h2>Extraction failed</h2><p>Please try again with a clearer image.</p>`;
-              }
-            });
-        });
-    } else {
-      window.setTimeout(() => { window.location.href = pagePath('ocr-review'); }, 1850);
-    }
-  }
 
   // ─── Core Helpers ───
 
@@ -41941,115 +41328,6 @@
       document.querySelectorAll(`[data-column="${colId}"]`).forEach(el => {
         el.style.display = visible ? '' : 'none';
       });
-    });
-  }
-
-  function applyDocumentFilters() {
-    const searchVal = document.querySelector('[data-document-search]')?.value.toLowerCase().trim() || '';
-    document.querySelectorAll('.document-card').forEach((card) => {
-      const text = card.dataset.document || '';
-      const matchesSearch = text.includes(searchVal);
-      const badge = card.querySelector('.badge');
-      const statusBadgeText = badge ? badge.textContent.trim() : '';
-      const matchesStatus = (activeDocFilter === 'All') ||
-        (activeDocFilter === 'Pending' && statusBadgeText.includes('Pending')) ||
-        (activeDocFilter === 'Verified' && (statusBadgeText.includes('Verified') || statusBadgeText.includes('Active')));
-      card.style.display = (matchesSearch && matchesStatus) ? '' : 'none';
-    });
-  }
-
-  function processUploadedFile(file) {
-    if (!file.type.startsWith('image/')) {
-      toast('Unsupported file format', 'Please upload a clean image file (JPG or PNG).');
-      return;
-    }
-
-    toast('Document received', 'Starting a secure draft extraction.');
-
-    const reader = new FileReader();
-    reader.onload = function (e) {
-      const img = new Image();
-      img.onload = function () {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-
-        try {
-          const pngDataUrl = canvas.toDataURL('image/png');
-          localStorage.setItem('ocr-upload-file', pngDataUrl);
-          localStorage.setItem('ocr-upload-filename', file.name.replace(/\.[^/.]+$/, "") + '.png');
-          localStorage.setItem('ocr-upload-filetype', 'image/png');
-        } catch (err) {
-          console.warn('Canvas conversion failed, saving original:', err);
-          localStorage.setItem('ocr-upload-file', e.target.result);
-          localStorage.setItem('ocr-upload-filename', file.name);
-          localStorage.setItem('ocr-upload-filetype', file.type);
-        }
-        window.setTimeout(() => { window.location.href = pagePath('ocr-processing'); }, 500);
-      };
-      img.onerror = function () {
-        console.warn('Image loading failed, saving original:', file.name);
-        localStorage.setItem('ocr-upload-file', e.target.result);
-        localStorage.setItem('ocr-upload-filename', file.name);
-        localStorage.setItem('ocr-upload-filetype', file.type);
-        window.setTimeout(() => { window.location.href = pagePath('ocr-processing'); }, 500);
-      };
-      img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  // ─── SheetJS Excel Export Logic ───
-  function loadSheetJS(callback) {
-    if (window.XLSX) {
-      callback();
-      return;
-    }
-    toast('Preparing export', 'Loading the secure Excel engine...');
-    const script = document.createElement('script');
-    script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-    script.onload = () => callback();
-    script.onerror = () => toast('Export failed', 'Could not load the Excel export library. Please check your internet connection.');
-    document.head.appendChild(script);
-  }
-
-  function exportChildrenToExcel() {
-    const children = getChildren();
-    if (children.length === 0) {
-      toast('No data to export', 'Register some children first.');
-      return;
-    }
-
-    loadSheetJS(() => {
-      const data = children.map(c => ({
-        'Child ID': c.id || '',
-        'Name': c.name || '',
-        'Date of Birth': c.dob || '',
-        'Age': calculateAge(c.dob) || '',
-        'Gender': c.gender || '',
-        'Blood Group': c.blood || '',
-        'Father / Guardian': c.father || '',
-        'Mother': c.mother || '',
-        'Phone': c.phone || '',
-        'Registration Date': c.registeredDate || '',
-        'Height (cm)': c.height || '',
-        'Weight (kg)': c.weight || '',
-        'Medical Conditions': c.medicalConditions || '',
-        'Allergies': c.allergies || '',
-        'Address': c.address || '',
-        'Health Status': healthStatus(c).label,
-        'Verification Status': c.status || 'Active'
-      }));
-
-      const ws = XLSX.utils.json_to_sheet(data);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Children Health Records");
-      XLSX.writeFile(wb, "ChildCare_Health_Records.xlsx");
-
-      logActivity('export_created', 'Excel file', 'Exported all children health data to Excel');
-      toast('Export complete', 'Your children health records Excel file has been downloaded.');
     });
   }
 

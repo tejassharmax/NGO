@@ -29,7 +29,7 @@
 
 const crypto = require('crypto');
 const { getDb, getAuth } = require('./firebaseAdmin');
-const { COLLECTION_KEYS, SCALAR_KEYS } = require('./syncMerge');
+const { COLLECTION_KEYS, SCALAR_KEYS, TOMBSTONE_KEY, tombstonesByKey } = require('./syncMerge');
 
 /** chm-* key -> Firestore subcollection name. */
 const COLLECTION_NAMES = {
@@ -44,7 +44,8 @@ const COLLECTION_NAMES = {
   'chm-emergency': 'emergency',
   'chm-expenses': 'expenses',
   'chm-alerts': 'alerts',
-  'chm-health-records': 'healthRecords'
+  'chm-health-records': 'healthRecords',
+  'chm-deleted': 'deleted'
 };
 
 /** sample-org-* key -> field name inside the settings/org document. */
@@ -416,6 +417,7 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
 
   const root = db.collection('ngos').doc(sanitizeNgoSlug(ngoSlug));
   const operations = [];
+  const tombstones = tombstonesByKey(merged[TOMBSTONE_KEY]);
 
   COLLECTION_KEYS.forEach(key => {
     let items = [];
@@ -450,6 +452,18 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
     if (key === 'chm-children' || key === 'chm-documents') {
       stored.forEach((_entry, docId) => {
         if (!seen.has(docId)) {
+          operations.push({
+            type: 'delete',
+            ref: root.collection(collectionName).doc(docId)
+          });
+          stored.delete(docId);
+        }
+      });
+    } else if (tombstones.has(key)) {
+      // Union-merged collections remove only what a tombstone names.
+      const deletedDocIds = new Set(Array.from(tombstones.get(key)).map(id => deriveDocId({ id })));
+      stored.forEach((_entry, docId) => {
+        if (!seen.has(docId) && deletedDocIds.has(docId)) {
           operations.push({
             type: 'delete',
             ref: root.collection(collectionName).doc(docId)

@@ -8,6 +8,7 @@
 
 import { getSession } from './session.js';
 import { toast } from './toast.js';
+import { modal } from './modal.js';
 import { getChildren, calculateAge, logActivity } from './storage.js';
 import { escapeHTML, icon, showProgressBar, hideProgressBar } from './utils.js';
 import { apiFetch } from './apiClient.js';
@@ -68,6 +69,9 @@ export async function fetchSheetsConfig(ngoSlug) {
         localStorage.setItem(`google_sheet_url_${slug}`, cachedSheetsConfig.spreadsheetUrl);
         localStorage.setItem('google_sheet_url', cachedSheetsConfig.spreadsheetUrl);
       }
+      if (cachedSheetsConfig?.monthlySpreadsheetUrl) {
+        localStorage.setItem(`google_monthly_sheet_url_${slug}`, cachedSheetsConfig.monthlySpreadsheetUrl);
+      }
       return cachedSheetsConfig;
     }
   } catch (err) {
@@ -101,6 +105,20 @@ export function getClinicalSheetUrl() {
   const ngoSlug = getNgoSlug(session);
   const savedUrl = localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
   return cachedSheetsConfig?.clinicalSpreadsheetUrl || savedUrl || null;
+}
+
+/**
+ * Get live view link to the Monthly Checkup Register workbook ("Ayusha Nilayam — Monthly Checkup Register"),
+ * opened on the current month's tab when its gid is known.
+ */
+export function getMonthlySheetUrl() {
+  const ngoSlug = getNgoSlug(getSession() || {});
+  const url = cachedSheetsConfig?.monthlySpreadsheetUrl || localStorage.getItem(`google_monthly_sheet_url_${ngoSlug}`);
+  if (!url) return null;
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const gid = cachedSheetsConfig?.monthlySheetGids?.[monthKey];
+  return gid !== undefined ? `${url.split('#')[0].replace(/\/edit.*$/, '/edit')}#gid=${gid}` : url;
 }
 
 /**
@@ -231,11 +249,6 @@ export function formatUnitValue(val, unit) {
   return num ? `${num} ${unit}` : '—';
 }
 
-export function extractRawNumber(val) {
-  if (val === null || val === undefined || val === '') return '';
-  return String(val).replace(/[^0-9.]/g, '').trim();
-}
-
 /**
  * Format a child health record object into the EXACT 15-column Google Sheets row array
  * @param {Object} child 
@@ -293,14 +306,6 @@ export function copySheetDataToClipboard() {
       console.warn('Clipboard write notice:', err);
     });
   }
-}
-
-/**
- * Copy formatted 15-column dataset to clipboard and open Google Sheets
- */
-export function copyAndOpenGoogleSheets() {
-  copySheetDataToClipboard();
-  window.open(getGoogleSheetUrl(), '_blank');
 }
 
 /**
@@ -608,6 +613,7 @@ export async function autoSyncChildToGoogleSheets(child) {
           cachedSheetsConfig.sheetId = data.sheetId || cachedSheetsConfig.sheetId;
           cachedSheetsConfig.clinicalSpreadsheetUrl = data.clinicalSpreadsheetUrl || cachedSheetsConfig.clinicalSpreadsheetUrl;
           cachedSheetsConfig.clinicalSheetId = data.clinicalSheetId || cachedSheetsConfig.clinicalSheetId;
+          cachedSheetsConfig.monthlySpreadsheetUrl = data.monthlySpreadsheetUrl || cachedSheetsConfig.monthlySpreadsheetUrl;
           if (data.childSheetGids) {
             cachedSheetsConfig.childSheetGids = data.childSheetGids;
             localStorage.setItem('chm_child_sheet_gids', JSON.stringify(data.childSheetGids));
@@ -722,12 +728,4 @@ export async function pullChildrenFromGoogleSheets(options = {}) {
     hideProgressBar();
   }
   return { success: false };
-}
-
-/**
- * Get total synced rows count
- */
-export function getSyncedRowsCount() {
-  const children = getChildren();
-  return children ? children.length : 0;
 }

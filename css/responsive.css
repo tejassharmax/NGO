@@ -58,7 +58,9 @@ img, svg, canvas {
   .sidebar-open .sidebar {
     transform: translateX(0);
   }
-  .mobile-backdrop {
+  /* Only while the drawer is open. Styling .mobile-backdrop unconditionally put an
+     invisible layer over the whole page that swallowed every tap on phones. */
+  .sidebar-open .mobile-backdrop {
     position: fixed;
     z-index: 25;
     inset: 0;
@@ -82,7 +84,7 @@ img, svg, canvas {
     margin-left: 8px;
   }
   .u-mobile-only {
-    display: inline-flex;
+    display: inline-flex !important;
   }
 
   /* Content area */

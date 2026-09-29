@@ -1,11 +1,10 @@
-import { icon, initials, pagePath, statusBadge, escapeHTML, formatDate, healthDot } from './utils.js';
-import { getChildren, getChild, getActivities, getPendingDocs, timeAgo, activityIcon, activityLabel, getUploadedDocs, getAppointments, getMedicines, getExpenses, getEmergencyContacts, getSponsors, getGrowthRecords, getMeals, getAllMeals, getHealthRecords, getAlerts, healthStatus, calculateAge, ageGroup } from './storage.js';
+import { icon, initials, pagePath, statusBadge, escapeHTML, formatDate } from './utils.js';
+import { getChildren, getChild, getActivities, timeAgo, getUploadedDocs, getAppointments, getMedicines, getGrowthRecords, getHealthRecords, getAlerts, healthStatus, calculateAge } from './storage.js';
 import { childRows, childTableHeaders } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
-import { getGoogleSheetUrl, getClinicalSheetUrl, getChildGoogleSheetUrl, getSheetsConfig, getNgoSlug } from './googleSheetsSync.js';
-import { getGoogleDocUrl, getDocsConfig } from './googleDocsSync.js';
-import { calendarCard, renderCalendarGrid, renderDayView, renderBookingForm, computeAppointmentStatus, formatSingleDisplayTime, renderClinicalSectionsMarkup } from './googleCalendar.js';
+import { getGoogleSheetUrl, getClinicalSheetUrl, getMonthlySheetUrl, getSheetsConfig, getNgoSlug } from './googleSheetsSync.js';
+import { calendarCard, computeAppointmentStatus, formatSingleDisplayTime, renderClinicalSectionsMarkup } from './googleCalendar.js';
 
 /* ═══════════════════════════════════════════════════════
    NAVIGATION
@@ -22,10 +21,6 @@ const pageTitles = {
   appointments: 'Appointments',
   'child-profile': 'Child Health Profile',
   'register-child': 'Register child',
-  'ocr-upload': 'Google Cloud Vision API Extraction',
-  'ocr-review': 'Review extracted information',
-  'ocr-details': 'Additional details',
-  'ocr-processing': 'Processing document',
   documents: 'Health records & documents',
   reports: 'Health reports',
   settings: 'Settings'
@@ -92,14 +87,15 @@ export function shell(page, content) {
 
   return `<div class="app-shell">
     <aside class="sidebar" aria-label="Primary navigation">
-      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">Demo</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
+      <div class="sidebar__header"><a class="sidebar__brand" href="${pagePath('dashboard')}" aria-label="Home"><span class="brand-mark">${icon('heartPulse')}</span><span class="brand-name">${escapeHTML(ngoName)}</span></a><button class="sidebar__toggle" type="button" data-collapse-sidebar aria-label="Collapse sidebar">${icon('menu')}</button></div>
       <nav class="sidebar__nav">${navHTML}<a class="nav-item ${page === 'settings' ? 'nav-item--active' : ''}" href="${pagePath('settings')}">${icon('settings')}<span class="nav-item__text">Google Workspace</span></a></nav>
       <div class="sidebar__foot"><div class="workspace-user"><span class="workspace-user__avatar">${userInitials}</span><span class="workspace-user__copy"><span class="workspace-user__name">${escapeHTML(ngoName)}</span><span class="workspace-user__role">${escapeHTML(role)}</span></span></div></div>
     </aside><div class="mobile-backdrop" hidden data-close-sidebar></div>
     <main class="app-main" id="app-main">
       <header class="topbar">
+        <button class="icon-button u-mobile-only" type="button" data-open-sidebar aria-label="Open navigation">${icon('menu')}</button>
         ${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}
-        <div class="topbar__crumbs"><span>Demo</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
+        <div class="topbar__crumbs"><span>${escapeHTML(ngoName)}</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
         <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
         <div class="topbar__actions">
           <button class="icon-button" data-theme-toggle type="button" aria-label="Toggle color theme" style="cursor: pointer;">
@@ -161,9 +157,11 @@ const heading = (title, description, actions) => `<div class="page-heading"><div
 
 function getDynamicGreeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning, Admin';
-  if (hour < 17) return 'Good afternoon, Admin';
-  return 'Good evening, Admin';
+  const session = getSession() || {};
+  const firstName = escapeHTML(String(session.displayName || '').trim().split(/\s+/)[0] || 'there');
+  if (hour < 12) return `Good morning, ${firstName}`;
+  if (hour < 17) return `Good afternoon, ${firstName}`;
+  return `Good evening, ${firstName}`;
 }
 
 const statCard = (label, value, glyph, color = 'blue') => `
@@ -215,7 +213,7 @@ export function dashboardPage() {
     }).join('');
   }
 
-  return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a><a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
+  return shell('dashboard', `${heading(getDynamicGreeting(), 'Welcome to the Google Workspace-integrated Child Health Management Platform.', `<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}Register child</a>`)}
   <div class="stat-grid">
     ${statCard('Total Children', totalChildren.toLocaleString(), 'users', 'blue')}
     ${statCard('Growth Records', growthCount.toLocaleString(), 'ruler', 'amber')}
@@ -404,7 +402,7 @@ export function childProfilePage() {
             <button class="button button--sm button--secondary" type="button" data-edit-growth-item='${safeGJson}' style="margin-right:6px;">
               ${icon('pencil')} Edit
             </button>
-            <button class="icon-button tooltip" type="button" data-tooltip="Delete measurement" data-delete-growth-id="${g.id || g.date}" style="color:var(--color-danger);">
+            <button class="icon-button tooltip" type="button" data-tooltip="Delete measurement" data-delete-growth-id="${escapeHTML(g.id || g.date)}" data-child-id="${escapeHTML(g.childId || '')}" style="color:var(--color-danger);">
               ${icon('trash')}
             </button>
           </td>
@@ -886,13 +884,8 @@ function steps(active, upload = false) {
 }
 
 export function registerChildPage() {
-  const method = getURLParam('method');
   const editId = getURLParam('edit');
   const child = editId ? getChild(editId) : null;
-
-  if (method !== 'manual' && !editId) {
-    return shell('register-child', `${heading('Register a child', 'Choose the quickest, most reliable way to start a new child record.')}<section class="card"><div class="card__body"><div class="method-grid"><article class="method-card card card--interactive"><span class="method-card__icon">${icon('pencil')}</span><div><h2 class="card__title">Enter details manually</h2><p>Start with a clean, guided form. Best when information is already at hand.</p></div><a class="button" href="${pagePath('register-child')}?method=manual">Start manual entry ${icon('arrowRight')}</a></article><article class="method-card card card--interactive"><span class="method-card__icon">${icon('scan')}</span><div><h2 class="card__title">Google Cloud Vision API Document Upload</h2><p>Extract information automatically from medical documents using Cloud Vision API, then verify before saving.</p></div><a class="button button--primary" href="${pagePath('ocr-upload')}">Upload document ${icon('arrowRight')}</a></article></div></div></section>`);
-  }
 
   let firstName = '', lastName = '', email = '', father = '', phone = '', blood = '';
   if (child) {
@@ -970,57 +963,6 @@ export function registerChildPage() {
   </div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Guardian contact</h2><p>This contact will receive health updates.</p></div><div class="form-grid--two">${field('Parent / guardian name *', 'father', 'e.g. A.N. Roy', 'text', '', father)}${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', child ? child.mother : '')}${field('Phone number *', 'phone', '+91 00000 00000', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email', '', email)}</div></section>
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Address & notes</h2></div><div class="form-grid--two"><label class="field form-span-all"><span class="field__label">Home address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode">${child ? escapeHTML(child.address) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Internal notes</span><textarea class="textarea" name="notes" placeholder="Optional notes visible to staff only.">${child ? escapeHTML(child.notes) : ''}</textarea></label></div></section></form>${steps(1)}</div>`);
-}
-
-/* ═══════════════════════════════════════════════════════
-   GOOGLE CLOUD VISION API EXTRACTION PAGES
-   ═══════════════════════════════════════════════════════ */
-
-export function ocrUploadPage() {
-  return shell('ocr-upload', `${heading('Google Cloud Vision API Extraction', 'Upload a medical document (Blood Reports, Prescriptions, Medical Certificates, Vaccination Records, Aadhaar). Google Cloud Vision API will extract structured fields for review.', `<a class="button button--ghost" href="${pagePath('register-child')}">Cancel</a>`)}<div class="form-layout"><section class="card"><div class="card__body"><div class="upload-zone" data-upload-zone><span class="upload-zone__icon">${icon('upload')}</span><h2 class="card__title">Drop a medical document here</h2><p>Choose a file from your device. Google Cloud Vision API will scan and extract health & child details.</p><button class="button button--primary" type="button" data-start-ocr>${icon('file')}Choose document</button><input class="sr-only" type="file" accept=".jpg,.jpeg,.png" data-upload-input><span class="upload-zone__formats">JPG or PNG · Up to 15 MB</span></div></div><div style="padding:16px; background:var(--color-bg-alt); border-top:1px solid var(--color-border);"><b style="font-size:13px; display:block; margin-bottom:8px;">Supported Document Types:</b><div style="display:flex; flex-wrap:wrap; gap:8px;"><span class="badge badge--blue">Blood Reports</span><span class="badge badge--blue">Prescriptions</span><span class="badge badge--blue">Handwritten Medical Notes</span><span class="badge badge--blue">Medical Certificates</span><span class="badge badge--blue">Vaccination Records</span></div></div></section>${steps(0, true)}</div>`);
-}
-
-export function ocrProcessingPage() {
-  return shell('ocr-processing', `${heading('Processing with Google Cloud Vision API', 'Extracted details will be prepared for your verification before any record is updated.')}<section class="card"><div class="ocr-processing"><div class="ocr-processing__orbit" style="box-shadow: 0 0 25px rgba(59, 130, 246, 0.35);">${icon('scan')}</div><h2>Google Cloud Vision API Scanning</h2><p>Performing multi-pass document OCR and extracting health vital data for review.</p><div class="ocr-processing__progress"><div class="ocr-processing__progress-header"><span class="ocr-progress-status" style="font-weight: 600; color: var(--color-primary);">Analyzing image contrast with Google Cloud Vision API...</span><span class="ocr-progress-pct" style="font-weight: 700;">0%</span></div><div class="progress" style="height: 10px;"><div class="progress__bar ocr-progress-bar" style="width: 0%; transition: width 0.25s ease-out;"></div></div></div></div></section>`);
-}
-
-export function ocrReviewPage() {
-  const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-  const firstName = ocrData.firstName || '';
-  const lastName = ocrData.lastName || '';
-  const dob = ocrData.dob || '';
-  const blood = ocrData.blood || '';
-  const father = ocrData.father || '';
-  const mother = ocrData.mother || '';
-  const phone = ocrData.phone || '';
-  const idNumber = ocrData.idNumber || '';
-  const gender = ocrData.gender || '';
-
-  const uploadedFile = localStorage.getItem('ocr-upload-file');
-  let previewHTML = '';
-  if (uploadedFile) {
-    previewHTML = `<div class="document-preview-img-wrap" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; background:#f3f4f6; position:relative; min-height:360px;">
-      <img class="document-preview-img" src="${uploadedFile}" alt="Uploaded document" style="max-width:100%; max-height:100%; object-fit:contain; transition:transform 0.2s ease;" data-rotation="0">
-    </div>`;
-  } else {
-    previewHTML = `<div class="document-sheet"><div class="document-sheet__brand">GOOGLE CLOUD VISION OCR</div><div class="document-sheet__title">EXTRACTED HEALTH RECORD FORM</div><div class="document-sheet__line document-sheet__line--wide"></div><div class="document-sheet__line document-sheet__line--half"></div><div class="document-sheet__table"><div class="document-sheet__cell"><b>CHILD NAME</b><span>${firstName} ${lastName}</span></div><div class="document-sheet__cell"><b>DATE OF BIRTH</b><span>${dob}</span></div><div class="document-sheet__cell"><b>PARENT'S NAME</b><span>${father}</span></div><div class="document-sheet__cell"><b>BLOOD GROUP</b><span>${blood}</span></div><div class="document-sheet__cell"><b>PHONE</b><span>${phone}</span></div><div class="document-sheet__cell"><b>ID NUMBER</b><span>${idNumber}</span></div></div></div>`;
-  }
-
-  return shell('ocr-review', `${heading('Review Cloud Vision API Extracted Data', 'Check the values below against the document before continuing.', `<button class="button" type="button" data-ocr-back>Back</button><button class="button button--primary" type="button" data-ocr-continue>Continue to details ${icon('arrowRight')}</button>`)}<div class="form-layout"><div class="review-layout"><section class="card document-preview"><div class="document-toolbar"><span class="badge badge--blue">Cloud Vision Scan</span><div class="document-toolbar__controls"><button class="icon-button icon-button--small tooltip" data-tooltip="Rotate" type="button" data-ocr-rotate>${icon('rotate')}</button><button class="icon-button icon-button--small tooltip" data-tooltip="Fullscreen" type="button" data-ocr-fullscreen>${icon('maximize')}</button></div></div>${previewHTML}</section><form class="card"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Extracted fields</h2><p>Review the values detected by Cloud Vision API.</p></div><div class="form-grid--two"><label class="field"><span class="field__label">First name</span><input class="input" value="${firstName}" name="firstName"></label><label class="field"><span class="field__label">Last name</span><input class="input" value="${lastName}" name="lastName"></label><label class="field"><span class="field__label">Date of birth</span><input class="input" value="${dob}" name="date"></label><label class="field"><span class="field__label">Gender</span><input class="input" value="${gender}" name="gender"></label><label class="field"><span class="field__label">Blood group</span><input class="input" value="${blood}" name="blood"></label><label class="field"><span class="field__label">ID number</span><input class="input" value="${idNumber}" name="idNumber"></label><label class="field form-span-all"><span class="field__label">Parent / guardian</span><input class="input" value="${father}" name="father"></label><label class="field form-span-all"><span class="field__label">Mother name</span><input class="input" value="${mother}" name="mother"></label></div></section><section class="form-section"><label class="checkbox"><input type="checkbox" data-ocr-confirm required><span>I've checked the extracted details against the original document.</span></label></section></form></div>${steps(2, true)}</div>`);
-}
-
-export function ocrDetailsPage() {
-  const ocrData = JSON.parse(localStorage.getItem('ocr-parsed-data') || '{}');
-  const firstName = ocrData.firstName || '';
-  const lastName = ocrData.lastName || '';
-  const father = ocrData.father || '';
-  const mother = ocrData.mother || '';
-  const gender = ocrData.gender || '';
-  const blood = ocrData.blood || '';
-  const phone = ocrData.phone || '';
-  const idNumber = ocrData.idNumber || '';
-
-  return shell('ocr-details', `${heading('Additional details', 'Complete remaining health details before saving.', `<a class="button" href="${pagePath('ocr-review')}">Back</a><button class="button button--primary" type="submit" form="ocr-additional-form">Save child record</button>`)}<div class="form-layout"><form class="card" id="ocr-additional-form"><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Registration & contact</h2><p>Complete any additional details for this record.</p></div><div class="form-grid--two">${field('Mother name', 'mother', 'e.g. Priya Roy', 'text', '', mother)}${field('Mobile number *', 'phone', 'e.g. +91 98221 40393', 'tel', '', phone)}${field('Email address', 'email', 'guardian@example.com', 'email')}${field('Height (cm)', 'height', 'e.g. 140', 'number', '', '', 'step="any" min="0"')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', '', 'step="any" min="0"')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes"></textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin"></textarea></label><label class="field form-span-all"><span class="field__label">Address</span><textarea class="textarea" name="address" placeholder="Street address, city, state, postcode"></textarea></label><label class="field form-span-all"><span class="field__label">Upload Additional Medical Records / Reports</span><input class="input" type="file" name="additionalDoc" accept=".jpg,.jpeg,.png,.pdf" data-additional-doc-input><span style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">Upload blood test reports, immunization records, or medical certificates.</span></label></div></section><section class="form-section"><div class="form-section__heading"><h2 class="card__title">Final verification</h2><p>You're about to create the child record.</p></div><label class="checkbox"><input type="checkbox" required><span>I confirm the information is accurate and complete.</span></label></section><input type="hidden" name="firstName" value="${firstName}"><input type="hidden" name="lastName" value="${lastName}"><input type="hidden" name="father" value="${father}"><input type="hidden" name="gender" value="${gender}"><input type="hidden" name="blood" value="${blood}"><input type="hidden" name="idNumber" value="${idNumber}"><input type="hidden" name="dob" value="${ocrData.dob || ''}"></form>${steps(3, true)}</div>`);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1116,7 +1058,7 @@ export function documentsPage() {
     contentHTML = `<div class="empty-state" style="padding:48px 24px">
       <span class="empty-state__icon">${icon('file')}</span>
       <h3>No health documents uploaded yet</h3>
-      <p>Click "Upload document" to attach medical reports or use Google Cloud Vision API.</p>
+      <p>Click "Upload document" to attach medical reports, certificates or ID documents.</p>
     </div>`;
   } else {
     contentHTML = `<div class="document-grid" id="document-grid">
@@ -1153,7 +1095,7 @@ export function documentsPage() {
 
   const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
 
-  return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button>${unsyncedCount > 0 ? `<button class="button button--ghost" type="button" data-auto-sync-drive style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')}Sync ${unsyncedCount} to Drive</button>` : ''}<a class="button button--ghost" href="${pagePath('ocr-upload')}">${icon('scan')}Cloud Vision Upload</a>`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
+  return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button>${unsyncedCount > 0 ? `<button class="button button--ghost" type="button" data-auto-sync-drive style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')}Sync ${unsyncedCount} to Drive</button>` : ''}`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1173,16 +1115,24 @@ export function reportsPage() {
   const malePct = total > 0 ? Math.round((males / total) * 100) : 0;
   const otherPct = total > 0 ? Math.max(0, 100 - (femalePct + malePct)) : 0;
 
-  return shell('reports', `${heading('Health reports & analytics', 'Audited monthly summary of children\u2019s health status and clinical records.', `<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
-  <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length || 4}</div><p class="report-card__caption">verified lab test reports</p></article></div>
-  
+  // Checkup coverage: children with a checkup or measurement in the last 90 days.
+  const growthRecords = getGrowthRecords();
+  const cutoff = new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const recentlySeen = new Set(growthRecords.filter(g => g.date && g.date >= cutoff).map(g => g.childId));
+  const recentCount = children.filter(c => recentlySeen.has(c.id)).length;
+  const checkupsThisMonth = growthRecords.filter(g => (g.date || '').startsWith(thisMonth)).length;
+  const neverSeen = children.filter(c => !growthRecords.some(g => g.childId === c.id)).length;
+
+  return shell('reports', `${heading('Health reports & analytics', 'Summary of children\u2019s health status and clinical records.', `<button class="button" type="button" data-report-print>${icon('printer')}Print summary</button>`)}
+  <div class="report-grid section-gap"><article class="card report-card"><span class="eyebrow">Children</span><div class="report-card__value">${total}</div><p class="report-card__caption">total children registered</p></article><article class="card report-card"><span class="eyebrow">Healthy</span><div class="report-card__value">${total - flaggedCount}</div><p class="report-card__caption">${healthyPct}% with optimal health</p></article><article class="card report-card"><span class="eyebrow">Health Records</span><div class="report-card__value">${getHealthRecords().length}</div><p class="report-card__caption">lab test reports on file</p></article></div>
+
   <section class="card section-gap" style="margin-top: 24px;">
     <header class="card__header">
       <div>
         <h2 class="card__title">NGO Health Platform Executive Summary</h2>
-        <p class="card__caption">Audited health status and growth tracking overview</p>
+        <p class="card__caption">Health status and checkup coverage, as of ${formatDate(new Date())}</p>
       </div>
-      <span class="badge badge--success">${icon('check')} Audited & Verified</span>
     </header>
     <div class="card__body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; padding: 20px 0;">
       <div>
@@ -1196,10 +1146,12 @@ export function reportsPage() {
       </div>
       <div>
         <h3 style="font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; color: var(--color-success);">
-          ${icon('ruler')} Growth Tracking Performance
+          ${icon('ruler')} Checkup Coverage
         </h3>
         <p style="font-size: 13px; line-height: 1.5; color: var(--color-text-muted);">
-          Regular assessments ensure height, weight, and BMI progression are monitored according to WHO standards.
+          <b>${recentCount} out of ${total} children</b> had a checkup or measurement in the last 90 days.
+          <b>${checkupsThisMonth}</b> checkup record(s) this month.
+          ${neverSeen > 0 ? `<b>${neverSeen} child(ren)</b> have no checkup recorded yet.` : 'Every child has at least one checkup on record.'}
         </p>
       </div>
     </div>
@@ -1221,6 +1173,7 @@ export function settingsPage() {
   const adminEmail = sheetsConfig.adminEmail || 'Admin';
   const masterSheetUrl = getGoogleSheetUrl();
   const clinicalSheetUrl = getClinicalSheetUrl();
+  const monthlySheetUrl = getMonthlySheetUrl();
 
   return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
   <div class="settings-layout">
@@ -1251,7 +1204,7 @@ export function settingsPage() {
             <div style="background: rgba(234, 67, 53, 0.08); border-left: 4px solid #ea4335; padding: 12px 14px; border-radius: 4px; margin-bottom: 16px;">
               <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">Google Workspace Authorization Expired</div>
               <div style="font-size: 12.5px; color: var(--color-text); line-height: 1.4;">
-                Google OAuth tokens in Testing mode expire periodically. Click <strong>Reconnect Google Sheets Sync</strong> below to refresh authorization and instantly sync your records and Monika Sharma's clinical vitals to Google Sheets.
+                Google OAuth tokens in Testing mode expire periodically. Click <strong>Reconnect Google Sheets Sync</strong> below to refresh authorization and resume syncing your records to Google Sheets.
               </div>
             </div>
           ` : `
@@ -1278,6 +1231,12 @@ export function settingsPage() {
               </a>
             ` : ''}
 
+            ${monthlySheetUrl ? `
+              <a href="${escapeHTML(monthlySheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                📅 Monthly Checkup Register ↗
+              </a>
+            ` : ''}
+
             ${masterSheetUrl ? `
               <a href="${escapeHTML(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
                 📄 Master Directory Sheet ↗
@@ -1300,20 +1259,13 @@ export function settingsPage() {
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Authentication</b>
-            <span class="badge badge--success">Connected</span>
+            <b style="font-size: 14px; font-weight: 600;">Signed-in account</b>
+            <span class="badge badge--success">${escapeHTML(session.role || 'Admin')}</span>
           </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">OAuth 2.0 GIS Authentication active. Firestore verified account.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active Account Provider</button>
-        </div>
-
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Google Cloud Vision API</b>
-            <span class="badge badge--blue">Connected</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">Medical document OCR extraction for blood reports, prescriptions & certificates.</p>
-          <button class="button button--sm button--ghost" type="button" disabled style="width: 100%; justify-content: center; opacity: 0.7;">Active OCR Provider</button>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0;">
+            ${escapeHTML(session.email || 'Unknown account')} · ${escapeHTML(session.ngo || 'No NGO assigned')}
+            ${session.loginTimestamp ? `<br>Signed in ${escapeHTML(formatDate(session.loginTimestamp))}` : ''}
+          </p>
         </div>
       </div>
     </section>
@@ -1449,10 +1401,6 @@ export function renderPage(page) {
     'child-profile': childProfilePage,
     'child_profile': childProfilePage,
     'register-child': registerChildPage,
-    'ocr-upload': ocrUploadPage,
-    'ocr-processing': ocrProcessingPage,
-    'ocr-review': ocrReviewPage,
-    'ocr-details': ocrDetailsPage,
     documents: documentsPage,
     reports: reportsPage,
     settings: settingsPage,
