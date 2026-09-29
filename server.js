@@ -10,7 +10,9 @@ const express = require('express');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ quiet: true });
+// Load .env from this folder, not the working directory: hosting panels
+// (cPanel / Passenger / LiteSpeed) do not always start the app from its root.
+require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
 
 // Per-NGO OAuth Integration Module
 const {
