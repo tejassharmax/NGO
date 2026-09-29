@@ -6,6 +6,7 @@
   "scripts": {
     "build": "rollup -c rollup.config.mjs",
     "start": "node server.js",
+    "start:prod": "npm install --omit=dev --no-audit --no-fund && node server.js",
     "setup:firestore": "node scripts/setupFirestore.js",
     "setup:firestore:dry": "node scripts/setupFirestore.js --dry-run"
   },
