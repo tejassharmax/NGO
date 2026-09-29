@@ -1,5 +1,13 @@
 # Deploying to MilesWeb (cPanel Node.js hosting)
 
+> **MilesWeb mPanel (what ayushahealth.in uses):** there is no cPanel here. Upload
+> the code to a folder `ngo-app` in your home directory with **File Manager**, add
+> `serviceAccountKey.json` and `.env` next to it (step 3), then **Node.js → Deploy
+> Node.js**: *Automatic (Production)*, Node 22+, startup command
+> `npm run start:prod`, working directory = the `ngo-app` folder, proxy path empty,
+> port `3000`. `start:prod` installs dependencies and starts the server. Then do
+> step 5 (Google/Firebase settings).
+
 This takes the app from GitHub to your own domain on a MilesWeb plan with Node.js
 apps (the **Business** plan and above). Follow the steps in order. Replace
 `your-domain.com` with your real domain everywhere. It takes about 20 minutes, plus
