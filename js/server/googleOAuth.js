@@ -100,20 +100,28 @@ function buildOAuthClient(req = null) {
   const clientId = (process.env.GOOGLE_OAUTH_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_OAUTH_CLIENT_SECRET || '').trim();
 
+  const configured = (process.env.GOOGLE_OAUTH_REDIRECT_URI || '').trim();
+  const isLocalUrl = (value) => /localhost|127\.0\.0\.1/.test(value);
   let redirectUri = '';
 
-  // If request is from a live web server (e.g. Render), auto-force live domain callback URI
-  if (req) {
-    const host = (req.headers['x-forwarded-host'] || req.headers.host || '').trim();
-    if (host && !host.includes('localhost') && !host.includes('127.0.0.1')) {
-      const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-      redirectUri = `${protocol}://${host}/auth/google/callback`;
+  // An explicitly configured public URL always wins: Google rejects any redirect
+  // that is not listed verbatim, so guessing it from proxy headers is fragile.
+  if (configured && !isLocalUrl(configured)) {
+    redirectUri = configured;
+  } else if (req) {
+    // Otherwise derive it from the live request. A public host is assumed to be
+    // served over HTTPS; behind some proxies req.protocol reports "http" even
+    // though the browser used HTTPS, which produced a mismatching redirect URI.
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    if (host && !isLocalUrl(host)) {
+      const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
+      redirectUri = `${forwardedProto || 'https'}://${host}/auth/google/callback`;
     }
   }
 
-  // Fallback to process.env or local development URI
+  // Local development
   if (!redirectUri) {
-    redirectUri = (process.env.GOOGLE_OAUTH_REDIRECT_URI || 'http://localhost:3000/auth/google/callback').trim();
+    redirectUri = configured || 'http://localhost:3000/auth/google/callback';
   }
 
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);

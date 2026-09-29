@@ -50,7 +50,7 @@ const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } }); // Max 15MB
 
 // CORS & Security Headers
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
-  'https://ngo-4xde.onrender.com,http://localhost:3000,http://127.0.0.1:3000')
+  'http://localhost:3000,http://127.0.0.1:3000')
   .split(',').map(o => o.trim()).filter(Boolean);
 
 app.use((req, res, next) => {

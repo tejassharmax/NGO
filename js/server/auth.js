@@ -42,13 +42,13 @@ const IS_PRODUCTION =
   process.env.NODE_ENV === 'production' || Boolean(process.env.RENDER);
 
 /**
- * The loopback sign-in bypass is opt-in: it runs only when NODE_ENV is exactly
- * "development". It used to be on whenever NODE_ENV was not "production", which
- * is unsafe on shared hosting (cPanel/Passenger) where the web server forwards
- * every visitor's request to the app over loopback — a host that forgot to set
- * NODE_ENV would have treated every visitor as signed in.
+ * The loopback sign-in bypass needs its own explicit opt-in. It used to be on
+ * whenever NODE_ENV was not "production", which is unsafe on shared hosting
+ * (cPanel/Passenger/LiteSpeed) where the web server forwards every visitor's
+ * request to the app over loopback: a host left in "development" mode would have
+ * treated every visitor as signed in. Only a developer's local .env sets this.
  */
-const LOCAL_BYPASS_ENABLED = process.env.NODE_ENV === 'development' && !IS_PRODUCTION;
+const LOCAL_BYPASS_ENABLED = process.env.ALLOW_LOCAL_AUTH_BYPASS === 'true' && !IS_PRODUCTION;
 
 /** Account the local bypass assumes. Only ever used off-production. */
 const LOCAL_DEV_EMAIL =
