@@ -5,6 +5,7 @@
 
 import { apiFetch } from './apiClient.js';
 import { showProgressBar, hideProgressBar } from './utils.js';
+import { BACKUP_KEYS, buildBackup, planRestore } from './backup.js';
 
 const CHILDREN_KEY = 'chm-children';
 const ACTIVITY_KEY = 'chm-activity';
@@ -680,3 +681,30 @@ localStorage.setItem = function(key, value) {
     triggerSync();
   }
 };
+
+/* ─── Backup & restore (move records between sites) ─── */
+
+function readBackupKeys() {
+  const raw = {};
+  BACKUP_KEYS.forEach(key => { raw[key] = localStorage.getItem(key); });
+  return raw;
+}
+
+/** Everything this browser holds, as a downloadable backup object. */
+export function exportBackup() {
+  return buildBackup(readBackupKeys(), window.location.host);
+}
+
+/** What restoring `backup` would add here, without changing anything. */
+export function previewRestore(backup) {
+  return planRestore(readBackupKeys(), backup);
+}
+
+/**
+ * Apply a restore plan from previewRestore(), then save it to the server
+ * (Firestore) and Google Sheets through the normal sync.
+ */
+export async function applyRestore(plan) {
+  Object.entries(plan.merged).forEach(([key, value]) => originalSetItem(key, value));
+  await syncWithServer();
+}

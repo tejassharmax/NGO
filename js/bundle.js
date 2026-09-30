@@ -33550,6 +33550,123 @@
     return fetch(path, { ...options, headers });
   }
 
+  /**
+   * backup.js
+   * Export and restore of everything this browser holds, so records can be moved
+   * between deployments (e.g. from the old Render site to ayushahealth.in).
+   *
+   * Restoring only ADDS records that are missing. A record that already exists
+   * (same id) is kept as it is, so a restore can never overwrite work done on the
+   * destination site. Pure functions only; storage.js does the localStorage I/O.
+   */
+
+  const BACKUP_FORMAT = 'child-health-management-backup';
+
+  /** Keys a backup carries: every synced collection plus the org settings. */
+  const BACKUP_KEYS = [
+    'chm-children', 'chm-growth', 'chm-health-records', 'chm-appointments', 'chm-medicines',
+    'chm-documents', 'chm-alerts', 'chm-activity', 'chm-deleted',
+    'chm-nutrition', 'chm-emergency', 'chm-expenses',
+    'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
+  ];
+
+  /** Same record identity rule as the sync server (js/server/syncMerge.js). */
+  function recordKey(item) {
+    if (!item || typeof item !== 'object') return '';
+    if (item.id) return String(item.id);
+    if (item.childId && item.date && item.time && item.type) return `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
+    if (item.childId && item.date) return `${item.childId}_${item.date}_${item.recordType || ''}`;
+    return JSON.stringify(item);
+  }
+
+  function parseArray(raw) {
+    try {
+      const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      return Array.isArray(value) ? value : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /**
+   * Build a backup object from a key -> raw localStorage string map.
+   * @param {Record<string, string|null>} storage
+   * @param {string} source where it came from (hostname), for the confirmation text
+   */
+  function buildBackup(storage, source) {
+    const data = {};
+    BACKUP_KEYS.forEach(key => {
+      if (storage[key] !== null && storage[key] !== undefined) data[key] = storage[key];
+    });
+    return { format: BACKUP_FORMAT, version: 1, source, exportedAt: new Date().toISOString(), data };
+  }
+
+  /**
+   * Validate a parsed backup file. Returns an error message, or '' when usable.
+   * @param {any} backup
+   */
+  function validateBackup(backup) {
+    if (!backup || typeof backup !== 'object') return 'This file is not a backup.';
+    if (backup.format !== BACKUP_FORMAT) return 'This file is not a Child Health backup.';
+    if (!backup.data || typeof backup.data !== 'object') return 'The backup file is empty.';
+    return '';
+  }
+
+  /**
+   * Work out what a restore would add, without changing anything.
+   *
+   * Deleted records (tombstones in either copy) are never brought back.
+   *
+   * @param {Record<string, string|null>} current destination's raw values
+   * @param {{data: Record<string, string>}} backup
+   * @returns {{merged: Record<string, string>, added: Record<string, number>, totalAdded: number}}
+   *   `merged` holds the new raw value for every key that gains records.
+   */
+  function planRestore(current, backup) {
+    const tombstones = [...parseArray(current['chm-deleted']), ...parseArray(backup.data['chm-deleted'])];
+    const deletedIds = new Map(); // key -> Set(recordId)
+    tombstones.forEach(t => {
+      if (!t || !t.key || t.recordId === undefined) return;
+      if (!deletedIds.has(t.key)) deletedIds.set(t.key, new Set());
+      deletedIds.get(t.key).add(String(t.recordId));
+    });
+
+    const merged = {};
+    const added = {};
+    let totalAdded = 0;
+
+    BACKUP_KEYS.filter(key => key.startsWith('chm-')).forEach(key => {
+      const existing = parseArray(current[key]);
+      const incoming = parseArray(backup.data[key]);
+      if (incoming.length === 0) return;
+
+      const known = new Set(existing.map(recordKey));
+      const gone = deletedIds.get(key) || new Set();
+      const additions = incoming.filter(item => {
+        if (!item || typeof item !== 'object') return false;
+        if (item.id !== undefined && gone.has(String(item.id))) return false;
+        const k = recordKey(item);
+        if (known.has(k)) return false;
+        known.add(k);
+        return true;
+      });
+
+      if (additions.length > 0) {
+        merged[key] = JSON.stringify([...existing, ...additions]);
+        added[key] = additions.length;
+        totalAdded += additions.length;
+      }
+    });
+
+    // Org settings: only fill in values the destination does not have yet.
+    BACKUP_KEYS.filter(key => !key.startsWith('chm-')).forEach(key => {
+      const value = backup.data[key];
+      if (value && !current[key]) merged[key] = value;
+    });
+
+    return { merged, added, totalAdded };
+  }
+
   /* ═══════════════════════════════════════════════════════
      CHILD HEALTH MANAGEMENT — DATA LAYER
      All data is stored in localStorage as JSON.
@@ -34230,6 +34347,33 @@
       triggerSync();
     }
   };
+
+  /* ─── Backup & restore (move records between sites) ─── */
+
+  function readBackupKeys() {
+    const raw = {};
+    BACKUP_KEYS.forEach(key => { raw[key] = localStorage.getItem(key); });
+    return raw;
+  }
+
+  /** Everything this browser holds, as a downloadable backup object. */
+  function exportBackup() {
+    return buildBackup(readBackupKeys(), window.location.host);
+  }
+
+  /** What restoring `backup` would add here, without changing anything. */
+  function previewRestore(backup) {
+    return planRestore(readBackupKeys(), backup);
+  }
+
+  /**
+   * Apply a restore plan from previewRestore(), then save it to the server
+   * (Firestore) and Google Sheets through the normal sync.
+   */
+  async function applyRestore(plan) {
+    Object.entries(plan.merged).forEach(([key, value]) => originalSetItem(key, value));
+    await syncWithServer();
+  }
 
   const DEFAULT_COLUMN_ORDER = ['child', 'age', 'gender', 'blood', 'status'];
 
@@ -36580,8 +36724,21 @@
           </div>
         </div>
       </header>
-      <section class="content page-enter">${content}</section>
+      <section class="content page-enter">${oldSiteBanner()}${content}</section>
     </main>
+  </div>`;
+  }
+
+  /**
+   * The old Render address kept its own copy of the data. Until it is retired, tell
+   * anyone using it to move their records to the live site.
+   */
+  function oldSiteBanner() {
+    if (!/\.onrender\.com$/i.test(window.location.hostname)) return '';
+    return `<div class="card" style="padding: 14px 18px; margin-bottom: 18px; border: 1px solid #f59e0b; background: #fffbeb; color: #92400e; font-size: 13px; line-height: 1.5;">
+    <b>This old address is being retired.</b> The live site is <a href="https://ayushahealth.in" style="color: #b45309; font-weight: 700;">ayushahealth.in</a>.
+    Records entered here are not on the new site yet: open <a href="${pagePath('settings')}" style="color: #b45309; font-weight: 700;">Settings</a> →
+    <b>Download backup</b>, then on ayushahealth.in open Settings → <b>Restore from backup</b>.
   </div>`;
   }
 
@@ -37583,7 +37740,7 @@
     const clinicalSheetUrl = getClinicalSheetUrl();
     const monthlySheetUrl = getMonthlySheetUrl();
 
-    return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
+    return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.')}
   <div class="settings-layout">
     <nav class="card settings-nav" aria-label="Settings sections" style="align-self: flex-start; height: fit-content; min-height: auto; padding: 12px;">
       <button type="button" class="active">Google Workspace</button>
@@ -37674,6 +37831,23 @@
             ${escapeHTML$1(session.email || 'Unknown account')} · ${escapeHTML$1(session.ngo || 'No NGO assigned')}
             ${session.loginTimestamp ? `<br>Signed in ${escapeHTML$1(formatDate(session.loginTimestamp))}` : ''}
           </p>
+        </div>
+
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Backup &amp; restore</b>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">
+            Download every record stored in this browser, or restore a backup from another site.
+            Restoring only adds missing records; nothing here is overwritten.
+          </p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="button button--sm button--primary" type="button" data-export-backup>${icon('download')} Download backup</button>
+            <label class="button button--sm button--ghost" style="cursor: pointer; border: 1px solid var(--color-border);">
+              ${icon('upload')} Restore from backup
+              <input type="file" accept=".json,application/json" data-import-backup hidden>
+            </label>
+          </div>
         </div>
       </div>
     </section>
@@ -39897,20 +40071,22 @@
 
     if (target.matches('[data-report-print], [data-profile-print]')) window.print();
 
-    if (target.matches('[data-save-settings]')) {
-      const orgNameInput = document.querySelector('input[name="schoolName"]')?.value.trim() || 'An Organisation';
-      const orgCodeInput = document.querySelector('input[name="schoolCode"]')?.value.trim() || 'ORG-IND-01';
-      const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
-      const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
-
-      localStorage.setItem('sample-org-name', orgNameInput);
-      localStorage.setItem('sample-org-code', orgCodeInput);
-      localStorage.setItem('sample-org-email', orgEmailInput);
-      localStorage.setItem('sample-org-timezone', orgTimezoneInput);
-
-      toast('Settings saved', 'Your workspace preferences and Google Sheet connection are up to date.');
-      window.setTimeout(() => { window.location.reload(); }, 600);
+    // Backup: download everything this browser holds as a JSON file
+    if (target.closest('[data-export-backup]')) {
+      const backup = exportBackup();
+      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `child-health-backup-${window.location.hostname}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      const children = JSON.parse(backup.data['chm-children'] || '[]').length;
+      const checkups = JSON.parse(backup.data['chm-growth'] || '[]').length;
+      toast('Backup downloaded', `${children} children and ${checkups} checkup records saved to your Downloads folder.`);
     }
+
 
     if (target.closest('[data-add-measurement]')) {
       const firstSelect = document.querySelector('.growth-form-instance select[name="childId"]');
@@ -40436,6 +40612,42 @@
       applyTableFilters();
     }
     if (event.target.matches('#select-all')) document.querySelectorAll('[data-select-row]').forEach((input) => { input.checked = event.target.checked; });
+
+    // Restore: add the records from a backup file that are missing here
+    if (event.target.matches('[data-import-backup]') && event.target.files?.length) {
+      const input = event.target;
+      const reader = new FileReader();
+      reader.onload = () => {
+        input.value = '';
+        let backup;
+        try { backup = JSON.parse(reader.result); } catch (e) { backup = null; }
+        const problem = validateBackup(backup);
+        if (problem) {
+          toast('Restore failed', problem);
+          return;
+        }
+        const plan = previewRestore(backup);
+        if (plan.totalAdded === 0) {
+          toast('Nothing to restore', 'Every record in this backup is already here.');
+          return;
+        }
+        const labels = { 'chm-children': 'children', 'chm-growth': 'checkups / measurements', 'chm-health-records': 'blood test reports', 'chm-appointments': 'appointments', 'chm-medicines': 'prescriptions', 'chm-documents': 'documents', 'chm-activity': 'activity entries', 'chm-alerts': 'alerts', 'chm-deleted': 'deletion records' };
+        const lines = Object.entries(plan.added).map(([key, count]) => `<li><b>${count}</b> ${escapeHTML$1(labels[key] || key)}</li>`).join('');
+        modal({
+          title: 'Restore records from backup?',
+          body: `<p style="margin-bottom:8px;">From <b>${escapeHTML$1(backup.source || 'another site')}</b>, exported ${escapeHTML$1(formatDate(backup.exportedAt))}. These will be added:</p><ul style="margin:0 0 8px 18px;">${lines}</ul><p style="font-size:12px; color:var(--color-text-muted);">Records already here are not changed. They will be saved to the database and Google Sheets.</p>`,
+          confirmText: 'Restore',
+          onConfirm: async () => {
+            showProgressBar(40);
+            await applyRestore(plan);
+            hideProgressBar();
+            toast('Restore complete', `${plan.totalAdded} records added and saved.`);
+            if (renderCurrentPage) await renderCurrentPage();
+          }
+        });
+      };
+      reader.readAsText(event.target.files[0]);
+    }
   });
 
   // ─── Drag-and-Drop Row Reorder (Apple-style) ───
