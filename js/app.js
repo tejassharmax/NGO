@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore } from './storage.js';
+import { deleteChild, getGrowthRecords, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore } from './storage.js';
 import { updateChildTable, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
@@ -1800,7 +1800,7 @@ function initFormListeners() {
   // Child registration form
   document.addEventListener('submit', (event) => {
     const form = event.target;
-    if (!form || form.id !== 'child-form') return;
+    if (!form || form.getAttribute('id') !== 'child-form') return;
     event.preventDefault();
     if (!form.reportValidity()) return;
     const child = saveChild(form);
@@ -1816,7 +1816,7 @@ function initFormListeners() {
   // Child Profile: Growth & Health Vitals form (with Date reference)
   document.addEventListener('submit', async (event) => {
     const form = event.target;
-    if (!form || form.id !== 'child-growth-form') return;
+    if (!form || form.getAttribute('id') !== 'child-growth-form') return;
     event.preventDefault();
     if (!form.reportValidity()) return;
 
@@ -1825,8 +1825,12 @@ function initFormListeners() {
     const childName = form.dataset.childName || 'Child';
     const child = getChild(childId);
 
+    // The form opens pre-filled with the latest entry. That entry is updated only
+    // when the date is unchanged; a different date is a new entry, so an existing
+    // record (and any clinical checkup stored on it) is never moved to another day.
+    const editing = values.id ? getGrowthRecords(childId).find(g => g.id === values.id) : null;
     const record = {
-      id: values.id || `GW-${Date.now()}`,
+      id: editing && editing.date === values.date ? values.id : undefined,
       childId,
       childName,
       date: values.date,
@@ -1863,7 +1867,7 @@ function initFormListeners() {
   // Growth form (using delegated submit handler for dynamic form cards)
   document.addEventListener('submit', (event) => {
     const form = event.target;
-    if (form.classList.contains('growth-form-instance') || form.id === 'growth-form') {
+    if (form.classList.contains('growth-form-instance') || form.getAttribute('id') === 'growth-form') {
       event.preventDefault();
       if (!form.reportValidity()) return;
       const values = Object.fromEntries(new FormData(form));
@@ -1883,7 +1887,7 @@ function initFormListeners() {
   // Medicine form
   document.addEventListener('submit', (event) => {
     const form = event.target;
-    if (!form || form.id !== 'medicine-form') return;
+    if (!form || form.getAttribute('id') !== 'medicine-form') return;
     event.preventDefault();
     if (!form.reportValidity()) return;
     const values = Object.fromEntries(new FormData(form));
@@ -1983,7 +1987,7 @@ function initFormListeners() {
 
   document.addEventListener('submit', (event) => {
     const form = event.target;
-    if (form && (form.id === 'cal-booking-form' || form.id === 'appointment-form' || form.classList.contains('cal-booking-form'))) {
+    if (form && (form.getAttribute('id') === 'cal-booking-form' || form.getAttribute('id') === 'appointment-form' || form.classList.contains('cal-booking-form'))) {
       event.preventDefault();
       handleBookingSubmit(form);
     }
@@ -1992,7 +1996,7 @@ function initFormListeners() {
   // Edit appointment form submit
   document.addEventListener('submit', (event) => {
     const form = event.target;
-    if (!form || form.id !== 'cal-edit-appointment-form') return;
+    if (!form || form.getAttribute('id') !== 'cal-edit-appointment-form') return;
     event.preventDefault();
     if (!form.reportValidity()) return;
 
@@ -2029,11 +2033,11 @@ function initFormListeners() {
   // Clinical & Blood Test Data Entry form submit (both modal and profile page inline form)
   document.addEventListener('submit', async (event) => {
     const form = event.target;
-    if (!form || (form.id !== 'clinical-data-form' && form.id !== 'profile-clinical-data-form')) return;
+    if (!form || (form.getAttribute('id') !== 'clinical-data-form' && form.getAttribute('id') !== 'profile-clinical-data-form')) return;
     event.preventDefault();
     if (!form.reportValidity()) return;
 
-    const isProfileForm = form.id === 'profile-clinical-data-form';
+    const isProfileForm = form.getAttribute('id') === 'profile-clinical-data-form';
     const values = Object.fromEntries(new FormData(form));
     const childId = values.childId;
     const childName = values.childName || 'Child';
@@ -2182,7 +2186,7 @@ function initFormListeners() {
 
   document.addEventListener('keydown', (event) => {
     if (event.key === ' ' || event.key === 'Enter') {
-      const pill = event.target.closest('#cal-all-pill');
+      const pill = event.target.closest?.('#cal-all-pill');
       if (pill) {
         event.preventDefault();
         const checkbox = pill.querySelector('#cal-all-children-check');

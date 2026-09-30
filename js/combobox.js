@@ -34,7 +34,7 @@ export function initCombobox() {
   });
 
   document.addEventListener('input', (e) => {
-    if (!e.target.matches('[data-combobox-input]')) return;
+    if (!e.target.matches?.('[data-combobox-input]')) return;
     const cb = e.target.closest('[data-combobox]');
     if (!cb) return;
     if (!cb.classList.contains('combobox--open')) cb.classList.add('combobox--open');
@@ -59,7 +59,7 @@ export function initCombobox() {
   });
 
   document.addEventListener('keydown', (e) => {
-    if (!e.target.matches('[data-combobox-input]')) return;
+    if (!e.target.matches?.('[data-combobox-input]')) return;
     const cb = e.target.closest('[data-combobox]');
     if (!cb) return;
     const options = [...cb.querySelectorAll('[data-combobox-option]')].filter(o => o.style.display !== 'none');
