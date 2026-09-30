@@ -185,6 +185,9 @@ let renderCurrentPage = null;
     // Auto-sync any unsynced local documents to Google Drive in the background
     autoSyncPendingDocuments(false).catch(() => {});
 
+    // On the retired Render site, copy this browser's records to the live site.
+    migrateToLiveSite().catch(() => {});
+
     const app = document.querySelector('#app');
     if (app) {
       app.innerHTML = renderPage(page);
@@ -2444,4 +2447,33 @@ function applyColumnVisibility() {
       el.style.display = visible ? '' : 'none';
     });
   });
+}
+
+/**
+ * The old Render deployment kept records only in each browser. When it loads,
+ * send everything this browser holds to the live site, which adds only what it
+ * is missing (see /api/import in server.js). Runs at most once per page load
+ * session and is harmless to repeat: a second run adds nothing.
+ */
+const LIVE_SITE = 'https://ayushahealth.in';
+async function migrateToLiveSite() {
+  if (!/.onrender.com$/i.test(window.location.hostname)) return;
+  if (sessionStorage.getItem('chm_migrated_to_live')) return;
+  const backup = exportBackup();
+  const res = await apiFetch(`${LIVE_SITE}/api/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(backup)
+  });
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok || !result.success) {
+    console.warn('[Migrate] Copy to live site failed:', res.status, result.message);
+    return;
+  }
+  sessionStorage.setItem('chm_migrated_to_live', '1');
+  if (result.totalAdded > 0) {
+    toast('Records copied to ayushahealth.in', `${result.totalAdded} records from this browser are now on the live site.`);
+  } else {
+    toast('Live site is up to date', 'Every record in this browser is already on ayushahealth.in.');
+  }
 }
