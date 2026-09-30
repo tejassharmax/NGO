@@ -55,6 +55,11 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
   'http://localhost:3000,http://127.0.0.1:3000')
   .split(',').map(o => o.trim()).filter(Boolean);
 
+// The retired Render site copies its browser-only records here via /api/import.
+// Requests still need a valid signed-in admin token; CORS only lets the call through.
+const MIGRATION_ORIGINS = ['https://ngo-4xde.onrender.com'];
+MIGRATION_ORIGINS.forEach(o => { if (!ALLOWED_ORIGINS.includes(o)) ALLOWED_ORIGINS.push(o); });
+
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
@@ -506,6 +511,44 @@ app.delete('/api/children/:id', requireAuth, async (req, res) => {
   }
 });
 
+
+// POST /api/import - Add records from another deployment's backup.
+// Only records missing here are added (same rules as Settings -> Restore from
+// backup): nothing existing is overwritten and deleted records are not revived.
+app.post('/api/import', requireAuth, apiLimiter, async (req, res) => {
+  try {
+    const { validateBackup, planRestore } = await import('./js/backup.js');
+    const backup = req.body || {};
+    const problem = validateBackup(backup);
+    if (problem) return res.status(400).json({ success: false, message: problem });
+
+    const tenant = await tenantFor(req);
+    const { payload: serverData, index } = await readTenant(tenant.slug);
+    const plan = planRestore(serverData, backup);
+    if (plan.totalAdded === 0) {
+      return res.json({ success: true, totalAdded: 0, added: {} });
+    }
+
+    const mergedData = { ...serverData, ...plan.merged };
+    if (isFirestoreEnabled()) {
+      await writeSnapshot(tenant.slug, mergedData, index || new Map());
+    }
+    writeFileStore(mergedData);
+
+    try {
+      const children = JSON.parse(mergedData['chm-children'] || '[]');
+      oauthSyncSheets(children, tenant.slug, tenant.name).catch(err => {
+        console.warn('[Import] Google Sheets sync notice:', err.message);
+      });
+    } catch (e) { }
+
+    console.log(`[Import] ${req.user.email} added ${plan.totalAdded} record(s) from ${backup.source || 'backup'}: ${JSON.stringify(plan.added)}`);
+    return res.json({ success: true, totalAdded: plan.totalAdded, added: plan.added });
+  } catch (err) {
+    console.error('[Import] Failed:', err);
+    return res.status(500).json({ success: false, message: 'Import failed' });
+  }
+});
 
 // POST /api/sync - Merges and saves this NGO's database
 app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
