@@ -418,6 +418,11 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
   const root = db.collection('ngos').doc(sanitizeNgoSlug(ngoSlug));
   const operations = [];
   const tombstones = tombstonesByKey(merged[TOMBSTONE_KEY]);
+  // What Firestore will hold once these writes commit. Built as a copy so the
+  // cached index is never changed unless the writes actually succeed, and so
+  // documents created here are known to the next sync (a record created and then
+  // deleted within the cache lifetime used to be left behind in Firestore).
+  const nextIndex = new Map(index);
 
   COLLECTION_KEYS.forEach(key => {
     let items = [];
@@ -426,6 +431,8 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
 
     const collectionName = COLLECTION_NAMES[key];
     const stored = index.get(key) || new Map();
+    const next = new Map(stored);
+    nextIndex.set(key, next);
     const seen = new Set();
 
     items.forEach((rawItem, position) => {
@@ -437,10 +444,12 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
 
       // Skip only when both the content AND the position are already correct.
       const previous = stored.get(docId);
-      if (previous && previous.json === canonicalJSON(item) && previous.seq === position) {
+      const json = canonicalJSON(item);
+      if (previous && previous.json === json && previous.seq === position) {
         return;
       }
 
+      next.set(docId, { json, seq: position });
       operations.push({
         type: 'set',
         ref: root.collection(collectionName).doc(docId),
@@ -456,7 +465,7 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
             type: 'delete',
             ref: root.collection(collectionName).doc(docId)
           });
-          stored.delete(docId);
+          next.delete(docId);
         }
       });
     } else if (tombstones.has(key)) {
@@ -468,7 +477,7 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
             type: 'delete',
             ref: root.collection(collectionName).doc(docId)
           });
-          stored.delete(docId);
+          next.delete(docId);
         }
       });
     }
@@ -488,6 +497,7 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
     if (currentSettings[field] !== value) settingsChanged = true;
   });
   if (settingsChanged) {
+    nextIndex.set(SETTINGS_INDEX_KEY, { ...currentSettings, ...settings });
     operations.push({
       type: 'set',
       ref: root.collection('settings').doc('org'),
@@ -527,7 +537,7 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
 
   // Keep in-memory cache synchronized with the latest written data
   const slug = sanitizeNgoSlug(ngoSlug);
-  updateSnapshotMemoryCache(slug, merged, index);
+  updateSnapshotMemoryCache(slug, merged, nextIndex);
 
   return { writes, deletes };
 }
