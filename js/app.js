@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren } from './storage.js';
+import { deleteChild, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore } from './storage.js';
 import { updateChildTable, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
@@ -14,6 +14,7 @@ import { fetchDocsConfig } from './googleDocsSync.js';
 import { uploadDocumentToDrive, syncSingleDocToDrive, autoSyncPendingDocuments } from './googleDriveSync.js';
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, renderEditAppointmentModalMarkup, renderClinicalDataModalMarkup, buildGoogleCalendarUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
+import { validateBackup } from './backup.js';
 import { apiFetch } from './apiClient.js';
 
 let activeSort = { field: 'name', direction: 'asc' };
@@ -973,20 +974,22 @@ document.addEventListener('click', (event) => {
 
   if (target.matches('[data-report-print], [data-profile-print]')) window.print();
 
-  if (target.matches('[data-save-settings]')) {
-    const orgNameInput = document.querySelector('input[name="schoolName"]')?.value.trim() || 'An Organisation';
-    const orgCodeInput = document.querySelector('input[name="schoolCode"]')?.value.trim() || 'ORG-IND-01';
-    const orgEmailInput = document.querySelector('input[name="contact"]')?.value.trim() || 'admin@organisation.org';
-    const orgTimezoneInput = document.querySelector('input[name="timezone"]')?.value.trim() || 'Asia / Kolkata';
-
-    localStorage.setItem('sample-org-name', orgNameInput);
-    localStorage.setItem('sample-org-code', orgCodeInput);
-    localStorage.setItem('sample-org-email', orgEmailInput);
-    localStorage.setItem('sample-org-timezone', orgTimezoneInput);
-
-    toast('Settings saved', 'Your workspace preferences and Google Sheet connection are up to date.');
-    window.setTimeout(() => { window.location.reload(); }, 600);
+  // Backup: download everything this browser holds as a JSON file
+  if (target.closest('[data-export-backup]')) {
+    const backup = exportBackup();
+    const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `child-health-backup-${window.location.hostname}-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    const children = JSON.parse(backup.data['chm-children'] || '[]').length;
+    const checkups = JSON.parse(backup.data['chm-growth'] || '[]').length;
+    toast('Backup downloaded', `${children} children and ${checkups} checkup records saved to your Downloads folder.`);
   }
+
 
   if (target.closest('[data-add-measurement]')) {
     const firstSelect = document.querySelector('.growth-form-instance select[name="childId"]');
@@ -1512,6 +1515,42 @@ document.addEventListener('change', (event) => {
     applyTableFilters();
   }
   if (event.target.matches('#select-all')) document.querySelectorAll('[data-select-row]').forEach((input) => { input.checked = event.target.checked; });
+
+  // Restore: add the records from a backup file that are missing here
+  if (event.target.matches('[data-import-backup]') && event.target.files?.length) {
+    const input = event.target;
+    const reader = new FileReader();
+    reader.onload = () => {
+      input.value = '';
+      let backup;
+      try { backup = JSON.parse(reader.result); } catch (e) { backup = null; }
+      const problem = validateBackup(backup);
+      if (problem) {
+        toast('Restore failed', problem);
+        return;
+      }
+      const plan = previewRestore(backup);
+      if (plan.totalAdded === 0) {
+        toast('Nothing to restore', 'Every record in this backup is already here.');
+        return;
+      }
+      const labels = { 'chm-children': 'children', 'chm-growth': 'checkups / measurements', 'chm-health-records': 'blood test reports', 'chm-appointments': 'appointments', 'chm-medicines': 'prescriptions', 'chm-documents': 'documents', 'chm-activity': 'activity entries', 'chm-alerts': 'alerts', 'chm-deleted': 'deletion records' };
+      const lines = Object.entries(plan.added).map(([key, count]) => `<li><b>${count}</b> ${escapeHTML(labels[key] || key)}</li>`).join('');
+      modal({
+        title: 'Restore records from backup?',
+        body: `<p style="margin-bottom:8px;">From <b>${escapeHTML(backup.source || 'another site')}</b>, exported ${escapeHTML(formatDate(backup.exportedAt))}. These will be added:</p><ul style="margin:0 0 8px 18px;">${lines}</ul><p style="font-size:12px; color:var(--color-text-muted);">Records already here are not changed. They will be saved to the database and Google Sheets.</p>`,
+        confirmText: 'Restore',
+        onConfirm: async () => {
+          showProgressBar(40);
+          await applyRestore(plan);
+          hideProgressBar();
+          toast('Restore complete', `${plan.totalAdded} records added and saved.`);
+          if (renderCurrentPage) await renderCurrentPage();
+        }
+      });
+    };
+    reader.readAsText(event.target.files[0]);
+  }
 });
 
 // ─── Drag-and-Drop Row Reorder (Apple-style) ───

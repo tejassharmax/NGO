@@ -148,8 +148,21 @@ export function shell(page, content) {
           </div>
         </div>
       </header>
-      <section class="content page-enter">${content}</section>
+      <section class="content page-enter">${oldSiteBanner()}${content}</section>
     </main>
+  </div>`;
+}
+
+/**
+ * The old Render address kept its own copy of the data. Until it is retired, tell
+ * anyone using it to move their records to the live site.
+ */
+function oldSiteBanner() {
+  if (!/\.onrender\.com$/i.test(window.location.hostname)) return '';
+  return `<div class="card" style="padding: 14px 18px; margin-bottom: 18px; border: 1px solid #f59e0b; background: #fffbeb; color: #92400e; font-size: 13px; line-height: 1.5;">
+    <b>This old address is being retired.</b> The live site is <a href="https://ayushahealth.in" style="color: #b45309; font-weight: 700;">ayushahealth.in</a>.
+    Records entered here are not on the new site yet: open <a href="${pagePath('settings')}" style="color: #b45309; font-weight: 700;">Settings</a> →
+    <b>Download backup</b>, then on ayushahealth.in open Settings → <b>Restore from backup</b>.
   </div>`;
 }
 
@@ -1175,7 +1188,7 @@ export function settingsPage() {
   const clinicalSheetUrl = getClinicalSheetUrl();
   const monthlySheetUrl = getMonthlySheetUrl();
 
-  return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.', `<button class="button button--primary" type="button" data-save-settings>Save changes</button>`)}
+  return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.')}
   <div class="settings-layout">
     <nav class="card settings-nav" aria-label="Settings sections" style="align-self: flex-start; height: fit-content; min-height: auto; padding: 12px;">
       <button type="button" class="active">Google Workspace</button>
@@ -1266,6 +1279,23 @@ export function settingsPage() {
             ${escapeHTML(session.email || 'Unknown account')} · ${escapeHTML(session.ngo || 'No NGO assigned')}
             ${session.loginTimestamp ? `<br>Signed in ${escapeHTML(formatDate(session.loginTimestamp))}` : ''}
           </p>
+        </div>
+
+        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <b style="font-size: 14px; font-weight: 600;">Backup &amp; restore</b>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">
+            Download every record stored in this browser, or restore a backup from another site.
+            Restoring only adds missing records; nothing here is overwritten.
+          </p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="button button--sm button--primary" type="button" data-export-backup>${icon('download')} Download backup</button>
+            <label class="button button--sm button--ghost" style="cursor: pointer; border: 1px solid var(--color-border);">
+              ${icon('upload')} Restore from backup
+              <input type="file" accept=".json,application/json" data-import-backup hidden>
+            </label>
+          </div>
         </div>
       </div>
     </section>
