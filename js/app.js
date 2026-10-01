@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getGrowthRecords, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore, countMissingClinicDoctor, fillClinicDoctor } from './storage.js';
+import { deleteChild, getGrowthRecords, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore, countMissingClinicDoctor, fillClinicDoctor, signInExpired } from './storage.js';
 import { updateChildTable, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
@@ -8,7 +8,7 @@ import { saveChild } from './form.js';
 import { pagePath, icon, escapeHTML, formatDate, showProgressBar, hideProgressBar } from './utils.js';
 import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser } from './auth.js';
-import { isSessionActive } from './session.js';
+import { isSessionActive, clearSession } from './session.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets, autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
 import { fetchDocsConfig } from './googleDocsSync.js';
 import { uploadDocumentToDrive, syncSingleDocToDrive, autoSyncPendingDocuments } from './googleDriveSync.js';
@@ -175,6 +175,21 @@ let renderCurrentPage = null;
       fetchSheetsConfig().catch(() => {}),
       fetchDocsConfig().catch(() => {})
     ]);
+
+    // The app looked signed in but the server refused the session, so nothing
+    // would load or save. Ask for a fresh sign-in instead of showing stale data.
+    // Only the sign-in marker is cleared: records in this browser stay and are
+    // synced as soon as the user signs in again.
+    if (signInExpired()) {
+      clearSession();
+      window.location.hash = '#/login';
+      const appRoot = document.querySelector('#app');
+      if (appRoot) appRoot.innerHTML = renderPage('login');
+      dismissInitialLoader();
+      hideProgressBar();
+      toast('Please sign in again', 'Your sign-in on this device has expired. Your records are safe and will sync once you sign in.');
+      return;
+    }
 
     if (!isInitialBoot) {
       showProgressBar(85);

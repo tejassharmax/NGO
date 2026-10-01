@@ -34263,6 +34263,15 @@
      DATA SYNC WITH SERVER-SIDE DB
      ─────────────────────────────────────────────────────── */
   let isSyncing = false;
+  let serverRejectedSignIn = false;
+
+  /**
+   * True when the server answered the last load with 401: this browser still looks
+   * signed in, but its Google sign-in has expired, so nothing can load or save.
+   */
+  function signInExpired() {
+    return serverRejectedSignIn;
+  }
 
   /**
    * Hydrate state directly from server on fresh browser open / login
@@ -34271,6 +34280,7 @@
     try {
       isSyncing = true;
       const res = await apiFetch('/api/sync');
+      serverRejectedSignIn = res.status === 401;
       if (res.ok) {
         const serverData = await res.json();
         if (serverData && typeof serverData === 'object') {
@@ -39412,6 +39422,21 @@
         fetchSheetsConfig().catch(() => {}),
         fetchDocsConfig().catch(() => {})
       ]);
+
+      // The app looked signed in but the server refused the session, so nothing
+      // would load or save. Ask for a fresh sign-in instead of showing stale data.
+      // Only the sign-in marker is cleared: records in this browser stay and are
+      // synced as soon as the user signs in again.
+      if (signInExpired()) {
+        clearSession();
+        window.location.hash = '#/login';
+        const appRoot = document.querySelector('#app');
+        if (appRoot) appRoot.innerHTML = renderPage('login');
+        dismissInitialLoader();
+        hideProgressBar();
+        toast('Please sign in again', 'Your sign-in on this device has expired. Your records are safe and will sync once you sign in.');
+        return;
+      }
 
       if (!isInitialBoot) {
         showProgressBar(85);

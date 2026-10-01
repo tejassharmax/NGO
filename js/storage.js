@@ -597,6 +597,15 @@ function seedDatabase() {
    DATA SYNC WITH SERVER-SIDE DB
    ─────────────────────────────────────────────────────── */
 let isSyncing = false;
+let serverRejectedSignIn = false;
+
+/**
+ * True when the server answered the last load with 401: this browser still looks
+ * signed in, but its Google sign-in has expired, so nothing can load or save.
+ */
+export function signInExpired() {
+  return serverRejectedSignIn;
+}
 
 /**
  * Hydrate state directly from server on fresh browser open / login
@@ -605,6 +614,7 @@ export async function hydrateFromServer() {
   try {
     isSyncing = true;
     const res = await apiFetch('/api/sync');
+    serverRejectedSignIn = res.status === 401;
     if (res.ok) {
       const serverData = await res.json();
       if (serverData && typeof serverData === 'object') {
