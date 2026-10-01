@@ -82,8 +82,16 @@ function itemKey(item) {
   return JSON.stringify(item);
 }
 
+/** When a record was last edited (ms). Records saved before this existed count as 0. */
+function editedAt(item) {
+  return Number(item && item.updatedAt) || 0;
+}
+
 /**
- * Union-merge two JSON arrays, client entries winning on key collision.
+ * Union-merge two JSON arrays. On a key collision the more recently edited copy
+ * wins, so a browser still holding an old copy of a record cannot undo an edit
+ * made on another device. Copies with no edit time (or the same one) resolve to
+ * the client, as they always have.
  * @param {string} clientJSON
  * @param {string} serverJSON
  * @returns {string} merged JSON array
@@ -98,12 +106,16 @@ function mergeJSONArrays(clientJSON, serverJSON) {
 
   const map = new Map();
 
+  // Server copies go in first; a client copy replaces one unless it is older.
   serverArr.concat(clientArr).forEach(item => {
     if (!item || typeof item !== 'object') return;
     // Exclude legacy mock records and admin self-registration tests.
     if (item.name && DISALLOWED_MOCK_NAMES.includes(item.name.trim())) return;
     if (item.childName && DISALLOWED_MOCK_NAMES.includes(item.childName.trim())) return;
-    map.set(itemKey(item), item);
+    const key = itemKey(item);
+    const current = map.get(key);
+    if (current && editedAt(current) > editedAt(item)) return;
+    map.set(key, item);
   });
 
   let result = Array.from(map.values());

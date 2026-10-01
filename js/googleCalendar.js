@@ -6,7 +6,7 @@
  */
 
 import { getAppointments, addAppointment } from './storage.js';
-import { getChildren, getGrowthRecords, getHealthRecords } from './storage.js';
+import { getChildren, getGrowthRecords, getHealthRecords, getLastClinicDoctor } from './storage.js';
 import { toast } from './toast.js';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -167,6 +167,8 @@ export function bookAppointment(data) {
     date: data.date,
     time: data.time || '10:00',
     doctor: data.doctor || '',
+    clinicName: data.clinicName || '',
+    doctorName: data.doctorName || '',
     notes: data.notes || '',
     status: 'Upcoming'
   });
@@ -387,6 +389,7 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
   const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
   const specialtyOptions = DOCTOR_SPECIALTIES.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
   const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
+  const lastUsed = getLastClinicDoctor();
 
   // Format display date
   const dateObj = new Date(dateVal + 'T00:00:00');
@@ -464,6 +467,17 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
           </div>
           <div class="gcal-popup-row-content">
             <input class="gcal-popup-text-input" name="vaccineName" id="cal-vaccine-name" type="text" placeholder="Vaccination name" autocomplete="off" />
+          </div>
+        </div>
+
+        <!-- Clinic and doctor (optional; shown in the Monthly Checkup Register) -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M12 8v4M10 10h4"/></svg>
+          </div>
+          <div class="gcal-popup-row-content" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input class="gcal-popup-text-input" name="clinicName" type="text" placeholder="Clinic name" value="${escapeHTML(lastUsed.clinicName)}" autocomplete="off" style="flex:1; min-width:130px;" />
+            <input class="gcal-popup-text-input" name="doctorName" type="text" placeholder="Doctor name" value="${escapeHTML(lastUsed.doctorName)}" autocomplete="off" style="flex:1; min-width:130px;" />
           </div>
         </div>
 
@@ -603,6 +617,17 @@ export function renderEventDetailsModalMarkup(eventId) {
               </div>
             </div>
 
+            ${appt.clinicName || appt.doctorName ? `
+            <div class="gcal-popover-info-item">
+              <div class="gcal-popover-info-icon">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#2563eb" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M12 8v4M10 10h4"/></svg>
+              </div>
+              <div class="gcal-popover-info-text">
+                <span class="gcal-popover-info-label">Clinic / Doctor</span>
+                <span class="gcal-popover-info-val">${escapeHTML([appt.clinicName, appt.doctorName].filter(Boolean).join(' · '))}</span>
+              </div>
+            </div>` : ''}
+
             ${appt.vaccineName ? `
             <div class="gcal-popover-info-item">
               <div class="gcal-popover-info-icon">
@@ -674,6 +699,10 @@ export function renderEventDetailsModalMarkup(eventId) {
  */
 export function renderClinicalSectionsMarkup({ existingGrowth = {}, existingBlood = {}, targetDate = '', prefix = '' } = {}) {
   const dateVal = targetDate || new Date().toISOString().slice(0, 10);
+  // A new checkup starts with the clinic and doctor used last time; an existing one shows its own.
+  const lastUsed = existingGrowth.id ? { clinicName: '', doctorName: '' } : getLastClinicDoctor();
+  const clinicVal = existingGrowth.clinicName || lastUsed.clinicName;
+  const doctorVal = existingGrowth.doctorName || lastUsed.doctorName;
   return `
     <!-- SECTION 1: ROUTINE CLINICAL CHECKUP -->
     <div class="clinical-section-card" style="margin-bottom: 24px;">
@@ -728,6 +757,17 @@ export function renderClinicalSectionsMarkup({ existingGrowth = {}, existingBloo
           <div class="clinical-input-unit-wrapper">
             <input class="clinical-input" id="${prefix}checkup-spo2" type="number" name="spo2" placeholder="99" value="${escapeHTML(existingGrowth.spo2 || '')}" />
             <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-grid-full" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px 14px;">
+          <div class="clinical-field-group">
+            <label class="clinical-field-label" for="${prefix}checkup-clinic">CLINIC NAME</label>
+            <input class="clinical-input" id="${prefix}checkup-clinic" type="text" name="clinicName" placeholder="Clinic or hospital visited" value="${escapeHTML(clinicVal)}" autocomplete="off" />
+          </div>
+          <div class="clinical-field-group">
+            <label class="clinical-field-label" for="${prefix}checkup-doctor">DOCTOR NAME</label>
+            <input class="clinical-input" id="${prefix}checkup-doctor" type="text" name="doctorName" placeholder="Doctor who examined the child" value="${escapeHTML(doctorVal)}" autocomplete="off" />
           </div>
         </div>
 
@@ -1039,6 +1079,17 @@ export function renderEditAppointmentModalMarkup(eventId) {
               </div>
               <div class="gcal-popup-row-content">
                 <input class="gcal-popup-text-input" name="vaccineName" id="cal-vaccine-name" type="text" placeholder="Vaccination name" value="${escapeHTML(appt.vaccineName || '')}" autocomplete="off" />
+              </div>
+            </div>
+
+            <!-- Clinic and doctor (optional; shown in the Monthly Checkup Register) -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M12 8v4M10 10h4"/></svg>
+              </div>
+              <div class="gcal-popup-row-content" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <input class="gcal-popup-text-input" name="clinicName" type="text" placeholder="Clinic name" value="${escapeHTML(appt.clinicName || '')}" autocomplete="off" style="flex:1; min-width:130px;" />
+                <input class="gcal-popup-text-input" name="doctorName" type="text" placeholder="Doctor name" value="${escapeHTML(appt.doctorName || '')}" autocomplete="off" style="flex:1; min-width:130px;" />
               </div>
             </div>
 

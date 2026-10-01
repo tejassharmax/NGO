@@ -35,6 +35,7 @@ export function getChildren() {
 export function updateChild(child) {
   const children = getChildren();
   const idx = children.findIndex(c => c.id === child.id);
+  child.updatedAt = Date.now();
   if (idx !== -1) {
     children[idx] = child;
     logActivity('child_updated', child.name, 'Child record updated');
@@ -221,6 +222,7 @@ export function saveGrowthRecord(record) {
   const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
   record.id = record.id || `GW-${Date.now()}`;
   record.timestamp = record.timestamp || Date.now();
+  record.updatedAt = Date.now();
   record.date = record.date || new Date().toISOString().slice(0, 10);
   record.height = record.height ? String(record.height).replace(/[^0-9.]/g, '').trim() : '';
   record.weight = record.weight ? String(record.weight).replace(/[^0-9.]/g, '').trim() : '';
@@ -280,6 +282,57 @@ export function deleteGrowthRecord(id, childId) {
   localStorage.setItem(GROWTH_KEY, JSON.stringify(all.filter(r => !matches(r))));
 }
 
+/* ─── Clinic & doctor on checkups ─── */
+
+/**
+ * The clinic and doctor entered most recently, used to prefill a new checkup so
+ * staff who visit the same clinic every month type the names only once.
+ * @returns {{clinicName: string, doctorName: string}}
+ */
+export function getLastClinicDoctor() {
+  const recent = [...getGrowthRecords(), ...getAppointments()]
+    .filter(r => r && (r.clinicName || r.doctorName))
+    .sort((a, b) => (b.updatedAt || b.timestamp || 0) - (a.updatedAt || a.timestamp || 0))[0];
+  return { clinicName: recent?.clinicName || '', doctorName: recent?.doctorName || '' };
+}
+
+/** How many checkups and appointments have no clinic or no doctor recorded. */
+export function countMissingClinicDoctor() {
+  return [...getGrowthRecords(), ...getAppointments()].filter(r => r && (!r.clinicName || !r.doctorName)).length;
+}
+
+/**
+ * Put a clinic and doctor on existing checkups and appointments in one go.
+ * Only empty fields are filled, unless `replace` is set. A blank argument leaves
+ * that field alone.
+ * @returns {number} how many records changed
+ */
+export function fillClinicDoctor({ clinicName = '', doctorName = '', replace = false } = {}) {
+  const clinic = clinicName.trim();
+  const doctor = doctorName.trim();
+  if (!clinic && !doctor) return 0;
+  const now = Date.now();
+  let changed = 0;
+  [GROWTH_KEY, APPOINTMENTS_KEY].forEach(key => {
+    const all = JSON.parse(localStorage.getItem(key) || '[]');
+    let touched = false;
+    all.forEach(r => {
+      if (!r) return;
+      const next = {
+        clinicName: clinic && (replace || !r.clinicName) ? clinic : (r.clinicName || ''),
+        doctorName: doctor && (replace || !r.doctorName) ? doctor : (r.doctorName || '')
+      };
+      if (next.clinicName === (r.clinicName || '') && next.doctorName === (r.doctorName || '')) return;
+      Object.assign(r, next, { updatedAt: now });
+      touched = true;
+      changed++;
+    });
+    if (touched) localStorage.setItem(key, JSON.stringify(all));
+  });
+  if (changed > 0) logActivity('clinic_doctor_filled', 'All children', `Clinic and doctor added to ${changed} checkup record(s)`);
+  return changed;
+}
+
 /* ─── Nutrition / Meal Log ─── */
 
 /* ─── Medicine Management ─── */
@@ -324,6 +377,7 @@ export function addAppointment(appt) {
 
   appt.id = appt.id || `APT-${appt.childId || 'GEN'}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
   appt.timestamp = Date.now();
+  appt.updatedAt = appt.timestamp;
   all.unshift(appt);
   localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
   logActivity('appointment_added', appt.childName || 'Child', `${appt.type} on ${appt.date}`);
@@ -333,6 +387,7 @@ export function addAppointment(appt) {
 export function updateAppointment(appt) {
   const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
   const idx = all.findIndex(a => a.id === appt.id);
+  appt.updatedAt = Date.now();
   if (idx !== -1) all[idx] = appt;
   localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
   return appt;
@@ -357,6 +412,7 @@ export function saveHealthRecord(record) {
   const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
   record.id = record.id || `HR-${Date.now()}`;
   record.timestamp = record.timestamp || Date.now();
+  record.updatedAt = Date.now();
   record.date = record.date || new Date().toISOString().slice(0, 10);
 
   // Check if an existing record with same ID or (same childId AND same date) exists
@@ -580,8 +636,12 @@ export async function hydrateFromServer() {
                     localArr.forEach(item => {
                       if (!item) return;
                       const id = keyFn(item);
-                      if (!itemMap.has(id)) {
+                      const fromServer = itemMap.get(id);
+                      if (!fromServer) {
                         hasLocalChangesToPush = true;
+                      } else if ((Number(fromServer.updatedAt) || 0) > (Number(item.updatedAt) || 0)) {
+                        // Edited on another device after this copy was saved: keep the newer one.
+                        return;
                       }
                       itemMap.set(id, item);
                     });

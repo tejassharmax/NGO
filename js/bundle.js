@@ -33701,6 +33701,7 @@
   function updateChild(child) {
     const children = getChildren();
     const idx = children.findIndex(c => c.id === child.id);
+    child.updatedAt = Date.now();
     if (idx !== -1) {
       children[idx] = child;
       logActivity('child_updated', child.name, 'Child record updated');
@@ -33887,6 +33888,7 @@
     const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
     record.id = record.id || `GW-${Date.now()}`;
     record.timestamp = record.timestamp || Date.now();
+    record.updatedAt = Date.now();
     record.date = record.date || new Date().toISOString().slice(0, 10);
     record.height = record.height ? String(record.height).replace(/[^0-9.]/g, '').trim() : '';
     record.weight = record.weight ? String(record.weight).replace(/[^0-9.]/g, '').trim() : '';
@@ -33946,6 +33948,57 @@
     localStorage.setItem(GROWTH_KEY, JSON.stringify(all.filter(r => !matches(r))));
   }
 
+  /* ─── Clinic & doctor on checkups ─── */
+
+  /**
+   * The clinic and doctor entered most recently, used to prefill a new checkup so
+   * staff who visit the same clinic every month type the names only once.
+   * @returns {{clinicName: string, doctorName: string}}
+   */
+  function getLastClinicDoctor() {
+    const recent = [...getGrowthRecords(), ...getAppointments()]
+      .filter(r => r && (r.clinicName || r.doctorName))
+      .sort((a, b) => (b.updatedAt || b.timestamp || 0) - (a.updatedAt || a.timestamp || 0))[0];
+    return { clinicName: recent?.clinicName || '', doctorName: recent?.doctorName || '' };
+  }
+
+  /** How many checkups and appointments have no clinic or no doctor recorded. */
+  function countMissingClinicDoctor() {
+    return [...getGrowthRecords(), ...getAppointments()].filter(r => r && (!r.clinicName || !r.doctorName)).length;
+  }
+
+  /**
+   * Put a clinic and doctor on existing checkups and appointments in one go.
+   * Only empty fields are filled, unless `replace` is set. A blank argument leaves
+   * that field alone.
+   * @returns {number} how many records changed
+   */
+  function fillClinicDoctor({ clinicName = '', doctorName = '', replace = false } = {}) {
+    const clinic = clinicName.trim();
+    const doctor = doctorName.trim();
+    if (!clinic && !doctor) return 0;
+    const now = Date.now();
+    let changed = 0;
+    [GROWTH_KEY, APPOINTMENTS_KEY].forEach(key => {
+      const all = JSON.parse(localStorage.getItem(key) || '[]');
+      let touched = false;
+      all.forEach(r => {
+        if (!r) return;
+        const next = {
+          clinicName: clinic && (replace || !r.clinicName) ? clinic : (r.clinicName || ''),
+          doctorName: doctor && (replace || !r.doctorName) ? doctor : (r.doctorName || '')
+        };
+        if (next.clinicName === (r.clinicName || '') && next.doctorName === (r.doctorName || '')) return;
+        Object.assign(r, next, { updatedAt: now });
+        touched = true;
+        changed++;
+      });
+      if (touched) localStorage.setItem(key, JSON.stringify(all));
+    });
+    if (changed > 0) logActivity('clinic_doctor_filled', 'All children', `Clinic and doctor added to ${changed} checkup record(s)`);
+    return changed;
+  }
+
   /* ─── Nutrition / Meal Log ─── */
 
   /* ─── Medicine Management ─── */
@@ -33990,6 +34043,7 @@
 
     appt.id = appt.id || `APT-${appt.childId || 'GEN'}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     appt.timestamp = Date.now();
+    appt.updatedAt = appt.timestamp;
     all.unshift(appt);
     localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
     logActivity('appointment_added', appt.childName || 'Child', `${appt.type} on ${appt.date}`);
@@ -33999,6 +34053,7 @@
   function updateAppointment(appt) {
     const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
     const idx = all.findIndex(a => a.id === appt.id);
+    appt.updatedAt = Date.now();
     if (idx !== -1) all[idx] = appt;
     localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
     return appt;
@@ -34023,6 +34078,7 @@
     const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
     record.id = record.id || `HR-${Date.now()}`;
     record.timestamp = record.timestamp || Date.now();
+    record.updatedAt = Date.now();
     record.date = record.date || new Date().toISOString().slice(0, 10);
 
     // Check if an existing record with same ID or (same childId AND same date) exists
@@ -34246,8 +34302,12 @@
                       localArr.forEach(item => {
                         if (!item) return;
                         const id = keyFn(item);
-                        if (!itemMap.has(id)) {
+                        const fromServer = itemMap.get(id);
+                        if (!fromServer) {
                           hasLocalChangesToPush = true;
+                        } else if ((Number(fromServer.updatedAt) || 0) > (Number(item.updatedAt) || 0)) {
+                          // Edited on another device after this copy was saved: keep the newer one.
+                          return;
                         }
                         itemMap.set(id, item);
                       });
@@ -35571,6 +35631,8 @@
       date: data.date,
       time: data.time || '10:00',
       doctor: data.doctor || '',
+      clinicName: data.clinicName || '',
+      doctorName: data.doctorName || '',
       notes: data.notes || '',
       status: 'Upcoming'
     });
@@ -35791,6 +35853,7 @@
     const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
     const specialtyOptions = DOCTOR_SPECIALTIES.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
     const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
+    const lastUsed = getLastClinicDoctor();
 
     // Format display date
     const dateObj = new Date(dateVal + 'T00:00:00');
@@ -35868,6 +35931,17 @@
           </div>
           <div class="gcal-popup-row-content">
             <input class="gcal-popup-text-input" name="vaccineName" id="cal-vaccine-name" type="text" placeholder="Vaccination name" autocomplete="off" />
+          </div>
+        </div>
+
+        <!-- Clinic and doctor (optional; shown in the Monthly Checkup Register) -->
+        <div class="gcal-popup-row">
+          <div class="gcal-popup-icon">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M12 8v4M10 10h4"/></svg>
+          </div>
+          <div class="gcal-popup-row-content" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <input class="gcal-popup-text-input" name="clinicName" type="text" placeholder="Clinic name" value="${escapeHTML(lastUsed.clinicName)}" autocomplete="off" style="flex:1; min-width:130px;" />
+            <input class="gcal-popup-text-input" name="doctorName" type="text" placeholder="Doctor name" value="${escapeHTML(lastUsed.doctorName)}" autocomplete="off" style="flex:1; min-width:130px;" />
           </div>
         </div>
 
@@ -36007,6 +36081,17 @@
               </div>
             </div>
 
+            ${appt.clinicName || appt.doctorName ? `
+            <div class="gcal-popover-info-item">
+              <div class="gcal-popover-info-icon">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#2563eb" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M12 8v4M10 10h4"/></svg>
+              </div>
+              <div class="gcal-popover-info-text">
+                <span class="gcal-popover-info-label">Clinic / Doctor</span>
+                <span class="gcal-popover-info-val">${escapeHTML([appt.clinicName, appt.doctorName].filter(Boolean).join(' · '))}</span>
+              </div>
+            </div>` : ''}
+
             ${appt.vaccineName ? `
             <div class="gcal-popover-info-item">
               <div class="gcal-popover-info-icon">
@@ -36078,6 +36163,10 @@
    */
   function renderClinicalSectionsMarkup({ existingGrowth = {}, existingBlood = {}, targetDate = '', prefix = '' } = {}) {
     const dateVal = targetDate || new Date().toISOString().slice(0, 10);
+    // A new checkup starts with the clinic and doctor used last time; an existing one shows its own.
+    const lastUsed = existingGrowth.id ? { clinicName: '', doctorName: '' } : getLastClinicDoctor();
+    const clinicVal = existingGrowth.clinicName || lastUsed.clinicName;
+    const doctorVal = existingGrowth.doctorName || lastUsed.doctorName;
     return `
     <!-- SECTION 1: ROUTINE CLINICAL CHECKUP -->
     <div class="clinical-section-card" style="margin-bottom: 24px;">
@@ -36132,6 +36221,17 @@
           <div class="clinical-input-unit-wrapper">
             <input class="clinical-input" id="${prefix}checkup-spo2" type="number" name="spo2" placeholder="99" value="${escapeHTML(existingGrowth.spo2 || '')}" />
             <span class="clinical-input-unit">%</span>
+          </div>
+        </div>
+
+        <div class="clinical-grid-full" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px 14px;">
+          <div class="clinical-field-group">
+            <label class="clinical-field-label" for="${prefix}checkup-clinic">CLINIC NAME</label>
+            <input class="clinical-input" id="${prefix}checkup-clinic" type="text" name="clinicName" placeholder="Clinic or hospital visited" value="${escapeHTML(clinicVal)}" autocomplete="off" />
+          </div>
+          <div class="clinical-field-group">
+            <label class="clinical-field-label" for="${prefix}checkup-doctor">DOCTOR NAME</label>
+            <input class="clinical-input" id="${prefix}checkup-doctor" type="text" name="doctorName" placeholder="Doctor who examined the child" value="${escapeHTML(doctorVal)}" autocomplete="off" />
           </div>
         </div>
 
@@ -36443,6 +36543,17 @@
               </div>
               <div class="gcal-popup-row-content">
                 <input class="gcal-popup-text-input" name="vaccineName" id="cal-vaccine-name" type="text" placeholder="Vaccination name" value="${escapeHTML(appt.vaccineName || '')}" autocomplete="off" />
+              </div>
+            </div>
+
+            <!-- Clinic and doctor (optional; shown in the Monthly Checkup Register) -->
+            <div class="gcal-popup-row">
+              <div class="gcal-popup-icon">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4M12 8v4M10 10h4"/></svg>
+              </div>
+              <div class="gcal-popup-row-content" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <input class="gcal-popup-text-input" name="clinicName" type="text" placeholder="Clinic name" value="${escapeHTML(appt.clinicName || '')}" autocomplete="off" style="flex:1; min-width:130px;" />
+                <input class="gcal-popup-text-input" name="doctorName" type="text" placeholder="Doctor name" value="${escapeHTML(appt.doctorName || '')}" autocomplete="off" style="flex:1; min-width:130px;" />
               </div>
             </div>
 
@@ -37206,7 +37317,7 @@
         ].filter(Boolean).join(' · ') || 'Lab values recorded'}</span>`;
 
       const detailsHTML = isCheckup
-        ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML$1(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML$1(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML$1(item.eyeCheckup)}` : ''}` || '—'
+        ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML$1(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML$1(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML$1(item.eyeCheckup)}` : ''}${item.clinicName || item.doctorName ? ` · ${escapeHTML$1([item.doctorName, item.clinicName].filter(Boolean).join(', '))}` : ''}` || '—'
         : `${item.rbcMorphology ? `RBC: ${escapeHTML$1(item.rbcMorphology)} ` : ''}${item.plateletsAdequacy ? `· Platelets: ${escapeHTML$1(item.plateletsAdequacy)}` : ''}` || '—';
 
       const rawData = JSON.stringify(item).replace(/"/g, '&quot;');
@@ -37739,6 +37850,8 @@
     const masterSheetUrl = getGoogleSheetUrl();
     const clinicalSheetUrl = getClinicalSheetUrl();
     const monthlySheetUrl = getMonthlySheetUrl();
+    const lastUsed = getLastClinicDoctor();
+    const missingClinicDoctor = countMissingClinicDoctor();
 
     return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.')}
   <div class="settings-layout">
@@ -37821,6 +37934,33 @@
             ` : ''}
           </div>
         </div>
+
+        <form class="card" id="clinic-doctor-form" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: 1 / -1;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap;">
+            <b style="font-size: 14px; font-weight: 600;">Clinic &amp; doctor on the Monthly Checkup Register</b>
+            <span class="badge ${missingClinicDoctor > 0 ? 'badge--neutral' : 'badge--success'}">${missingClinicDoctor > 0 ? `${missingClinicDoctor} record(s) without one` : 'All records have one'}</span>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">
+            Every checkup has its own Clinic name and Doctor name, and both appear as columns in the monthly sheet.
+            Use this to add them to checkups that were saved without one. Checkups that already have a name are left as they are.
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; margin-bottom: 12px;">
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600;">
+              Clinic name
+              <input class="clinical-input" type="text" name="clinicName" value="${escapeHTML$1(lastUsed.clinicName)}" placeholder="Clinic or hospital visited" autocomplete="off" />
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600;">
+              Doctor name
+              <input class="clinical-input" type="text" name="doctorName" value="${escapeHTML$1(lastUsed.doctorName)}" placeholder="Doctor who examined the children" autocomplete="off" />
+            </label>
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            <button class="button button--sm button--primary" type="submit">${icon('check')} Add to checkups</button>
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); cursor: pointer;">
+              <input type="checkbox" name="replace" value="true" /> Also replace names already entered
+            </label>
+          </div>
+        </form>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -40192,6 +40332,8 @@
             setVal('checkup-eye', item.eyeCheckup || item.eyeRemarks);
             setVal('checkup-complaint', item.complaint || item.symptoms);
             setVal('checkup-prescription', item.prescription || item.medication);
+            setVal('checkup-clinic', item.clinicName);
+            setVal('checkup-doctor', item.doctorName);
             const idInput = form.querySelector('#prof-growth-id');
             if (idInput) idInput.value = item.id || '';
             toast('Checkup Loaded', `Loaded checkup measurements from ${item.date || 'record'} into editor.`);
@@ -41031,6 +41173,8 @@
               date: values.date,
               time: values.time || '10:00',
               doctor: values.doctor || '',
+              clinicName: (values.clinicName || '').trim(),
+              doctorName: (values.doctorName || '').trim(),
               specialty: values.specialty || '',
               vaccineName,
               notes: values.notes || '',
@@ -41065,6 +41209,8 @@
           date: values.date,
           time: values.time || '',
           doctor: values.doctor || '',
+          clinicName: (values.clinicName || '').trim(),
+          doctorName: (values.doctorName || '').trim(),
           specialty: values.specialty || '',
           vaccineName,
           notes: values.notes || ''
@@ -41111,6 +41257,8 @@
         date: values.date,
         time: values.time || '10:00',
         doctor: values.doctor || '',
+        clinicName: (values.clinicName || '').trim(),
+        doctorName: (values.doctorName || '').trim(),
         notes: values.notes || '',
         status: values.status || 'Upcoming',
         timestamp: existing ? (existing.timestamp || Date.now()) : Date.now()
@@ -41125,6 +41273,43 @@
       if (calModal) calModal.remove();
 
       window.setTimeout(() => window.location.reload(), 500);
+    });
+
+    // Settings: add a clinic and doctor to checkups saved without one
+    document.addEventListener('submit', (event) => {
+      const form = event.target;
+      if (!form || form.getAttribute('id') !== 'clinic-doctor-form') return;
+      event.preventDefault();
+
+      const values = Object.fromEntries(new FormData(form));
+      const clinicName = (values.clinicName || '').trim();
+      const doctorName = (values.doctorName || '').trim();
+      const replace = values.replace === 'true';
+      if (!clinicName && !doctorName) {
+        toast('Nothing to add', 'Type a clinic name or a doctor name first.');
+        return;
+      }
+
+      const affected = replace ? getGrowthRecords().length + getAppointments().length : countMissingClinicDoctor();
+      if (affected === 0) {
+        toast('Nothing to change', 'Every checkup already has a clinic and a doctor.');
+        return;
+      }
+
+      const names = [clinicName && `clinic <b>${escapeHTML$1(clinicName)}</b>`, doctorName && `doctor <b>${escapeHTML$1(doctorName)}</b>`].filter(Boolean).join(' and ');
+      modal({
+        title: replace ? 'Replace clinic and doctor on every checkup?' : 'Add clinic and doctor to checkups?',
+        body: replace
+          ? `<p>This sets ${names} on all ${affected} checkup and appointment record(s), replacing any name already entered.</p>`
+          : `<p>This sets ${names} on the ${affected} checkup or appointment record(s) that are missing one. Names already entered are not changed.</p>`,
+        confirmText: replace ? 'Replace on all' : 'Add to checkups',
+        onConfirm: async () => {
+          const changed = fillClinicDoctor({ clinicName, doctorName, replace });
+          await syncWithServer();
+          toast('Clinic and doctor saved', `${changed} record(s) updated. The Monthly Checkup Register sheet refreshes in about a minute.`);
+          if (renderCurrentPage) await renderCurrentPage();
+        }
+      });
     });
 
     // Clinical & Blood Test Data Entry form submit (both modal and profile page inline form)
@@ -41166,7 +41351,9 @@
             spo2: (values.spo2 || '').trim(),
             complaint: (values.complaint || '').trim(),
             prescription: (values.prescription || '').trim(),
-            eyeCheckup: (values.eyeCheckup || '').trim()
+            eyeCheckup: (values.eyeCheckup || '').trim(),
+            clinicName: (values.clinicName || '').trim(),
+            doctorName: (values.doctorName || '').trim()
           };
           saveGrowthRecord(growthRecord);
         }

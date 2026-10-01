@@ -5,7 +5,7 @@
  *
  * A visit is identified by (child, date) and assembled from three collections:
  *   chm-appointments  the checkup type, vaccination name and appointment notes
- *   chm-growth        the clinical checkup: complaint and prescription
+ *   chm-growth        the clinical checkup: clinic, doctor, complaint and prescription
  *   chm-medicines     prescriptions added on the Prescriptions page
  * so a checkup booked in the calendar and filled in afterwards lands on one row.
  * A child can have several visits in a month (illness, infection, follow-up);
@@ -19,7 +19,7 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-const REGISTER_HEADERS = ['NAME OF CHILD', 'CHECKUP TYPE', 'PRESCRIPTION', 'NOTES', 'DATE'];
+const REGISTER_HEADERS = ['NAME OF CHILD', 'CHECKUP TYPE', 'CLINIC NAME', 'DOCTOR NAME', 'PRESCRIPTION', 'NOTES', 'DATE'];
 
 /** The NGO works in India, so "this month" follows IST, not the server's UTC clock. */
 const REGISTER_TIME_ZONE = 'Asia/Kolkata';
@@ -95,7 +95,7 @@ function buildMonthlyRegister({ children = [], appointments = [], growth = [], m
   const visits = new Map();
   const addVisit = (child, date, fields) => {
     const key = `${child.id || child.name}|${date}`;
-    const visit = { child, date, type: '', prescriptions: [], notes: [], ...fields };
+    const visit = { child, date, type: '', clinic: '', doctor: '', prescriptions: [], notes: [], ...fields };
     if (!visits.has(key)) visits.set(key, []);
     visits.get(key).push(visit);
     return visit;
@@ -120,12 +120,15 @@ function buildMonthlyRegister({ children = [], appointments = [], growth = [], m
     const vaccine = text(appt.vaccineName);
     addVisit(child, date, {
       type: vaccine ? `${type} — ${vaccine}` : type,
+      clinic: text(appt.clinicName),
+      doctor: text(appt.doctorName),
       notes: text(appt.notes) ? [text(appt.notes)] : []
     });
   });
 
-  // 2. Clinical checkups add the prescription and complaint to that day's visit,
-  //    or stand as their own visit when nothing was booked.
+  // 2. Clinical checkups add the clinic, doctor, prescription and complaint to that
+  //    day's visit, or stand as their own visit when nothing was booked. The clinic
+  //    and doctor on the checkup win over the booking: they record who was seen.
   growth.filter(Boolean).forEach(g => {
     const date = normalizeDate(g.date);
     const child = resolveChild(g);
@@ -145,10 +148,17 @@ function buildMonthlyRegister({ children = [], appointments = [], growth = [], m
         // Height/weight only: a growth measurement, not a clinical visit.
         const measured = [text(g.height) && `Height ${text(g.height)} cm`, text(g.weight) && `Weight ${text(g.weight)} kg`].filter(Boolean);
         if (measured.length === 0) return;
-        addVisit(child, date, { type: 'Growth Measurement', notes: [measured.join(', ')] });
+        addVisit(child, date, {
+          type: 'Growth Measurement',
+          clinic: text(g.clinicName),
+          doctor: text(g.doctorName),
+          notes: [measured.join(', ')]
+        });
         return;
       }
     }
+    visit.clinic = text(g.clinicName) || visit.clinic;
+    visit.doctor = text(g.doctorName) || visit.doctor;
     if (prescription) visit.prescriptions.push(prescription);
     if (complaint) visit.notes.push(`Complaint: ${complaint}`);
   });
@@ -175,6 +185,8 @@ function buildMonthlyRegister({ children = [], appointments = [], growth = [], m
       byMonth.get(monthKey).push([
         text(v.child.name),
         v.type,
+        v.clinic,
+        v.doctor,
         v.prescriptions.join('; '),
         v.notes.join(' | '),
         v.date
