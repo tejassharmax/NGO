@@ -1,5 +1,5 @@
 import { icon, initials, pagePath, statusBadge, escapeHTML, formatDate } from './utils.js';
-import { getChildren, getChild, getActivities, timeAgo, getUploadedDocs, getAppointments, getMedicines, getGrowthRecords, getHealthRecords, getAlerts, healthStatus, calculateAge } from './storage.js';
+import { getChildren, getChild, getActivities, timeAgo, getUploadedDocs, getAppointments, getMedicines, getGrowthRecords, getHealthRecords, getAlerts, healthStatus, calculateAge, getLastClinicDoctor, countMissingClinicDoctor } from './storage.js';
 import { childRows, childTableHeaders } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
@@ -640,7 +640,7 @@ export function childProfilePage() {
         ].filter(Boolean).join(' · ') || 'Lab values recorded'}</span>`;
 
     const detailsHTML = isCheckup
-      ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML(item.eyeCheckup)}` : ''}` || '—'
+      ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML(item.eyeCheckup)}` : ''}${item.clinicName || item.doctorName ? ` · ${escapeHTML([item.doctorName, item.clinicName].filter(Boolean).join(', '))}` : ''}` || '—'
       : `${item.rbcMorphology ? `RBC: ${escapeHTML(item.rbcMorphology)} ` : ''}${item.plateletsAdequacy ? `· Platelets: ${escapeHTML(item.plateletsAdequacy)}` : ''}` || '—';
 
     const rawData = JSON.stringify(item).replace(/"/g, '&quot;');
@@ -1187,6 +1187,8 @@ export function settingsPage() {
   const masterSheetUrl = getGoogleSheetUrl();
   const clinicalSheetUrl = getClinicalSheetUrl();
   const monthlySheetUrl = getMonthlySheetUrl();
+  const lastUsed = getLastClinicDoctor();
+  const missingClinicDoctor = countMissingClinicDoctor();
 
   return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.')}
   <div class="settings-layout">
@@ -1269,6 +1271,33 @@ export function settingsPage() {
             ` : ''}
           </div>
         </div>
+
+        <form class="card" id="clinic-doctor-form" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: 1 / -1;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap;">
+            <b style="font-size: 14px; font-weight: 600;">Clinic &amp; doctor on the Monthly Checkup Register</b>
+            <span class="badge ${missingClinicDoctor > 0 ? 'badge--neutral' : 'badge--success'}">${missingClinicDoctor > 0 ? `${missingClinicDoctor} record(s) without one` : 'All records have one'}</span>
+          </div>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">
+            Every checkup has its own Clinic name and Doctor name, and both appear as columns in the monthly sheet.
+            Use this to add them to checkups that were saved without one. Checkups that already have a name are left as they are.
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; margin-bottom: 12px;">
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600;">
+              Clinic name
+              <input class="clinical-input" type="text" name="clinicName" value="${escapeHTML(lastUsed.clinicName)}" placeholder="Clinic or hospital visited" autocomplete="off" />
+            </label>
+            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600;">
+              Doctor name
+              <input class="clinical-input" type="text" name="doctorName" value="${escapeHTML(lastUsed.doctorName)}" placeholder="Doctor who examined the children" autocomplete="off" />
+            </label>
+          </div>
+          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            <button class="button button--sm button--primary" type="submit">${icon('check')} Add to checkups</button>
+            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); cursor: pointer;">
+              <input type="checkbox" name="replace" value="true" /> Also replace names already entered
+            </label>
+          </div>
+        </form>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">

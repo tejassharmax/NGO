@@ -507,7 +507,7 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
     layoutRequests.push({
       updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' }
     });
-    [200, 190, 320, 320, 120].forEach((width, col) => {
+    [200, 190, 200, 180, 320, 320, 120].forEach((width, col) => {
       layoutRequests.push({
         updateDimensionProperties: {
           range: { sheetId: gid, dimension: 'COLUMNS', startIndex: col, endIndex: col + 1 },
@@ -523,17 +523,20 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
         fields: 'userEnteredFormat(textFormat,backgroundColor)'
       }
     });
-    // Wrap long prescriptions and notes instead of letting them spill across cells.
+    // Wrap long clinic names, prescriptions and notes instead of letting them spill
+    // across cells. numberFormat is reset too: these columns sit where the date
+    // column was before CLINIC NAME and DOCTOR NAME were added.
+    const dateCol = REGISTER_HEADERS.length - 1;
     layoutRequests.push({
       repeatCell: {
-        range: { sheetId: gid, startRowIndex: 1, startColumnIndex: 2, endColumnIndex: 4 },
+        range: { sheetId: gid, startRowIndex: 1, startColumnIndex: 2, endColumnIndex: dateCol },
         cell: { userEnteredFormat: { wrapStrategy: 'WRAP', verticalAlignment: 'TOP' } },
-        fields: 'userEnteredFormat(wrapStrategy,verticalAlignment)'
+        fields: 'userEnteredFormat(wrapStrategy,verticalAlignment,numberFormat)'
       }
     });
     layoutRequests.push({
       repeatCell: {
-        range: { sheetId: gid, startRowIndex: 1, startColumnIndex: 4, endColumnIndex: 5 },
+        range: { sheetId: gid, startRowIndex: 1, startColumnIndex: dateCol, endColumnIndex: dateCol + 1 },
         cell: { userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'dd mmm yyyy' } } },
         fields: 'userEnteredFormat.numberFormat'
       }

@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getGrowthRecords, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore } from './storage.js';
+import { deleteChild, getGrowthRecords, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore, countMissingClinicDoctor, fillClinicDoctor } from './storage.js';
 import { updateChildTable, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
@@ -1095,6 +1095,8 @@ document.addEventListener('click', (event) => {
           setVal('checkup-eye', item.eyeCheckup || item.eyeRemarks);
           setVal('checkup-complaint', item.complaint || item.symptoms);
           setVal('checkup-prescription', item.prescription || item.medication);
+          setVal('checkup-clinic', item.clinicName);
+          setVal('checkup-doctor', item.doctorName);
           const idInput = form.querySelector('#prof-growth-id');
           if (idInput) idInput.value = item.id || '';
           toast('Checkup Loaded', `Loaded checkup measurements from ${item.date || 'record'} into editor.`);
@@ -1934,6 +1936,8 @@ function initFormListeners() {
             date: values.date,
             time: values.time || '10:00',
             doctor: values.doctor || '',
+            clinicName: (values.clinicName || '').trim(),
+            doctorName: (values.doctorName || '').trim(),
             specialty: values.specialty || '',
             vaccineName,
             notes: values.notes || '',
@@ -1968,6 +1972,8 @@ function initFormListeners() {
         date: values.date,
         time: values.time || '',
         doctor: values.doctor || '',
+        clinicName: (values.clinicName || '').trim(),
+        doctorName: (values.doctorName || '').trim(),
         specialty: values.specialty || '',
         vaccineName,
         notes: values.notes || ''
@@ -2014,6 +2020,8 @@ function initFormListeners() {
       date: values.date,
       time: values.time || '10:00',
       doctor: values.doctor || '',
+      clinicName: (values.clinicName || '').trim(),
+      doctorName: (values.doctorName || '').trim(),
       notes: values.notes || '',
       status: values.status || 'Upcoming',
       timestamp: existing ? (existing.timestamp || Date.now()) : Date.now()
@@ -2028,6 +2036,43 @@ function initFormListeners() {
     if (calModal) calModal.remove();
 
     window.setTimeout(() => window.location.reload(), 500);
+  });
+
+  // Settings: add a clinic and doctor to checkups saved without one
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!form || form.getAttribute('id') !== 'clinic-doctor-form') return;
+    event.preventDefault();
+
+    const values = Object.fromEntries(new FormData(form));
+    const clinicName = (values.clinicName || '').trim();
+    const doctorName = (values.doctorName || '').trim();
+    const replace = values.replace === 'true';
+    if (!clinicName && !doctorName) {
+      toast('Nothing to add', 'Type a clinic name or a doctor name first.');
+      return;
+    }
+
+    const affected = replace ? getGrowthRecords().length + getAppointments().length : countMissingClinicDoctor();
+    if (affected === 0) {
+      toast('Nothing to change', 'Every checkup already has a clinic and a doctor.');
+      return;
+    }
+
+    const names = [clinicName && `clinic <b>${escapeHTML(clinicName)}</b>`, doctorName && `doctor <b>${escapeHTML(doctorName)}</b>`].filter(Boolean).join(' and ');
+    modal({
+      title: replace ? 'Replace clinic and doctor on every checkup?' : 'Add clinic and doctor to checkups?',
+      body: replace
+        ? `<p>This sets ${names} on all ${affected} checkup and appointment record(s), replacing any name already entered.</p>`
+        : `<p>This sets ${names} on the ${affected} checkup or appointment record(s) that are missing one. Names already entered are not changed.</p>`,
+      confirmText: replace ? 'Replace on all' : 'Add to checkups',
+      onConfirm: async () => {
+        const changed = fillClinicDoctor({ clinicName, doctorName, replace });
+        await syncWithServer();
+        toast('Clinic and doctor saved', `${changed} record(s) updated. The Monthly Checkup Register sheet refreshes in about a minute.`);
+        if (renderCurrentPage) await renderCurrentPage();
+      }
+    });
   });
 
   // Clinical & Blood Test Data Entry form submit (both modal and profile page inline form)
@@ -2069,7 +2114,9 @@ function initFormListeners() {
           spo2: (values.spo2 || '').trim(),
           complaint: (values.complaint || '').trim(),
           prescription: (values.prescription || '').trim(),
-          eyeCheckup: (values.eyeCheckup || '').trim()
+          eyeCheckup: (values.eyeCheckup || '').trim(),
+          clinicName: (values.clinicName || '').trim(),
+          doctorName: (values.doctorName || '').trim()
         };
         saveGrowthRecord(growthRecord);
       }
