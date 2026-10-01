@@ -296,43 +296,6 @@ export function getLastClinicDoctor() {
   return { clinicName: recent?.clinicName || '', doctorName: recent?.doctorName || '' };
 }
 
-/** How many checkups and appointments have no clinic or no doctor recorded. */
-export function countMissingClinicDoctor() {
-  return [...getGrowthRecords(), ...getAppointments()].filter(r => r && (!r.clinicName || !r.doctorName)).length;
-}
-
-/**
- * Put a clinic and doctor on existing checkups and appointments in one go.
- * Only empty fields are filled, unless `replace` is set. A blank argument leaves
- * that field alone.
- * @returns {number} how many records changed
- */
-export function fillClinicDoctor({ clinicName = '', doctorName = '', replace = false } = {}) {
-  const clinic = clinicName.trim();
-  const doctor = doctorName.trim();
-  if (!clinic && !doctor) return 0;
-  const now = Date.now();
-  let changed = 0;
-  [GROWTH_KEY, APPOINTMENTS_KEY].forEach(key => {
-    const all = JSON.parse(localStorage.getItem(key) || '[]');
-    let touched = false;
-    all.forEach(r => {
-      if (!r) return;
-      const next = {
-        clinicName: clinic && (replace || !r.clinicName) ? clinic : (r.clinicName || ''),
-        doctorName: doctor && (replace || !r.doctorName) ? doctor : (r.doctorName || '')
-      };
-      if (next.clinicName === (r.clinicName || '') && next.doctorName === (r.doctorName || '')) return;
-      Object.assign(r, next, { updatedAt: now });
-      touched = true;
-      changed++;
-    });
-    if (touched) localStorage.setItem(key, JSON.stringify(all));
-  });
-  if (changed > 0) logActivity('clinic_doctor_filled', 'All children', `Clinic and doctor added to ${changed} checkup record(s)`);
-  return changed;
-}
-
 /* ─── Nutrition / Meal Log ─── */
 
 /* ─── Medicine Management ─── */
