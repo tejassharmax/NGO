@@ -33962,43 +33962,6 @@
     return { clinicName: recent?.clinicName || '', doctorName: recent?.doctorName || '' };
   }
 
-  /** How many checkups and appointments have no clinic or no doctor recorded. */
-  function countMissingClinicDoctor() {
-    return [...getGrowthRecords(), ...getAppointments()].filter(r => r && (!r.clinicName || !r.doctorName)).length;
-  }
-
-  /**
-   * Put a clinic and doctor on existing checkups and appointments in one go.
-   * Only empty fields are filled, unless `replace` is set. A blank argument leaves
-   * that field alone.
-   * @returns {number} how many records changed
-   */
-  function fillClinicDoctor({ clinicName = '', doctorName = '', replace = false } = {}) {
-    const clinic = clinicName.trim();
-    const doctor = doctorName.trim();
-    if (!clinic && !doctor) return 0;
-    const now = Date.now();
-    let changed = 0;
-    [GROWTH_KEY, APPOINTMENTS_KEY].forEach(key => {
-      const all = JSON.parse(localStorage.getItem(key) || '[]');
-      let touched = false;
-      all.forEach(r => {
-        if (!r) return;
-        const next = {
-          clinicName: clinic && (replace || !r.clinicName) ? clinic : (r.clinicName || ''),
-          doctorName: doctor && (replace || !r.doctorName) ? doctor : (r.doctorName || '')
-        };
-        if (next.clinicName === (r.clinicName || '') && next.doctorName === (r.doctorName || '')) return;
-        Object.assign(r, next, { updatedAt: now });
-        touched = true;
-        changed++;
-      });
-      if (touched) localStorage.setItem(key, JSON.stringify(all));
-    });
-    if (changed > 0) logActivity('clinic_doctor_filled', 'All children', `Clinic and doctor added to ${changed} checkup record(s)`);
-    return changed;
-  }
-
   /* ─── Nutrition / Meal Log ─── */
 
   /* ─── Medicine Management ─── */
@@ -37860,8 +37823,6 @@
     const masterSheetUrl = getGoogleSheetUrl();
     const clinicalSheetUrl = getClinicalSheetUrl();
     const monthlySheetUrl = getMonthlySheetUrl();
-    const lastUsed = getLastClinicDoctor();
-    const missingClinicDoctor = countMissingClinicDoctor();
 
     return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.')}
   <div class="settings-layout">
@@ -37944,33 +37905,6 @@
             ` : ''}
           </div>
         </div>
-
-        <form class="card" id="clinic-doctor-form" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg); grid-column: 1 / -1;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap;">
-            <b style="font-size: 14px; font-weight: 600;">Clinic &amp; doctor on the Monthly Checkup Register</b>
-            <span class="badge ${missingClinicDoctor > 0 ? 'badge--neutral' : 'badge--success'}">${missingClinicDoctor > 0 ? `${missingClinicDoctor} record(s) without one` : 'All records have one'}</span>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">
-            Every checkup has its own Clinic name and Doctor name, and both appear as columns in the monthly sheet.
-            Use this to add them to checkups that were saved without one. Checkups that already have a name are left as they are.
-          </p>
-          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 14px; margin-bottom: 12px;">
-            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600;">
-              Clinic name
-              <input class="clinical-input" type="text" name="clinicName" value="${escapeHTML$1(lastUsed.clinicName)}" placeholder="Clinic or hospital visited" autocomplete="off" />
-            </label>
-            <label style="display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600;">
-              Doctor name
-              <input class="clinical-input" type="text" name="doctorName" value="${escapeHTML$1(lastUsed.doctorName)}" placeholder="Doctor who examined the children" autocomplete="off" />
-            </label>
-          </div>
-          <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
-            <button class="button button--sm button--primary" type="submit">${icon('check')} Add to checkups</button>
-            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); cursor: pointer;">
-              <input type="checkbox" name="replace" value="true" /> Also replace names already entered
-            </label>
-          </div>
-        </form>
 
         <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -41298,43 +41232,6 @@
       if (calModal) calModal.remove();
 
       window.setTimeout(() => window.location.reload(), 500);
-    });
-
-    // Settings: add a clinic and doctor to checkups saved without one
-    document.addEventListener('submit', (event) => {
-      const form = event.target;
-      if (!form || form.getAttribute('id') !== 'clinic-doctor-form') return;
-      event.preventDefault();
-
-      const values = Object.fromEntries(new FormData(form));
-      const clinicName = (values.clinicName || '').trim();
-      const doctorName = (values.doctorName || '').trim();
-      const replace = values.replace === 'true';
-      if (!clinicName && !doctorName) {
-        toast('Nothing to add', 'Type a clinic name or a doctor name first.');
-        return;
-      }
-
-      const affected = replace ? getGrowthRecords().length + getAppointments().length : countMissingClinicDoctor();
-      if (affected === 0) {
-        toast('Nothing to change', 'Every checkup already has a clinic and a doctor.');
-        return;
-      }
-
-      const names = [clinicName && `clinic <b>${escapeHTML$1(clinicName)}</b>`, doctorName && `doctor <b>${escapeHTML$1(doctorName)}</b>`].filter(Boolean).join(' and ');
-      modal({
-        title: replace ? 'Replace clinic and doctor on every checkup?' : 'Add clinic and doctor to checkups?',
-        body: replace
-          ? `<p>This sets ${names} on all ${affected} checkup and appointment record(s), replacing any name already entered.</p>`
-          : `<p>This sets ${names} on the ${affected} checkup or appointment record(s) that are missing one. Names already entered are not changed.</p>`,
-        confirmText: replace ? 'Replace on all' : 'Add to checkups',
-        onConfirm: async () => {
-          const changed = fillClinicDoctor({ clinicName, doctorName, replace });
-          await syncWithServer();
-          toast('Clinic and doctor saved', `${changed} record(s) updated. The Monthly Checkup Register sheet refreshes in about a minute.`);
-          if (renderCurrentPage) await renderCurrentPage();
-        }
-      });
     });
 
     // Clinical & Blood Test Data Entry form submit (both modal and profile page inline form)
