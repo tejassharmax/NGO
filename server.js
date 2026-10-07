@@ -257,7 +257,10 @@ app.get('/auth/google/callback', async (req, res) => {
       childSheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.childSheetGids || {}),
       monthlySheetId: (isNewAccount || isLegacySheet) ? null : (existing.monthlySheetId || null),
       monthlySpreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.monthlySpreadsheetUrl || null),
-      monthlySheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.monthlySheetGids || {})
+      monthlySheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.monthlySheetGids || {}),
+      bloodSheetId: (isNewAccount || isLegacySheet) ? null : (existing.bloodSheetId || null),
+      bloodSpreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.bloodSpreadsheetUrl || null),
+      bloodSheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.bloodSheetGids || {})
     };
     await saveNgoIntegration(ngoSlug, updated);
 
@@ -301,6 +304,9 @@ app.all('/api/google/disconnect', requireAuth, async (req, res) => {
     delete existing.monthlySheetId;
     delete existing.monthlySpreadsheetUrl;
     delete existing.monthlySheetGids;
+    delete existing.bloodSheetId;
+    delete existing.bloodSpreadsheetUrl;
+    delete existing.bloodSheetGids;
     delete existing.docId;
     delete existing.documentUrl;
     await saveNgoIntegration(ngoSlug, existing);
@@ -378,7 +384,7 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
   }
 
   // Auto-create/sync Student Medical Records sheet if connected but not yet generated
-  if (connected && (!integration.clinicalSheetId || !integration.sheetId || !integration.monthlySheetId)) {
+  if (connected && (!integration.clinicalSheetId || !integration.sheetId || !integration.monthlySheetId || !integration.bloodSheetId)) {
     try {
       const children = await readChildrenFor({ slug: ngoSlug });
       await oauthSyncSheets(children, ngoSlug, ngoName);
@@ -399,6 +405,8 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
     clinicalSpreadsheetUrl: integration.clinicalSpreadsheetUrl || null,
     monthlySpreadsheetUrl: integration.monthlySpreadsheetUrl || null,
     monthlySheetGids: integration.monthlySheetGids || {},
+    bloodSpreadsheetUrl: integration.bloodSpreadsheetUrl || null,
+    bloodSheetGids: integration.bloodSheetGids || {},
     childSheetGids: integration.childSheetGids || {}
   });
 });

@@ -34,6 +34,55 @@ function currentMonthKey(now = new Date()) {
   return `${year}-${month}`;
 }
 
+/** 'YYYY-MM-DD' of today in the register's time zone. */
+function todayKey(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: REGISTER_TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit'
+  }).format(now);
+}
+
+/* ─── Date Range Report tab ─── */
+
+/** Tab where staff pick a From/To date (and optionally a child) and see every visit in that range. */
+const REPORT_TAB_TITLE = 'Date Range Report';
+
+/** Dropdown choice that shows every child. */
+const ALL_CHILDREN = 'All children';
+
+/** Rows of the report tab: controls in A1:C4, headers on row 6, results from row 7. */
+const REPORT_HEADER_ROW = 6;
+
+function quoteTabTitle(title) {
+  return `'${String(title).replace(/'/g, "''")}'`;
+}
+
+/** Spreadsheet column letter of the register's last column (DATE). */
+function lastRegisterColumn() {
+  return String.fromCharCode(64 + REGISTER_HEADERS.length);
+}
+
+/**
+ * The report formula. It stacks every month tab, keeps the visits dated between
+ * From (B2) and To (B3), optionally only one child (B4), and sorts them by date.
+ * The month tabs stay the only place the data is written; this tab only reads them.
+ * @param {string[]} monthTitles e.g. ['October 2026', 'September 2026']
+ */
+function buildDateRangeFormula(monthTitles) {
+  const last = lastRegisterColumn();
+  const dateCol = REGISTER_HEADERS.length;
+  const stack = monthTitles.map(t => `${quoteTabTitle(t)}!A2:${last}`).join(';');
+  return `=LET(rows,{${stack}},d,INDEX(rows,0,${dateCol}),n,INDEX(rows,0,1),` +
+    `hit,FILTER(rows,d<>"",d>=$B$2,d<=$B$3,($B$4="${ALL_CHILDREN}")+(n=$B$4)),` +
+    `IFERROR(SORT(hit,${dateCol},TRUE,1,TRUE),"No checkups in this date range."))`;
+}
+
+/** Number of visits the report shows (0 when it shows the "no checkups" message). */
+function buildDateRangeCountFormula() {
+  const last = lastRegisterColumn();
+  const first = REPORT_HEADER_ROW + 1;
+  return `=IF(ISNUMBER(${last}${first}),COUNTA(A${first}:A),0)`;
+}
+
 /** 'YYYY-MM' -> 'September 2026' */
 function monthTabTitle(monthKey) {
   const [year, month] = monthKey.split('-').map(Number);
@@ -198,6 +247,12 @@ function buildMonthlyRegister({ children = [], appointments = [], growth = [], m
 
 module.exports = {
   REGISTER_HEADERS,
+  REPORT_TAB_TITLE,
+  REPORT_HEADER_ROW,
+  ALL_CHILDREN,
+  buildDateRangeFormula,
+  buildDateRangeCountFormula,
+  todayKey,
   currentMonthKey,
   monthTabTitle,
   parseMonthTabTitle,

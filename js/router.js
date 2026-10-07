@@ -3,7 +3,7 @@ import { getChildren, getChild, getActivities, timeAgo, getUploadedDocs, getAppo
 import { childRows, childTableHeaders } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
-import { getGoogleSheetUrl, getClinicalSheetUrl, getMonthlySheetUrl, getSheetsConfig, getNgoSlug } from './googleSheetsSync.js';
+import { getGoogleSheetUrl, getClinicalSheetUrl, getMonthlySheetUrl, getDateRangeReportUrl, getBloodTestSheetUrl, getSheetsConfig, getNgoSlug } from './googleSheetsSync.js';
 import { calendarCard, computeAppointmentStatus, formatSingleDisplayTime, renderClinicalSectionsMarkup } from './googleCalendar.js';
 
 /* ═══════════════════════════════════════════════════════
@@ -611,6 +611,7 @@ export function childProfilePage() {
 
   // Clinical & Google Sheet Sync HTML
   const latestBlood = healthRecs[0] || {};
+  const childBloodSheetUrl = getBloodTestSheetUrl(child.id, child.name);
   const allClinicalHistory = [
     ...growth.map(g => ({ ...g, entryType: 'checkup', sortDate: g.date || '1970-01-01' })),
     ...healthRecs.map(h => ({ ...h, entryType: 'blood', sortDate: h.date || '1970-01-01' }))
@@ -719,7 +720,10 @@ export function childProfilePage() {
           <h2 class="card__title">Clinical &amp; Lab History</h2>
           <p class="card__caption">All routine clinical checkups and blood test reports recorded for ${escapeHTML(child.name)}</p>
         </div>
-        <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          ${childBloodSheetUrl ? `<a href="${escapeHTML(childBloodSheetUrl)}" target="_blank" class="button button--ghost button--sm" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border);">🩸 Blood test sheet ↗</a>` : ''}
+          <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
+        </div>
       </header>
       <div class="data-table-wrap">
         <table class="data-table">
@@ -1187,6 +1191,8 @@ export function settingsPage() {
   const masterSheetUrl = getGoogleSheetUrl();
   const clinicalSheetUrl = getClinicalSheetUrl();
   const monthlySheetUrl = getMonthlySheetUrl();
+  const dateRangeReportUrl = getDateRangeReportUrl();
+  const bloodTestSheetUrl = getBloodTestSheetUrl();
 
   return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.')}
   <div class="settings-layout">
@@ -1247,6 +1253,18 @@ export function settingsPage() {
             ${monthlySheetUrl ? `
               <a href="${escapeHTML(monthlySheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
                 📅 Monthly Checkup Register ↗
+              </a>
+            ` : ''}
+
+            ${dateRangeReportUrl ? `
+              <a href="${escapeHTML(dateRangeReportUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                🗓️ Date Range Report ↗
+              </a>
+            ` : ''}
+
+            ${bloodTestSheetUrl ? `
+              <a href="${escapeHTML(bloodTestSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                🩸 Blood Test Reports ↗
               </a>
             ` : ''}
 

@@ -34781,6 +34781,9 @@
         if (cachedSheetsConfig?.monthlySpreadsheetUrl) {
           localStorage.setItem(`google_monthly_sheet_url_${slug}`, cachedSheetsConfig.monthlySpreadsheetUrl);
         }
+        if (cachedSheetsConfig?.bloodSpreadsheetUrl) {
+          localStorage.setItem(`google_blood_sheet_url_${slug}`, cachedSheetsConfig.bloodSpreadsheetUrl);
+        }
         return cachedSheetsConfig;
       }
     } catch (err) {
@@ -34828,6 +34831,34 @@
     const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const gid = cachedSheetsConfig?.monthlySheetGids?.[monthKey];
     return gid !== undefined ? `${url.split('#')[0].replace(/\/edit.*$/, '/edit')}#gid=${gid}` : url;
+  }
+
+  /** A workbook URL opened on one tab. */
+  function withGid(url, gid) {
+    if (!url) return null;
+    return gid !== undefined && gid !== null ? `${url.split('#')[0].replace(/\/edit.*$/, '/edit')}#gid=${gid}` : url;
+  }
+
+  /**
+   * Link to the "Date Range Report" tab of the Monthly Checkup Register, where staff
+   * pick a From and To date. Null until the workbook exists.
+   */
+  function getDateRangeReportUrl() {
+    const ngoSlug = getNgoSlug(getSession() || {});
+    const url = cachedSheetsConfig?.monthlySpreadsheetUrl || localStorage.getItem(`google_monthly_sheet_url_${ngoSlug}`);
+    return withGid(url, cachedSheetsConfig?.monthlySheetGids?.report);
+  }
+
+  /**
+   * Link to the Blood Test Reports workbook, opened on one child's tab when a child
+   * is given and its tab is known, otherwise on the "All Children" tab.
+   */
+  function getBloodTestSheetUrl(childId, childName) {
+    const ngoSlug = getNgoSlug(getSession() || {});
+    const url = cachedSheetsConfig?.bloodSpreadsheetUrl || localStorage.getItem(`google_blood_sheet_url_${ngoSlug}`);
+    const gids = cachedSheetsConfig?.bloodSheetGids || {};
+    const gid = (childId && gids[childId]) ?? (childName && gids[childName]) ?? gids.all;
+    return withGid(url, gid);
   }
 
   /**
@@ -35323,6 +35354,8 @@
             cachedSheetsConfig.clinicalSpreadsheetUrl = data.clinicalSpreadsheetUrl || cachedSheetsConfig.clinicalSpreadsheetUrl;
             cachedSheetsConfig.clinicalSheetId = data.clinicalSheetId || cachedSheetsConfig.clinicalSheetId;
             cachedSheetsConfig.monthlySpreadsheetUrl = data.monthlySpreadsheetUrl || cachedSheetsConfig.monthlySpreadsheetUrl;
+            cachedSheetsConfig.bloodSpreadsheetUrl = data.bloodSpreadsheetUrl || cachedSheetsConfig.bloodSpreadsheetUrl;
+            if (data.bloodSheetGids) cachedSheetsConfig.bloodSheetGids = data.bloodSheetGids;
             if (data.childSheetGids) {
               cachedSheetsConfig.childSheetGids = data.childSheetGids;
               localStorage.setItem('chm_child_sheet_gids', JSON.stringify(data.childSheetGids));
@@ -37261,6 +37294,7 @@
 
     // Clinical & Google Sheet Sync HTML
     const latestBlood = healthRecs[0] || {};
+    const childBloodSheetUrl = getBloodTestSheetUrl(child.id, child.name);
     const allClinicalHistory = [
       ...growth.map(g => ({ ...g, entryType: 'checkup', sortDate: g.date || '1970-01-01' })),
       ...healthRecs.map(h => ({ ...h, entryType: 'blood', sortDate: h.date || '1970-01-01' }))
@@ -37369,7 +37403,10 @@
           <h2 class="card__title">Clinical &amp; Lab History</h2>
           <p class="card__caption">All routine clinical checkups and blood test reports recorded for ${escapeHTML$1(child.name)}</p>
         </div>
-        <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          ${childBloodSheetUrl ? `<a href="${escapeHTML$1(childBloodSheetUrl)}" target="_blank" class="button button--ghost button--sm" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border);">🩸 Blood test sheet ↗</a>` : ''}
+          <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
+        </div>
       </header>
       <div class="data-table-wrap">
         <table class="data-table">
@@ -37823,6 +37860,8 @@
     const masterSheetUrl = getGoogleSheetUrl();
     const clinicalSheetUrl = getClinicalSheetUrl();
     const monthlySheetUrl = getMonthlySheetUrl();
+    const dateRangeReportUrl = getDateRangeReportUrl();
+    const bloodTestSheetUrl = getBloodTestSheetUrl();
 
     return shell('settings', `${heading('Settings & Google Workspace', 'Manage platform configuration and Google Sheets synchronization.')}
   <div class="settings-layout">
@@ -37883,6 +37922,18 @@
             ${monthlySheetUrl ? `
               <a href="${escapeHTML$1(monthlySheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
                 📅 Monthly Checkup Register ↗
+              </a>
+            ` : ''}
+
+            ${dateRangeReportUrl ? `
+              <a href="${escapeHTML$1(dateRangeReportUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                🗓️ Date Range Report ↗
+              </a>
+            ` : ''}
+
+            ${bloodTestSheetUrl ? `
+              <a href="${escapeHTML$1(bloodTestSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
+                🩸 Blood Test Reports ↗
               </a>
             ` : ''}
 
