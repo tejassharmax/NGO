@@ -20,11 +20,25 @@ const { loadIntegration, saveIntegration } = require('./integrationStore');
 
 const {
   REGISTER_HEADERS,
+  REPORT_TAB_TITLE,
+  REPORT_HEADER_ROW,
+  ALL_CHILDREN,
+  buildDateRangeFormula,
+  buildDateRangeCountFormula,
+  todayKey,
   currentMonthKey,
   monthTabTitle,
   parseMonthTabTitle,
   buildMonthlyRegister
 } = require('./monthlyRegister');
+
+const {
+  BLOOD_HEADERS,
+  ALL_CHILDREN_HEADERS,
+  ALL_CHILDREN_TAB_TITLE,
+  CHILD_TAB_HEADER_ROW,
+  buildBloodTestRegister
+} = require('./bloodTestRegister');
 
 /**
  * Sanitize NGO slug for filename safety
@@ -401,6 +415,75 @@ async function ensureSpreadsheetSharing(authClient, spreadsheetId, secondaryEmai
 }
 
 /**
+ * Formatting, dropdowns and tab position for the Date Range Report tab. Rebuilt on
+ * every sync so the child list follows the roster; cell values are not touched.
+ * @param {{gid: number, index: number}} tab
+ * @param {object[]} children roster, for the child dropdown
+ */
+function dateRangeReportLayout(tab, children = []) {
+  const gid = tab.gid;
+  const headerRow = REPORT_HEADER_ROW - 1; // 0-based
+  const columns = REGISTER_HEADERS.length;
+  const dateCol = columns - 1;
+  const names = [...new Set((children || [])
+    .map(c => String((c && c.name) || '').trim())
+    .filter(Boolean))];
+  const range = (r1, r2, c1, c2) => ({ sheetId: gid, startRowIndex: r1, endRowIndex: r2, startColumnIndex: c1, endColumnIndex: c2 });
+  const format = (r, fields, userEnteredFormat) => ({ repeatCell: { range: r, cell: { userEnteredFormat }, fields } });
+  const requests = [];
+
+  if (tab.index !== 0) {
+    requests.push({ updateSheetProperties: { properties: { sheetId: gid, index: 0 }, fields: 'index' } });
+  }
+  requests.push({
+    updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: REPORT_HEADER_ROW } }, fields: 'gridProperties.frozenRowCount' }
+  });
+  [200, 190, 200, 180, 320, 320, 120].forEach((width, col) => {
+    requests.push({
+      updateDimensionProperties: {
+        range: { sheetId: gid, dimension: 'COLUMNS', startIndex: col, endIndex: col + 1 },
+        properties: { pixelSize: width },
+        fields: 'pixelSize'
+      }
+    });
+  });
+  // Title, labels and headers in bold; hints in small grey italics.
+  requests.push(format(range(0, 1, 0, 1), 'userEnteredFormat.textFormat', { textFormat: { bold: true, fontSize: 12 } }));
+  requests.push(format(range(1, 4, 0, 1), 'userEnteredFormat.textFormat', { textFormat: { bold: true, fontSize: 10 } }));
+  requests.push(format(range(1, 2, 4, 6), 'userEnteredFormat.textFormat', { textFormat: { bold: true, fontSize: 10 } }));
+  requests.push(format(range(1, 4, 2, 3), 'userEnteredFormat.textFormat',
+    { textFormat: { italic: true, fontSize: 9, foregroundColor: { red: 0.45, green: 0.47, blue: 0.5 } } }));
+  requests.push(format(range(headerRow, headerRow + 1, 0, columns), 'userEnteredFormat(textFormat,backgroundColor)',
+    { textFormat: { bold: true, fontSize: 10 }, backgroundColor: { red: 0.95, green: 0.96, blue: 0.98 } }));
+  // The three cells staff change: highlighted, dates shown as dates.
+  requests.push(format(range(1, 4, 1, 2), 'userEnteredFormat(backgroundColor,textFormat)',
+    { backgroundColor: { red: 1, green: 0.97, blue: 0.8 }, textFormat: { bold: true, fontSize: 10 } }));
+  requests.push(format(range(1, 3, 1, 2), 'userEnteredFormat.numberFormat', { numberFormat: { type: 'DATE', pattern: 'dd mmm yyyy' } }));
+  requests.push({
+    setDataValidation: {
+      range: range(1, 3, 1, 2),
+      rule: { condition: { type: 'DATE_IS_VALID' }, strict: true, inputMessage: 'Double-click to pick a date' }
+    }
+  });
+  requests.push({
+    setDataValidation: {
+      range: range(3, 4, 1, 2),
+      rule: {
+        condition: { type: 'ONE_OF_LIST', values: [ALL_CHILDREN, ...names].map(v => ({ userEnteredValue: v })) },
+        strict: true,
+        showCustomUi: true
+      }
+    }
+  });
+  // Results: wrap long prescriptions and notes, show the date column as dates.
+  requests.push(format(range(headerRow + 1, 5000, 2, dateCol), 'userEnteredFormat(wrapStrategy,verticalAlignment)',
+    { wrapStrategy: 'WRAP', verticalAlignment: 'TOP' }));
+  requests.push(format(range(headerRow + 1, 5000, dateCol, dateCol + 1), 'userEnteredFormat.numberFormat',
+    { numberFormat: { type: 'DATE', pattern: 'dd mmm yyyy' } }));
+  return requests;
+}
+
+/**
  * File 3: the Monthly Checkup Register workbook — one tab per month ("September 2026"),
  * newest first, listing every child's visits that month. Rewritten in full on every
  * sync, like the child tabs, because the app is the source of truth.
@@ -462,6 +545,10 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
   const addRequests = orderedMonths
     .filter(key => !tabs.has(monthTabTitle(key)))
     .map(key => ({ addSheet: { properties: { title: monthTabTitle(key) } } }));
+  // The Date Range Report tab reads the month tabs with a formula; its From/To/Child
+  // cells belong to staff, so they are filled in only when the tab is first made.
+  const reportIsNew = !tabs.has(REPORT_TAB_TITLE);
+  if (reportIsNew) addRequests.push({ addSheet: { properties: { title: REPORT_TAB_TITLE, index: 0 } } });
   if (addRequests.length > 0) {
     const addRes = await sheets.spreadsheets.batchUpdate({
       spreadsheetId: monthlySheetId,
@@ -479,17 +566,40 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
     requestBody: { ranges: titles.map(t => `'${t}'!A1:Z`) }
   });
 
+  const reportRange = cell => `'${REPORT_TAB_TITLE}'!${cell}`;
+  const reportData = [
+    { range: reportRange('A1'), values: [['CHECKUP REPORT FOR ANY DATE RANGE']] },
+    { range: reportRange('A2'), values: [['FROM DATE'], ['TO DATE'], ['CHILD']] },
+    {
+      range: reportRange('C2'),
+      values: [
+        ['← double-click to pick a date'],
+        ['← double-click to pick a date'],
+        ['← pick one child or All children']
+      ]
+    },
+    { range: reportRange('E2'), values: [['CHECKUPS FOUND', buildDateRangeCountFormula()]] },
+    { range: reportRange(`A${REPORT_HEADER_ROW}`), values: [REGISTER_HEADERS] },
+    { range: reportRange(`A${REPORT_HEADER_ROW + 1}`), values: [[buildDateRangeFormula(titles)]] }
+  ];
+  if (reportIsNew) {
+    reportData.push({ range: reportRange('B2'), values: [[`${thisMonth}-01`], [todayKey()], [ALL_CHILDREN]] });
+  }
+
   await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: monthlySheetId,
     requestBody: {
       valueInputOption: 'USER_ENTERED',
-      data: orderedMonths.map(key => {
-        const rows = (register.get(key) || []).map(r => r.map(plainTextCell));
-        return {
-          range: `'${monthTabTitle(key)}'!A1`,
-          values: [REGISTER_HEADERS, ...(rows.length ? rows : [['No checkups recorded this month.']])]
-        };
-      })
+      data: [
+        ...orderedMonths.map(key => {
+          const rows = (register.get(key) || []).map(r => r.map(plainTextCell));
+          return {
+            range: `'${monthTabTitle(key)}'!A1`,
+            values: [REGISTER_HEADERS, ...(rows.length ? rows : [['No checkups recorded this month.']])]
+          };
+        }),
+        ...reportData
+      ]
     }
   });
 
@@ -501,8 +611,8 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
     const gid = tab.gid;
     monthlySheetGids[key] = gid;
 
-    if (tab.index !== position) {
-      layoutRequests.push({ updateSheetProperties: { properties: { sheetId: gid, index: position }, fields: 'index' } });
+    if (tab.index !== position + 1) {
+      layoutRequests.push({ updateSheetProperties: { properties: { sheetId: gid, index: position + 1 }, fields: 'index' } });
     }
     layoutRequests.push({
       updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 1 } }, fields: 'gridProperties.frozenRowCount' }
@@ -543,6 +653,12 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
     });
   });
 
+  const reportTab = tabs.get(REPORT_TAB_TITLE);
+  if (reportTab) {
+    monthlySheetGids.report = reportTab.gid;
+    layoutRequests.push(...dateRangeReportLayout(reportTab, data.children));
+  }
+
   try {
     await sheets.spreadsheets.batchUpdate({
       spreadsheetId: monthlySheetId,
@@ -555,6 +671,170 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
   const visitCount = Array.from(register.values()).reduce((n, rows) => n + rows.length, 0);
   console.log(`[Google OAuth] Synced Monthly Checkup Register: ${visitCount} visit(s) across ${orderedMonths.length} month tab(s) (${monthlySheetId})`);
   return monthlySheetGids;
+}
+
+/**
+ * File 4: the Blood Test Reports workbook — an "All Children" tab with every
+ * report and the child's name, then one tab per child. Rewritten in full on every
+ * sync, like the other workbooks, because the app is the source of truth.
+ *
+ * @returns {Promise<Record<string, number>>} 'all', child id and child name -> tab gid
+ */
+async function syncBloodTestSheet(sheets, client, integration, safeSlug, displayName, data, shareWith) {
+  const { perChild, allRows } = buildBloodTestRegister(data);
+
+  let bloodSheetId = integration.bloodSheetId;
+  if (!bloodSheetId) {
+    console.log(`[Google OAuth] Creating Blood Test Reports Spreadsheet for NGO (${safeSlug})...`);
+    const createRes = await sheets.spreadsheets.create({
+      requestBody: {
+        properties: { title: `${displayName} — Blood Test Reports` },
+        sheets: [{ properties: { title: ALL_CHILDREN_TAB_TITLE } }]
+      }
+    });
+    bloodSheetId = createRes.data.spreadsheetId;
+    integration.bloodSheetId = bloodSheetId;
+    integration.bloodSpreadsheetUrl = createRes.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${bloodSheetId}/edit`;
+    await saveNgoIntegration(safeSlug, integration);
+    ensureSpreadsheetSharing(client, bloodSheetId, shareWith).catch(() => {});
+    console.log(`[Google OAuth] Created Blood Test Reports: ${integration.bloodSpreadsheetUrl}`);
+  }
+
+  let meta;
+  try {
+    meta = await sheets.spreadsheets.get({ spreadsheetId: bloodSheetId });
+  } catch (err) {
+    // Workbook deleted from Drive: forget it and build a fresh one next time round.
+    if (err.code === 404 || err.status === 404) {
+      delete integration.bloodSheetId;
+      delete integration.bloodSpreadsheetUrl;
+      delete integration.bloodSheetGids;
+      await saveNgoIntegration(safeSlug, integration);
+      return syncBloodTestSheet(sheets, client, integration, safeSlug, displayName, data, shareWith);
+    }
+    throw err;
+  }
+
+  const tabs = new Map(); // title -> { gid, index }
+  (meta.data.sheets || []).forEach(sh => tabs.set(sh.properties.title, { gid: sh.properties.sheetId, index: sh.properties.index }));
+
+  // One tab per child, named like the Student Medical Records tabs. Two children
+  // with the same name get their ID added so neither overwrites the other.
+  const used = new Set([ALL_CHILDREN_TAB_TITLE.toUpperCase()]);
+  const childTabs = perChild.map(({ child, rows }) => {
+    let title = sanitizeSheetTitle(child.name);
+    if (used.has(title.toUpperCase())) title = sanitizeSheetTitle(`${String(child.name || '').slice(0, 20)} ${child.id || ''}`);
+    used.add(title.toUpperCase());
+    return { child, rows, title };
+  });
+  const titles = [ALL_CHILDREN_TAB_TITLE, ...childTabs.map(t => t.title)];
+
+  const addRequests = titles.filter(t => !tabs.has(t)).map(title => ({ addSheet: { properties: { title } } }));
+  if (addRequests.length > 0) {
+    const addRes = await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: bloodSheetId,
+      requestBody: { requests: addRequests }
+    });
+    (addRes.data.replies || []).forEach(reply => {
+      const props = reply.addSheet?.properties;
+      if (props) tabs.set(props.title, { gid: props.sheetId, index: props.index });
+    });
+  }
+
+  await sheets.spreadsheets.values.batchClear({
+    spreadsheetId: bloodSheetId,
+    requestBody: { ranges: titles.map(t => `'${t}'!A1:Z`) }
+  });
+
+  const cells = rows => rows.map(r => r.map(plainTextCell));
+  const none = [['No blood test reports recorded yet.']];
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: bloodSheetId,
+    requestBody: {
+      valueInputOption: 'USER_ENTERED',
+      data: [
+        { range: `'${ALL_CHILDREN_TAB_TITLE}'!A1`, values: [ALL_CHILDREN_HEADERS, ...(allRows.length ? cells(allRows) : none)] },
+        ...childTabs.map(({ child, rows, title }) => ({
+          range: `'${title}'!A1`,
+          values: [
+            [plainTextCell(String(child.name || '').toUpperCase()), '', plainTextCell(child.id ? `ID: ${child.id}` : '')],
+            [],
+            BLOOD_HEADERS,
+            ...(rows.length ? cells(rows) : none)
+          ]
+        }))
+      ]
+    }
+  });
+
+  const gids = {};
+  const layoutRequests = [];
+  const range = (gid, r1, r2, c1, c2) => ({ sheetId: gid, startRowIndex: r1, endRowIndex: r2, startColumnIndex: c1, endColumnIndex: c2 });
+  const widths = [110, 125, 95, 115, 90, 85, 120, 130, 120, 110, 100, 150, 150, 165];
+  const layout = (gid, position, headerRow, dateCol, columnWidths, extraColumns) => {
+    const tab = [...tabs.values()].find(t => t.gid === gid);
+    if (tab && tab.index !== position) {
+      layoutRequests.push({ updateSheetProperties: { properties: { sheetId: gid, index: position }, fields: 'index' } });
+    }
+    layoutRequests.push({
+      updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: headerRow + 1 } }, fields: 'gridProperties.frozenRowCount' }
+    });
+    columnWidths.forEach((width, col) => {
+      layoutRequests.push({
+        updateDimensionProperties: {
+          range: { sheetId: gid, dimension: 'COLUMNS', startIndex: col, endIndex: col + 1 },
+          properties: { pixelSize: width },
+          fields: 'pixelSize'
+        }
+      });
+    });
+    layoutRequests.push({
+      repeatCell: {
+        range: range(gid, headerRow, headerRow + 1, 0, BLOOD_HEADERS.length + extraColumns),
+        cell: { userEnteredFormat: { textFormat: { bold: true, fontSize: 10 }, backgroundColor: { red: 0.95, green: 0.96, blue: 0.98 } } },
+        fields: 'userEnteredFormat(textFormat,backgroundColor)'
+      }
+    });
+    layoutRequests.push({
+      repeatCell: {
+        range: range(gid, headerRow + 1, 5000, dateCol, dateCol + 1),
+        cell: { userEnteredFormat: { numberFormat: { type: 'DATE', pattern: 'dd mmm yyyy' } } },
+        fields: 'userEnteredFormat.numberFormat'
+      }
+    });
+  };
+
+  const allTab = tabs.get(ALL_CHILDREN_TAB_TITLE);
+  if (allTab) {
+    gids.all = allTab.gid;
+    layout(allTab.gid, 0, 0, 2, [190, 90, ...widths], 2);
+  }
+  childTabs.forEach(({ child, title }, i) => {
+    const tab = tabs.get(title);
+    if (!tab) return;
+    if (child.id) gids[child.id] = tab.gid;
+    if (child.name) gids[child.name] = tab.gid;
+    layout(tab.gid, i + 1, CHILD_TAB_HEADER_ROW - 1, 0, widths, 0);
+    layoutRequests.push({
+      repeatCell: {
+        range: range(tab.gid, 0, 1, 0, 3),
+        cell: { userEnteredFormat: { textFormat: { bold: true, fontSize: 11 } } },
+        fields: 'userEnteredFormat.textFormat'
+      }
+    });
+  });
+
+  try {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: bloodSheetId,
+      requestBody: { requests: layoutRequests }
+    });
+  } catch (fmtErr) {
+    console.warn('[Google OAuth] Blood Test Reports formatting notice:', fmtErr.message);
+  }
+
+  console.log(`[Google OAuth] Synced Blood Test Reports: ${allRows.length} report(s) across ${childTabs.length} child tab(s) (${bloodSheetId})`);
+  return gids;
 }
 
 /**
@@ -994,6 +1274,16 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
     console.warn('[Google OAuth] Monthly Checkup Register sync notice:', monthlyErr.message);
   }
 
+  // D. Sync File 4: Blood Test Reports (All Children tab + one tab per child)
+  try {
+    integration.bloodSheetGids = await syncBloodTestSheet(sheets, client, integration, safeSlug, displayName, {
+      children: cleanChildren,
+      healthRecords: allHealthRecords
+    }, secondaryList);
+  } catch (bloodErr) {
+    console.warn('[Google OAuth] Blood Test Reports sync notice:', bloodErr.message);
+  }
+
   // Save gid map and URLs to integration config
   integration.childSheetGids = childSheetGids;
   await saveNgoIntegration(safeSlug, integration);
@@ -1006,6 +1296,8 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
     clinicalSpreadsheetUrl: integration.clinicalSpreadsheetUrl,
     monthlySheetId: integration.monthlySheetId || null,
     monthlySpreadsheetUrl: integration.monthlySpreadsheetUrl || null,
+    bloodSpreadsheetUrl: integration.bloodSpreadsheetUrl || null,
+    bloodSheetGids: integration.bloodSheetGids || {},
     childSheetGids,
     count: cleanChildren.length
   };
