@@ -189,6 +189,38 @@ app.get('/api/google/connect', (req, res) => {
 });
 
 // GET /auth/google/callback -> Exchange authorization code for refresh token
+/**
+ * Spreadsheets and documents the sync creates live in the Drive of whichever
+ * Google account connected. They are remembered per account, so switching the
+ * connection to another account and back reuses the same files instead of
+ * creating a new set each time.
+ */
+const ACCOUNT_FILE_FIELDS = {
+  sheetId: null, spreadsheetUrl: null,
+  clinicalSheetId: null, clinicalSpreadsheetUrl: null, childSheetGids: {},
+  monthlySheetId: null, monthlySpreadsheetUrl: null, monthlySheetGids: {},
+  bloodSheetId: null, bloodSpreadsheetUrl: null, bloodSheetGids: {},
+  docId: null, documentUrl: null
+};
+
+/** The connected account's file IDs, or an empty object when it has none yet. */
+function accountFiles(integration) {
+  const files = {};
+  Object.keys(ACCOUNT_FILE_FIELDS).forEach(key => {
+    const value = integration[key];
+    if (value !== undefined && value !== null && !(typeof value === 'object' && Object.keys(value).length === 0)) files[key] = value;
+  });
+  return files;
+}
+
+/** Store the connected account's file IDs under its email before they are replaced or cleared. */
+function rememberAccountFiles(integration) {
+  const email = String(integration.adminEmail || '').trim().toLowerCase();
+  const files = accountFiles(integration);
+  if (!email || Object.keys(files).length === 0) return;
+  integration.accountFiles = { ...(integration.accountFiles || {}), [email]: files };
+}
+
 app.get('/auth/google/callback', async (req, res) => {
   try {
     const code = req.query.code;
@@ -240,27 +272,26 @@ app.get('/auth/google/callback', async (req, res) => {
 
     const existing = await getNgoIntegration(ngoSlug);
     const connectingAccount = (adminEmail !== 'Admin' ? adminEmail : (connectingEmail || '')).trim().toLowerCase();
-    const isNewAccount = existing.adminEmail && existing.adminEmail.toLowerCase() !== connectingAccount;
+    const isSameAccount = String(existing.adminEmail || '').toLowerCase() === connectingAccount;
     const isLegacySheet = existing.sheetId === '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88' || existing.clinicalSheetId === '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY';
+
+    // Keep the outgoing account's files, then use the connecting account's own:
+    // its current ones when it is reconnecting, the ones remembered from an
+    // earlier connection when it is switching back, or none (a fresh set).
+    rememberAccountFiles(existing);
+    const files = isLegacySheet ? {}
+      : isSameAccount ? accountFiles(existing)
+        : ((existing.accountFiles || {})[connectingAccount] || {});
 
     const updated = {
       ...existing,
+      ...ACCOUNT_FILE_FIELDS,
+      ...files,
       refresh_token: tokens.refresh_token || existing.refresh_token,
       tokenExpired: false,
       connectedAt: new Date().toISOString(),
       adminEmail: connectingAccount || existing.adminEmail || 'ayushahome@gmail.com',
-      secondaryEmail: 'tejassachin2010@gmail.com',
-      sheetId: (isNewAccount || isLegacySheet) ? null : (existing.sheetId || null),
-      spreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.spreadsheetUrl || null),
-      clinicalSheetId: (isNewAccount || isLegacySheet) ? null : (existing.clinicalSheetId || null),
-      clinicalSpreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.clinicalSpreadsheetUrl || null),
-      childSheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.childSheetGids || {}),
-      monthlySheetId: (isNewAccount || isLegacySheet) ? null : (existing.monthlySheetId || null),
-      monthlySpreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.monthlySpreadsheetUrl || null),
-      monthlySheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.monthlySheetGids || {}),
-      bloodSheetId: (isNewAccount || isLegacySheet) ? null : (existing.bloodSheetId || null),
-      bloodSpreadsheetUrl: (isNewAccount || isLegacySheet) ? null : (existing.bloodSpreadsheetUrl || null),
-      bloodSheetGids: (isNewAccount || isLegacySheet) ? {} : (existing.bloodSheetGids || {})
+      secondaryEmail: 'tejassachin2010@gmail.com'
     };
     await saveNgoIntegration(ngoSlug, updated);
 
@@ -293,6 +324,7 @@ app.all('/api/google/disconnect', requireAuth, async (req, res) => {
   try {
     const { slug: ngoSlug } = await tenantFor(req);
     const existing = await getNgoIntegration(ngoSlug);
+    rememberAccountFiles(existing);
     delete existing.refresh_token;
     delete existing.connectedAt;
     delete existing.adminEmail;
