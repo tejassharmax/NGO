@@ -16,6 +16,8 @@ require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
 
 // Per-NGO OAuth Integration Module
 const {
+  DRIVE_OWNER_EMAIL,
+  DRIVE_EDITOR_EMAILS,
   buildOAuthClient,
   getAuthUrl,
   getClientForNgo,
@@ -256,6 +258,14 @@ app.get('/auth/google/callback', async (req, res) => {
       return res.redirect('/index.html?google_error=unauthorized#/settings');
     }
 
+    // Every sheet, document and folder lives in the main admin's Drive. Another
+    // admin's Google account (even an allowlisted one) is not accepted here, so
+    // the files can never end up split across two Drives.
+    if (connectingEmail !== DRIVE_OWNER_EMAIL) {
+      console.warn(`[oauth] Refused workspace connect from ${connectingEmail}; only ${DRIVE_OWNER_EMAIL} may own the files.`);
+      return res.redirect(`/index.html?google_error=wrong_account&expected=${encodeURIComponent(DRIVE_OWNER_EMAIL)}#/settings`);
+    }
+
     // The NGO comes from the connecting admin's own allowlist record, not from the
     // `state` slug the browser sent, so a crafted connect link cannot file a
     // refresh token under someone else's tenant.
@@ -291,7 +301,7 @@ app.get('/auth/google/callback', async (req, res) => {
       tokenExpired: false,
       connectedAt: new Date().toISOString(),
       adminEmail: connectingAccount || existing.adminEmail || 'ayushahome@gmail.com',
-      secondaryEmail: 'tejassachin2010@gmail.com'
+      secondaryEmail: DRIVE_EDITOR_EMAILS[0] || null
     };
     await saveNgoIntegration(ngoSlug, updated);
 
@@ -429,6 +439,7 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
   res.json({
     connected,
     tokenExpired,
+    driveOwnerEmail: DRIVE_OWNER_EMAIL,
     adminEmail: integration.adminEmail || null,
     secondaryEmail: integration.secondaryEmail || null,
     sheetId: integration.sheetId || null,

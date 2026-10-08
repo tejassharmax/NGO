@@ -41,6 +41,33 @@ const {
 } = require('./bloodTestRegister');
 
 /**
+ * The one Google account whose Drive holds every sheet, document and folder the
+ * app creates (the NGO's main admin). The Google connection only accepts it.
+ */
+const DRIVE_OWNER_EMAIL = (process.env.GOOGLE_DRIVE_OWNER_EMAIL || 'ayushahome@gmail.com').trim().toLowerCase();
+
+/** Accounts given editor access to everything in the owner's Drive (the developer / secondary admins). */
+const DRIVE_EDITOR_EMAILS = (process.env.GOOGLE_DRIVE_EDITOR_EMAILS || 'tejassachin2010@gmail.com')
+  .split(',').map(e => e.trim().toLowerCase()).filter(e => e && e !== DRIVE_OWNER_EMAIL);
+
+/** Give the editor accounts access to a Drive file or folder (folders pass it on to their contents). */
+async function shareWithEditors(authClient, fileId) {
+  if (!fileId || !authClient) return;
+  const drive = google.drive({ version: 'v3', auth: authClient });
+  for (const emailAddress of DRIVE_EDITOR_EMAILS) {
+    try {
+      await drive.permissions.create({
+        fileId,
+        sendNotificationEmail: false,
+        requestBody: { role: 'writer', type: 'user', emailAddress }
+      });
+    } catch (e) {
+      // Already shared, or the address cannot receive shares.
+    }
+  }
+}
+
+/**
  * Sanitize NGO slug for filename safety
  */
 function sanitizeNgoSlug(ngoSlug) {
@@ -164,7 +191,9 @@ function getAuthUrl(ngoSlug, req = null, state = null) {
       'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/drive.file'
     ],
-    state: state || safeSlug
+    state: state || safeSlug,
+    // Open Google's account chooser on the account that must own the files.
+    login_hint: DRIVE_OWNER_EMAIL
   });
 }
 
@@ -931,7 +960,7 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   }
 
   // Ensure both spreadsheets are shared with link access and secondary admin (tejassachin2010@gmail.com)
-  const secondaryList = ['tejassachin2010@gmail.com', integration.secondaryEmail, integration.adminEmail];
+  const secondaryList = [...DRIVE_EDITOR_EMAILS, integration.secondaryEmail];
   if (sheetId) {
     ensureSpreadsheetSharing(client, sheetId, secondaryList).catch(() => {});
   }
@@ -1853,6 +1882,7 @@ async function findOrCreateFolder(authClient, folderName, parentId = null) {
   });
 
   const folder = createRes.data;
+  await shareWithEditors(authClient, folder.id);
 
   try {
     await drive.permissions.create({
@@ -2049,6 +2079,12 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
     rootFolderUrl = rootFolder.webViewLink;
   }
 
+  // The editors get the whole documents tree through its root folder.
+  if (!sharedRootFolders.has(rootFolderId)) {
+    await shareWithEditors(authClient, rootFolderId);
+    sharedRootFolders.add(rootFolderId);
+  }
+
   // Save root folder ID for this tenant and sister slug
   integration.documentsRootFolderId = rootFolderId;
   integration.documentsRootFolderUrl = rootFolderUrl;
@@ -2075,7 +2111,12 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
   };
 }
 
+/** Root folders already shared with the editors since this process started. */
+const sharedRootFolders = new Set();
+
 module.exports = {
+  DRIVE_OWNER_EMAIL,
+  DRIVE_EDITOR_EMAILS,
   buildOAuthClient,
   getAuthUrl,
   getClientForNgo,
