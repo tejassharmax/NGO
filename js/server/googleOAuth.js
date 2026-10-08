@@ -25,6 +25,11 @@ const {
   ALL_CHILDREN,
   buildDateRangeFormula,
   buildDateRangeCountFormula,
+  BLOOD_DATA_TAB_TITLE,
+  BLOOD_DATA_HEADERS,
+  BLOOD_SECTION_TITLE,
+  bloodDataRows,
+  buildBloodCountFormula,
   todayKey,
   currentMonthKey,
   monthTabTitle,
@@ -479,7 +484,28 @@ function dateRangeReportLayout(tab, children = []) {
   // Title, labels and headers in bold; hints in small grey italics.
   requests.push(format(range(0, 1, 0, 1), 'userEnteredFormat.textFormat', { textFormat: { bold: true, fontSize: 12 } }));
   requests.push(format(range(1, 4, 0, 1), 'userEnteredFormat.textFormat', { textFormat: { bold: true, fontSize: 10 } }));
-  requests.push(format(range(1, 2, 4, 6), 'userEnteredFormat.textFormat', { textFormat: { bold: true, fontSize: 10 } }));
+  requests.push(format(range(1, 3, 4, 6), 'userEnteredFormat.textFormat', { textFormat: { bold: true, fontSize: 10 } }));
+  // The blood test section moves up and down with the number of checkups, so its
+  // title and header rows are styled by a rule instead of fixed formatting.
+  for (let i = 0; i < (tab.rules || 0); i++) {
+    requests.push({ deleteConditionalFormatRule: { sheetId: gid, index: 0 } });
+  }
+  const first = REPORT_HEADER_ROW + 1;
+  requests.push({
+    addConditionalFormatRule: {
+      index: 0,
+      rule: {
+        ranges: [range(headerRow + 1, 5000, 0, 15)],
+        booleanRule: {
+          condition: {
+            type: 'CUSTOM_FORMULA',
+            values: [{ userEnteredValue: `=OR($A${first}="${BLOOD_SECTION_TITLE}",AND($A${first}="NAME OF CHILD",$B${first}="DATE"))` }]
+          },
+          format: { textFormat: { bold: true }, backgroundColor: { red: 0.99, green: 0.91, blue: 0.91 } }
+        }
+      }
+    }
+  });
   requests.push(format(range(1, 4, 2, 3), 'userEnteredFormat.textFormat',
     { textFormat: { italic: true, fontSize: 9, foregroundColor: { red: 0.45, green: 0.47, blue: 0.5 } } }));
   requests.push(format(range(headerRow, headerRow + 1, 0, columns), 'userEnteredFormat(textFormat,backgroundColor)',
@@ -558,8 +584,10 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
     throw err;
   }
 
-  const tabs = new Map(); // title -> { gid, index }
-  (meta.data.sheets || []).forEach(s => tabs.set(s.properties.title, { gid: s.properties.sheetId, index: s.properties.index }));
+  const tabs = new Map(); // title -> { gid, index, rules }
+  (meta.data.sheets || []).forEach(s => tabs.set(s.properties.title, {
+    gid: s.properties.sheetId, index: s.properties.index, rules: (s.conditionalFormats || []).length
+  }));
 
   // Months to write: every month with visits, the current month (so staff always
   // see this month's tab), and any month tab already in the workbook, which gets
@@ -578,6 +606,7 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
   // cells belong to staff, so they are filled in only when the tab is first made.
   const reportIsNew = !tabs.has(REPORT_TAB_TITLE);
   if (reportIsNew) addRequests.push({ addSheet: { properties: { title: REPORT_TAB_TITLE, index: 0 } } });
+  if (!tabs.has(BLOOD_DATA_TAB_TITLE)) addRequests.push({ addSheet: { properties: { title: BLOOD_DATA_TAB_TITLE, hidden: true } } });
   if (addRequests.length > 0) {
     const addRes = await sheets.spreadsheets.batchUpdate({
       spreadsheetId: monthlySheetId,
@@ -592,8 +621,9 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
   const titles = orderedMonths.map(monthTabTitle);
   await sheets.spreadsheets.values.batchClear({
     spreadsheetId: monthlySheetId,
-    requestBody: { ranges: titles.map(t => `'${t}'!A1:Z`) }
+    requestBody: { ranges: [...titles, BLOOD_DATA_TAB_TITLE].map(t => `'${t}'!A1:Z`) }
   });
+  const bloodRows = bloodDataRows(buildBloodTestRegister({ children: data.children, healthRecords: data.healthRecords || [] }).allRows);
 
   const reportRange = cell => `'${REPORT_TAB_TITLE}'!${cell}`;
   const reportData = [
@@ -607,7 +637,11 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
         ['← pick one child or All children']
       ]
     },
-    { range: reportRange('E2'), values: [['CHECKUPS FOUND', buildDateRangeCountFormula()]] },
+    { range: reportRange('E2'), values: [['CHECKUPS FOUND', buildDateRangeCountFormula()], ['BLOOD TESTS FOUND', buildBloodCountFormula()]] },
+    {
+      range: `'${BLOOD_DATA_TAB_TITLE}'!A1`,
+      values: [BLOOD_DATA_HEADERS, ...bloodRows.map(r => r.map(plainTextCell))]
+    },
     { range: reportRange(`A${REPORT_HEADER_ROW}`), values: [REGISTER_HEADERS] },
     { range: reportRange(`A${REPORT_HEADER_ROW + 1}`), values: [[buildDateRangeFormula(titles)]] }
   ];
@@ -686,6 +720,13 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
   if (reportTab) {
     monthlySheetGids.report = reportTab.gid;
     layoutRequests.push(...dateRangeReportLayout(reportTab, data.children));
+  }
+  // The blood test data tab sits hidden after the month tabs.
+  const bloodTab = tabs.get(BLOOD_DATA_TAB_TITLE);
+  if (bloodTab) {
+    layoutRequests.push({
+      updateSheetProperties: { properties: { sheetId: bloodTab.gid, index: orderedMonths.length + 1, hidden: true }, fields: 'index,hidden' }
+    });
   }
 
   try {
@@ -1297,7 +1338,8 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
       children: cleanChildren,
       appointments: allAppointments,
       growth: allGrowth,
-      medicines: allMedicines
+      medicines: allMedicines,
+      healthRecords: allHealthRecords
     }, secondaryList);
   } catch (monthlyErr) {
     console.warn('[Google OAuth] Monthly Checkup Register sync notice:', monthlyErr.message);
