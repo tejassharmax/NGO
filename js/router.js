@@ -1188,6 +1188,10 @@ export function settingsPage() {
   const isConnected = !!sheetsConfig.connected;
   const isTokenExpired = !!sheetsConfig.tokenExpired;
   const adminEmail = sheetsConfig.adminEmail || 'Admin';
+  const driveOwnerEmail = sheetsConfig.driveOwnerEmail || '';
+  // Connected, but with an account other than the one that must own the files.
+  const isWrongOwner = isConnected && !isTokenExpired && !!driveOwnerEmail && !!sheetsConfig.adminEmail &&
+    sheetsConfig.adminEmail.toLowerCase() !== driveOwnerEmail.toLowerCase();
   const masterSheetUrl = getGoogleSheetUrl();
   const clinicalSheetUrl = getClinicalSheetUrl();
   const monthlySheetUrl = getMonthlySheetUrl();
@@ -1219,6 +1223,16 @@ export function settingsPage() {
             }
           </div>
 
+          ${isWrongOwner ? `
+            <div style="background: rgba(251, 188, 4, 0.12); border-left: 4px solid #f9ab00; padding: 12px 14px; border-radius: 4px; margin-bottom: 16px;">
+              <div style="font-size: 13.5px; font-weight: 700; margin-bottom: 4px;">Connected to the wrong Google account</div>
+              <div style="font-size: 12.5px; color: var(--color-text); line-height: 1.4;">
+                Files are being saved in <b>${escapeHTML(adminEmail)}</b>. They belong in <b>${escapeHTML(driveOwnerEmail)}</b>.
+                Click <strong>Switch to ${escapeHTML(driveOwnerEmail)}</strong> and choose that account; its existing sheets are reused.
+              </div>
+            </div>
+          ` : ''}
+
           ${isTokenExpired ? `
             <div style="background: rgba(234, 67, 53, 0.08); border-left: 4px solid #ea4335; padding: 12px 14px; border-radius: 4px; margin-bottom: 16px;">
               <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">Google Workspace Authorization Expired</div>
@@ -1236,6 +1250,12 @@ export function settingsPage() {
           `}
 
           <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+            ${isWrongOwner ? `
+              <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: #f9ab00; border-color: #f9ab00; color: #202124;">
+                Switch to ${escapeHTML(driveOwnerEmail)} ↗
+              </a>
+            ` : ''}
+
             ${(!isConnected || isTokenExpired) ? `
               <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; border-color: ${isTokenExpired ? '#ea4335' : '#0F9D58'};">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>

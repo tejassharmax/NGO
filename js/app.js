@@ -91,6 +91,13 @@ let renderCurrentPage = null;
             `,
             confirmText: 'Understood'
           });
+        } else if (errType === 'wrong_account') {
+          const expected = urlParams.get('expected') || 'the main admin account';
+          modal({
+            title: 'Use the main admin Google account',
+            body: `<p>All sheets, documents and Drive folders are kept in <b>${escapeHTML(expected)}</b>. Please click Connect again and choose that account. Other admins get access to the files automatically.</p>`,
+            confirmText: 'Understood'
+          });
         } else {
           toast('Google Workspace Notice', 'Connection flow was not completed. Please try connecting again.');
         }
