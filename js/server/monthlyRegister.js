@@ -14,6 +14,8 @@
  * Pure functions only. The Google Sheets I/O lives in googleOAuth.js.
  */
 
+const { BLOOD_HEADERS } = require('./bloodTestRegister');
+
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
@@ -62,25 +64,61 @@ function lastRegisterColumn() {
 }
 
 /**
+ * Hidden tab in the same workbook holding every blood test report (child name,
+ * date, values). The report tab reads it so blood tests can be filtered by the
+ * same From/To/Child cells; it is rewritten on every sync like the month tabs.
+ */
+const BLOOD_DATA_TAB_TITLE = 'Blood Test Data';
+const BLOOD_DATA_HEADERS = ['NAME OF CHILD', ...BLOOD_HEADERS];
+
+/** Title row that separates the blood test section from the checkups in the report. */
+const BLOOD_SECTION_TITLE = 'BLOOD TEST REPORTS';
+const NO_CHECKUPS = 'No checkups in this date range.';
+const NO_BLOOD_TESTS = 'No blood test reports in this date range.';
+
+/** One row of the Blood Test Data tab per report: name, date, then the values. */
+function bloodDataRows(allRows) {
+  return allRows.map(([name, , ...report]) => [name, ...report]);
+}
+
+/**
  * The report formula. It stacks every month tab, keeps the visits dated between
  * From (B2) and To (B3), optionally only one child (B4), and sorts them by date.
- * The month tabs stay the only place the data is written; this tab only reads them.
+ * Below them it lists the blood test reports matching the same filters.
+ * The month tabs and the Blood Test Data tab stay the only place the data is
+ * written; this tab only reads them.
  * @param {string[]} monthTitles e.g. ['October 2026', 'September 2026']
  */
 function buildDateRangeFormula(monthTitles) {
   const last = lastRegisterColumn();
   const dateCol = REGISTER_HEADERS.length;
   const stack = monthTitles.map(t => `${quoteTabTitle(t)}!A2:${last}`).join(';');
+  const bloodLast = String.fromCharCode(64 + BLOOD_DATA_HEADERS.length);
+  const childMatch = (names) => `($B$4="${ALL_CHILDREN}")+(${names}=$B$4)`;
+  const headerRow = `{${BLOOD_DATA_HEADERS.map(h => `"${h}"`).join(',')}}`;
   return `=LET(rows,{${stack}},d,INDEX(rows,0,${dateCol}),n,INDEX(rows,0,1),` +
-    `hit,FILTER(rows,d<>"",d>=$B$2,d<=$B$3,($B$4="${ALL_CHILDREN}")+(n=$B$4)),` +
-    `IFERROR(SORT(hit,${dateCol},TRUE,1,TRUE),"No checkups in this date range."))`;
+    `hit,FILTER(rows,d<>"",d>=$B$2,d<=$B$3,${childMatch('n')}),` +
+    `checkups,IFERROR(SORT(hit,${dateCol},TRUE,1,TRUE),"${NO_CHECKUPS}"),` +
+    `b,${quoteTabTitle(BLOOD_DATA_TAB_TITLE)}!A2:${bloodLast},bd,INDEX(b,0,2),bn,INDEX(b,0,1),` +
+    `bf,FILTER(b,bd<>"",bd>=$B$2,bd<=$B$3,${childMatch('bn')}),` +
+    // Dates and values as text so they keep their look whatever column they land in.
+    `blood,IF(ISERROR(INDEX(bf,1,1)),"${NO_BLOOD_TESTS}",LET(bs,SORT(bf,2,TRUE,1,TRUE),ARRAYFORMULA(` +
+    `HSTACK(INDEX(bs,0,1),TEXT(INDEX(bs,0,2),"dd mmm yyyy"),TO_TEXT(CHOOSECOLS(bs,SEQUENCE(1,${BLOOD_DATA_HEADERS.length - 2},3))))))),` +
+    `IFNA(VSTACK(checkups,"","${BLOOD_SECTION_TITLE}",${headerRow},blood),""))`;
 }
 
-/** Number of visits the report shows (0 when it shows the "no checkups" message). */
+/** Number of visits the report shows. */
 function buildDateRangeCountFormula() {
-  const last = lastRegisterColumn();
   const first = REPORT_HEADER_ROW + 1;
-  return `=IF(ISNUMBER(${last}${first}),COUNTA(A${first}:A),0)`;
+  return `=IF(A${first}="${NO_CHECKUPS}",0,MATCH("${BLOOD_SECTION_TITLE}",A${first}:A,0)-2)`;
+}
+
+/** Number of blood test reports the report shows. */
+function buildBloodCountFormula() {
+  const first = REPORT_HEADER_ROW + 1;
+  const title = `MATCH("${BLOOD_SECTION_TITLE}",A${first}:A,0)`;
+  // Text rows: checkups (or the message), the section title, its header, then one per report.
+  return `=IFERROR(IF(INDEX(A${first}:A,${title}+2)="${NO_BLOOD_TESTS}",0,COUNTIF(A${first}:A,"?*")-${title}),0)`;
 }
 
 /** 'YYYY-MM' -> 'September 2026' */
@@ -247,6 +285,11 @@ function buildMonthlyRegister({ children = [], appointments = [], growth = [], m
 
 module.exports = {
   REGISTER_HEADERS,
+  BLOOD_DATA_TAB_TITLE,
+  BLOOD_DATA_HEADERS,
+  BLOOD_SECTION_TITLE,
+  bloodDataRows,
+  buildBloodCountFormula,
   REPORT_TAB_TITLE,
   REPORT_HEADER_ROW,
   ALL_CHILDREN,
