@@ -12,6 +12,7 @@ const { Readable } = require('stream');
 // Tenant-scoped database access. Reads and writes go to `ngos/{slug}` in
 // Firestore, falling back to data/db.json when no service-account key is present.
 const { readTenantArrays, writeTenantChildren } = require('./dataSource');
+const { DEFAULT_NGO } = require('./ngoStore');
 const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
 
 // Where the refresh token and the created sheet/doc IDs live. Firestore-backed so
@@ -46,10 +47,19 @@ const {
 } = require('./bloodTestRegister');
 
 /**
- * The one Google account whose Drive holds every sheet, document and folder the
- * app creates (the NGO's main admin). The Google connection only accepts it.
+ * The Google account whose Drive holds every sheet, document and folder created
+ * for the main NGO (DEFAULT_NGO). Its Google connection only accepts this account.
  */
 const DRIVE_OWNER_EMAIL = (process.env.GOOGLE_DRIVE_OWNER_EMAIL || 'ayushahome@gmail.com').trim().toLowerCase();
+
+/**
+ * The account that must own an NGO's Google files, or null when any of that NGO's
+ * own admins may connect (every NGO other than the main one).
+ * @param {string} ngoSlug
+ */
+function driveOwnerFor(ngoSlug) {
+  return sanitizeNgoSlug(ngoSlug) === sanitizeNgoSlug(DEFAULT_NGO) ? DRIVE_OWNER_EMAIL : null;
+}
 
 /** Accounts given editor access to everything in the owner's Drive (the developer / secondary admins). */
 const DRIVE_EDITOR_EMAILS = (process.env.GOOGLE_DRIVE_EDITOR_EMAILS || 'tejassachin2010@gmail.com')
@@ -89,43 +99,7 @@ function sanitizeNgoSlug(ngoSlug) {
  * @returns {Promise<object>}
  */
 async function getNgoIntegration(ngoSlug) {
-  const data = await loadIntegration(ngoSlug);
-
-  // Fallback to environment variables when nothing has been connected yet. Lets a
-  // deployment be seeded with a pre-existing refresh token instead of requiring
-  // someone to click through the consent screen.
-  if (!data.refresh_token && process.env.GOOGLE_OAUTH_REFRESH_TOKEN) {
-    data.refresh_token = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
-    data.adminEmail = process.env.GOOGLE_OAUTH_ADMIN_EMAIL || 'ayushahome@gmail.com';
-    if (process.env.GOOGLE_SPREADSHEET_ID && !data.sheetId && process.env.GOOGLE_SPREADSHEET_ID !== '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88') {
-      data.sheetId = process.env.GOOGLE_SPREADSHEET_ID;
-      data.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${data.sheetId}/edit`;
-    }
-    if (process.env.GOOGLE_CLINICAL_SPREADSHEET_ID && !data.clinicalSheetId && process.env.GOOGLE_CLINICAL_SPREADSHEET_ID !== '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY') {
-      data.clinicalSheetId = process.env.GOOGLE_CLINICAL_SPREADSHEET_ID;
-      data.clinicalSpreadsheetUrl = `https://docs.google.com/spreadsheets/d/${data.clinicalSheetId}/edit`;
-    }
-  }
-
-  // Sanitize any legacy hardcoded spreadsheet IDs so fresh sheets are created under ayushahome@gmail.com
-  if (data.sheetId === '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88') {
-    data.sheetId = null;
-    data.spreadsheetUrl = null;
-    data.childSheetGids = {};
-  }
-  if (data.clinicalSheetId === '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY') {
-    data.clinicalSheetId = null;
-    data.clinicalSpreadsheetUrl = null;
-    data.childSheetGids = {};
-  }
-  if (!data.adminEmail || data.adminEmail === 'Connected Admin' || data.adminEmail === 'Authorized Admin') {
-    data.adminEmail = 'ayushahome@gmail.com';
-  }
-  if (!data.secondaryEmail) {
-    data.secondaryEmail = 'tejassachin2010@gmail.com';
-  }
-
-  return data;
+  return loadIntegration(ngoSlug);
 }
 
 /**
@@ -198,7 +172,7 @@ function getAuthUrl(ngoSlug, req = null, state = null) {
     ],
     state: state || safeSlug,
     // Open Google's account chooser on the account that must own the files.
-    login_hint: DRIVE_OWNER_EMAIL
+    ...(driveOwnerFor(safeSlug) ? { login_hint: driveOwnerFor(safeSlug) } : {})
   });
 }
 
@@ -212,19 +186,7 @@ function getAuthUrl(ngoSlug, req = null, state = null) {
  */
 async function getClientForNgo(ngoSlug) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
-  let integration = await getNgoIntegration(safeSlug);
-
-  // If this slug has no refresh token, check the sister slug
-  if (!integration || !integration.refresh_token) {
-    const fallbackSlug = safeSlug === 'alex-agape' ? 'ayusha-nilayam' : (safeSlug === 'ayusha-nilayam' ? 'alex-agape' : null);
-    if (fallbackSlug) {
-      const fallbackInteg = await getNgoIntegration(fallbackSlug);
-      if (fallbackInteg && fallbackInteg.refresh_token) {
-        integration = fallbackInteg;
-      }
-    }
-  }
-
+  const integration = await getNgoIntegration(safeSlug);
   if (!integration || !integration.refresh_token) {
     return null;
   }
@@ -929,14 +891,6 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
     if (tokenErr.message?.includes('invalid_grant') || tokenErr.response?.data?.error === 'invalid_grant') {
       integration.tokenExpired = true;
       await saveNgoIntegration(safeSlug, integration);
-      const fallbackSlug = safeSlug === 'alex-agape' ? 'ayusha-nilayam' : (safeSlug === 'ayusha-nilayam' ? 'alex-agape' : null);
-      if (fallbackSlug) {
-        const fbIntegration = await getNgoIntegration(fallbackSlug);
-        if (fbIntegration) {
-          fbIntegration.tokenExpired = true;
-          await saveNgoIntegration(fallbackSlug, fbIntegration);
-        }
-      }
       return {
         success: false,
         error: 'invalid_grant',
@@ -2127,12 +2081,10 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
     sharedRootFolders.add(rootFolderId);
   }
 
-  // Save root folder ID for this tenant and sister slug
+  // Save root folder ID for this NGO
   integration.documentsRootFolderId = rootFolderId;
   integration.documentsRootFolderUrl = rootFolderUrl;
   await saveNgoIntegration(safeSlug, integration);
-  const sisterSlug = safeSlug === 'alex-agape' ? 'ayusha-nilayam' : 'alex-agape';
-  await saveNgoIntegration(sisterSlug, integration);
 
   // 4. Find or create the child subfolder strictly inside this primary root folder
   const safeChildName = (childName || 'General Documents').trim();
@@ -2157,7 +2109,7 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
 const sharedRootFolders = new Set();
 
 module.exports = {
-  DRIVE_OWNER_EMAIL,
+  driveOwnerFor,
   DRIVE_EDITOR_EMAILS,
   buildOAuthClient,
   getAuthUrl,

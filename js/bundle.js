@@ -33551,6 +33551,68 @@
   }
 
   /**
+   * session.js
+   * Session state manager for Firebase Authentication & Firestore User Context.
+   */
+
+  const SESSION_KEY = 'chm_firebase_user_session';
+
+  /**
+   * Save active authenticated user session to local storage
+   * @param {Object} userData 
+   */
+  function saveSession(userData) {
+    if (!userData) return;
+    const sessionPayload = {
+      uid: userData.uid,
+      displayName: userData.displayName || 'Authorized User',
+      email: userData.email,
+      photoURL: userData.photoURL || null,
+      ngo: userData.ngo || 'Partner NGO',
+      role: userData.role || 'Admin',
+      loginTimestamp: new Date().toISOString()
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionPayload));
+    localStorage.setItem('sample-logged-in', 'true');
+    localStorage.setItem('google-user-email', userData.email);
+    localStorage.setItem('sample-org-name', userData.ngo || 'Partner NGO');
+  }
+
+  /**
+   * Get active user session
+   * @returns {Object|null}
+   */
+  function getSession() {
+    try {
+      const data = localStorage.getItem(SESSION_KEY);
+      if (!data) return null;
+      return JSON.parse(data);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Clear user session state
+   */
+  function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem('sample-logged-in');
+    localStorage.removeItem('google-user-email');
+    localStorage.removeItem('sample-org-name');
+  }
+
+  /**
+   * Check if a valid authenticated session exists
+   * @returns {boolean}
+   */
+  function isSessionActive() {
+    const loggedIn = localStorage.getItem('sample-logged-in') === 'true';
+    const session = getSession();
+    return Boolean(loggedIn && session && session.email && session.email.trim() !== '');
+  }
+
+  /**
    * backup.js
    * Export and restore of everything this browser holds, so records can be moved
    * between deployments (e.g. from the old Render site to ayushahealth.in).
@@ -34228,6 +34290,32 @@
   let isSyncing = false;
   let serverRejectedSignIn = false;
 
+  /** Which NGO the records cached in this browser belong to. */
+  const TENANT_KEY = 'chm-tenant';
+
+  /** Every cached collection; together they belong to one NGO at a time. */
+  const TENANT_DATA_KEYS = [
+    CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY, NUTRITION_KEY, MEDICINES_KEY,
+    APPOINTMENTS_KEY, EMERGENCY_KEY, EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY, DELETED_KEY
+  ];
+
+  /**
+   * Drop the cached records when the signed-in account belongs to a different NGO
+   * than the one they were cached for. Without this, signing in to another NGO in
+   * the same browser uploaded the previous NGO's children into it. Those records
+   * are already on their own NGO's server; this NGO's records load right after.
+   */
+  function guardTenantCache() {
+    const session = getSession();
+    const raw = session && (session.ngoSlug || session.ngo);
+    if (!raw) return;
+    const tenant = String(raw).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+    const cached = localStorage.getItem(TENANT_KEY);
+    if (cached === tenant) return;
+    if (cached) TENANT_DATA_KEYS.forEach(key => localStorage.removeItem(key));
+    originalSetItem(TENANT_KEY, tenant);
+  }
+
   /**
    * True when the server answered the last load with 401: this browser still looks
    * signed in, but its Google sign-in has expired, so nothing can load or save.
@@ -34240,6 +34328,7 @@
    * Hydrate state directly from server on fresh browser open / login
    */
   async function hydrateFromServer() {
+    guardTenantCache();
     try {
       isSyncing = true;
       const res = await apiFetch('/api/sync');
@@ -34315,6 +34404,7 @@
       clearTimeout(syncDebounceTimer);
       syncDebounceTimer = null;
     }
+    guardTenantCache();
     if (isSyncing) {
       syncPending = true;
       return;
@@ -34623,68 +34713,6 @@
       hoverCircle.style.display = 'none';
       tooltip.style.opacity = '0';
     });
-  }
-
-  /**
-   * session.js
-   * Session state manager for Firebase Authentication & Firestore User Context.
-   */
-
-  const SESSION_KEY = 'chm_firebase_user_session';
-
-  /**
-   * Save active authenticated user session to local storage
-   * @param {Object} userData 
-   */
-  function saveSession(userData) {
-    if (!userData) return;
-    const sessionPayload = {
-      uid: userData.uid,
-      displayName: userData.displayName || 'Authorized User',
-      email: userData.email,
-      photoURL: userData.photoURL || null,
-      ngo: userData.ngo || 'Partner NGO',
-      role: userData.role || 'Admin',
-      loginTimestamp: new Date().toISOString()
-    };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(sessionPayload));
-    localStorage.setItem('sample-logged-in', 'true');
-    localStorage.setItem('google-user-email', userData.email);
-    localStorage.setItem('sample-org-name', userData.ngo || 'Partner NGO');
-  }
-
-  /**
-   * Get active user session
-   * @returns {Object|null}
-   */
-  function getSession() {
-    try {
-      const data = localStorage.getItem(SESSION_KEY);
-      if (!data) return null;
-      return JSON.parse(data);
-    } catch (e) {
-      return null;
-    }
-  }
-
-  /**
-   * Clear user session state
-   */
-  function clearSession() {
-    localStorage.removeItem(SESSION_KEY);
-    localStorage.removeItem('sample-logged-in');
-    localStorage.removeItem('google-user-email');
-    localStorage.removeItem('sample-org-name');
-  }
-
-  /**
-   * Check if a valid authenticated session exists
-   * @returns {boolean}
-   */
-  function isSessionActive() {
-    const loggedIn = localStorage.getItem('sample-logged-in') === 'true';
-    const session = getSession();
-    return Boolean(loggedIn && session && session.email && session.email.trim() !== '');
   }
 
   function toast(title, message = 'Your changes have been saved.') {
