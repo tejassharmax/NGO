@@ -16,7 +16,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
 
 // Per-NGO OAuth Integration Module
 const {
-  DRIVE_OWNER_EMAIL,
+  driveOwnerFor,
   DRIVE_EDITOR_EMAILS,
   buildOAuthClient,
   getAuthUrl,
@@ -258,13 +258,6 @@ app.get('/auth/google/callback', async (req, res) => {
       return res.redirect('/index.html?google_error=unauthorized#/settings');
     }
 
-    // Every sheet, document and folder lives in the main admin's Drive. Another
-    // admin's Google account (even an allowlisted one) is not accepted here, so
-    // the files can never end up split across two Drives.
-    if (connectingEmail !== DRIVE_OWNER_EMAIL) {
-      console.warn(`[oauth] Refused workspace connect from ${connectingEmail}; only ${DRIVE_OWNER_EMAIL} may own the files.`);
-      return res.redirect(`/index.html?google_error=wrong_account&expected=${encodeURIComponent(DRIVE_OWNER_EMAIL)}#/settings`);
-    }
 
     // The NGO comes from the connecting admin's own allowlist record, not from the
     // `state` slug the browser sent, so a crafted connect link cannot file a
@@ -278,20 +271,27 @@ app.get('/auth/google/callback', async (req, res) => {
     }
     ngoSlug = tenant.slug;
 
+    // The main NGO's files live in its main admin's Drive. Another admin's Google
+    // account (even an allowlisted one) is not accepted for it, so the files can
+    // never end up split across two Drives. Other NGOs connect their own admin.
+    const requiredOwner = driveOwnerFor(ngoSlug);
+    if (requiredOwner && connectingEmail !== requiredOwner) {
+      console.warn(`[oauth] Refused workspace connect from ${connectingEmail}; only ${requiredOwner} may own ${ngoSlug}'s files.`);
+      return res.redirect(`/index.html?google_error=wrong_account&expected=${encodeURIComponent(requiredOwner)}#/settings`);
+    }
+
     console.log(`[OAuth Callback] Successfully authenticated connecting admin: ${connectingEmail} for NGO: ${ngoSlug}`);
 
     const existing = await getNgoIntegration(ngoSlug);
     const connectingAccount = (adminEmail !== 'Admin' ? adminEmail : (connectingEmail || '')).trim().toLowerCase();
     const isSameAccount = String(existing.adminEmail || '').toLowerCase() === connectingAccount;
-    const isLegacySheet = existing.sheetId === '1KnxgrxAYmvUnD_BTMsQREav8umsZgU4Qg_UFJYhH-88' || existing.clinicalSheetId === '15P5OExjG12acJrGm6c3dOfaGBIB73_6ZJh5Sh4RbXwY';
 
     // Keep the outgoing account's files, then use the connecting account's own:
     // its current ones when it is reconnecting, the ones remembered from an
     // earlier connection when it is switching back, or none (a fresh set).
     rememberAccountFiles(existing);
-    const files = isLegacySheet ? {}
-      : isSameAccount ? accountFiles(existing)
-        : ((existing.accountFiles || {})[connectingAccount] || {});
+    const files = isSameAccount ? accountFiles(existing)
+      : ((existing.accountFiles || {})[connectingAccount] || {});
 
     const updated = {
       ...existing,
@@ -300,14 +300,10 @@ app.get('/auth/google/callback', async (req, res) => {
       refresh_token: tokens.refresh_token || existing.refresh_token,
       tokenExpired: false,
       connectedAt: new Date().toISOString(),
-      adminEmail: connectingAccount || existing.adminEmail || 'ayushahome@gmail.com',
+      adminEmail: connectingAccount,
       secondaryEmail: DRIVE_EDITOR_EMAILS[0] || null
     };
     await saveNgoIntegration(ngoSlug, updated);
-
-    // Also mirror to sister slug so both tenants stay in sync
-    const sisterSlug = ngoSlug === 'alex-agape' ? 'ayusha-nilayam' : 'alex-agape';
-    await saveNgoIntegration(sisterSlug, updated);
 
     // Immediately create or update Google Spreadsheet in user's Drive and populate records
     const children = await readChildrenFor(tenant);
@@ -392,17 +388,6 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
   const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
   let integration = await getNgoIntegration(ngoSlug);
 
-  // If this slug has no refresh token, check sister slug
-  if (!integration || !integration.refresh_token) {
-    const fallbackSlug = ngoSlug === 'alex-agape' ? 'ayusha-nilayam' : (ngoSlug === 'ayusha-nilayam' ? 'alex-agape' : null);
-    if (fallbackSlug) {
-      const fallbackInteg = await getNgoIntegration(fallbackSlug);
-      if (fallbackInteg && fallbackInteg.refresh_token) {
-        integration = fallbackInteg;
-      }
-    }
-  }
-
   let connected = !!(integration && integration.refresh_token);
   let tokenExpired = !!integration?.tokenExpired;
 
@@ -439,7 +424,7 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
   res.json({
     connected,
     tokenExpired,
-    driveOwnerEmail: DRIVE_OWNER_EMAIL,
+    driveOwnerEmail: driveOwnerFor(ngoSlug),
     adminEmail: integration.adminEmail || null,
     secondaryEmail: integration.secondaryEmail || null,
     sheetId: integration.sheetId || null,

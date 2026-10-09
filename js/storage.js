@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════════════════ */
 
 import { apiFetch } from './apiClient.js';
+import { getSession } from './session.js';
 import { showProgressBar, hideProgressBar } from './utils.js';
 import { BACKUP_KEYS, buildBackup, planRestore } from './backup.js';
 
@@ -562,6 +563,32 @@ function seedDatabase() {
 let isSyncing = false;
 let serverRejectedSignIn = false;
 
+/** Which NGO the records cached in this browser belong to. */
+const TENANT_KEY = 'chm-tenant';
+
+/** Every cached collection; together they belong to one NGO at a time. */
+const TENANT_DATA_KEYS = [
+  CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY, NUTRITION_KEY, MEDICINES_KEY,
+  APPOINTMENTS_KEY, EMERGENCY_KEY, EXPENSES_KEY, ALERTS_KEY, HEALTH_RECORDS_KEY, DELETED_KEY
+];
+
+/**
+ * Drop the cached records when the signed-in account belongs to a different NGO
+ * than the one they were cached for. Without this, signing in to another NGO in
+ * the same browser uploaded the previous NGO's children into it. Those records
+ * are already on their own NGO's server; this NGO's records load right after.
+ */
+function guardTenantCache() {
+  const session = getSession();
+  const raw = session && (session.ngoSlug || session.ngo);
+  if (!raw) return;
+  const tenant = String(raw).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
+  const cached = localStorage.getItem(TENANT_KEY);
+  if (cached === tenant) return;
+  if (cached) TENANT_DATA_KEYS.forEach(key => localStorage.removeItem(key));
+  originalSetItem(TENANT_KEY, tenant);
+}
+
 /**
  * True when the server answered the last load with 401: this browser still looks
  * signed in, but its Google sign-in has expired, so nothing can load or save.
@@ -574,6 +601,7 @@ export function signInExpired() {
  * Hydrate state directly from server on fresh browser open / login
  */
 export async function hydrateFromServer() {
+  guardTenantCache();
   try {
     isSyncing = true;
     const res = await apiFetch('/api/sync');
@@ -649,6 +677,7 @@ export async function syncWithServer() {
     clearTimeout(syncDebounceTimer);
     syncDebounceTimer = null;
   }
+  guardTenantCache();
   if (isSyncing) {
     syncPending = true;
     return;
