@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ayusha Health · Child health records for children's homes</title>
+<meta name="description" content="Ayusha Health keeps every child's health record in one place for children's homes, and syncs it to the home's own Google Sheets and Drive.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<script>
+  // Staff who are already signed in go straight to the app.
+  try { if (localStorage.getItem('sample-logged-in') === 'true') location.replace('/app' + location.hash); } catch (e) {}
+</script>
+<style>
+  :root { --ink: #0E2A2F; --muted: #4A5A5E; --paper: #F6F3EC; --card: #FDFCF8; --teal: #0F9D8A; --teal-dark: #0B7A6B; --orange: #E8772E; --line: #E4E0D6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'IBM Plex Sans', Arial, sans-serif; color: var(--ink); background: radial-gradient(circle at 80% 0%, #E3F3EE 0%, var(--paper) 55%); line-height: 1.6; }
+  a { color: var(--teal-dark); }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 28px 0; }
+  .brand { font-family: 'Space Grotesk', Arial, sans-serif; font-weight: 700; font-size: 26px; letter-spacing: -0.5px; color: var(--ink); text-decoration: none; }
+  .brand span { color: var(--teal); }
+  .btn { display: inline-block; padding: 14px 28px; border-radius: 999px; background: var(--teal); color: #FBFAF6; font-weight: 600; text-decoration: none; }
+  .btn:hover { background: var(--teal-dark); }
+  .hero { padding: 64px 0 48px; }
+  h1 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: clamp(40px, 7vw, 72px); line-height: 1.05; letter-spacing: -2px; margin: 0 0 20px; }
+  .lead { font-size: 21px; color: var(--muted); max-width: 680px; margin: 0 0 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin: 24px 0 56px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 28px; }
+  .card h3 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 22px; margin: 0 0 8px; }
+  .card p { margin: 0; color: var(--muted); }
+  h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 32px; letter-spacing: -0.5px; margin: 0 0 12px; }
+  section { margin-bottom: 56px; }
+  ul { padding-left: 22px; color: var(--muted); }
+  li { margin-bottom: 8px; }
+  footer { border-top: 1px solid var(--line); padding: 28px 0 48px; color: var(--muted); font-size: 15px; display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/">Ayusha <span>Health</span></a>
+    <a class="btn" href="/app">Sign in</a>
+  </header>
+
+  <div class="hero">
+    <h1>Every child's health record, in one place.</h1>
+    <p class="lead">Ayusha Health is a health record system for children's homes. Staff record each child's checkups, prescriptions, blood tests, vaccinations and documents, and every record is kept in sync with the home's own Google Sheets and Google Drive.</p>
+    <a class="btn" href="/app">Sign in with Google</a>
+  </div>
+
+  <div class="grid">
+    <div class="card"><h3>One profile per child</h3><p>A complete, ordered health history for every child in the home's care.</p></div>
+    <div class="card"><h3>Reports on demand</h3><p>A monthly checkup register and a date range report, ready for district inspections.</p></div>
+    <div class="card"><h3>In the home's own Google account</h3><p>Workbooks and uploaded documents are created in the home's Google Sheets and Drive.</p></div>
+  </div>
+
+  <section>
+    <h2>Who it is for</h2>
+    <p>Ayusha Health is used by the staff of registered children's homes (child care institutions) in India to keep the health records they are required to maintain. It is not a public service: only staff whose email address a home has authorised can sign in.</p>
+  </section>
+
+  <section>
+    <h2>Why the app asks for Google access</h2>
+    <ul>
+      <li><b>Sign in with Google</b>: to confirm who the staff member is.</li>
+      <li><b>Google Sheets</b>: to create and update the home's health record workbooks (master directory, medical records, monthly checkup register, blood test reports).</li>
+      <li><b>Google Drive</b>: to store documents uploaded in the app, such as medical reports, in a folder the app creates in the home's Drive. The app only accesses files it created.</li>
+    </ul>
+    <p>Data from Google is used only to provide these features. It is never sold or used for advertising. Read the <a href="/privacy">privacy policy</a> for details.</p>
+  </section>
+
+  <footer>
+    <span>© 2026 Ayusha Health · Provided by Empowered Margins Foundation</span>
+    <span><a href="/privacy">Privacy policy</a> · <a href="/terms">Terms of service</a> · <a href="mailto:tejassachin2010@gmail.com">tejassachin2010@gmail.com</a></span>
+  </footer>
+</div>
+</body>
+</html>
