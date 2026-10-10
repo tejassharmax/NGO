@@ -12,7 +12,7 @@ const { Readable } = require('stream');
 // Tenant-scoped database access. Reads and writes go to `ngos/{slug}` in
 // Firestore, falling back to data/db.json when no service-account key is present.
 const { readTenantArrays, writeTenantChildren } = require('./dataSource');
-const { DEFAULT_NGO } = require('./ngoStore');
+const { DEFAULT_NGO, sanitizeNgoSlug: tenantSlug } = require('./ngoStore');
 const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
 
 // Where the refresh token and the created sheet/doc IDs live. Firestore-backed so
@@ -64,23 +64,6 @@ function driveOwnerFor(ngoSlug) {
 /** Accounts given editor access to everything in the owner's Drive (the developer / secondary admins). */
 const DRIVE_EDITOR_EMAILS = (process.env.GOOGLE_DRIVE_EDITOR_EMAILS || 'tejassachin2010@gmail.com')
   .split(',').map(e => e.trim().toLowerCase()).filter(e => e && e !== DRIVE_OWNER_EMAIL);
-
-/** Give the editor accounts access to a Drive file or folder (folders pass it on to their contents). */
-async function shareWithEditors(authClient, fileId) {
-  if (!fileId || !authClient) return;
-  const drive = google.drive({ version: 'v3', auth: authClient });
-  for (const emailAddress of DRIVE_EDITOR_EMAILS) {
-    try {
-      await drive.permissions.create({
-        fileId,
-        sendNotificationEmail: false,
-        requestBody: { role: 'writer', type: 'user', emailAddress }
-      });
-    } catch (e) {
-      // Already shared, or the address cannot receive shares.
-    }
-  }
-}
 
 /**
  * Sanitize NGO slug for filename safety
@@ -365,31 +348,59 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
   ];
 }
 
+/** Active staff of one NGO, from authorized_users (cached for 5 minutes). */
+const staffEmailCache = new Map();
+async function ngoStaffEmails(ngoSlug) {
+  const slug = sanitizeNgoSlug(ngoSlug);
+  const cached = staffEmailCache.get(slug);
+  if (cached && Date.now() < cached.expiresAt) return cached.emails;
+  let emails = [];
+  try {
+    const db = isFirestoreEnabled() ? getDb() : null;
+    if (db) {
+      const snap = await db.collection('authorized_users').where('active', '==', true).get();
+      emails = snap.docs.map(d => d.data())
+        .filter(u => u.email && tenantSlug(u.ngo || DEFAULT_NGO) === slug)
+        .map(u => String(u.email).trim().toLowerCase());
+    }
+  } catch (err) {
+    console.warn('[Google OAuth] Staff lookup notice:', err.message);
+  }
+  staffEmailCache.set(slug, { emails, expiresAt: Date.now() + 5 * 60 * 1000 });
+  return emails;
+}
+
+/** Files whose sharing has already been checked since this process started. */
+const sharingChecked = new Set();
+
 /**
- * Ensure spreadsheet has proper sharing permissions so authorized staff can open directly
- * without ever getting blocked by a "Request Access" prompt.
+ * Share a spreadsheet, document or folder with exactly the people who should open
+ * it: the NGO's authorised staff and the developer editors, as editors, without
+ * notification emails. Any "anyone with the link" access is removed, because these
+ * files hold children's medical records. Runs once per file and recipient list
+ * per process, so it costs nothing on later syncs.
  */
 async function ensureSpreadsheetSharing(authClient, spreadsheetId, secondaryEmails = []) {
   if (!spreadsheetId || !authClient) return;
+  const targets = [...new Set((Array.isArray(secondaryEmails) ? secondaryEmails : [secondaryEmails])
+    .filter(e => typeof e === 'string' && e.includes('@'))
+    .map(e => e.trim().toLowerCase()))];
+  const checkKey = `${spreadsheetId}|${targets.sort().join(',')}`;
+  if (sharingChecked.has(checkKey)) return;
+  sharingChecked.add(checkKey);
   const drive = google.drive({ version: 'v3', auth: authClient });
 
-  // 1. Grant 'writer' to anyone with the link so any authorized NGO staff can open and edit immediately
+  // 1. No open links: remove "anyone with the link" access left by older versions.
   try {
-    await drive.permissions.create({
-      fileId: spreadsheetId,
-      requestBody: { role: 'writer', type: 'anyone' }
-    });
+    const list = await drive.permissions.list({ fileId: spreadsheetId, fields: 'permissions(id,type)' });
+    for (const p of (list.data.permissions || []).filter(p => p.type === 'anyone')) {
+      await drive.permissions.delete({ fileId: spreadsheetId, permissionId: p.id });
+    }
   } catch (err) {
-    try {
-      await drive.permissions.create({
-        fileId: spreadsheetId,
-        requestBody: { role: 'reader', type: 'anyone' }
-      });
-    } catch (e2) {}
+    console.warn('[Google OAuth] Link-sharing cleanup notice:', err.message);
   }
 
-  // 2. Explicitly share with secondary admin emails (e.g. tejassachin2010@gmail.com) as Editor without sending notification spam
-  const targets = Array.isArray(secondaryEmails) ? secondaryEmails : [secondaryEmails];
+  // 2. The NGO's staff and the developer editors as editors, without notification emails.
   for (const email of targets) {
     if (!email || typeof email !== 'string') continue;
     const cleanEmail = email.trim().toLowerCase();
@@ -527,9 +538,9 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
     integration.monthlySheetId = monthlySheetId;
     integration.monthlySpreadsheetUrl = createRes.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${monthlySheetId}/edit`;
     await saveNgoIntegration(safeSlug, integration);
-    ensureSpreadsheetSharing(client, monthlySheetId, shareWith).catch(() => {});
     console.log(`[Google OAuth] Created Monthly Checkup Register: ${integration.monthlySpreadsheetUrl}`);
   }
+  ensureSpreadsheetSharing(client, monthlySheetId, shareWith).catch(() => {});
 
   let meta;
   try {
@@ -728,9 +739,9 @@ async function syncBloodTestSheet(sheets, client, integration, safeSlug, display
     integration.bloodSheetId = bloodSheetId;
     integration.bloodSpreadsheetUrl = createRes.data.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${bloodSheetId}/edit`;
     await saveNgoIntegration(safeSlug, integration);
-    ensureSpreadsheetSharing(client, bloodSheetId, shareWith).catch(() => {});
     console.log(`[Google OAuth] Created Blood Test Reports: ${integration.bloodSpreadsheetUrl}`);
   }
+  ensureSpreadsheetSharing(client, bloodSheetId, shareWith).catch(() => {});
 
   let meta;
   try {
@@ -955,7 +966,7 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   }
 
   // Ensure both spreadsheets are shared with link access and secondary admin (tejassachin2010@gmail.com)
-  const secondaryList = [...DRIVE_EDITOR_EMAILS, integration.secondaryEmail];
+  const secondaryList = [...DRIVE_EDITOR_EMAILS, integration.secondaryEmail, ...(await ngoStaffEmails(safeSlug))];
   if (sheetId) {
     ensureSpreadsheetSharing(client, sheetId, secondaryList).catch(() => {});
   }
@@ -1878,16 +1889,6 @@ async function findOrCreateFolder(authClient, folderName, parentId = null) {
   });
 
   const folder = createRes.data;
-  await shareWithEditors(authClient, folder.id);
-
-  try {
-    await drive.permissions.create({
-      fileId: folder.id,
-      requestBody: { role: 'reader', type: 'anyone' }
-    });
-  } catch (permErr) {
-    // Restricted by Google Workspace domain policy, fallback to default ownership
-  }
 
   return {
     id: folder.id,
@@ -1967,15 +1968,6 @@ async function uploadFileToDrive(authClient, fileBuffer, fileName, mimeType, fol
     },
     fields: 'id, name, webViewLink, webContentLink'
   });
-
-  try {
-    await drive.permissions.create({
-      fileId: res.data.id,
-      requestBody: { role: 'reader', type: 'anyone' }
-    });
-  } catch (permErr) {
-    // Restricted by Google Workspace domain policy
-  }
 
   return {
     fileId: res.data.id,
@@ -2076,10 +2068,8 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
   }
 
   // The editors get the whole documents tree through its root folder.
-  if (!sharedRootFolders.has(rootFolderId)) {
-    await shareWithEditors(authClient, rootFolderId);
-    sharedRootFolders.add(rootFolderId);
-  }
+  // The root folder is shared with the staff; child folders and files inherit it.
+  await ensureSpreadsheetSharing(authClient, rootFolderId, [...DRIVE_EDITOR_EMAILS, ...(await ngoStaffEmails(safeSlug))]);
 
   // Save root folder ID for this NGO
   integration.documentsRootFolderId = rootFolderId;
@@ -2104,9 +2094,6 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
     rootFolderUrl
   };
 }
-
-/** Root folders already shared with the editors since this process started. */
-const sharedRootFolders = new Set();
 
 module.exports = {
   driveOwnerFor,

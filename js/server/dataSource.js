@@ -120,6 +120,7 @@ async function writeTenantChildren(ngoSlug, children) {
   const safeChildren = Array.isArray(children) ? children : [];
   const json = JSON.stringify(safeChildren);
   const slug = sanitizeNgoSlug(ngoSlug);
+  let savedToFirestore = false;
 
   // 1. Primary: Write directly to Firebase Cloud Firestore
   if (isFirestoreEnabled()) {
@@ -178,13 +179,15 @@ async function writeTenantChildren(ngoSlug, children) {
         // left every other collection empty in the cache, so a Sheets sync inside
         // the next 60s rewrote each child's tab with no checkups.
         clearSnapshotMemoryCache(slug);
+        savedToFirestore = true;
       }
     } catch (fsErr) {
       console.warn(`[dataSource] Direct Firestore write warning (${fsErr.message}). Persisting to emergency local store.`);
     }
   }
 
-  // 2. Secondary: Emergency local file store backup
+  // 2. Fallback only: the local file store, when Firestore is unavailable.
+  if (savedToFirestore) return;
   try {
     const store = readFileStore();
     store['chm-children'] = json;

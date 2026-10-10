@@ -97,7 +97,11 @@ const sendPublicFile = (relativePath) => (req, res) => {
   noCacheCode(res, relativePath);
   res.sendFile(path.join(__dirname, relativePath));
 };
-app.get(['/', '/index.html'], sendPublicFile('index.html'));
+// Public pages anyone can open (also what Google's OAuth review reads), then the app.
+app.get('/', sendPublicFile('public/home.html'));
+app.get('/privacy', sendPublicFile('public/privacy.html'));
+app.get('/terms', sendPublicFile('public/terms.html'));
+app.get(['/app', '/index.html'], sendPublicFile('index.html'));
 app.get('/js/bundle.js', sendPublicFile('js/bundle.js'));
 app.get('/google-logo.png', sendPublicFile('google-logo.png'));
 app.use('/css', express.static(path.join(__dirname, 'css'), { etag: true, setHeaders: noCacheCode }));
@@ -568,8 +572,9 @@ app.post('/api/import', requireAuth, apiLimiter, async (req, res) => {
     const mergedData = { ...serverData, ...plan.merged };
     if (isFirestoreEnabled()) {
       await writeSnapshot(tenant.slug, mergedData, index || new Map());
+    } else {
+      writeFileStore(mergedData);
     }
-    writeFileStore(mergedData);
 
     try {
       const children = JSON.parse(mergedData['chm-children'] || '[]');
@@ -595,6 +600,8 @@ app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
 
     const mergedData = mergeNamespace(clientData, serverData);
 
+    // Records are kept in Firestore only. The local file is a fallback for when
+    // Firestore is not configured or a write fails, never a second copy.
     if (isFirestoreEnabled()) {
       try {
         await writeSnapshot(tenant.slug, mergedData, index || new Map());
@@ -605,7 +612,6 @@ app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
     } else {
       writeFileStore(mergedData);
     }
-    writeFileStore(mergedData);
 
     // Trigger the Google Sheets sync in the background
     if (mergedData['chm-children']) {
