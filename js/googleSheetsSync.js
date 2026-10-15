@@ -9,7 +9,7 @@
 import { getSession } from './session.js';
 import { toast } from './toast.js';
 import { modal } from './modal.js';
-import { getChildren, calculateAge, logActivity } from './storage.js';
+import { getChildren, calculateAge, logActivity, records } from './storage.js';
 import { escapeHTML, icon, showProgressBar, hideProgressBar } from './utils.js';
 import { apiFetch } from './apiClient.js';
 
@@ -694,7 +694,7 @@ export async function autoSyncDeleteChildFromGoogleSheets(deletedChildId, childN
     if (res.ok) {
       const data = await res.json();
       if (data && data.success && Array.isArray(data.children)) {
-        localStorage.setItem('chm-children', JSON.stringify(data.children));
+        records.setItem('chm-children', JSON.stringify(data.children));
         toast('Google Sheets Updated', `Removed ${childName || 'child'} from connected Google Sheet.`);
         return data;
       }
@@ -728,8 +728,7 @@ export async function pullChildrenFromGoogleSheets(options = {}) {
     if (res.ok) {
       const data = await res.json();
       if (data && data.success && Array.isArray(data.children)) {
-        // Save merged children into localStorage
-        localStorage.setItem('chm-children', JSON.stringify(data.children));
+        records.setItem('chm-children', JSON.stringify(data.children));
 
         if (data.addedCount > 0) {
           logActivity('child_added', `${data.addedCount} student(s)`, `Imported ${data.addedCount} new child record(s) from Google Sheets.`);

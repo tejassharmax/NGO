@@ -1,5 +1,5 @@
 import { renderPage } from './router.js';
-import { deleteChild, getGrowthRecords, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore, signInExpired } from './storage.js';
+import { deleteChild, getGrowthRecords, getChildren, getChild, logActivity, addUploadedDoc, updateUploadedDoc, getUploadedDocs, deleteUploadedDoc, addGrowthRecord, saveGrowthRecord, deleteGrowthRecord, addMedicine, addAppointment, deleteAppointment, getAppointments, updateAppointment, healthStatus, saveHealthRecord, deleteHealthRecord, getAlerts, dismissAlert, syncWithServer, hydrateFromServer, reorderChildren, exportBackup, previewRestore, applyRestore, signInExpired, records, clearLocalRecords } from './storage.js';
 import { updateChildTable, setColumnOrder } from './table.js';
 import { searchChildren, globalSearchMarkup, getAllSpotlightItems, renderSpotlightItemsHTML, renderSpotlightPreviewHTML } from './search.js';
 import { toast } from './toast.js';
@@ -27,31 +27,29 @@ let lastSilentPullTime = 0;
 let renderCurrentPage = null;
 
 (async () => {
-  localStorage.removeItem('sample-students');
-  localStorage.removeItem('sample-children');
-  localStorage.setItem('chm-pending-docs', '[]');
+  records.setItem('chm-pending-docs', '[]');
 
   // Purge legacy preset mock data and test registrations completely
   const MOCK_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Unnamed Child', 'Tejas Sharma'];
   const MOCK_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-1001', 'CH-1002', 'CH-1461', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-3938', 'CH-1079'];
 
   try {
-    const rawKids = localStorage.getItem('chm-children');
+    const rawKids = records.getItem('chm-children');
     if (rawKids) {
       const kids = JSON.parse(rawKids);
       const cleanKids = (kids || []).filter(k => k && !MOCK_NAMES.includes((k.name || '').trim()) && !MOCK_IDS.includes(k.id));
-      localStorage.setItem('chm-children', JSON.stringify(cleanKids));
+      records.setItem('chm-children', JSON.stringify(cleanKids));
     }
   } catch (e) {}
 
   ['chm-growth', 'chm-appointments', 'chm-medicines', 'chm-alerts', 'chm-health-records', 'chm-activity', 'chm-nutrition', 'chm-expenses'].forEach(key => {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = records.getItem(key);
       if (raw) {
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) {
           const clean = arr.filter(item => item && !MOCK_IDS.includes(item.childId) && !MOCK_NAMES.includes(item.childName || item.subject));
-          localStorage.setItem(key, JSON.stringify(clean));
+          records.setItem(key, JSON.stringify(clean));
         }
       }
     } catch (e) {}
@@ -185,7 +183,7 @@ let renderCurrentPage = null;
 
     // The app looked signed in but the server refused the session, so nothing
     // would load or save. Ask for a fresh sign-in instead of showing stale data.
-    // Only the sign-in marker is cleared: records in this browser stay and are
+    // Only the sign-in marker is cleared: this tab's unsaved edits stay and are
     // synced as soon as the user signs in again.
     if (signInExpired()) {
       clearSession();
@@ -346,7 +344,7 @@ document.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
     const allAlerts = getAlerts().map(a => ({ ...a, dismissed: true }));
-    localStorage.setItem('sample-alerts', JSON.stringify(allAlerts));
+    records.setItem('chm-alerts', JSON.stringify(allAlerts));
 
     document.querySelector('.notif-badge-dot')?.remove();
     clearAllNotifsBtn.remove();
@@ -396,8 +394,8 @@ document.addEventListener('click', (event) => {
   const signOutBtn = target.closest('[data-sign-out]');
   if (signOutBtn) {
     event.preventDefault();
-    logoutUser().then(() => {
-      toast('Signed Out', 'Terminated session and cleared workspace state.');
+    clearLocalRecords().then(logoutUser).then(() => {
+      toast('Signed Out', 'Signed out and removed the records from this browser.');
       window.location.hash = '#/login';
       if (renderCurrentPage) renderCurrentPage();
     });
@@ -907,7 +905,7 @@ document.addEventListener('click', (event) => {
           return;
         }
         const file = fileInput.files[0];
-        toast('Saving document...', 'Saving locally and syncing to Google Drive...', 'info');
+        toast('Saving document...', 'Saving and syncing to Google Drive...', 'info');
         const reader = new FileReader();
         reader.onload = async function(e) {
           const newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
@@ -924,11 +922,11 @@ document.addEventListener('click', (event) => {
               });
               toast('Google Drive Synced', `${title} backed up in ${childName}'s Google Drive folder.`, 'success');
             } else {
-              toast('Document saved', `${title} saved locally.`);
+              toast('Document saved', `${title} saved.`);
             }
           } catch (uploadErr) {
             console.warn('[Drive Upload]', uploadErr);
-            toast('Document saved', `${title} saved locally.`);
+            toast('Document saved', `${title} saved.`);
           } finally {
             window.setTimeout(() => { window.location.reload(); }, 300);
           }
@@ -1369,7 +1367,7 @@ document.addEventListener('click', (event) => {
 
         if (fileInput && fileInput.files && fileInput.files[0]) {
           const file = fileInput.files[0];
-          toast('Saving document...', 'Saving locally and syncing to Google Drive...', 'info');
+          toast('Saving document...', 'Saving and syncing to Google Drive...', 'info');
           const reader = new FileReader();
           reader.onload = async function (e) {
             const newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
@@ -1386,11 +1384,11 @@ document.addEventListener('click', (event) => {
                 });
                 toast('Google Drive Synced', `${docName} backed up in ${childName}'s Google Drive folder.`, 'success');
               } else {
-                toast('Document saved', `${docName} saved locally.`);
+                toast('Document saved', `${docName} saved.`);
               }
             } catch (uploadErr) {
               console.warn('[Drive Upload]', uploadErr);
-              toast('Document saved', `${docName} saved locally.`);
+              toast('Document saved', `${docName} saved.`);
             } finally {
               window.setTimeout(() => window.location.reload(), 300);
             }
@@ -2510,6 +2508,6 @@ async function migrateToLiveSite() {
   if (result.totalAdded > 0) {
     toast('Records copied to ayushahealth.in', `${result.totalAdded} records from this browser are now on the live site.`);
   } else {
-    toast('Live site is up to date', 'Every record in this browser is already on ayushahealth.in.');
+    toast('Live site is up to date', 'Every record is already on ayushahealth.in.');
   }
 }

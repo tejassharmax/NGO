@@ -67,9 +67,8 @@
   <ul>
     <li><b>Google Cloud Firestore</b>, in Google's Mumbai region (asia-south1). Each home's records are kept separately from every other home's.</li>
     <li><b>The home's own Google account</b>: the spreadsheets and uploaded documents the app creates there belong to the home.</li>
-    <li><b>The signed-in browser</b>: to stay fast, the app keeps a working copy of the home's records in the browser of staff who sign in. Staff should use the app only on the home's own devices.</li>
   </ul>
-  <p>Our application server, hosted by MilesWeb, passes requests between the browser and Google's services. It does not keep copies of the records, except briefly as a fallback if the database cannot be reached.</p>
+  <p>Our application server, hosted by MilesWeb, passes requests between the app and Google's services. It does not store the records.</p>
 
   <h2>6. Who can see the information</h2>
   <ul>
