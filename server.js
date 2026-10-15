@@ -600,14 +600,15 @@ app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
 
     const mergedData = mergeNamespace(clientData, serverData);
 
-    // Records are kept in Firestore only. The local file is a fallback for when
-    // Firestore is not configured or a write fails, never a second copy.
+    // Records are kept in Firestore only. If the write fails the browser keeps
+    // its edits and retries; nothing is saved to this server's disk. The file
+    // store is used only when Firestore is not configured (local development).
     if (isFirestoreEnabled()) {
       try {
         await writeSnapshot(tenant.slug, mergedData, index || new Map());
       } catch (fsErr) {
-        console.warn(`[Sync] Firestore write failed (${fsErr.message}). Persisting to file store fallback.`);
-        writeFileStore(mergedData);
+        console.error(`[Sync] Firestore write failed: ${fsErr.message}`);
+        return res.status(503).json({ success: false, message: 'The database is unavailable. Your changes will be retried.' });
       }
     } else {
       writeFileStore(mergedData);

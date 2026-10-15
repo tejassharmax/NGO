@@ -1324,7 +1324,7 @@ export function settingsPage() {
             <b style="font-size: 14px; font-weight: 600;">Backup &amp; restore</b>
           </div>
           <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">
-            Download every record stored in this browser, or restore a backup from another site.
+            Download every record as a backup file, or restore a backup from another site.
             Restoring only adds missing records; nothing here is overwritten.
           </p>
           <div style="display: flex; gap: 8px; flex-wrap: wrap;">

@@ -33731,7 +33731,9 @@
 
   /* ═══════════════════════════════════════════════════════
      CHILD HEALTH MANAGEMENT — DATA LAYER
-     All data is stored in localStorage as JSON.
+     The records live in Firestore, behind /api/sync. The open tab keeps a
+     short-lived working copy in sessionStorage, which the browser deletes when
+     the tab is closed and sign-out clears. Nothing is kept after that.
      ═══════════════════════════════════════════════════════ */
 
 
@@ -33749,13 +33751,29 @@
   const HEALTH_RECORDS_KEY = 'chm-health-records';
   const DELETED_KEY = 'chm-deleted';
 
+  /** Record keys start with "chm-"; "sample-org-" keys are the home's settings. */
+  const isRecordKey = key => key.startsWith('chm-');
+
+  /**
+   * This tab's working copy of the records. Every change schedules a sync, so
+   * edits reach Firestore within a couple of seconds.
+   */
+  const records = {
+    getItem: key => sessionStorage.getItem(key),
+    setItem(key, value) {
+      sessionStorage.setItem(key, value);
+      if (!isSyncing) triggerSync();
+    },
+    removeItem: key => sessionStorage.removeItem(key)
+  };
+
   /* ─── Children (was Students) ─── */
 
   function getChildren() {
-    let data = localStorage.getItem(CHILDREN_KEY);
+    let data = records.getItem(CHILDREN_KEY);
     if (!data) {
       seedDatabase();
-      data = localStorage.getItem(CHILDREN_KEY);
+      data = records.getItem(CHILDREN_KEY);
     }
     return JSON.parse(data || '[]');
   }
@@ -33771,21 +33789,21 @@
       children.unshift(child);
       logActivity('child_added', child.name, 'New child registered');
     }
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(children));
+    records.setItem(CHILDREN_KEY, JSON.stringify(children));
     return child;
   }
 
   function deleteChild(id) {
     const child = getChildren().find(c => c.id === id);
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(getChildren().filter(c => c.id !== id)));
+    records.setItem(CHILDREN_KEY, JSON.stringify(getChildren().filter(c => c.id !== id)));
     if (child) {
       logActivity('child_removed', child.name, 'Child record removed');
     }
 
-    // Clean up child-specific records across localStorage so they don't linger
+    // Clean up child-specific records across the working copy so they don't linger
     ['chm-growth', 'chm-appointments', 'chm-medicines', 'chm-alerts', 'chm-health-records', 'chm-documents'].forEach(key => {
       try {
-        const raw = localStorage.getItem(key);
+        const raw = records.getItem(key);
         if (raw) {
           const arr = JSON.parse(raw);
           if (Array.isArray(arr)) {
@@ -33793,7 +33811,7 @@
             if (filtered.length !== arr.length) {
               // Documents are client-authoritative on the server; the rest need tombstones.
               if (key !== DOCS_KEY) recordDeletions(key, arr.filter(item => item && item.childId === id));
-              localStorage.setItem(key, JSON.stringify(filtered));
+              records.setItem(key, JSON.stringify(filtered));
             }
           }
         }
@@ -33814,7 +33832,7 @@
     const ids = (items || []).map(i => i && i.id).filter(recordId => recordId !== undefined && recordId !== null && recordId !== '');
     if (ids.length === 0) return;
     let list = [];
-    try { list = JSON.parse(localStorage.getItem(DELETED_KEY) || '[]'); } catch (e) { }
+    try { list = JSON.parse(records.getItem(DELETED_KEY) || '[]'); } catch (e) { }
     if (!Array.isArray(list)) list = [];
     const known = new Set(list.map(t => t && t.id));
     const deletedAt = new Date().toISOString();
@@ -33822,7 +33840,7 @@
       const tombstoneId = `${key}:${recordId}`;
       if (!known.has(tombstoneId)) list.push({ id: tombstoneId, key, recordId: String(recordId), deletedAt });
     });
-    localStorage.setItem(DELETED_KEY, JSON.stringify(list));
+    records.setItem(DELETED_KEY, JSON.stringify(list));
   }
 
   /** Drop tombstoned records from a collection array. */
@@ -33843,7 +33861,7 @@
     const reordered = orderedIds.map(id => map.get(id)).filter(Boolean);
     // Append any children not in orderedIds (safety net)
     children.forEach(c => { if (!orderedIds.includes(c.id)) reordered.push(c); });
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify(reordered));
+    records.setItem(CHILDREN_KEY, JSON.stringify(reordered));
   }
 
   /* ─── Activity Log ─── */
@@ -33852,11 +33870,11 @@
     const activities = getActivities();
     activities.unshift({ type, subject, description, timestamp: Date.now() });
     if (activities.length > 50) activities.length = 50;
-    localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activities));
+    records.setItem(ACTIVITY_KEY, JSON.stringify(activities));
   }
 
   function getActivities() {
-    return JSON.parse(localStorage.getItem(ACTIVITY_KEY) || '[]');
+    return JSON.parse(records.getItem(ACTIVITY_KEY) || '[]');
   }
 
   function timeAgo(timestamp) {
@@ -33875,7 +33893,7 @@
   /* ─── Uploaded Documents ─── */
 
   function getUploadedDocs() {
-    return JSON.parse(localStorage.getItem(DOCS_KEY) || '[]');
+    return JSON.parse(records.getItem(DOCS_KEY) || '[]');
   }
 
   function addUploadedDoc(docName, childName, fileData, status = 'Verified', docType = 'Medical report', childId = null, driveFileId = null, driveUrl = null) {
@@ -33897,7 +33915,7 @@
       timestamp: Date.now()
     };
     docs.unshift(newDoc);
-    localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+    records.setItem(DOCS_KEY, JSON.stringify(docs));
     return newDoc;
   }
 
@@ -33907,7 +33925,7 @@
     const doc = docs.find(d => d.id === docId);
     if (doc) {
       Object.assign(doc, updates);
-      localStorage.setItem(DOCS_KEY, JSON.stringify(docs));
+      records.setItem(DOCS_KEY, JSON.stringify(docs));
       return doc;
     }
     return null;
@@ -33929,7 +33947,7 @@
       updatedDocs = docs.filter(d => d.id !== idOrIndex);
     }
 
-    localStorage.setItem(DOCS_KEY, JSON.stringify(updatedDocs));
+    records.setItem(DOCS_KEY, JSON.stringify(updatedDocs));
     if (deletedDoc) {
       logActivity('doc_deleted', deletedDoc.child || deletedDoc.childName || 'Child', `Deleted document: ${deletedDoc.name || 'Medical Document'}`);
     }
@@ -33937,7 +33955,7 @@
   }
 
   function getGrowthRecords(childId) {
-    const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
+    const all = JSON.parse(records.getItem(GROWTH_KEY) || '[]');
     all.sort((a, b) => (b.timestamp || new Date(b.date).getTime() || 0) - (a.timestamp || new Date(a.date).getTime() || 0));
     return childId ? all.filter(r => r.childId === childId) : all;
   }
@@ -33947,7 +33965,7 @@
   }
 
   function saveGrowthRecord(record) {
-    const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
+    const all = JSON.parse(records.getItem(GROWTH_KEY) || '[]');
     record.id = record.id || `GW-${Date.now()}`;
     record.timestamp = record.timestamp || Date.now();
     record.updatedAt = Date.now();
@@ -33971,7 +33989,7 @@
 
     // Sort descending by date
     all.sort((a, b) => (new Date(b.date || b.timestamp).getTime() || 0) - (new Date(a.date || a.timestamp).getTime() || 0));
-    localStorage.setItem(GROWTH_KEY, JSON.stringify(all));
+    records.setItem(GROWTH_KEY, JSON.stringify(all));
 
     // If this record belongs to a child, update the child's top-level vitals if it's the latest date
     if (record.childId) {
@@ -34004,10 +34022,10 @@
    * never applied across every child's records on that day.
    */
   function deleteGrowthRecord(id, childId) {
-    const all = JSON.parse(localStorage.getItem(GROWTH_KEY) || '[]');
+    const all = JSON.parse(records.getItem(GROWTH_KEY) || '[]');
     const matches = (r) => (r.id && r.id === id) || (!r.id && r.date === id && (!childId || r.childId === childId));
     recordDeletions(GROWTH_KEY, all.filter(matches));
-    localStorage.setItem(GROWTH_KEY, JSON.stringify(all.filter(r => !matches(r))));
+    records.setItem(GROWTH_KEY, JSON.stringify(all.filter(r => !matches(r))));
   }
 
   /* ─── Clinic & doctor on checkups ─── */
@@ -34029,16 +34047,16 @@
   /* ─── Medicine Management ─── */
 
   function getMedicines(childId) {
-    const all = JSON.parse(localStorage.getItem(MEDICINES_KEY) || '[]');
+    const all = JSON.parse(records.getItem(MEDICINES_KEY) || '[]');
     return childId ? all.filter(m => m.childId === childId) : all;
   }
 
   function addMedicine(med) {
-    const all = JSON.parse(localStorage.getItem(MEDICINES_KEY) || '[]');
+    const all = JSON.parse(records.getItem(MEDICINES_KEY) || '[]');
     med.id = med.id || `MED-${Date.now()}`;
     med.timestamp = Date.now();
     all.unshift(med);
-    localStorage.setItem(MEDICINES_KEY, JSON.stringify(all));
+    records.setItem(MEDICINES_KEY, JSON.stringify(all));
     logActivity('medicine_added', med.childName || 'Child', `${med.medicineName} — ${med.dosage}`);
     return med;
   }
@@ -34046,12 +34064,12 @@
   /* ─── Appointments ─── */
 
   function getAppointments(childId) {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+    const all = JSON.parse(records.getItem(APPOINTMENTS_KEY) || '[]');
     return childId ? all.filter(a => a.childId === childId) : all;
   }
 
   function addAppointment(appt) {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+    const all = JSON.parse(records.getItem(APPOINTMENTS_KEY) || '[]');
 
     // Guard against duplicate creation within 5 seconds for same child, date, time & type
     const isDuplicate = all.some(a =>
@@ -34070,37 +34088,37 @@
     appt.timestamp = Date.now();
     appt.updatedAt = appt.timestamp;
     all.unshift(appt);
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
+    records.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
     logActivity('appointment_added', appt.childName || 'Child', `${appt.type} on ${appt.date}`);
     return appt;
   }
 
   function updateAppointment(appt) {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+    const all = JSON.parse(records.getItem(APPOINTMENTS_KEY) || '[]');
     const idx = all.findIndex(a => a.id === appt.id);
     appt.updatedAt = Date.now();
     if (idx !== -1) all[idx] = appt;
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
+    records.setItem(APPOINTMENTS_KEY, JSON.stringify(all));
     return appt;
   }
 
   function deleteAppointment(id) {
-    const all = JSON.parse(localStorage.getItem(APPOINTMENTS_KEY) || '[]');
+    const all = JSON.parse(records.getItem(APPOINTMENTS_KEY) || '[]');
     recordDeletions(APPOINTMENTS_KEY, all.filter(a => String(a.id) === String(id)));
     const filtered = all.filter(a => String(a.id) !== String(id));
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(filtered));
+    records.setItem(APPOINTMENTS_KEY, JSON.stringify(filtered));
     return true;
   }
 
   /* ─── Health Records (Lab results, test reports) ─── */
 
   function getHealthRecords(childId) {
-    const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+    const all = JSON.parse(records.getItem(HEALTH_RECORDS_KEY) || '[]');
     return childId ? all.filter(r => r.childId === childId) : all;
   }
 
   function saveHealthRecord(record) {
-    const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+    const all = JSON.parse(records.getItem(HEALTH_RECORDS_KEY) || '[]');
     record.id = record.id || `HR-${Date.now()}`;
     record.timestamp = record.timestamp || Date.now();
     record.updatedAt = Date.now();
@@ -34118,21 +34136,21 @@
 
     // Sort descending by date
     all.sort((a, b) => (new Date(b.date || b.timestamp).getTime() || 0) - (new Date(a.date || a.timestamp).getTime() || 0));
-    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all));
+    records.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all));
     return record;
   }
 
   function deleteHealthRecord(id) {
-    const all = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+    const all = JSON.parse(records.getItem(HEALTH_RECORDS_KEY) || '[]');
     const matches = (r) => r.id === id;
     recordDeletions(HEALTH_RECORDS_KEY, all.filter(matches));
-    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all.filter(r => !matches(r))));
+    records.setItem(HEALTH_RECORDS_KEY, JSON.stringify(all.filter(r => !matches(r))));
   }
 
   /* ─── Alerts ─── */
 
   function getAlerts() {
-    let alerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+    let alerts = JSON.parse(records.getItem(ALERTS_KEY) || '[]');
     const children = getChildren();
     const appointments = getAppointments();
     const medicines = getMedicines();
@@ -34174,7 +34192,7 @@
     });
 
     // 3. Check for alarming blood test reports (hemoglobin < 11.0)
-    const healthRecords = JSON.parse(localStorage.getItem(HEALTH_RECORDS_KEY) || '[]');
+    const healthRecords = JSON.parse(records.getItem(HEALTH_RECORDS_KEY) || '[]');
     healthRecords.forEach(record => {
       if (record.hemoglobin && parseFloat(record.hemoglobin) < 11.0) {
         const alertId = `ALR-ANEMIA-${record.childId}-${record.date}`;
@@ -34213,7 +34231,7 @@
 
     if (dynamicAlerts.length > 0) {
       alerts = [...dynamicAlerts, ...alerts];
-      localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
+      records.setItem(ALERTS_KEY, JSON.stringify(alerts));
     }
 
     return alerts;
@@ -34221,7 +34239,7 @@
 
   function dismissAlert(id) {
     const all = getAlerts().map(a => a.id === id ? { ...a, dismissed: true } : a);
-    localStorage.setItem(ALERTS_KEY, JSON.stringify(all));
+    records.setItem(ALERTS_KEY, JSON.stringify(all));
   }
 
   /* ─── Utility: Calculate age from DOB ─── */
@@ -34272,16 +34290,16 @@
   }
 
   function seedDatabase() {
-    localStorage.setItem(CHILDREN_KEY, JSON.stringify([]));
-    localStorage.setItem(GROWTH_KEY, JSON.stringify([]));
-    localStorage.setItem(NUTRITION_KEY, JSON.stringify([]));
-    localStorage.setItem(MEDICINES_KEY, JSON.stringify([]));
-    localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify([]));
-    localStorage.setItem(EMERGENCY_KEY, JSON.stringify([]));
-    localStorage.setItem(EXPENSES_KEY, JSON.stringify([]));
-    localStorage.setItem(HEALTH_RECORDS_KEY, JSON.stringify([]));
-    localStorage.setItem(ACTIVITY_KEY, JSON.stringify([]));
-    localStorage.setItem(ALERTS_KEY, JSON.stringify([]));
+    records.setItem(CHILDREN_KEY, JSON.stringify([]));
+    records.setItem(GROWTH_KEY, JSON.stringify([]));
+    records.setItem(NUTRITION_KEY, JSON.stringify([]));
+    records.setItem(MEDICINES_KEY, JSON.stringify([]));
+    records.setItem(APPOINTMENTS_KEY, JSON.stringify([]));
+    records.setItem(EMERGENCY_KEY, JSON.stringify([]));
+    records.setItem(EXPENSES_KEY, JSON.stringify([]));
+    records.setItem(HEALTH_RECORDS_KEY, JSON.stringify([]));
+    records.setItem(ACTIVITY_KEY, JSON.stringify([]));
+    records.setItem(ALERTS_KEY, JSON.stringify([]));
   }
 
   /* ───────────────────────────────────────────────────────
@@ -34310,10 +34328,10 @@
     const raw = session && (session.ngoSlug || session.ngo);
     if (!raw) return;
     const tenant = String(raw).toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-');
-    const cached = localStorage.getItem(TENANT_KEY);
+    const cached = records.getItem(TENANT_KEY);
     if (cached === tenant) return;
-    if (cached) TENANT_DATA_KEYS.forEach(key => localStorage.removeItem(key));
-    originalSetItem(TENANT_KEY, tenant);
+    if (cached) TENANT_DATA_KEYS.forEach(key => records.removeItem(key));
+    writeQuietly(TENANT_KEY, tenant);
   }
 
   /**
@@ -34339,12 +34357,12 @@
           let hasLocalChangesToPush = false;
           // Deletions known to either side, so a stale local copy is not revived below.
           const parseList = (raw) => { try { const v = JSON.parse(raw || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } };
-          const tombstones = [...parseList(serverData[DELETED_KEY]), ...parseList(localStorage.getItem(DELETED_KEY))];
+          const tombstones = [...parseList(serverData[DELETED_KEY]), ...parseList(records.getItem(DELETED_KEY))];
           Object.keys(serverData).forEach(k => {
             if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
               if (k.startsWith('chm-')) {
                 // Safely merge server array with local array so offline/unsynced local entries are never lost
-                const localRaw = localStorage.getItem(k);
+                const localRaw = records.getItem(k);
                 if (localRaw) {
                   try {
                     const localArr = JSON.parse(localRaw);
@@ -34374,13 +34392,13 @@
                         itemMap.set(id, item);
                       });
                       const merged = withoutDeleted(k, Array.from(itemMap.values()), tombstones);
-                      originalSetItem(k, JSON.stringify(merged));
+                      writeQuietly(k, JSON.stringify(merged));
                       return;
                     }
                   } catch (e) { }
                 }
               }
-              originalSetItem(k, serverData[k]);
+              writeQuietly(k, serverData[k]);
             }
           });
           if (hasLocalChangesToPush) {
@@ -34409,6 +34427,7 @@
       syncPending = true;
       return;
     }
+    let synced = false;
     try {
       isSyncing = true;
       showProgressBar(45);
@@ -34422,7 +34441,7 @@
       // Pack local state
       const payload = {};
       keys.forEach(k => {
-        payload[k] = localStorage.getItem(k);
+        payload[k] = isRecordKey(k) ? records.getItem(k) : localStorage.getItem(k);
       });
 
       // POST payload to merge/save on server (relative URL + auth token)
@@ -34434,15 +34453,19 @@
 
       if (res.ok) {
         const serverData = await res.json();
-        // Apply merged state from server without triggering interceptor loops
+        // Apply merged state from server without scheduling another sync
         Object.keys(serverData).forEach(k => {
           if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
-            originalSetItem(k, serverData[k]);
+            writeQuietly(k, serverData[k]);
           }
         });
+        synced = true;
+      } else if (res.status >= 500) {
+        retrySyncLater();
       }
     } catch (err) {
       console.warn('Sync failed (offline or server starting):', err);
+      retrySyncLater();
     } finally {
       isSyncing = false;
       hideProgressBar();
@@ -34451,6 +34474,28 @@
         syncWithServer().catch(() => {});
       }
     }
+    return synced;
+  }
+
+  /** The server could not save (offline or a database error): try again shortly. */
+  function retrySyncLater() {
+    if (syncDebounceTimer) return;
+    syncDebounceTimer = setTimeout(() => {
+      syncDebounceTimer = null;
+      syncWithServer().catch(() => {});
+    }, 15000);
+  }
+
+  /**
+   * Save any pending edits, then remove this tab's working copy of the records.
+   * Used at sign-out. If the save fails, the copy stays until the tab is closed
+   * so the edits can still be retried.
+   */
+  async function clearLocalRecords() {
+    const saved = await syncWithServer().catch(() => false);
+    if (!saved) return false;
+    [...TENANT_DATA_KEYS, TENANT_KEY].forEach(key => sessionStorage.removeItem(key));
+    return true;
   }
 
   let syncDebounceTimer = null;
@@ -34462,20 +34507,55 @@
     }, 1500);
   }
 
-  // Intercept localStorage sets to trigger background sync when key changes
-  const originalSetItem = localStorage.setItem.bind(localStorage);
-  localStorage.setItem = function(key, value) {
-    originalSetItem(key, value);
-    if (!isSyncing && (key.startsWith('chm-') || key.startsWith('sample-org-'))) {
-      triggerSync();
+  /**
+   * Write a value from the server without scheduling another sync. Records go to
+   * this tab's working copy; the home's settings ("sample-org-" keys) stay in
+   * localStorage.
+   */
+  function writeQuietly(key, value) {
+    if (isRecordKey(key)) sessionStorage.setItem(key, value);
+    else localStorage.setItem(key, value);
+  }
+
+  /** Both copies of one record list, without duplicates (the tab's copy wins). */
+  function unionRecordLists(tabRaw, oldRaw) {
+    try {
+      const tab = JSON.parse(tabRaw || '[]');
+      const old = JSON.parse(oldRaw || '[]');
+      if (!Array.isArray(tab) || !Array.isArray(old)) return tabRaw ?? oldRaw;
+      const keyOf = item => (item && item.id ? String(item.id) : JSON.stringify(item));
+      const seen = new Set(tab.map(keyOf));
+      return JSON.stringify([...tab, ...old.filter(item => item && !seen.has(keyOf(item)))]);
+    } catch (e) {
+      return tabRaw ?? oldRaw;
     }
-  };
+  }
+
+  /**
+   * Older versions kept the records in localStorage, which outlives the tab.
+   * Merge anything left there into this tab's working copy, so unsynced edits
+   * still reach the server, and remove it from localStorage.
+   */
+  function moveRecordsOutOfLocalStorage() {
+    TENANT_DATA_KEYS.forEach(key => {
+      const old = localStorage.getItem(key);
+      if (old === null) return;
+      sessionStorage.setItem(key, unionRecordLists(sessionStorage.getItem(key), old));
+      localStorage.removeItem(key);
+    });
+    const tenant = localStorage.getItem(TENANT_KEY);
+    if (tenant !== null && sessionStorage.getItem(TENANT_KEY) === null) sessionStorage.setItem(TENANT_KEY, tenant);
+    // Leftovers from older versions, including an item named "setItem" written by
+    // an old attempt to wrap localStorage.setItem.
+    [TENANT_KEY, 'sample-alerts', 'sample-students', 'sample-children', 'setItem'].forEach(key => localStorage.removeItem(key));
+  }
+  moveRecordsOutOfLocalStorage();
 
   /* ─── Backup & restore (move records between sites) ─── */
 
   function readBackupKeys() {
     const raw = {};
-    BACKUP_KEYS.forEach(key => { raw[key] = localStorage.getItem(key); });
+    BACKUP_KEYS.forEach(key => { raw[key] = isRecordKey(key) ? records.getItem(key) : localStorage.getItem(key); });
     return raw;
   }
 
@@ -34494,7 +34574,7 @@
    * (Firestore) and Google Sheets through the normal sync.
    */
   async function applyRestore(plan) {
-    Object.entries(plan.merged).forEach(([key, value]) => originalSetItem(key, value));
+    Object.entries(plan.merged).forEach(([key, value]) => writeQuietly(key, value));
     await syncWithServer();
   }
 
@@ -35431,7 +35511,7 @@
       if (res.ok) {
         const data = await res.json();
         if (data && data.success && Array.isArray(data.children)) {
-          localStorage.setItem('chm-children', JSON.stringify(data.children));
+          records.setItem('chm-children', JSON.stringify(data.children));
           toast('Google Sheets Updated', `Removed ${childName || 'child'} from connected Google Sheet.`);
           return data;
         }
@@ -35465,8 +35545,7 @@
       if (res.ok) {
         const data = await res.json();
         if (data && data.success && Array.isArray(data.children)) {
-          // Save merged children into localStorage
-          localStorage.setItem('chm-children', JSON.stringify(data.children));
+          records.setItem('chm-children', JSON.stringify(data.children));
 
           if (data.addedCount > 0) {
             logActivity('child_added', `${data.addedCount} student(s)`, `Imported ${data.addedCount} new child record(s) from Google Sheets.`);
@@ -39307,31 +39386,29 @@
   let renderCurrentPage = null;
 
   (async () => {
-    localStorage.removeItem('sample-students');
-    localStorage.removeItem('sample-children');
-    localStorage.setItem('chm-pending-docs', '[]');
+    records.setItem('chm-pending-docs', '[]');
 
     // Purge legacy preset mock data and test registrations completely
     const MOCK_NAMES = ['Naveen Roy', 'Aisha Khan', 'Aarav Sharma', 'Ananya Patil', 'Diya Nair', 'Unnamed Child', 'Tejas Sharma'];
     const MOCK_IDS = ['CH-1025', 'CH-1026', 'CH-1027', 'CH-1028', 'CH-1029', 'CH-1001', 'CH-1002', 'CH-1461', 'CH-3923', 'CH-3136', 'CH-8372', 'CH-3938', 'CH-1079'];
 
     try {
-      const rawKids = localStorage.getItem('chm-children');
+      const rawKids = records.getItem('chm-children');
       if (rawKids) {
         const kids = JSON.parse(rawKids);
         const cleanKids = (kids || []).filter(k => k && !MOCK_NAMES.includes((k.name || '').trim()) && !MOCK_IDS.includes(k.id));
-        localStorage.setItem('chm-children', JSON.stringify(cleanKids));
+        records.setItem('chm-children', JSON.stringify(cleanKids));
       }
     } catch (e) {}
 
     ['chm-growth', 'chm-appointments', 'chm-medicines', 'chm-alerts', 'chm-health-records', 'chm-activity', 'chm-nutrition', 'chm-expenses'].forEach(key => {
       try {
-        const raw = localStorage.getItem(key);
+        const raw = records.getItem(key);
         if (raw) {
           const arr = JSON.parse(raw);
           if (Array.isArray(arr)) {
             const clean = arr.filter(item => item && !MOCK_IDS.includes(item.childId) && !MOCK_NAMES.includes(item.childName || item.subject));
-            localStorage.setItem(key, JSON.stringify(clean));
+            records.setItem(key, JSON.stringify(clean));
           }
         }
       } catch (e) {}
@@ -39465,7 +39542,7 @@
 
       // The app looked signed in but the server refused the session, so nothing
       // would load or save. Ask for a fresh sign-in instead of showing stale data.
-      // Only the sign-in marker is cleared: records in this browser stay and are
+      // Only the sign-in marker is cleared: this tab's unsaved edits stay and are
       // synced as soon as the user signs in again.
       if (signInExpired()) {
         clearSession();
@@ -39626,7 +39703,7 @@
       event.preventDefault();
       event.stopPropagation();
       const allAlerts = getAlerts().map(a => ({ ...a, dismissed: true }));
-      localStorage.setItem('sample-alerts', JSON.stringify(allAlerts));
+      records.setItem('chm-alerts', JSON.stringify(allAlerts));
 
       document.querySelector('.notif-badge-dot')?.remove();
       clearAllNotifsBtn.remove();
@@ -39676,8 +39753,8 @@
     const signOutBtn = target.closest('[data-sign-out]');
     if (signOutBtn) {
       event.preventDefault();
-      logoutUser().then(() => {
-        toast('Signed Out', 'Terminated session and cleared workspace state.');
+      clearLocalRecords().then(logoutUser).then(() => {
+        toast('Signed Out', 'Signed out and removed the records from this browser.');
         window.location.hash = '#/login';
         if (renderCurrentPage) renderCurrentPage();
       });

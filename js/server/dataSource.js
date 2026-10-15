@@ -17,12 +17,18 @@ const fs = require('fs');
 const path = require('path');
 
 const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
-const { readSnapshot, writeSnapshot, updateSnapshotMemoryCache, clearSnapshotMemoryCache, sanitizeNgoSlug } = require('./ngoStore');
+const { readSnapshot, writeSnapshot, clearSnapshotMemoryCache, sanitizeNgoSlug } = require('./ngoStore');
 const { SYNC_KEYS } = require('./syncMerge');
 
 const DB_FILE = path.join(__dirname, '../../data/db.json');
 
-/** Read the legacy global file store. @returns {Record<string,string>} */
+/**
+ * The file store is only for running the app without Firestore (local
+ * development). When Firestore is configured, records are never written to
+ * the server's disk.
+ */
+
+/** Read the local development file store. @returns {Record<string,string>} */
 function readFileStore() {
   try {
     if (fs.existsSync(DB_FILE)) {
@@ -34,7 +40,7 @@ function readFileStore() {
   return {};
 }
 
-/** Write the legacy global file store, skipping no-op writes. */
+/** Write the local development file store, skipping no-op writes. */
 function writeFileStore(snapshot) {
   const dir = path.dirname(DB_FILE);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -59,16 +65,10 @@ async function readTenant(ngoSlug) {
     return { payload: readFileStore(), index: null, firestore: false };
   }
   const slug = sanitizeNgoSlug(ngoSlug);
-  try {
-    const { payload, index } = await readSnapshot(slug);
-    return { payload, index, firestore: true };
-  } catch (err) {
-    console.warn(`[data] Firestore read failed for "${slug}" (${err.message}). Using emergency local fallback.`);
-    const fallback = readFileStore();
-    // Pre-seed snapshot cache so subsequent calls stay fast and do not spam failed reads
-    updateSnapshotMemoryCache(slug, fallback);
-    return { payload: fallback, index: null, firestore: false };
-  }
+  // A failed read is an error for the caller: answering from any other copy
+  // could merge stale records back into Firestore.
+  const { payload, index } = await readSnapshot(slug);
+  return { payload, index, firestore: true };
 }
 
 /**
@@ -182,12 +182,14 @@ async function writeTenantChildren(ngoSlug, children) {
         savedToFirestore = true;
       }
     } catch (fsErr) {
-      console.warn(`[dataSource] Direct Firestore write warning (${fsErr.message}). Persisting to emergency local store.`);
+      console.error(`[dataSource] Firestore write failed for "${slug}": ${fsErr.message}`);
+      throw fsErr;
     }
+    if (!savedToFirestore) throw new Error('Firestore is not available');
+    return;
   }
 
-  // 2. Fallback only: the local file store, when Firestore is unavailable.
-  if (savedToFirestore) return;
+  // 2. Local development without Firestore: the file store.
   try {
     const store = readFileStore();
     store['chm-children'] = json;
