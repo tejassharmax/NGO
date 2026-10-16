@@ -8,7 +8,7 @@
 import { apiFetch } from './apiClient.js';
 import { getSession } from './session.js';
 import { showProgressBar, hideProgressBar } from './utils.js';
-import { BACKUP_KEYS, buildBackup, planRestore } from './backup.js';
+import { BACKUP_KEYS, buildBackup } from './backup.js';
 
 const CHILDREN_KEY = 'chm-children';
 const ACTIVITY_KEY = 'chm-activity';
@@ -824,7 +824,7 @@ function moveRecordsOutOfLocalStorage() {
 }
 moveRecordsOutOfLocalStorage();
 
-/* ─── Backup & restore (move records between sites) ─── */
+/* ─── Moving records from the retired Render site ─── */
 
 function readBackupKeys() {
   const raw = {};
@@ -832,21 +832,8 @@ function readBackupKeys() {
   return raw;
 }
 
-/** Everything this browser holds, as a downloadable backup object. */
+/** The records this tab holds, packed for /api/import on the live site. */
 export function exportBackup() {
   return buildBackup(readBackupKeys(), window.location.host);
 }
 
-/** What restoring `backup` would add here, without changing anything. */
-export function previewRestore(backup) {
-  return planRestore(readBackupKeys(), backup);
-}
-
-/**
- * Apply a restore plan from previewRestore(), then save it to the server
- * (Firestore) and Google Sheets through the normal sync.
- */
-export async function applyRestore(plan) {
-  Object.entries(plan.merged).forEach(([key, value]) => writeQuietly(key, value));
-  await syncWithServer();
-}

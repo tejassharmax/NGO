@@ -161,8 +161,7 @@ function oldSiteBanner() {
   if (!/\.onrender\.com$/i.test(window.location.hostname)) return '';
   return `<div class="card" style="padding: 14px 18px; margin-bottom: 18px; border: 1px solid #f59e0b; background: #fffbeb; color: #92400e; font-size: 13px; line-height: 1.5;">
     <b>This old address is being retired.</b> The live site is <a href="https://ayushahealth.in" style="color: #b45309; font-weight: 700;">ayushahealth.in</a>.
-    Records entered here are not on the new site yet: open <a href="${pagePath('settings')}" style="color: #b45309; font-weight: 700;">Settings</a> →
-    <b>Download backup</b>, then on ayushahealth.in open Settings → <b>Restore from backup</b>.
+    Records entered here are copied to the live site automatically when this page opens. Please use ayushahealth.in from now on.
   </div>`;
 }
 
@@ -1216,7 +1215,7 @@ export function settingsPage() {
               Google Sheets Live Sync
             </b>
             ${isTokenExpired 
-              ? `<span class="badge" style="background: rgba(234, 67, 53, 0.12); color: #ea4335; border: 1px solid rgba(234, 67, 53, 0.3); font-weight: 700;">⚠️ Authorization Expired</span>`
+              ? `<span class="badge" style="background: rgba(234, 67, 53, 0.12); color: #ea4335; border: 1px solid rgba(234, 67, 53, 0.3); font-weight: 700;">⚠️ Reconnect needed</span>`
               : isConnected 
                 ? `<span class="badge badge--success">Connected as ${escapeHTML(adminEmail)}</span>` 
                 : `<span class="badge badge--neutral">Not Connected</span>`
@@ -1235,9 +1234,12 @@ export function settingsPage() {
 
           ${isTokenExpired ? `
             <div style="background: rgba(234, 67, 53, 0.08); border-left: 4px solid #ea4335; padding: 12px 14px; border-radius: 4px; margin-bottom: 16px;">
-              <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">Google Workspace Authorization Expired</div>
+              <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">The Google connection needs to be renewed</div>
               <div style="font-size: 12.5px; color: var(--color-text); line-height: 1.4;">
-                Google OAuth tokens in Testing mode expire periodically. Click <strong>Reconnect Google Sheets Sync</strong> below to refresh authorization and resume syncing your records to Google Sheets.
+                Google no longer accepts this connection, so new records are not reaching Google Sheets yet. They are safe in the database and will sync once it is renewed.
+                ${driveOwnerEmail
+                  ? `<b>${escapeHTML(driveOwnerEmail)}</b> needs to click <strong>Reconnect</strong> below once and sign in with that account.`
+                  : `An admin needs to click <strong>Reconnect</strong> below once.`}
               </div>
             </div>
           ` : `
@@ -1259,7 +1261,7 @@ export function settingsPage() {
             ${(!isConnected || isTokenExpired) ? `
               <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; border-color: ${isTokenExpired ? '#ea4335' : '#0F9D58'};">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-                ${isTokenExpired ? 'Reconnect Google Sheets Sync ↗' : 'Connect Google Sheets Sync'}
+                ${isTokenExpired ? `Reconnect${driveOwnerEmail ? ` as ${escapeHTML(driveOwnerEmail)}` : ''} ↗` : 'Connect Google Sheets Sync'}
               </a>
             ` : ''}
 
@@ -1319,22 +1321,6 @@ export function settingsPage() {
           </p>
         </div>
 
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Backup &amp; restore</b>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">
-            Download every record as a backup file, or restore a backup from another site.
-            Restoring only adds missing records; nothing here is overwritten.
-          </p>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="button button--sm button--primary" type="button" data-export-backup>${icon('download')} Download backup</button>
-            <label class="button button--sm button--ghost" style="cursor: pointer; border: 1px solid var(--color-border);">
-              ${icon('upload')} Restore from backup
-              <input type="file" accept=".json,application/json" data-import-backup hidden>
-            </label>
-          </div>
-        </div>
       </div>
     </section>
   </div>`);

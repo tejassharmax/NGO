@@ -665,7 +665,7 @@ export async function autoSyncChildToGoogleSheets(child) {
         if (!cachedSheetsConfig) cachedSheetsConfig = {};
         cachedSheetsConfig.connected = false;
         cachedSheetsConfig.tokenExpired = true;
-        toast('Google Authorization Expired', 'Google Workspace session expired. Please reconnect in Settings.', 'warning');
+        toast('Google connection expired', 'Records are saved. The main admin needs to reconnect Google once in Settings.', 'warning');
       } else if (data && data.message === 'Not connected') {
         console.log('[Google Sheets] Skip auto-sync: NGO is not connected to Google Workspace.');
       }
