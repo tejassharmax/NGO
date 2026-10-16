@@ -9,6 +9,7 @@ import { apiFetch } from './apiClient.js';
 import { getSession } from './session.js';
 import { showProgressBar, hideProgressBar } from './utils.js';
 import { BACKUP_KEYS, buildBackup } from './backup.js';
+import { isFamilySpace } from './space.js';
 
 const CHILDREN_KEY = 'chm-children';
 const ACTIVITY_KEY = 'chm-activity';
@@ -447,8 +448,8 @@ export function getAlerts() {
     }
   });
 
-  // 2. Check for missing Aadhaar or ID documents
-  children.forEach(child => {
+  // 2. Check for missing Aadhaar or ID documents (children's homes only)
+  if (!isFamilySpace()) children.forEach(child => {
     if (!child.idNumber || child.idNumber.trim() === '') {
       const alertId = `ALR-MISSING-ID-${child.id}`;
       if (!alerts.some(a => a.id === alertId)) {

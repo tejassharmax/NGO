@@ -160,6 +160,30 @@ async function ensureNgoClaim(email, slug) {
  * @param {string} email verified email from the ID token
  * @returns {Promise<{slug: string, name: string}>}
  */
+const spaceTypeCache = new Map();
+
+/**
+ * 'family' when the space's root document says so (a family's personal health
+ * records), otherwise 'home': children's homes, the default, carry no type.
+ * Cached like the email lookup. A failed read is an error, never a guess, so a
+ * family's files are never written in the children's-home format.
+ * @param {string} ngoSlug
+ * @returns {Promise<'home'|'family'>}
+ */
+async function spaceTypeFor(ngoSlug) {
+  const slug = sanitizeNgoSlug(ngoSlug);
+  const cached = spaceTypeCache.get(slug);
+  if (cached && Date.now() < cached.expiresAt) return cached.type;
+  let type = 'home';
+  const db = getDb();
+  if (db) {
+    const snap = await db.collection('ngos').doc(slug).get();
+    if (snap.exists && (snap.data() || {}).type === 'family') type = 'family';
+  }
+  spaceTypeCache.set(slug, { type, expiresAt: Date.now() + NGO_CACHE_TTL_MS });
+  return type;
+}
+
 async function resolveNgoForEmail(email) {
   const normalized = String(email || '').trim().toLowerCase();
   const cached = ngoCache.get(normalized);
@@ -544,6 +568,7 @@ module.exports = {
   sanitizeNgoSlug,
   emailToDocId,
   resolveNgoForEmail,
+  spaceTypeFor,
   invalidateNgoCache,
   ensureNgoClaim,
   readSnapshot,

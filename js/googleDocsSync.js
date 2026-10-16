@@ -8,6 +8,7 @@
 import { getSession } from './session.js';
 import { getChildren, getHealthRecords, healthStatus, calculateAge } from './storage.js';
 import { apiFetch } from './apiClient.js';
+import { isFamilySpace } from './space.js';
 
 let cachedDocsConfig = null;
 
@@ -93,6 +94,8 @@ export function generateExecutiveDocContent() {
  * Automatically sync executive report to Google Docs in background via OAuth API
  */
 export async function autoSyncToGoogleDocs() {
+  // A family space has no executive audit report.
+  if (isFamilySpace()) return;
   const session = getSession() || {};
   const ngoSlug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
   const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';

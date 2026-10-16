@@ -4,7 +4,11 @@ import { childRows, childTableHeaders } from './table.js';
 import { registrationChart } from './chart.js';
 import { getSession } from './session.js';
 import { getGoogleSheetUrl, getClinicalSheetUrl, getMonthlySheetUrl, getDateRangeReportUrl, getBloodTestSheetUrl, getSheetsConfig, getNgoSlug } from './googleSheetsSync.js';
-import { calendarCard, computeAppointmentStatus, formatSingleDisplayTime, renderClinicalSectionsMarkup } from './googleCalendar.js';
+import { calendarCard, computeAppointmentStatus, formatSingleDisplayTime } from './googleCalendar.js';
+import { heading, statCard, field, formatDateForInput, getURLParam, getDynamicGreeting } from './ui.js';
+import { isFamilySpace, term, personLabel } from './space.js';
+import { familyOverviewContent, familyMembersContent, familyMemberContent, familyMemberFormContent, familyDocumentsContent } from './family.js';
+import { clinicalSectionHTML } from './clinicalSection.js';
 
 /* ═══════════════════════════════════════════════════════
    NAVIGATION
@@ -26,6 +30,22 @@ const pageTitles = {
   settings: 'Settings'
 };
 
+/** A family space has its own menu; the routes are the same, so links work in both. */
+const familyNav = [
+  { section: 'Overview', items: [['dashboard', 'Overview', 'grid']] },
+  { section: 'Family & Health', items: [['children', 'Family members', 'users'], ['documents', 'Reports & documents', 'file'], ['appointments', 'Appointments', 'calendar']] }
+];
+
+const familyPageTitles = {
+  dashboard: 'Overview',
+  children: 'Family members',
+  appointments: 'Appointments',
+  'child-profile': 'Health profile',
+  'register-child': 'Add family member',
+  documents: 'Reports & documents',
+  settings: 'Settings'
+};
+
 function navItem(item, active) {
   const [page, label, glyph] = item;
   return `<a class="nav-item ${page === active ? 'nav-item--active' : ''}" href="${pagePath(page)}" ${page === active ? 'aria-current="page"' : ''}>${icon(glyph)}<span class="nav-item__text">${label}</span></a>`;
@@ -44,7 +64,9 @@ export function shell(page, content) {
   const photoURL = session.photoURL;
   const userInitials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'AD';
 
-  const navHTML = nav.map(group => group.items.map(item => navItem(item, page)).join('')).join('');
+  const family = isFamilySpace();
+  const navHTML = (family ? familyNav : nav).map(group => group.items.map(item => navItem(item, page)).join('')).join('');
+  const titles = family ? familyPageTitles : pageTitles;
 
   const alerts = getAlerts();
   const unreadAlerts = alerts.filter(a => !a.dismissed);
@@ -95,8 +117,8 @@ export function shell(page, content) {
       <header class="topbar">
         <button class="icon-button u-mobile-only" type="button" data-open-sidebar aria-label="Open navigation">${icon('menu')}</button>
         ${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}
-        <div class="topbar__crumbs"><span>${escapeHTML(ngoName)}</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
-        <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
+        <div class="topbar__crumbs"><span>${escapeHTML(ngoName)}</span><span aria-hidden="true"> / </span><b>${titles[page] || 'Workspace'}</b></div>
+        <label class="topbar-search"><span class="sr-only">${term('searchLabel')}</span>${icon('search')}<input type="search" placeholder="${term('searchPlaceholder')}" data-global-search><kbd>⌘ K</kbd></label>
         <div class="topbar__actions">
           <button class="icon-button" data-theme-toggle type="button" aria-label="Toggle color theme" style="cursor: pointer;">
             <span class="theme-icon-container">
@@ -139,7 +161,7 @@ export function shell(page, content) {
               <div style="padding:12px 14px; border-bottom:1px solid var(--color-border); font-size:12px;">
                 <div style="font-weight:700; color:var(--color-text);">${escapeHTML(displayName)}</div>
                 <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML(email)}</div>
-                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML(ngoName)}</span></div>
+                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">${term('workspaceBadge')}: ${escapeHTML(ngoName)}</span></div>
               </div>
               <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
               <div class="divider" style="margin: 4px 0; border-top: 1px solid var(--color-border);"></div>
@@ -165,40 +187,7 @@ function oldSiteBanner() {
   </div>`;
 }
 
-const heading = (title, description, actions) => `<div class="page-heading"><div class="page-heading__copy"><h1>${title}</h1><p>${description}</p></div>${actions ? `<div class="page-heading__actions">${actions}</div>` : ''}</div>`;
 
-function getDynamicGreeting() {
-  const hour = new Date().getHours();
-  const session = getSession() || {};
-  const firstName = escapeHTML(String(session.displayName || '').trim().split(/\s+/)[0] || 'there');
-  if (hour < 12) return `Good morning, ${firstName}`;
-  if (hour < 17) return `Good afternoon, ${firstName}`;
-  return `Good evening, ${firstName}`;
-}
-
-const statCard = (label, value, glyph, color = 'blue') => `
-  <article class="stat-card stat-card--${color}">
-    <div class="stat-card__top">
-      <span class="stat-card__label" title="${escapeHTML(label)}">${label}</span>
-      <span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span>
-    </div>
-    <div class="stat-card__number">${value}</div>
-  </article>
-`;
-
-const field = (label, name, placeholder, type = 'text', hint = '', value = '', extra = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML(value)}" ${extra}>${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
-
-function formatDateForInput(dateStr) {
-  if (!dateStr) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  const matchDMY = dateStr.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
-  if (matchDMY) {
-    const [_, d, m, y] = matchDMY;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-  }
-  try { const d = new Date(dateStr); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch (e) { }
-  return '';
-}
 
 /* ═══════════════════════════════════════════════════════
    DASHBOARD — Child Health Platform
@@ -290,16 +279,6 @@ export function childrenPage() {
    CHILD HEALTH PROFILE
    ═══════════════════════════════════════════════════════ */
 
-function getURLParam(key) {
-  let searchParams = new URLSearchParams(window.location.search);
-  let val = searchParams.get(key);
-  if (!val && window.location.hash.includes('?')) {
-    const hashQuery = window.location.hash.split('?')[1];
-    val = new URLSearchParams(hashQuery).get(key);
-  }
-  return val;
-}
-
 export function childProfilePage() {
   const id = getURLParam('id');
   const child = getChild(id);
@@ -329,7 +308,7 @@ export function childProfilePage() {
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px; gap:8px;">
             <h3 style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${d.name || d.title || 'Medical Document'}</h3>
             <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
-              ${d.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:13px; height:13px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Local</span>`}
+              ${d.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:13px; height:13px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Not in Drive yet</span>`}
               <span class="badge badge--success">${d.status || 'Verified'}</span>
             </div>
           </div>
@@ -608,140 +587,8 @@ export function childProfilePage() {
     </div>
   `;
 
-  // Clinical & Google Sheet Sync HTML
   const latestBlood = healthRecs[0] || {};
-  const childBloodSheetUrl = getBloodTestSheetUrl(child.id, child.name);
-  const allClinicalHistory = [
-    ...growth.map(g => ({ ...g, entryType: 'checkup', sortDate: g.date || '1970-01-01' })),
-    ...healthRecs.map(h => ({ ...h, entryType: 'blood', sortDate: h.date || '1970-01-01' }))
-  ].sort((a, b) => (new Date(b.sortDate).getTime() || 0) - (new Date(a.sortDate).getTime() || 0));
-
-  const historyClinicalRowsHTML = allClinicalHistory.length === 0 ? `
-    <tr><td colspan="5" class="empty-state" style="padding: 24px; text-align: center;">No clinical checkups or blood tests recorded yet for ${escapeHTML(child.name)}.</td></tr>
-  ` : allClinicalHistory.map(item => {
-    const isCheckup = item.entryType === 'checkup';
-    const typeBadge = isCheckup
-      ? `<span class="badge badge--blue" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Routine Checkup (Row 3)</span>`
-      : `<span class="badge badge--danger" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> Blood Test (Row 19)</span>`;
-
-    const summaryHTML = isCheckup
-      ? `<span>${[
-          item.temperature ? `${item.temperature}°F` : '',
-          item.bp ? `BP ${item.bp}` : '',
-          item.weight ? `${item.weight}kg` : '',
-          item.pulse ? `${item.pulse}bpm` : '',
-          item.spo2 ? `SpO2 ${item.spo2}%` : ''
-        ].filter(Boolean).join(' · ') || 'Vitals recorded'}</span>`
-      : `<span>${[
-          item.hemoglobin ? `Hb: ${item.hemoglobin} g/dL` : '',
-          item.wbc ? `WBC: ${item.wbc}` : '',
-          item.platelets ? `Platelets: ${item.platelets} Lakhs` : '',
-          item.rbc ? `RBC: ${item.rbc}` : ''
-        ].filter(Boolean).join(' · ') || 'Lab values recorded'}</span>`;
-
-    const detailsHTML = isCheckup
-      ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML(item.eyeCheckup)}` : ''}${item.clinicName || item.doctorName ? ` · ${escapeHTML([item.doctorName, item.clinicName].filter(Boolean).join(', '))}` : ''}` || '—'
-      : `${item.rbcMorphology ? `RBC: ${escapeHTML(item.rbcMorphology)} ` : ''}${item.plateletsAdequacy ? `· Platelets: ${escapeHTML(item.plateletsAdequacy)}` : ''}` || '—';
-
-    const rawData = JSON.stringify(item).replace(/"/g, '&quot;');
-
-    return `
-      <tr>
-        <td style="font-weight:600; white-space:nowrap;">${item.date ? formatDate(item.date) : 'Recent'}</td>
-        <td style="white-space:nowrap;">${typeBadge}</td>
-        <td style="font-size:13px;">${summaryHTML}</td>
-        <td style="font-size:12.5px; color:var(--color-text-muted); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detailsHTML}</td>
-        <td style="text-align:right; white-space:nowrap;">
-          <button class="button button--ghost button--sm" type="button" data-load-clinical-item="${rawData}" style="display:inline-flex; align-items:center; gap:4px;">
-            ${icon('pencil')} Load into Form
-          </button>
-          <button class="icon-button tooltip" type="button" data-tooltip="Delete entry" data-delete-clinical-item="${item.id}" data-clinical-type="${item.entryType}" style="color:var(--color-danger); margin-left:6px;">
-            ${icon('trash')}
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
-
-  const clinicalHTML = `
-    <!-- Main Data Entry Form -->
-    <section class="card" style="margin-bottom: 24px;">
-      <form id="profile-clinical-data-form" class="clinical-sync-form" style="padding: 24px;">
-        <input type="hidden" name="childId" value="${child.id}" />
-        <input type="hidden" name="childName" value="${escapeHTML(child.name)}" />
-        <input type="hidden" name="existingGrowthId" id="prof-growth-id" value="" />
-        <input type="hidden" name="existingBloodId" id="prof-blood-id" value="" />
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; gap: 12px;">
-          <div>
-            <h2 class="card__title" style="margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-              Clinical Details &amp; Google Sheet Sync Form
-            </h2>
-            <p class="card__caption" style="margin: 0;">Fill in clinical checkup vitals and blood test parameters. Saving automatically updates both local records and Google Sheets.</p>
-          </div>
-          <button class="button button--primary" id="btn-save-profile-clinical" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Save &amp; Sync to Sheet
-          </button>
-        </div>
-
-        <div id="prof-edit-banner" style="display: none; margin-bottom: 18px; padding: 10px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #1d4ed8; font-weight: 600;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            <span id="prof-edit-banner-text">Editing historical clinical entry</span>
-          </div>
-          <button type="button" class="button button--ghost button--sm" id="prof-cancel-edit-btn" style="color: #1d4ed8; font-size: 12px; padding: 4px 12px; border-color: #bfdbfe;">
-            Cancel &amp; New Entry
-          </button>
-        </div>
-
-        ${renderClinicalSectionsMarkup({
-          existingGrowth: {},
-          existingBlood: {},
-          targetDate: new Date().toISOString().slice(0, 10),
-          prefix: 'prof-'
-        })}
-
-        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--color-border);">
-          <button class="button button--primary" id="btn-save-profile-clinical-bottom" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Save &amp; Sync to Sheet
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <!-- History Table -->
-    <section class="card">
-      <header class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <h2 class="card__title">Clinical &amp; Lab History</h2>
-          <p class="card__caption">All routine clinical checkups and blood test reports recorded for ${escapeHTML(child.name)}</p>
-        </div>
-        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-          ${childBloodSheetUrl ? `<a href="${escapeHTML(childBloodSheetUrl)}" target="_blank" class="button button--ghost button--sm" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border);">🩸 Blood test sheet ↗</a>` : ''}
-          <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
-        </div>
-      </header>
-      <div class="data-table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Category</th>
-              <th>Measurements / Key Values</th>
-              <th>Clinical Remarks / Prescription</th>
-              <th style="text-align: right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${historyClinicalRowsHTML}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `;
+  const clinicalHTML = clinicalSectionHTML(child, growth, healthRecs);
 
   const activeTab = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('chm_active_profile_tab')) || 'overview';
 
@@ -1090,7 +937,7 @@ export function documentsPage() {
             <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
               <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${doc.name}</h2>
               <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
-                ${doc.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:12px; height:12px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Local</span>`}
+                ${doc.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:12px; height:12px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Not in Drive yet</span>`}
                 ${statusBadge(doc.status || 'Verified')}
               </div>
             </div>
@@ -1204,7 +1051,7 @@ export function settingsPage() {
     </nav>
     <section class="card settings-panel">
       <h2>Google Workspace Connections</h2>
-      <p class="muted">Manage real-time Google Sheets Live Synchronization for child health records.</p>
+      <p class="muted">${isFamilySpace() ? 'Keep a copy of your family\u2019s health records in your own Google Sheets, and reports in Google Drive.' : 'Manage real-time Google Sheets Live Synchronization for child health records.'}</p>
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
         <!-- Google Sheets Live Sync Highlight Card (TOP) -->
@@ -1245,8 +1092,8 @@ export function settingsPage() {
           ` : `
             <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
               ${isConnected 
-                ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
-                : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
+                ? (isFamilySpace() ? `Sync is on for your Google account (${escapeHTML(adminEmail)}). Every health record you add or change is copied to your Google Sheets, and reports you upload are saved in your Google Drive.` : `Real-time automated sync is active for your NGO's Google Account (${escapeHTML(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`)
+                : (isFamilySpace() ? `Connect your Google account once to keep a copy of every health record in your own Google Sheets, and every report you upload in your Google Drive.` : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`)
               }
             </p>
           `}
@@ -1268,7 +1115,7 @@ export function settingsPage() {
             ${clinicalSheetUrl ? `
               <a href="${escapeHTML(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
                 ${icon('googleSheets')}
-                Open Student Medical Records Workbook ↗
+                Open ${term('medicalWorkbook')} Workbook ↗
               </a>
             ` : ''}
 
@@ -1292,7 +1139,7 @@ export function settingsPage() {
 
             ${masterSheetUrl ? `
               <a href="${escapeHTML(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
-                📄 Master Directory Sheet ↗
+                📄 ${isFamilySpace() ? 'Family Members Sheet' : 'Master Directory Sheet'} ↗
               </a>
             ` : ''}
 
@@ -1351,7 +1198,7 @@ export function appointmentsPage() {
         <table class="data-table">
           <thead>
             <tr>
-              <th>Child</th>
+              <th>${term('person')}</th>
               <th>Appointment Type</th>
               <th>Doctor / Clinic</th>
               <th>Date & Time</th>
@@ -1374,8 +1221,8 @@ export function appointmentsPage() {
                     <div style="display:flex; align-items:center; gap:10px;">
                       <div class="avatar avatar--sm" style="background:#e8f0fe; color:#1a73e8; font-weight:700; font-size:12px; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;">${initials(a.childName || 'C')}</div>
                       <div>
-                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML(a.childName || 'Child')}</strong>
-                        <span style="font-size:11px; color:var(--color-text-muted);">${a.childId ? `ID: ${a.childId}` : ''}</span>
+                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML(personLabel(a.childName) || term('person'))}</strong>
+                        <span style="font-size:11px; color:var(--color-text-muted);">${a.childId && !isFamilySpace() ? `ID: ${a.childId}` : ''}</span>
                       </div>
                     </div>
                   </td>
@@ -1419,7 +1266,7 @@ export function appointmentsPage() {
         </table>
       </div>`;
 
-  return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}View Children</a>`)}
+  return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}${term('viewPeople')}</a>`)}
   <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
     ${statCard('Total Appointments', appointments.length.toLocaleString(), 'calendar', 'blue')}
     ${statCard('Upcoming', upcomingCount.toLocaleString(), 'clock', 'amber')}
@@ -1431,7 +1278,7 @@ export function appointmentsPage() {
       <header class="card__header">
         <div>
           <h2 class="card__title">All Appointments</h2>
-          <p class="card__caption">Complete appointment history across all children</p>
+          <p class="card__caption">${isFamilySpace() ? 'Every appointment for the family' : 'Complete appointment history across all children'}</p>
         </div>
         <span class="badge badge--blue">${appointments.length} total</span>
       </header>
@@ -1446,7 +1293,27 @@ export function appointmentsPage() {
    PAGE ROUTER
    ═══════════════════════════════════════════════════════ */
 
+/** Pages a family space draws with its own screens; the others are shared. */
+const familyPages = {
+  dashboard: familyOverviewContent,
+  children: familyMembersContent,
+  'child-profile': familyMemberContent,
+  'child_profile': familyMemberContent,
+  'register-child': familyMemberFormContent,
+  documents: familyDocumentsContent
+};
+
+function renderFamilyPage(page) {
+  if (page === 'login') return loginPage();
+  if (page === 'appointments') return appointmentsPage();
+  if (page === 'settings') return settingsPage();
+  // Children's-home pages (growth charts, reports, medicine stock) open the overview.
+  const key = familyPages[page] ? page : 'dashboard';
+  return shell(key === 'child_profile' ? 'child-profile' : key, familyPages[key]());
+}
+
 export function renderPage(page) {
+  if (isFamilySpace()) return renderFamilyPage(page);
   const pages = {
     login: loginPage,
     dashboard: dashboardPage,

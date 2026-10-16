@@ -12,6 +12,7 @@ import { modal } from './modal.js';
 import { getChildren, calculateAge, logActivity, records } from './storage.js';
 import { escapeHTML, icon, showProgressBar, hideProgressBar } from './utils.js';
 import { apiFetch } from './apiClient.js';
+import { rememberSpaceType, isFamilySpace, term } from './space.js';
 
 export const EXACT_SHEET_COLUMNS = [
   'ID',
@@ -55,6 +56,7 @@ export async function fetchSheetsConfig(ngoSlug) {
     const res = await apiFetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
     if (res.ok) {
       cachedSheetsConfig = await res.json();
+      rememberSpaceType(cachedSheetsConfig?.spaceType);
       if (cachedSheetsConfig?.tokenExpired) {
         cachedSheetsConfig.connected = false;
       }
@@ -96,7 +98,7 @@ export function getSheetsConfig() {
 export function getGoogleSheetUrl() {
   const session = getSession() || {};
   const ngoSlug = getNgoSlug(session);
-  const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
+  const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || (isFamilySpace() ? null : localStorage.getItem('google_sheet_url'));
   return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
 }
 
@@ -106,7 +108,7 @@ export function getGoogleSheetUrl() {
 export function getClinicalSheetUrl() {
   const session = getSession() || {};
   const ngoSlug = getNgoSlug(session);
-  const savedUrl = localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
+  const savedUrl = localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || (isFamilySpace() ? null : localStorage.getItem('google_clinical_sheet_url'));
   return cachedSheetsConfig?.clinicalSpreadsheetUrl || savedUrl || null;
 }
 
@@ -182,14 +184,14 @@ export function getChildGoogleSheetUrl(childId, childName) {
  * Open a child's dedicated Google Sheet tab in a new browser window
  */
 export async function openChildGoogleSheet(childId, childName) {
-  toast('Opening Google Sheet...', `Connecting to ${childName || 'student'}'s sheet...`);
+  toast('Opening Google Sheet...', `Connecting to ${childName || term('personLower')}'s sheet...`);
   
   // Open window synchronously on user click to avoid browser popup blockers
   let win = null;
   try {
     win = window.open('', '_blank');
     if (win && win.document) {
-      win.document.write('<html><head><title>Loading Sheet...</title></head><body style="font-family:system-ui,sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f8fafc; color:#334155;"><div style="text-align:center;"><div style="width:40px; height:40px; border:3px solid #cbd5e1; border-top-color:#0f9d58; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 16px auto;"></div><p style="font-size:15px; font-weight:600; margin:0;">Opening Student Medical Records...</p><p style="font-size:13px; color:#64748b; margin:6px 0 0 0;">Connecting to ' + (childName || 'child') + '\'s tab...</p></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></body></html>');
+      win.document.write('<html><head><title>Loading Sheet...</title></head><body style="font-family:system-ui,sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f8fafc; color:#334155;"><div style="text-align:center;"><div style="width:40px; height:40px; border:3px solid #cbd5e1; border-top-color:#0f9d58; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 16px auto;"></div><p style="font-size:15px; font-weight:600; margin:0;">Opening ' + term('medicalWorkbook') + '...</p><p style="font-size:13px; color:#64748b; margin:6px 0 0 0;">Connecting to ' + (childName || term('personLower')) + '\'s tab...</p></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></body></html>');
     }
   } catch (e) {}
 
@@ -262,7 +264,7 @@ export async function openChildGoogleSheet(childId, childName) {
             </div>
             <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
             <p style="font-size:13.5px; color:var(--color-text-muted); margin:0 0 20px 0; line-height:1.5;">
-              To view <b>${escapeHTML(childName || 'this child')}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
+              To view <b>${escapeHTML(childName || `this ${term('personLower')}`)}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
             </p>
             <div style="display:flex; gap:10px; justify-content:center;">
               <button class="button button--ghost" type="button" onclick="document.querySelector('#modal-root').replaceChildren();">Cancel</button>
@@ -491,7 +493,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
   overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
   
   const activeSheetUrl = getGoogleSheetUrl() || '#';
-  const activeSheetId = cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : 'Active NGO Sheet';
+  const activeSheetId = cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : term('activeSheetLabel');
 
   overlay.innerHTML = `
     <div class="card" style="position:relative; width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
@@ -509,7 +511,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
       
       <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
-          <span id="sync-stage-text" style="font-weight:600; color:var(--color-primary);">1. Validating child details...</span>
+          <span id="sync-stage-text" style="font-weight:600; color:var(--color-primary);">${term('validatingStage')}</span>
           <span id="sync-stage-pct" style="font-weight:700; color:var(--color-text);">25%</span>
         </div>
         <div class="progress" style="height:8px; border-radius:4px; overflow:hidden; background:var(--color-border);">
@@ -527,7 +529,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        <span id="sync-footer-label">Synced to Live NGO Sheet</span>
+        <span id="sync-footer-label">${term('liveSheetLabel')}</span>
       </div>
     </div>
   `;
@@ -579,7 +581,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
         if (targetUrl && targetUrl !== '#' && targetUrl !== 'javascript:void(0)') {
           window.open(targetUrl, '_blank');
         } else {
-          toast('Fetching Google Sheet...', 'Connecting to your NGO Google Sheet...');
+          toast('Fetching Google Sheet...', term('connectingSheet'));
           fetchSheetsConfig().then(cfg => {
             if (cfg && cfg.spreadsheetUrl && cfg.spreadsheetUrl !== '#') {
               window.open(cfg.spreadsheetUrl, '_blank');
@@ -660,7 +662,7 @@ export async function autoSyncChildToGoogleSheets(child) {
             localStorage.setItem('google_clinical_sheet_url', data.clinicalSpreadsheetUrl);
           }
         }
-        toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
+        toast('Auto-Synced to Google Sheets', `Record for ${child.name || term('person')} live synced.`);
       } else if (data && (data.tokenExpired || data.error === 'invalid_grant')) {
         if (!cachedSheetsConfig) cachedSheetsConfig = {};
         cachedSheetsConfig.connected = false;
@@ -695,7 +697,7 @@ export async function autoSyncDeleteChildFromGoogleSheets(deletedChildId, childN
       const data = await res.json();
       if (data && data.success && Array.isArray(data.children)) {
         records.setItem('chm-children', JSON.stringify(data.children));
-        toast('Google Sheets Updated', `Removed ${childName || 'child'} from connected Google Sheet.`);
+        toast('Google Sheets Updated', `Removed ${childName || term('personLower')} from connected Google Sheet.`);
         return data;
       }
     }

@@ -9,6 +9,7 @@ import { pagePath, icon, escapeHTML, formatDate, showProgressBar, hideProgressBa
 import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser } from './auth.js';
 import { isSessionActive, clearSession } from './session.js';
+import { isFamilySpace, term, forgetSpaceType, familyCategoryOptions } from './space.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, fetchSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets, autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
 import { fetchDocsConfig } from './googleDocsSync.js';
 import { uploadDocumentToDrive, syncSingleDocToDrive, autoSyncPendingDocuments } from './googleDriveSync.js';
@@ -394,7 +395,8 @@ document.addEventListener('click', (event) => {
   if (signOutBtn) {
     event.preventDefault();
     clearLocalRecords().then(logoutUser).then(() => {
-      toast('Signed Out', 'Signed out and removed the records from this browser.');
+      forgetSpaceType();
+      toast('Signed Out', 'You have been signed out.');
       window.location.hash = '#/login';
       if (renderCurrentPage) renderCurrentPage();
     });
@@ -814,16 +816,16 @@ document.addEventListener('click', (event) => {
   if (target.matches('[data-delete]')) {
     const id = target.dataset.delete;
     const child = getChildren().find((item) => item.id === id);
-    const childName = child?.name || 'child';
+    const childName = child?.name || term('personLower');
     modal({
       title: `Remove ${childName}?`,
-      body: 'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
-      confirmText: 'Remove child',
+      body: term('removeBody'),
+      confirmText: term('removeConfirm'),
       confirmClass: 'button--danger',
       onConfirm: async () => {
         deleteChild(id);
         applyTableFilters();
-        toast('Child removed', `The record for ${childName} has been removed.`);
+        toast(term('removedToast'), `The record for ${childName} has been removed.`);
         await autoSyncDeleteChildFromGoogleSheets(id, childName);
         await syncWithServer();
         if (typeof renderCurrentPage === 'function') {
@@ -872,18 +874,18 @@ document.addEventListener('click', (event) => {
         <form id="profile-doc-upload-form" class="form-layout" style="display:flex; flex-direction:column; gap:14px;">
           <label class="field">
             <span class="field__label">Document Title *</span>
-            <input class="input" type="text" name="title" placeholder="e.g. Aadhaar Card, Vaccination Certificate, Blood Report" required />
+            <input class="input" type="text" name="title" placeholder="${term('uploadTitlePlaceholder')}" required />
           </label>
           <label class="field">
             <span class="field__label">Category / Document Type *</span>
             <select class="select" name="docType">
-              <option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
+              ${isFamilySpace() ? familyCategoryOptions() : `<option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
               <option value="Medical Report">Medical Report / Lab Test</option>
               <option value="Aadhaar Card">Aadhaar Card / Govt ID</option>
               <option value="Birth Certificate">Birth Certificate</option>
               <option value="Vaccination Record">Immunization / Vaccination Record</option>
               <option value="Prescription">Doctor Prescription</option>
-              <option value="School Certificate">School / Admission Certificate</option>
+              <option value="School Certificate">School / Admission Certificate</option>`}
             </select>
           </label>
           <label class="field">
@@ -1269,7 +1271,7 @@ document.addEventListener('click', (event) => {
     const growthChildId = delGrowthBtn.dataset.childId;
     modal({
       title: 'Delete Growth Record?',
-      body: 'Are you sure you want to remove this historical measurement? This will update your local records and sync to cloud database.',
+      body: 'Are you sure you want to remove this historical measurement? This updates the database and Google Sheets.',
       confirmText: 'Delete Record',
       confirmClass: 'button--danger',
       onConfirm: async () => {
@@ -1303,34 +1305,35 @@ document.addEventListener('click', (event) => {
   // Open Direct Document Upload Modal
   if (target.closest('[data-open-upload-modal]')) {
     const children = getChildren();
-    const selectedFilter = document.querySelector('[data-child-document-filter]')?.value || '';
-    const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name} (${c.id})</option>`).join('');
+    // A family's per-person "Upload" buttons name the person to preselect.
+    const selectedFilter = (target.closest('[data-open-upload-modal]').dataset.personName || document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
+    const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name}${isFamilySpace() ? '' : ` (${c.id})`}</option>`).join('');
 
     modal({
-      title: 'Upload Document for Child',
+      title: term('uploadForPerson'),
       body: `
           <form id="direct-doc-form" style="display:flex; flex-direction:column; gap:14px;">
             <label class="field">
-              <span class="field__label">Select Child *</span>
+              <span class="field__label">${isFamilySpace() ? 'Family member' : 'Select Child'} *</span>
               <select class="select" name="childName" required>
-                <option value="">Choose child</option>
+                <option value="">${term('choosePerson')}</option>
                 ${childOptions}
               </select>
             </label>
             <label class="field">
               <span class="field__label">Document Title / Name *</span>
-              <input class="input" name="docName" placeholder="e.g. Aadhaar Card, Blood Test Report" required>
+              <input class="input" name="docName" placeholder="${term('uploadDocPlaceholder')}" required>
             </label>
             <label class="field">
               <span class="field__label">Category *</span>
               <select class="select" name="docType" required>
-                <option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
+                ${isFamilySpace() ? familyCategoryOptions() : `<option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
                 <option value="Aadhaar Card">Aadhaar Card</option>
                 <option value="Medical Report">Medical Report / Lab Test</option>
                 <option value="Birth Certificate">Birth Certificate</option>
                 <option value="Vaccination Record">Vaccination Record</option>
                 <option value="Prescription">Prescription</option>
-                <option value="School Record">School / NGO Document</option>
+                <option value="School Record">School / NGO Document</option>`}
               </select>
             </label>
             <label class="field">
@@ -1778,7 +1781,7 @@ function initFormListeners() {
     form.querySelector('input[name="id"]')?.remove();
 
     showSheetsSyncLoader(child.name, () => {
-      toast('Child saved & synced', `${child.name}'s record generated in Google Sheets.`);
+      toast(term('savedToast'), `${child.name}'s record generated in Google Sheets.`);
       window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
     });
   });
@@ -2454,7 +2457,7 @@ async function migrateToLiveSite() {
   }
   sessionStorage.setItem('chm_migrated_to_live', '1');
   if (result.totalAdded > 0) {
-    toast('Records copied to ayushahealth.in', `${result.totalAdded} records from this browser are now on the live site.`);
+    toast('Records copied to ayushahealth.in', `${result.totalAdded} records are now on the live site.`);
   } else {
     toast('Live site is up to date', 'Every record is already on ayushahealth.in.');
   }
