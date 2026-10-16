@@ -199,6 +199,12 @@ export function updateUploadedDoc(docId, updates) {
   const doc = docs.find(d => d.id === docId);
   if (doc) {
     Object.assign(doc, updates);
+    // Once a family's report is in Google Drive, the record keeps only the
+    // Drive link; carrying every file would soon fill the tab's working copy.
+    if (updates.driveUrl && isFamilySpace()) {
+      delete doc.image;
+      delete doc.fileData;
+    }
     records.setItem(DOCS_KEY, JSON.stringify(docs));
     return doc;
   }
