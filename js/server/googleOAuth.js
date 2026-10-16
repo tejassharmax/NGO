@@ -12,7 +12,7 @@ const { Readable } = require('stream');
 // Tenant-scoped database access. Reads and writes go to `ngos/{slug}` in
 // Firestore, falling back to data/db.json when no service-account key is present.
 const { readTenantArrays, writeTenantChildren } = require('./dataSource');
-const { DEFAULT_NGO, sanitizeNgoSlug: tenantSlug } = require('./ngoStore');
+const { DEFAULT_NGO, sanitizeNgoSlug: tenantSlug, spaceTypeFor } = require('./ngoStore');
 const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
 
 // Where the refresh token and the created sheet/doc IDs live. Firestore-backed so
@@ -246,9 +246,8 @@ function formatCellLink(text, url) {
   return `=HYPERLINK("${safeUrl}", "${safeText}")`;
 }
 
-function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoName, uploadedDocsList = []) {
+function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoName, uploadedDocsList = [], clinicHeader = 'DR.BLESSY — GOOD SHEPHERD CLINIC') {
   const childName = (c.name || 'CHILD').toUpperCase();
-  const clinicHeader = 'DR.BLESSY — GOOD SHEPHERD CLINIC';
 
   const padRow = (r, len = 14) => {
     const copy = Array.isArray(r) ? [...r] : [];
@@ -357,6 +356,75 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
     padRow(bloodReportHeaderRow),
     ...bloodRows.map(r => padRow(r))
   ];
+}
+
+/**
+ * The master directory (Sheet1): one row per person.
+ *
+ * A family's columns use names the pull (pullChildrenFromGoogleSheets) reads the
+ * same way: "Member ID" is the ID, "Name" the name, and so on. Columns a family
+ * does not have (Aadhaar, guardian, dental) are left out, and the pull leaves
+ * those fields empty. "Relation" is read back only from a family sheet.
+ * @param {object[]} children
+ * @param {boolean} family
+ * @returns {string[][]}
+ */
+function masterDirectoryTable(children, family) {
+  if (family) {
+    const headers = [
+      'Member ID', 'Name', 'Relation', 'Date of Birth', 'Age', 'Gender', 'Blood Group',
+      'Phone', 'Height (cm)', 'Weight (kg)', 'Medical Conditions', 'Allergies',
+      'Current Medications', 'Status', 'Added On'
+    ];
+    const rows = children.map(c => [
+      cleanCell(c.id || ''),
+      cleanCell(c.name || ''),
+      cleanCell(c.relation || ''),
+      cleanCell(c.dob || ''),
+      cleanCell(c.age || ''),
+      cleanCell(c.gender || ''),
+      cleanCell(c.blood || ''),
+      cleanCell(c.phone || ''),
+      cleanCell(c.height ? `${c.height} cm` : ''),
+      cleanCell(c.weight ? `${c.weight} kg` : ''),
+      cleanCell(c.medicalConditions || ''),
+      cleanCell(c.allergies || ''),
+      cleanCell(c.medications || ''),
+      cleanCell(c.status || 'Active'),
+      cleanCell(c.registeredDate || new Date().toISOString().slice(0, 10))
+    ]);
+    return [headers, ...rows];
+  }
+
+  const overviewHeaders = [
+    'ID', 'Child Name', 'Date of Birth', 'Age', 'Gender', 'Blood Group',
+    'Aadhaar ID', 'Guardian', 'Contact Phone', 'Height (cm)', 'Weight (kg)',
+    'Medical Conditions', 'Allergies', 'Status', 'Registration Date',
+    'Current Medications', 'Dental Remarks', 'Oral Hygiene Index'
+  ];
+
+  const overviewRows = children.map(c => [
+    cleanCell(c.id || 'CH-0000'),
+    cleanCell(c.name || ''),
+    cleanCell(c.dob || ''),
+    cleanCell(c.age || ''),
+    cleanCell(c.gender || ''),
+    cleanCell(c.blood || ''),
+    cleanCell(c.idNumber || ''),
+    cleanCell(c.father || c.guardian || ''),
+    cleanCell(c.phone || ''),
+    cleanCell(c.height ? `${c.height} cm` : ''),
+    cleanCell(c.weight ? `${c.weight} kg` : ''),
+    cleanCell(c.medicalConditions || ''),
+    cleanCell(c.allergies || ''),
+    cleanCell(c.status || 'Active'),
+    cleanCell(c.registeredDate || new Date().toISOString().slice(0, 10)),
+    cleanCell(c.medications || ''),
+    cleanCell(c.dentalRemarks || ''),
+    cleanCell(c.hygieneIndex || '')
+  ]);
+
+  return [overviewHeaders, ...overviewRows];
 }
 
 /** Active staff of one NGO, from authorized_users (cached for 5 minutes). */
@@ -736,6 +804,9 @@ async function syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, d
  */
 async function syncBloodTestSheet(sheets, client, integration, safeSlug, displayName, data, shareWith) {
   const { perChild, allRows } = buildBloodTestRegister(data);
+  // A family's summary tab lists members rather than children.
+  const allTabTitle = data.family ? 'All Members' : ALL_CHILDREN_TAB_TITLE;
+  const allHeaders = data.family ? ['NAME', 'MEMBER ID', ...BLOOD_HEADERS] : ALL_CHILDREN_HEADERS;
 
   let bloodSheetId = integration.bloodSheetId;
   if (!bloodSheetId) {
@@ -743,7 +814,7 @@ async function syncBloodTestSheet(sheets, client, integration, safeSlug, display
     const createRes = await sheets.spreadsheets.create({
       requestBody: {
         properties: { title: `${displayName} — Blood Test Reports` },
-        sheets: [{ properties: { title: ALL_CHILDREN_TAB_TITLE } }]
+        sheets: [{ properties: { title: allTabTitle } }]
       }
     });
     bloodSheetId = createRes.data.spreadsheetId;
@@ -774,14 +845,14 @@ async function syncBloodTestSheet(sheets, client, integration, safeSlug, display
 
   // One tab per child, named like the Student Medical Records tabs. Two children
   // with the same name get their ID added so neither overwrites the other.
-  const used = new Set([ALL_CHILDREN_TAB_TITLE.toUpperCase()]);
+  const used = new Set([allTabTitle.toUpperCase()]);
   const childTabs = perChild.map(({ child, rows }) => {
     let title = sanitizeSheetTitle(child.name);
     if (used.has(title.toUpperCase())) title = sanitizeSheetTitle(`${String(child.name || '').slice(0, 20)} ${child.id || ''}`);
     used.add(title.toUpperCase());
     return { child, rows, title };
   });
-  const titles = [ALL_CHILDREN_TAB_TITLE, ...childTabs.map(t => t.title)];
+  const titles = [allTabTitle, ...childTabs.map(t => t.title)];
 
   const addRequests = titles.filter(t => !tabs.has(t)).map(title => ({ addSheet: { properties: { title } } }));
   if (addRequests.length > 0) {
@@ -807,7 +878,7 @@ async function syncBloodTestSheet(sheets, client, integration, safeSlug, display
     requestBody: {
       valueInputOption: 'USER_ENTERED',
       data: [
-        { range: `'${ALL_CHILDREN_TAB_TITLE}'!A1`, values: [ALL_CHILDREN_HEADERS, ...(allRows.length ? cells(allRows) : none)] },
+        { range: `'${allTabTitle}'!A1`, values: [allHeaders, ...(allRows.length ? cells(allRows) : none)] },
         ...childTabs.map(({ child, rows, title }) => ({
           range: `'${title}'!A1`,
           values: [
@@ -858,7 +929,7 @@ async function syncBloodTestSheet(sheets, client, integration, safeSlug, display
     });
   };
 
-  const allTab = tabs.get(ALL_CHILDREN_TAB_TITLE);
+  const allTab = tabs.get(allTabTitle);
   if (allTab) {
     gids.all = allTab.gid;
     layout(allTab.gid, 0, 0, 2, [190, 90, ...widths], 2);
@@ -930,6 +1001,7 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   const sheets = google.sheets({ version: 'v4', auth: client });
   let sheetId = integration.sheetId;
   const displayName = ngoName || safeSlug.replace(/-/g, ' ');
+  const family = (await spaceTypeFor(safeSlug)) === 'family';
 
   // 1. File 1: Master Directory Spreadsheet ("Ayusha Nilayam — Child Health Records")
   if (!sheetId) {
@@ -937,7 +1009,7 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
     const createRes = await sheets.spreadsheets.create({
       requestBody: {
         properties: {
-          title: `${displayName} — Child Health Records`
+          title: `${displayName} — ${family ? 'Family Members' : 'Child Health Records'}`
         }
       }
     });
@@ -954,11 +1026,11 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   let clinicalSheetId = integration.clinicalSheetId;
   if (!clinicalSheetId) {
     console.log(`[Google OAuth] Creating Student Medical Records Spreadsheet for NGO (${safeSlug})...`);
-    const firstTabTitle = cleanChildren.length > 0 ? sanitizeSheetTitle(cleanChildren[0].name) : 'Student Records';
+    const firstTabTitle = cleanChildren.length > 0 ? sanitizeSheetTitle(cleanChildren[0].name) : (family ? 'Records' : 'Student Records');
     const createRes = await sheets.spreadsheets.create({
       requestBody: {
         properties: {
-          title: `${displayName} — Student Medical Records`
+          title: `${displayName} — ${family ? 'Medical Records' : 'Student Medical Records'}`
         },
         sheets: [
           {
@@ -997,35 +1069,7 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   const allAppointments = aux['chm-appointments'];
 
   // Master Directory header and rows
-  const overviewHeaders = [
-    'ID', 'Child Name', 'Date of Birth', 'Age', 'Gender', 'Blood Group',
-    'Aadhaar ID', 'Guardian', 'Contact Phone', 'Height (cm)', 'Weight (kg)',
-    'Medical Conditions', 'Allergies', 'Status', 'Registration Date',
-    'Current Medications', 'Dental Remarks', 'Oral Hygiene Index'
-  ];
-
-  const overviewRows = cleanChildren.map(c => [
-    cleanCell(c.id || 'CH-0000'),
-    cleanCell(c.name || ''),
-    cleanCell(c.dob || ''),
-    cleanCell(c.age || ''),
-    cleanCell(c.gender || ''),
-    cleanCell(c.blood || ''),
-    cleanCell(c.idNumber || ''),
-    cleanCell(c.father || c.guardian || ''),
-    cleanCell(c.phone || ''),
-    cleanCell(c.height ? `${c.height} cm` : ''),
-    cleanCell(c.weight ? `${c.weight} kg` : ''),
-    cleanCell(c.medicalConditions || ''),
-    cleanCell(c.allergies || ''),
-    cleanCell(c.status || 'Active'),
-    cleanCell(c.registeredDate || new Date().toISOString().slice(0, 10)),
-    cleanCell(c.medications || ''),
-    cleanCell(c.dentalRemarks || ''),
-    cleanCell(c.hygieneIndex || '')
-  ]);
-
-  const masterTableData = [overviewHeaders, ...overviewRows];
+  const masterTableData = masterDirectoryTable(cleanChildren, family);
 
   // A. Sync File 1: Master Directory Spreadsheet
   try {
@@ -1137,7 +1181,9 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
           (d.child && c.name && d.child.trim().toLowerCase() === c.name.trim().toLowerCase())
         );
 
-        const childSheetData = buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName, childDocs);
+        const childSheetData = family
+          ? buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName, childDocs, `${displayName.toUpperCase()} — HEALTH RECORD`)
+          : buildChildSheetData(c, childGrowth, childMeds, childHealthRecs, displayName, childDocs);
         clinicalDataUpdates.push({
           range: `'${childTabTitle}'!A1`,
           values: childSheetData
@@ -1308,24 +1354,28 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
     }
   }
 
-  // C. Sync File 3: Monthly Checkup Register (one tab per month, all children)
-  try {
-    integration.monthlySheetGids = await syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, displayName, {
-      children: cleanChildren,
-      appointments: allAppointments,
-      growth: allGrowth,
-      medicines: allMedicines,
-      healthRecords: allHealthRecords
-    }, secondaryList);
-  } catch (monthlyErr) {
-    console.warn('[Google OAuth] Monthly Checkup Register sync notice:', monthlyErr.message);
+  // C. Sync File 3: Monthly Checkup Register (one tab per month, all children).
+  // Children's homes only: it is the register the government inspects.
+  if (!family) {
+    try {
+      integration.monthlySheetGids = await syncMonthlyRegisterSheet(sheets, client, integration, safeSlug, displayName, {
+        children: cleanChildren,
+        appointments: allAppointments,
+        growth: allGrowth,
+        medicines: allMedicines,
+        healthRecords: allHealthRecords
+      }, secondaryList);
+    } catch (monthlyErr) {
+      console.warn('[Google OAuth] Monthly Checkup Register sync notice:', monthlyErr.message);
+    }
   }
 
   // D. Sync File 4: Blood Test Reports (All Children tab + one tab per child)
   try {
     integration.bloodSheetGids = await syncBloodTestSheet(sheets, client, integration, safeSlug, displayName, {
       children: cleanChildren,
-      healthRecords: allHealthRecords
+      healthRecords: allHealthRecords,
+      family
     }, secondaryList);
   } catch (bloodErr) {
     console.warn('[Google OAuth] Blood Test Reports sync notice:', bloodErr.message);
@@ -1497,6 +1547,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
       const medsCol = getColIdx(['current medications', 'medications', 'medicine']);
       const dentalCol = getColIdx(['dental remarks', 'dental']);
       const hygieneCol = getColIdx(['oral hygiene index', 'hygiene index', 'hygiene']);
+      const relationCol = getColIdx(['relation']);
 
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
@@ -1557,6 +1608,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
           if (rawMeds !== existingMatch.medications && rawMeds !== 'None') { existingMatch.medications = rawMeds; changed = true; }
           if (rawDental !== existingMatch.dentalRemarks && rawDental !== 'None') { existingMatch.dentalRemarks = rawDental; changed = true; }
           if (rawHygiene !== existingMatch.hygieneIndex && rawHygiene !== 'Not Assessed') { existingMatch.hygieneIndex = rawHygiene; changed = true; }
+          if (relationCol >= 0 && cleanVal(relationCol) !== (existingMatch.relation || '')) { existingMatch.relation = cleanVal(relationCol); changed = true; }
           if (changed) updatedCount++;
           validSheetChildren.push(existingMatch);
         } else {
@@ -1579,6 +1631,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
             medications: rawMeds === 'None' ? '' : rawMeds,
             dentalRemarks: rawDental === 'None' ? '' : rawDental,
             hygieneIndex: rawHygiene === 'Not Assessed' ? '' : rawHygiene,
+            ...(relationCol >= 0 ? { relation: cleanVal(relationCol) } : {}),
             source: 'Google Sheets Live Sync'
           };
           validSheetChildren.push(newChild);
@@ -1693,35 +1746,8 @@ async function deleteChildFromGoogleSheets(childId, ngoSlug, ngoName) {
     try {
       const sheets = google.sheets({ version: 'v4', auth: client });
 
-      const overviewHeaders = [
-        'ID', 'Child Name', 'Date of Birth', 'Age', 'Gender', 'Blood Group',
-        'Aadhaar ID', 'Guardian', 'Contact Phone', 'Height (cm)', 'Weight (kg)',
-        'Medical Conditions', 'Allergies', 'Status', 'Registration Date',
-        'Current Medications', 'Dental Remarks', 'Oral Hygiene Index'
-      ];
-
-      const overviewRows = remainingChildren.map(c => [
-        cleanCell(c.id || 'CH-0000'),
-        cleanCell(c.name || ''),
-        cleanCell(c.dob || ''),
-        cleanCell(c.age || ''),
-        cleanCell(c.gender || ''),
-        cleanCell(c.blood || ''),
-        cleanCell(c.idNumber || ''),
-        cleanCell(c.father || c.guardian || ''),
-        cleanCell(c.phone || ''),
-        cleanCell(c.height ? `${c.height} cm` : ''),
-        cleanCell(c.weight ? `${c.weight} kg` : ''),
-        cleanCell(c.medicalConditions || ''),
-        cleanCell(c.allergies || ''),
-        cleanCell(c.status || 'Active'),
-        cleanCell(c.registeredDate || new Date().toISOString().slice(0, 10)),
-        cleanCell(c.medications || ''),
-        cleanCell(c.dentalRemarks || ''),
-        cleanCell(c.hygieneIndex || '')
-      ]);
-
-      const masterTableData = [overviewHeaders, ...overviewRows];
+      const family = (await spaceTypeFor(safeSlug)) === 'family';
+      const masterTableData = masterDirectoryTable(remainingChildren, family);
 
       await sheets.spreadsheets.values.clear({
         spreadsheetId: integration.sheetId,

@@ -62,7 +62,9 @@ export function collectChild(form) {
     hygieneIndex: values.hygieneIndex || '',
     emergencyContact: values.emergencyContact || '',
     emergencyPhone: values.emergencyPhone || '',
-    hospitalName: values.hospitalName || ''
+    hospitalName: values.hospitalName || '',
+    // Only the family member form has this field; a child record is unchanged.
+    ...(values.relation !== undefined ? { relation: values.relation } : {})
   };
 }
 

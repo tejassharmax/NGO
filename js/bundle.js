@@ -33645,6 +33645,149 @@
     return { format: BACKUP_FORMAT, version: 1, source, exportedAt: new Date().toISOString(), data };
   }
 
+  /**
+   * space.js
+   * Which kind of space the signed-in account works in, and the words each kind
+   * uses on screen.
+   *
+   * A "home" is a children's home such as Ayusha Nilayam; it is the default and
+   * its wording is exactly what the app has always shown. A "family" keeps one
+   * family's personal health records. Both store records the same way (a family
+   * member is saved like a child record), so only the screens differ.
+   *
+   * The server sends the type with the Google Sheets config before every render
+   * (see fetchSheetsConfig). It is kept for the tab so that anything drawn before
+   * that request returns still uses the right words.
+   */
+
+  const SPACE_TYPE_KEY = 'space-type';
+
+  /** @param {string|undefined} type the type sent by the server */
+  function rememberSpaceType(type) {
+    try {
+      sessionStorage.setItem(SPACE_TYPE_KEY, type === 'family' ? 'family' : 'home');
+    } catch (e) { }
+  }
+
+  function forgetSpaceType() {
+    try {
+      sessionStorage.removeItem(SPACE_TYPE_KEY);
+    } catch (e) { }
+  }
+
+  /** @returns {'home'|'family'} */
+  function spaceType() {
+    try {
+      return sessionStorage.getItem(SPACE_TYPE_KEY) === 'family' ? 'family' : 'home';
+    } catch (e) {
+      return 'home';
+    }
+  }
+
+  function isFamilySpace() {
+    return spaceType() === 'family';
+  }
+
+  /**
+   * Screen wording that differs between the two kinds of space, as
+   * [home, family]. The home text must stay exactly as it was.
+   */
+  const TERMS = {
+    // Navigation and page titles
+    navHealthSection: ['Children & Health', 'Family & Health'],
+    navPeople: ['Children', 'Family members'],
+    pageProfile: ['Child Health Profile', 'Health profile'],
+    pageRegister: ['Register child', 'Add family member'],
+    searchLabel: ['Search child records', 'Search family records'],
+    searchPlaceholder: ['Search children, health records…', 'Search family, health records…'],
+    workspaceBadge: ['Connected NGO', 'Family space'],
+
+    // One person, several people, everyone
+    person: ['Child', 'Family member'],
+    personLower: ['child', 'family member'],
+    everyone: ['All Children', 'Whole family'],
+    selectPerson: ['Select child', 'Select family member'],
+    viewPeople: ['View Children', 'View Family'],
+
+    // Global search
+    searchCmdRegister: ['Register New Student', 'Add Family Member'],
+    searchCmdRegisterHint: ['Enroll child with Aadhaar, parent details & vitals', 'Add someone in the family with their health details'],
+    searchCmdCalendar: ['Google Calendar & Health Camps', 'Google Calendar & Appointments'],
+    searchEmptyHint: [
+      'Try searching by student name, guardian, ID (CH-XXXX), blood group, checkup type, or command.',
+      'Try searching by name, relation, blood group, checkup type, or command.'
+    ],
+    searchIntro: [
+      'Type to search students, schedule camps, inspect clinical health records, or run instant commands.',
+      'Type to search family members, appointments and health records, or run quick commands.'
+    ],
+    searchInputPlaceholder: [
+      'Search students, health records, appointments, or commands…',
+      'Search family members, health records, appointments, or commands…'
+    ],
+    searchTabPeople: ['Students', 'Family'],
+    searchTabAppointments: ['Camps & Appts', 'Appointments'],
+    searchBadge: ['Student', 'Member'],
+    searchBadgeCaps: ['STUDENT', 'MEMBER'],
+    searchProfileLabel: ['Student Profile', 'Health profile'],
+    searchContactLabel: ['Guardian Contact', 'Relation'],
+    searchTitle: ['Child Health Management Spotlight', 'Family Health Search'],
+
+    // Google Sheets and Calendar
+    medicalWorkbook: ['Student Medical Records', 'Medical Records'],
+    calendarName: ['Child Health Calendar', 'Family Health Calendar'],
+    doctorPlaceholder: ['Doctor who examined the child', 'Doctor who examined them'],
+    liveSheetLabel: ['Synced to Live NGO Sheet', 'Synced to your Google Sheet'],
+    connectingSheet: ['Connecting to your NGO Google Sheet...', 'Connecting to your Google Sheet...'],
+    validatingStage: ['1. Validating child details...', '1. Checking the details...'],
+    activeSheetLabel: ['Active NGO Sheet', 'Your Google Sheet'],
+    calendarFooter: ['Created from Child Health Management App', 'Created from Ayusha Health'],
+
+    // Messages
+    savedToast: ['Child saved & synced', 'Saved & synced'],
+    removeConfirm: ['Remove child', 'Remove member'],
+    removedToast: ['Child removed', 'Family member removed'],
+    removeBody: [
+      'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
+      'This removes this person from your family space and updates your connected Google Sheet. This action cannot be undone.'
+    ],
+    uploadForPerson: ['Upload Document for Child', 'Upload a report'],
+    uploadDocPlaceholder: ['e.g. Aadhaar Card, Blood Test Report', 'e.g. Blood test report, MRI scan'],
+    uploadTitlePlaceholder: ['e.g. Aadhaar Card, Vaccination Certificate, Blood Report', 'e.g. Blood test report, MRI scan, Prescription'],
+    choosePerson: ['Choose child', 'Choose family member']
+  };
+
+  /** @param {keyof typeof TERMS} key */
+  function term(key) {
+    const pair = TERMS[key];
+    if (!pair) return key;
+    return pair[isFamilySpace() ? 1 : 0];
+  }
+
+  /** How a stored person name is shown; group appointments keep the "All Children" marker. */
+  function personLabel(name) {
+    return name === 'All Children' ? term('everyone') : name;
+  }
+
+  /** Document categories a family picks from when uploading, as [value, label]. */
+  const FAMILY_DOCUMENT_CATEGORIES = [
+    ['Lab Report', 'Lab report / Blood test'],
+    ['Prescription', 'Prescription'],
+    ['Scan', 'Scan / X-ray / MRI'],
+    ['Discharge Summary', 'Discharge summary'],
+    ['Vaccination Record', 'Vaccination record'],
+    ['Insurance', 'Insurance / Policy'],
+    ['Other', 'Other']
+  ];
+
+  /** The family categories as <option> elements. */
+  function familyCategoryOptions() {
+    return FAMILY_DOCUMENT_CATEGORIES.map(([value, label]) => `<option value="${value}">${label}</option>`).join('');
+  }
+
+  /** Ways someone can be related to the account holder, for the family member form. */
+  const RELATIONS = ['Self', 'Father', 'Mother', 'Spouse', 'Son', 'Daughter', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Other'];
+
   /* ═══════════════════════════════════════════════════════
      CHILD HEALTH MANAGEMENT — DATA LAYER
      The records live in Firestore, behind /api/sync. The open tab keeps a
@@ -34090,8 +34233,8 @@
       }
     });
 
-    // 2. Check for missing Aadhaar or ID documents
-    children.forEach(child => {
+    // 2. Check for missing Aadhaar or ID documents (children's homes only)
+    if (!isFamilySpace()) children.forEach(child => {
       if (!child.idNumber || child.idNumber.trim() === '') {
         const alertId = `ALR-MISSING-ID-${child.id}`;
         if (!alerts.some(a => a.id === alertId)) {
@@ -34774,6 +34917,7 @@
       const res = await apiFetch(`/api/sheets/config?ngo=${encodeURIComponent(slug)}`);
       if (res.ok) {
         cachedSheetsConfig = await res.json();
+        rememberSpaceType(cachedSheetsConfig?.spaceType);
         if (cachedSheetsConfig?.tokenExpired) {
           cachedSheetsConfig.connected = false;
         }
@@ -34815,7 +34959,7 @@
   function getGoogleSheetUrl() {
     const session = getSession() || {};
     const ngoSlug = getNgoSlug(session);
-    const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || localStorage.getItem('google_sheet_url');
+    const savedUrl = localStorage.getItem(`google_sheet_url_${ngoSlug}`) || (isFamilySpace() ? null : localStorage.getItem('google_sheet_url'));
     return cachedSheetsConfig?.spreadsheetUrl || savedUrl || null;
   }
 
@@ -34825,7 +34969,7 @@
   function getClinicalSheetUrl() {
     const session = getSession() || {};
     const ngoSlug = getNgoSlug(session);
-    const savedUrl = localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || localStorage.getItem('google_clinical_sheet_url');
+    const savedUrl = localStorage.getItem(`google_clinical_sheet_url_${ngoSlug}`) || (isFamilySpace() ? null : localStorage.getItem('google_clinical_sheet_url'));
     return cachedSheetsConfig?.clinicalSpreadsheetUrl || savedUrl || null;
   }
 
@@ -34901,14 +35045,14 @@
    * Open a child's dedicated Google Sheet tab in a new browser window
    */
   async function openChildGoogleSheet(childId, childName) {
-    toast('Opening Google Sheet...', `Connecting to ${childName || 'student'}'s sheet...`);
+    toast('Opening Google Sheet...', `Connecting to ${childName || term('personLower')}'s sheet...`);
     
     // Open window synchronously on user click to avoid browser popup blockers
     let win = null;
     try {
       win = window.open('', '_blank');
       if (win && win.document) {
-        win.document.write('<html><head><title>Loading Sheet...</title></head><body style="font-family:system-ui,sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f8fafc; color:#334155;"><div style="text-align:center;"><div style="width:40px; height:40px; border:3px solid #cbd5e1; border-top-color:#0f9d58; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 16px auto;"></div><p style="font-size:15px; font-weight:600; margin:0;">Opening Student Medical Records...</p><p style="font-size:13px; color:#64748b; margin:6px 0 0 0;">Connecting to ' + (childName || 'child') + '\'s tab...</p></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></body></html>');
+        win.document.write('<html><head><title>Loading Sheet...</title></head><body style="font-family:system-ui,sans-serif; display:flex; align-items:center; justify-content:center; height:100vh; margin:0; background:#f8fafc; color:#334155;"><div style="text-align:center;"><div style="width:40px; height:40px; border:3px solid #cbd5e1; border-top-color:#0f9d58; border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 16px auto;"></div><p style="font-size:15px; font-weight:600; margin:0;">Opening ' + term('medicalWorkbook') + '...</p><p style="font-size:13px; color:#64748b; margin:6px 0 0 0;">Connecting to ' + (childName || term('personLower')) + '\'s tab...</p></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></body></html>');
       }
     } catch (e) {}
 
@@ -34981,7 +35125,7 @@
             </div>
             <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
             <p style="font-size:13.5px; color:var(--color-text-muted); margin:0 0 20px 0; line-height:1.5;">
-              To view <b>${escapeHTML$1(childName || 'this child')}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
+              To view <b>${escapeHTML$1(childName || `this ${term('personLower')}`)}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
             </p>
             <div style="display:flex; gap:10px; justify-content:center;">
               <button class="button button--ghost" type="button" onclick="document.querySelector('#modal-root').replaceChildren();">Cancel</button>
@@ -35210,7 +35354,7 @@
     overlay.style.cssText = 'position:fixed; inset:0; z-index:9999; background:rgba(15, 23, 42, 0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; animation:fadeIn 0.25s ease;';
     
     getGoogleSheetUrl() || '#';
-    cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : 'Active NGO Sheet';
+    cachedSheetsConfig?.sheetId ? `${cachedSheetsConfig.sheetId.slice(0, 15)}...` : term('activeSheetLabel');
 
     overlay.innerHTML = `
     <div class="card" style="position:relative; width:min(480px, 92vw); padding:28px 24px; text-align:center; background:var(--color-bg); border:1px solid var(--color-border); box-shadow:0 20px 40px rgba(0,0,0,0.3); border-radius:16px;">
@@ -35228,7 +35372,7 @@
       
       <div style="background:var(--color-bg-alt); padding:16px; border-radius:10px; border:1px solid var(--color-border); text-align:left; margin-bottom:20px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px;">
-          <span id="sync-stage-text" style="font-weight:600; color:var(--color-primary);">1. Validating child details...</span>
+          <span id="sync-stage-text" style="font-weight:600; color:var(--color-primary);">${term('validatingStage')}</span>
           <span id="sync-stage-pct" style="font-weight:700; color:var(--color-text);">25%</span>
         </div>
         <div class="progress" style="height:8px; border-radius:4px; overflow:hidden; background:var(--color-border);">
@@ -35246,7 +35390,7 @@
 
       <div id="sync-footer-note" style="font-size:11px; color:var(--color-text-muted); display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;">
         <span style="width:6px; height:6px; border-radius:50%; background:#10b981;"></span>
-        <span id="sync-footer-label">Synced to Live NGO Sheet</span>
+        <span id="sync-footer-label">${term('liveSheetLabel')}</span>
       </div>
     </div>
   `;
@@ -35298,7 +35442,7 @@
           if (targetUrl && targetUrl !== '#' && targetUrl !== 'javascript:void(0)') {
             window.open(targetUrl, '_blank');
           } else {
-            toast('Fetching Google Sheet...', 'Connecting to your NGO Google Sheet...');
+            toast('Fetching Google Sheet...', term('connectingSheet'));
             fetchSheetsConfig().then(cfg => {
               if (cfg && cfg.spreadsheetUrl && cfg.spreadsheetUrl !== '#') {
                 window.open(cfg.spreadsheetUrl, '_blank');
@@ -35379,7 +35523,7 @@
               localStorage.setItem('google_clinical_sheet_url', data.clinicalSpreadsheetUrl);
             }
           }
-          toast('Auto-Synced to Google Sheets', `Record for ${child.name || 'Child'} live synced.`);
+          toast('Auto-Synced to Google Sheets', `Record for ${child.name || term('person')} live synced.`);
         } else if (data && (data.tokenExpired || data.error === 'invalid_grant')) {
           if (!cachedSheetsConfig) cachedSheetsConfig = {};
           cachedSheetsConfig.connected = false;
@@ -35414,7 +35558,7 @@
         const data = await res.json();
         if (data && data.success && Array.isArray(data.children)) {
           records.setItem('chm-children', JSON.stringify(data.children));
-          toast('Google Sheets Updated', `Removed ${childName || 'child'} from connected Google Sheet.`);
+          toast('Google Sheets Updated', `Removed ${childName || term('personLower')} from connected Google Sheet.`);
           return data;
         }
       }
@@ -35537,29 +35681,29 @@
       const list = allChildrenList && allChildrenList.length > 0 ? allChildrenList : getChildren();
       const groupCount = list.length;
       const titlePrefix = appointment.doctor ? `${appointment.doctor.trim()} — ` : '';
-      titleStr = `${titlePrefix}All Children (${groupCount}) — ${appointment.type}`;
+      titleStr = `${titlePrefix}${term('everyone')} (${groupCount}) — ${appointment.type}`;
 
       const childrenNames = list.map((c, i) => `  ${i + 1}. ${c.name} (ID: ${c.id || 'N/A'})`).join('\n');
       detailsStr =
-        `📋 GROUP APPOINTMENT: All Children — ${appointment.type}\n` +
+        `📋 GROUP APPOINTMENT: ${term('everyone')} — ${appointment.type}\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `👥 Target: All Registered Children (${groupCount} Students)\n` +
+        (isFamilySpace() ? `👥 Everyone in the family (${groupCount})\n` : `👥 Target: All Registered Children (${groupCount} Students)\n`) +
         `🩺 Doctor / Title: ${appointment.doctor || 'Routine Healthcare Session'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
         `📅 Date: ${appointment.date}\n` +
         `⏰ Time: ${formatSingleDisplayTime(appointment.time || '10:00')}\n\n` +
-        `📋 Children Included in this Plan (${groupCount}):\n${childrenNames}\n\n` +
+        `📋 ${isFamilySpace() ? 'Family members included' : 'Children Included in this Plan'} (${groupCount}):\n${childrenNames}\n\n` +
         `📝 Notes: ${appointment.notes || 'No additional notes'}\n\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-        `Created from Child Health Management App`;
+        term('calendarFooter');
     } else {
       titleStr = `${appointment.childName} — ${appointment.type}${appointment.vaccineName ? ` (${appointment.vaccineName})` : ''}`;
       detailsStr =
         `Doctor: ${appointment.doctor || 'N/A'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
-        `Child: ${appointment.childName}\n` +
+        `${term('person')}: ${appointment.childName}\n` +
         `Type: ${appointment.type}\n` +
         (appointment.vaccineName ? `Vaccination: ${appointment.vaccineName}\n` : '') +
         `Notes: ${appointment.notes || 'No notes'}\n\n` +
-        `Created from Child Health Management App`;
+        term('calendarFooter');
     }
 
     const title = encodeURIComponent(titleStr);
@@ -35865,7 +36009,7 @@
 
   function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
     const children = getChildren();
-    const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
+    const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)}${isFamilySpace() ? '' : ` (${c.id})`}</option>`).join('');
     const specialtyOptions = DOCTOR_SPECIALTIES.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
     const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
     const lastUsed = getLastClinicDoctor();
@@ -35907,15 +36051,15 @@
           </div>
           <div class="gcal-popup-row-content" style="display: flex; align-items: center; gap: 8px; width: 100%;">
             <select class="gcal-popup-select" name="childId" id="cal-child-select" required style="flex: 1; min-width: 0;">
-              <option value="">Select child</option>
-              <option value="ALL">All Children (${children.length})</option>
+              <option value="">${term('selectPerson')}</option>
+              <option value="ALL">${term('everyone')} (${children.length})</option>
               ${childOptions}
             </select>
-            <label class="gcal-all-pill" id="cal-all-pill" title="Toggle all ${children.length} registered children" role="button" aria-pressed="false" tabindex="0">
+            <label class="gcal-all-pill" id="cal-all-pill" title="Toggle all ${children.length} ${isFamilySpace() ? 'family members' : 'registered children'}" role="button" aria-pressed="false" tabindex="0">
               <input type="checkbox" id="cal-all-children-check" name="selectAllChildren" value="true" />
               <svg class="gcal-all-pill-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none; flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
               <svg class="gcal-all-pill-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              <span>All Children</span>
+              <span>${term('everyone')}</span>
             </label>
           </div>
         </div>
@@ -35991,7 +36135,7 @@
           <div class="gcal-popup-row-content">
             <span class="gcal-popup-cal-label">
               <span class="gcal-popup-cal-dot"></span>
-              Child Health Calendar
+              ${term('calendarName')}
             </span>
           </div>
         </div>
@@ -36246,7 +36390,7 @@
           </div>
           <div class="clinical-field-group">
             <label class="clinical-field-label" for="${prefix}checkup-doctor">DOCTOR NAME</label>
-            <input class="clinical-input" id="${prefix}checkup-doctor" type="text" name="doctorName" placeholder="Doctor who examined the child" value="${escapeHTML(doctorVal)}" autocomplete="off" />
+            <input class="clinical-input" id="${prefix}checkup-doctor" type="text" name="doctorName" placeholder="${term('doctorPlaceholder')}" value="${escapeHTML(doctorVal)}" autocomplete="off" />
           </div>
         </div>
 
@@ -36409,7 +36553,7 @@
     const healthRecords = childId ? getHealthRecords(childId) : [];
     const existingBlood = (targetDate ? healthRecords.find(h => h.date === targetDate) : null) || {};
 
-    const subTitle = appt ? `${escapeHTML(appt.type || 'Appointment')} (${appt.date})` : 'Student Medical Records';
+    const subTitle = appt ? `${escapeHTML(appt.type || 'Appointment')} (${appt.date})` : term('medicalWorkbook');
 
     return `
     <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
@@ -36466,7 +36610,7 @@
 
     const children = getChildren();
     const childOptions = children.map(c => 
-      `<option value="${c.id}" ${c.id === appt.childId ? 'selected' : ''}>${escapeHTML(c.name)} (${c.id})</option>`
+      `<option value="${c.id}" ${c.id === appt.childId ? 'selected' : ''}>${escapeHTML(c.name)}${isFamilySpace() ? '' : ` (${c.id})`}</option>`
     ).join('');
 
     const typeOptions = [
@@ -36533,7 +36677,7 @@
               </div>
               <div class="gcal-popup-row-content">
                 <select class="gcal-popup-select" name="childId" required>
-                  <option value="">Select child</option>
+                  <option value="">${term('selectPerson')}</option>
                   ${childOptions}
                 </select>
               </div>
@@ -36708,6 +36852,566 @@
     }
   }
 
+  /**
+   * ui.js
+   * Small markup helpers shared by the page renderers in router.js and family.js.
+   */
+
+
+  const heading = (title, description, actions) => `<div class="page-heading"><div class="page-heading__copy"><h1>${title}</h1><p>${description}</p></div>${actions ? `<div class="page-heading__actions">${actions}</div>` : ''}</div>`;
+
+  const statCard = (label, value, glyph, color = 'blue') => `
+  <article class="stat-card stat-card--${color}">
+    <div class="stat-card__top">
+      <span class="stat-card__label" title="${escapeHTML$1(label)}">${label}</span>
+      <span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span>
+    </div>
+    <div class="stat-card__number">${value}</div>
+  </article>
+`;
+
+  const field = (label, name, placeholder, type = 'text', hint = '', value = '', extra = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML$1(value)}" ${extra}>${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
+
+  function formatDateForInput(dateStr) {
+    if (!dateStr) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+    const matchDMY = dateStr.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
+    if (matchDMY) {
+      const [_, d, m, y] = matchDMY;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    try { const d = new Date(dateStr); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch (e) { }
+    return '';
+  }
+
+  function getURLParam(key) {
+    let searchParams = new URLSearchParams(window.location.search);
+    let val = searchParams.get(key);
+    if (!val && window.location.hash.includes('?')) {
+      const hashQuery = window.location.hash.split('?')[1];
+      val = new URLSearchParams(hashQuery).get(key);
+    }
+    return val;
+  }
+
+  function getDynamicGreeting() {
+    const hour = new Date().getHours();
+    const session = getSession() || {};
+    const firstName = escapeHTML$1(String(session.displayName || '').trim().split(/\s+/)[0] || 'there');
+    if (hour < 12) return `Good morning, ${firstName}`;
+    if (hour < 17) return `Good afternoon, ${firstName}`;
+    return `Good evening, ${firstName}`;
+  }
+
+  /**
+   * clinicalSection.js
+   * The "Clinical & Sheet Sync" part of a health profile: the checkup and blood
+   * test form, and the history of every checkup and blood test. Shared by the
+   * children's home profile (router.js) and the family profile (family.js).
+   */
+
+
+  /**
+   * @param {object} child the person whose profile this is
+   * @param {object[]} growth their checkups, newest first
+   * @param {object[]} healthRecs their blood test reports, newest first
+   * @returns {string}
+   */
+  function clinicalSectionHTML(child, growth, healthRecs) {
+    const family = isFamilySpace();
+    const childBloodSheetUrl = getBloodTestSheetUrl(child.id, child.name);
+    const allClinicalHistory = [
+      ...growth.map(g => ({ ...g, entryType: 'checkup', sortDate: g.date || '1970-01-01' })),
+      ...healthRecs.map(h => ({ ...h, entryType: 'blood', sortDate: h.date || '1970-01-01' }))
+    ].sort((a, b) => (new Date(b.sortDate).getTime() || 0) - (new Date(a.sortDate).getTime() || 0));
+
+    const historyClinicalRowsHTML = allClinicalHistory.length === 0 ? `
+    <tr><td colspan="5" class="empty-state" style="padding: 24px; text-align: center;">No ${family ? '' : 'clinical '}checkups or blood tests recorded yet for ${escapeHTML$1(child.name)}.</td></tr>
+  ` : allClinicalHistory.map(item => {
+      const isCheckup = item.entryType === 'checkup';
+      const typeBadge = isCheckup
+        ? `<span class="badge badge--blue" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> ${family ? 'Checkup' : 'Routine Checkup (Row 3)'}</span>`
+        : `<span class="badge badge--danger" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> ${family ? 'Blood test' : 'Blood Test (Row 19)'}</span>`;
+
+      const summaryHTML = isCheckup
+        ? `<span>${[
+          item.temperature ? `${item.temperature}°F` : '',
+          item.bp ? `BP ${item.bp}` : '',
+          item.weight ? `${item.weight}kg` : '',
+          item.pulse ? `${item.pulse}bpm` : '',
+          item.spo2 ? `SpO2 ${item.spo2}%` : ''
+        ].filter(Boolean).join(' · ') || 'Vitals recorded'}</span>`
+        : `<span>${[
+          item.hemoglobin ? `Hb: ${item.hemoglobin} g/dL` : '',
+          item.wbc ? `WBC: ${item.wbc}` : '',
+          item.platelets ? `Platelets: ${item.platelets} Lakhs` : '',
+          item.rbc ? `RBC: ${item.rbc}` : ''
+        ].filter(Boolean).join(' · ') || 'Lab values recorded'}</span>`;
+
+      const detailsHTML = isCheckup
+        ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML$1(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML$1(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML$1(item.eyeCheckup)}` : ''}${item.clinicName || item.doctorName ? ` · ${escapeHTML$1([item.doctorName, item.clinicName].filter(Boolean).join(', '))}` : ''}` || '—'
+        : `${item.rbcMorphology ? `RBC: ${escapeHTML$1(item.rbcMorphology)} ` : ''}${item.plateletsAdequacy ? `· Platelets: ${escapeHTML$1(item.plateletsAdequacy)}` : ''}` || '—';
+
+      const rawData = JSON.stringify(item).replace(/"/g, '&quot;');
+
+      return `
+      <tr>
+        <td style="font-weight:600; white-space:nowrap;">${item.date ? formatDate(item.date) : 'Recent'}</td>
+        <td style="white-space:nowrap;">${typeBadge}</td>
+        <td style="font-size:13px;">${summaryHTML}</td>
+        <td style="font-size:12.5px; color:var(--color-text-muted); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detailsHTML}</td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="button button--ghost button--sm" type="button" data-load-clinical-item="${rawData}" style="display:inline-flex; align-items:center; gap:4px;">
+            ${icon('pencil')} Load into Form
+          </button>
+          <button class="icon-button tooltip" type="button" data-tooltip="Delete entry" data-delete-clinical-item="${item.id}" data-clinical-type="${item.entryType}" style="color:var(--color-danger); margin-left:6px;">
+            ${icon('trash')}
+          </button>
+        </td>
+      </tr>
+    `;
+    }).join('');
+
+    return `
+    <!-- Main Data Entry Form -->
+    <section class="card" style="margin-bottom: 24px;">
+      <form id="profile-clinical-data-form" class="clinical-sync-form" style="padding: 24px;">
+        <input type="hidden" name="childId" value="${child.id}" />
+        <input type="hidden" name="childName" value="${escapeHTML$1(child.name)}" />
+        <input type="hidden" name="existingGrowthId" id="prof-growth-id" value="" />
+        <input type="hidden" name="existingBloodId" id="prof-blood-id" value="" />
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h2 class="card__title" style="margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+              ${family ? 'Add a checkup or blood test' : 'Clinical Details &amp; Google Sheet Sync Form'}
+            </h2>
+            <p class="card__caption" style="margin: 0;">${family ? 'Enter the vitals from a doctor visit, or the values from a blood test report. Saving updates your records and your Google Sheet.' : 'Fill in clinical checkup vitals and blood test parameters. Saving automatically updates the database and Google Sheets.'}</p>
+          </div>
+          <button class="button button--primary" id="btn-save-profile-clinical" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Save &amp; Sync to Sheet
+          </button>
+        </div>
+
+        <div id="prof-edit-banner" style="display: none; margin-bottom: 18px; padding: 10px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #1d4ed8; font-weight: 600;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span id="prof-edit-banner-text">Editing historical clinical entry</span>
+          </div>
+          <button type="button" class="button button--ghost button--sm" id="prof-cancel-edit-btn" style="color: #1d4ed8; font-size: 12px; padding: 4px 12px; border-color: #bfdbfe;">
+            Cancel &amp; New Entry
+          </button>
+        </div>
+
+        ${renderClinicalSectionsMarkup({
+          existingGrowth: {},
+          existingBlood: {},
+          targetDate: new Date().toISOString().slice(0, 10),
+          prefix: 'prof-'
+        })}
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--color-border);">
+          <button class="button button--primary" id="btn-save-profile-clinical-bottom" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            Save &amp; Sync to Sheet
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- History Table -->
+    <section class="card">
+      <header class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h2 class="card__title">${family ? 'Checkups &amp; test history' : 'Clinical &amp; Lab History'}</h2>
+          <p class="card__caption">${family ? 'Every checkup and blood test' : 'All routine clinical checkups and blood test reports'} recorded for ${escapeHTML$1(child.name)}</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+          ${childBloodSheetUrl ? `<a href="${escapeHTML$1(childBloodSheetUrl)}" target="_blank" class="button button--ghost button--sm" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border);">🩸 Blood test sheet ↗</a>` : ''}
+          <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
+        </div>
+      </header>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Category</th>
+              <th>Measurements / Key Values</th>
+              <th>Clinical Remarks / Prescription</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${historyClinicalRowsHTML}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+  }
+
+  /**
+   * family.js
+   * The screens of a family space: an overview, the family members, one member's
+   * health profile, the add/edit member form, and their reports and documents.
+   *
+   * A family member is stored like a child record, so these pages read the same
+   * collections and use the same actions (data-edit, data-delete, the upload and
+   * checkup forms) as the children's home screens. Each function returns the page
+   * content; renderPage in router.js wraps it in the app shell.
+   */
+
+
+  const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
+  /* ─── Helpers ─── */
+
+  /** A member's documents: matched by ID, or by name for uploads that carry only a name. */
+  function documentsFor(member) {
+    const name = (member.name || '').toLowerCase();
+    return getUploadedDocs().filter(d =>
+      d.childId === member.id ||
+      (d.childName && d.childName.toLowerCase() === name) ||
+      (d.child && d.child.toLowerCase() === name)
+    );
+  }
+
+  /** "Mother · 58 years" */
+  function memberSubtitle(member) {
+    const age = calculateAge(member.dob);
+    return [member.relation, age ? `${age}` : ''].filter(Boolean).join(' · ') || 'Family member';
+  }
+
+  /** Appointments that have not happened yet, soonest first. */
+  function upcomingAppointments() {
+    return getAppointments()
+      .filter(a => computeAppointmentStatus(a) !== 'Completed')
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  }
+
+  function avatar(name, size = 44) {
+    return `<span aria-hidden="true" style="display:grid; place-items:center; flex:0 0 ${size}px; width:${size}px; height:${size}px; border-radius:50%; background:var(--color-primary-soft, #eef2ff); color:var(--color-primary); font-weight:700; font-size:${Math.round(size * 0.36)}px;">${initials(name)}</span>`;
+  }
+
+  function emptyState(glyph, title, text, action = '') {
+    return `<div class="empty-state" style="padding:36px 24px;"><span class="empty-state__icon">${icon(glyph)}</span><h3>${title}</h3><p>${text}</p>${action ? `<div style="margin-top:16px;">${action}</div>` : ''}</div>`;
+  }
+
+  const addMemberButton = (label = 'Add family member') => `<a class="button button--primary" href="${pagePath('register-child')}">${icon('plus')}${label}</a>`;
+
+  /** One report or document, with its Google Drive link and a delete button. */
+  function documentCard(doc) {
+    const inDrive = !!doc.driveUrl;
+    return `
+    <article class="card document-card" style="position:relative;">
+      <button class="icon-button tooltip" data-tooltip="Delete document" type="button" data-delete-doc-id="${escapeHTML$1(doc.id || '')}" style="position:absolute; top:8px; right:8px; width:26px; height:26px; min-width:26px; padding:0; border-radius:50%; background:rgba(255,255,255,0.9); border:1px solid rgba(220,38,38,0.25); color:#dc2626; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2;">
+        ${icon('trash')}
+      </button>
+      <div class="document-card__body" style="padding:16px;">
+        <h3 style="font-size:14px; font-weight:600; margin:0 0 8px; padding-right:28px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML$1(doc.name || doc.title || 'Report')}</h3>
+        <div class="detail-list detail-list--single" style="font-size:13px;">
+          <div class="detail-row"><span>Type</span><b>${escapeHTML$1(doc.docType || doc.category || 'Report')}</b></div>
+          <div class="detail-row"><span>Added</span><b>${escapeHTML$1(doc.uploadDate || formatDate(doc.timestamp) || 'Recently')}</b></div>
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+          ${inDrive
+            ? `<a class="button button--sm button--primary" href="${escapeHTML$1(doc.driveUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px;">${icon('external')} Open in Drive</a>`
+            : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0;">Not in Drive yet</span>`}
+          ${!inDrive && (doc.fileData || doc.image) ? `<button class="button button--sm button--ghost" type="button" data-sync-doc-id="${escapeHTML$1(doc.id)}" style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')} Save to Drive</button>` : ''}
+        </div>
+      </div>
+    </article>`;
+  }
+
+  function documentGrid(docs) {
+    return `<div class="document-grid">${docs.map(documentCard).join('')}</div>`;
+  }
+
+  function appointmentList(appointments) {
+    if (appointments.length === 0) {
+      return emptyState('calendar', 'Nothing coming up', 'Appointments you book will appear here.', `<a class="button" href="${pagePath('appointments')}">${icon('calendar')}Book an appointment</a>`);
+    }
+    return `<div class="detail-list detail-list--single">${appointments.map(a => `
+    <div class="detail-row">
+      <span><b style="color:var(--color-text);">${escapeHTML$1(personLabel(a.childName) || 'Family member')}</b><br><span style="font-size:12px;">${escapeHTML$1(a.type || 'Appointment')}${a.doctor ? ` · ${escapeHTML$1(a.doctor)}` : ''}</span></span>
+      <b>${escapeHTML$1(formatDate(a.date) || a.date || '')}<br><span style="font-size:12px; font-weight:500; color:var(--color-text-muted);">${escapeHTML$1(formatSingleDisplayTime(a.time || '10:00 AM'))}</span></b>
+    </div>`).join('')}</div>`;
+  }
+
+  /* ─── Overview ─── */
+
+  function familyOverviewContent() {
+    const members = getChildren();
+    const docs = getUploadedDocs();
+    const upcoming = upcomingAppointments();
+    const checkups = getGrowthRecords().length + getHealthRecords().length;
+    const recentDocs = [...docs].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 6);
+
+    const membersHTML = members.length === 0
+      ? emptyState('users', 'Add the people in your family', 'Start with yourself, then add parents, a spouse or children. Each person gets their own health profile.', addMemberButton())
+      : `<div class="document-grid">${members.map(m => `
+        <a class="card document-card card--interactive" href="${pagePath('child-profile')}?id=${encodeURIComponent(m.id)}" style="text-decoration:none; color:inherit;">
+          <div class="document-card__body" style="padding:16px; display:flex; gap:12px; align-items:center;">
+            ${avatar(m.name)}
+            <div style="min-width:0;">
+              <h3 style="font-size:15px; font-weight:700; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML$1(m.name)}</h3>
+              <p style="font-size:12.5px; color:var(--color-text-muted); margin:2px 0 6px;">${escapeHTML$1(memberSubtitle(m))}</p>
+              <div style="display:flex; gap:6px; flex-wrap:wrap;">
+                ${m.blood ? `<span class="badge badge--blue">${escapeHTML$1(m.blood)}</span>` : ''}
+                <span class="badge badge--neutral">${documentsFor(m).length} report${documentsFor(m).length === 1 ? '' : 's'}</span>
+              </div>
+            </div>
+          </div>
+        </a>`).join('')}</div>`;
+
+    return `${heading(getDynamicGreeting(), 'Your family’s health records, reports and appointments, in one place.', `<button class="button" type="button" data-open-upload-modal>${icon('upload')}Upload a report</button>${addMemberButton()}`)}
+  <div class="stat-grid">
+    ${statCard('Family members', members.length.toLocaleString(), 'users', 'blue')}
+    ${statCard('Reports & documents', docs.length.toLocaleString(), 'file', 'cyan')}
+    ${statCard('Upcoming appointments', upcoming.length.toLocaleString(), 'calendar', 'amber')}
+    ${statCard('Checkups & tests', checkups.toLocaleString(), 'heartPulse', 'violet')}
+  </div>
+  <section class="card" style="margin-top:20px;">
+    <header class="card__header"><div><h2 class="card__title">Family members</h2><p class="card__caption">Open a profile to see reports, checkups and blood tests</p></div>${members.length ? `<a class="button button--sm" href="${pagePath('children')}">Manage</a>` : ''}</header>
+    <div class="card__body">${membersHTML}</div>
+  </section>
+  <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top:20px;">
+    <section class="card">
+      <header class="card__header"><div><h2 class="card__title">Recent reports</h2><p class="card__caption">The latest reports and documents added</p></div><a class="button button--sm" href="${pagePath('documents')}">All reports</a></header>
+      <div class="card__body">${recentDocs.length === 0
+        ? emptyState('file', 'No reports yet', 'Upload a lab report, prescription or scan and it is saved to your Google Drive.')
+        : `<div class="detail-list detail-list--single">${recentDocs.map(d => `
+            <div class="detail-row">
+              <span><b style="color:var(--color-text);">${escapeHTML$1(d.name || 'Report')}</b><br><span style="font-size:12px;">${escapeHTML$1(d.childName || d.child || '')}${d.docType ? ` · ${escapeHTML$1(d.docType)}` : ''}</span></span>
+              ${d.driveUrl ? `<a class="button button--sm button--ghost" href="${escapeHTML$1(d.driveUrl)}" target="_blank" rel="noopener noreferrer">${icon('external')}Open</a>` : `<b style="font-size:12px; color:var(--color-text-muted);">Not in Drive yet</b>`}
+            </div>`).join('')}</div>`}</div>
+    </section>
+    <section class="card">
+      <header class="card__header"><div><h2 class="card__title">Upcoming appointments</h2><p class="card__caption">Doctor visits and tests that are coming up</p></div><a class="button button--sm" href="${pagePath('appointments')}">Calendar</a></header>
+      <div class="card__body">${appointmentList(upcoming.slice(0, 6))}</div>
+    </section>
+  </div>`;
+  }
+
+  /* ─── Family members ─── */
+
+  function familyMembersContent() {
+    const members = getChildren();
+    const cards = members.map(m => {
+      const docsCount = documentsFor(m).length;
+      const health = [m.medicalConditions, m.allergies ? `Allergies: ${m.allergies}` : ''].filter(Boolean).join(' · ');
+      return `
+      <article class="card document-card">
+        <div class="document-card__body" style="padding:18px;">
+          <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
+            ${avatar(m.name, 48)}
+            <div style="min-width:0;">
+              <h3 style="font-size:16px; font-weight:700; margin:0;">${escapeHTML$1(m.name)}</h3>
+              <p style="font-size:12.5px; color:var(--color-text-muted); margin:2px 0 0;">${escapeHTML$1(memberSubtitle(m))}</p>
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;">
+            ${m.gender ? `<span class="badge badge--neutral">${escapeHTML$1(m.gender)}</span>` : ''}
+            ${m.blood ? `<span class="badge badge--blue">Blood ${escapeHTML$1(m.blood)}</span>` : ''}
+            <span class="badge badge--neutral">${docsCount} report${docsCount === 1 ? '' : 's'}</span>
+          </div>
+          <p style="font-size:12.5px; color:var(--color-text-muted); margin:0 0 14px; min-height:18px;">${escapeHTML$1(health) || 'No conditions or allergies noted'}</p>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <a class="button button--sm button--primary" href="${pagePath('child-profile')}?id=${encodeURIComponent(m.id)}">${icon('eye')}Open profile</a>
+            <button class="button button--sm" type="button" data-open-upload-modal data-person-name="${escapeHTML$1(m.name)}">${icon('upload')}Upload</button>
+            <button class="icon-button icon-button--small tooltip" data-tooltip="Edit" type="button" aria-label="Edit ${escapeHTML$1(m.name)}" data-edit="${escapeHTML$1(m.id)}">${icon('pencil')}</button>
+            <button class="icon-button icon-button--small tooltip" data-tooltip="Remove" type="button" aria-label="Remove ${escapeHTML$1(m.name)}" data-delete="${escapeHTML$1(m.id)}">${icon('trash')}</button>
+          </div>
+        </div>
+      </article>`;
+    }).join('');
+
+    return `${heading('Family members', 'Everyone whose health records you keep here.', addMemberButton())}
+  <section class="card">
+    <div class="card__body">${members.length === 0
+      ? emptyState('users', 'No family members yet', 'Add yourself and the people in your family to keep their health records together.', addMemberButton())
+      : `<div class="document-grid">${cards}</div>`}</div>
+  </section>`;
+  }
+
+  /* ─── One member's health profile ─── */
+
+  const PROFILE_TABS = ['documents', 'clinical', 'overview'];
+
+  function familyMemberContent() {
+    const member = getChild(getURLParam('id'));
+    if (!member) {
+      return `<div class="card"><div class="card__body">${emptyState('users', 'This person is not in your family space', 'They may have been removed.', `<a class="button" href="${pagePath('children')}">Family members</a>`)}</div></div>`;
+    }
+
+    const age = calculateAge(member.dob);
+    const docs = documentsFor(member);
+    const growth = getGrowthRecords(member.id);
+    const healthRecs = getHealthRecords(member.id);
+    const latestCheckup = growth[0] || {};
+    const latestBlood = healthRecs[0] || {};
+    const saved = sessionStorage.getItem('chm_active_profile_tab');
+    const activeTab = PROFILE_TABS.includes(saved) ? saved : 'documents';
+    const show = tab => (activeTab === tab ? 'display: block;' : 'display: none;');
+    const row = (label, value) => `<div class="detail-row"><span>${label}</span><b>${escapeHTML$1(value || '') || '—'}</b></div>`;
+
+    const documentsPanel = `
+    <section class="card">
+      <header class="card__header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+        <div><h2 class="card__title">Reports &amp; documents</h2><p class="card__caption">Lab reports, prescriptions and scans for ${escapeHTML$1(member.name)}, saved to your Google Drive</p></div>
+        <button class="button button--primary button--sm" type="button" data-upload-profile-doc="${escapeHTML$1(member.id)}" data-child-name="${escapeHTML$1(member.name)}">${icon('upload')} Upload a report</button>
+      </header>
+      <div class="card__body">${docs.length === 0
+        ? emptyState('file', 'No reports yet', `Upload ${escapeHTML$1(member.name)}’s lab reports, prescriptions or scans to keep them in one place.`)
+        : documentGrid(docs)}</div>
+    </section>`;
+
+    const overviewPanel = `
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px;">
+      <section class="card">
+        <header class="card__header"><div><h2 class="card__title">Details</h2><p class="card__caption">Personal and health information</p></div><button class="icon-button icon-button--small" type="button" data-edit="${escapeHTML$1(member.id)}" aria-label="Edit details">${icon('pencil')}</button></header>
+        <div class="card__body"><div class="detail-list">
+          ${row('Full name', member.name)}
+          ${row('Relation', member.relation)}
+          ${row('Date of birth', member.dob ? formatDate(member.dob) : '')}
+          ${row('Age', age)}
+          ${row('Gender', member.gender)}
+          ${row('Blood group', member.blood)}
+          ${row('Phone', member.phone)}
+          ${row('Email', member.email)}
+          ${row('Medical conditions', member.medicalConditions)}
+          ${row('Allergies', member.allergies)}
+          ${row('Current medicines', member.medications)}
+          ${row('Notes', member.notes)}
+        </div></div>
+      </section>
+      <section class="card">
+        <header class="card__header"><div><h2 class="card__title">Latest readings</h2><p class="card__caption">From the most recent checkup and blood test</p></div><button class="button button--sm" type="button" data-switch-profile-tab="clinical">${icon('plus')}Add</button></header>
+        <div class="card__body"><div class="detail-list">
+          ${row('Checkup date', latestCheckup.date ? formatDate(latestCheckup.date) : '')}
+          ${row('Blood pressure', latestCheckup.bp)}
+          ${row('Weight', latestCheckup.weight ? `${latestCheckup.weight} kg` : '')}
+          ${row('Pulse', latestCheckup.pulse ? `${latestCheckup.pulse} bpm` : '')}
+          ${row('SpO2', latestCheckup.spo2 ? `${latestCheckup.spo2} %` : '')}
+          ${row('Temperature', latestCheckup.temperature ? `${latestCheckup.temperature} °F` : '')}
+          ${row('Blood test date', latestBlood.date ? formatDate(latestBlood.date) : '')}
+          ${row('Haemoglobin', latestBlood.hemoglobin ? `${latestBlood.hemoglobin} g/dL` : '')}
+          ${row('Platelets', latestBlood.platelets ? `${latestBlood.platelets} Lakhs` : '')}
+        </div></div>
+      </section>
+    </div>`;
+
+    return `${heading('Health profile', `Everything about ${escapeHTML$1(member.name)}’s health in one place.`, `<button class="button" type="button" data-open-child-sheet="${escapeHTML$1(member.id)}" data-child-name="${escapeHTML$1(member.name)}" style="display:inline-flex; align-items:center; gap:8px;">${icon('googleSheets')}Open Google Sheet</button><button class="button button--primary" type="button" data-edit="${escapeHTML$1(member.id)}">${icon('pencil')}Edit details</button>`)}
+  <section class="card">
+    <div class="profile-header">
+      ${avatar(member.name, 64)}
+      <div class="profile-header__copy">
+        <h1>${escapeHTML$1(member.name)}</h1>
+        <p>${escapeHTML$1(memberSubtitle(member))}</p>
+        <div class="profile-header__meta">
+          ${member.gender ? `<span class="badge badge--neutral">${escapeHTML$1(member.gender)}</span>` : ''}
+          ${member.blood ? `<span class="badge badge--blue">Blood: ${escapeHTML$1(member.blood)}</span>` : ''}
+          ${member.allergies ? `<span class="badge badge--warning">Allergies: ${escapeHTML$1(member.allergies)}</span>` : ''}
+        </div>
+      </div>
+    </div>
+    <div class="profile-tabs">
+      <div class="tabs" role="tablist">
+        <button class="tab ${activeTab === 'documents' ? 'tab--active' : ''}" type="button" data-profile-tab="documents">Reports &amp; documents (${docs.length})</button>
+        <button class="tab ${activeTab === 'clinical' ? 'tab--active' : ''}" type="button" data-profile-tab="clinical">Checkups &amp; tests</button>
+        <button class="tab ${activeTab === 'overview' ? 'tab--active' : ''}" type="button" data-profile-tab="overview">Details</button>
+      </div>
+    </div>
+  </section>
+  <div class="profile-tab-content-container" style="margin-top: 20px;">
+    <div data-tab-panel="documents" style="${show('documents')}">${documentsPanel}</div>
+    <div data-tab-panel="clinical" style="${show('clinical')}">${clinicalSectionHTML(member, growth, healthRecs)}</div>
+    <div data-tab-panel="overview" style="${show('overview')}">${overviewPanel}</div>
+  </div>`;
+  }
+
+  /* ─── Add or edit a family member ─── */
+
+  function familyMemberFormContent() {
+    const editId = getURLParam('edit');
+    const member = editId ? getChild(editId) : null;
+    const parts = (member?.name || '').split(/\s+/);
+    const value = key => escapeHTML$1(member?.[key] || '');
+    const input = (label, name, val, type = 'text', extra = '') =>
+      `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" value="${val}" ${extra}></label>`;
+    const select = (label, name, options, current, required = false) =>
+      `<label class="field"><span class="field__label">${label}</span><select class="input" name="${name}" ${required ? 'required' : ''}><option value="" ${current ? '' : 'selected'} ${required ? 'disabled' : ''}>Select</option>${options.map(o => `<option value="${o}" ${o === current ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+    const textarea = (label, name, placeholder) =>
+      `<label class="field form-span-all"><span class="field__label">${label}</span><textarea class="textarea" name="${name}" placeholder="${placeholder}">${value(name)}</textarea></label>`;
+
+    const cancelHref = member ? `${pagePath('child-profile')}?id=${encodeURIComponent(member.id)}` : pagePath('children');
+    const title = member ? `Edit ${escapeHTML$1(member.name)}` : 'Add family member';
+
+    return `${heading(title, 'Fields marked with an asterisk are required.', `<a class="button button--ghost" href="${cancelHref}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${member ? 'Save changes' : 'Add to family'}</button>`)}
+  <div class="form-layout"><form class="card" id="child-form">${member ? `<input type="hidden" name="id" value="${escapeHTML$1(member.id)}">` : ''}
+    <section class="form-section"><div class="form-section__heading"><h2 class="card__title">About them</h2><p>Who they are and how they are related to you.</p></div>
+      <div class="form-grid--two">
+        ${input('First name *', 'firstName', escapeHTML$1(parts[0] || ''), 'text', 'required placeholder="e.g. Asha"')}
+        ${input('Last name', 'lastName', escapeHTML$1(parts.slice(1).join(' ')), 'text', 'placeholder="e.g. Pandya"')}
+        ${select('Relation *', 'relation', RELATIONS, member?.relation || '', true)}
+        ${input('Date of birth', 'birthDate', member ? formatDateForInput(member.dob) : '', 'date')}
+        ${select('Gender *', 'gender', ['Male', 'Female', 'Other'], member?.gender || '', true)}
+        ${select('Blood group', 'blood', BLOOD_GROUPS, member?.blood || '')}
+        ${input('Phone', 'phone', value('phone'), 'tel', 'placeholder="+91 00000 00000"')}
+        ${input('Email', 'email', value('email'), 'email', 'placeholder="name@example.com"')}
+      </div>
+    </section>
+    <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health</h2><p>Anything a doctor should know.</p></div>
+      <div class="form-grid--two">
+        ${textarea('Medical conditions', 'medicalConditions', 'e.g. Diabetes, High blood pressure')}
+        ${textarea('Allergies', 'allergies', 'e.g. Penicillin, Peanuts')}
+        ${textarea('Current medicines', 'medications', 'e.g. Metformin 500 mg twice a day')}
+        ${textarea('Notes', 'notes', 'Anything else worth remembering')}
+      </div>
+    </section>
+  </form></div>`;
+  }
+
+  /* ─── Reports and documents for the whole family ─── */
+
+  function familyDocumentsContent() {
+    const members = getChildren();
+    const docs = getUploadedDocs();
+    const unsynced = docs.filter(d => !d.driveUrl && (d.fileData || d.image)).length;
+    const claimed = new Set(); // IDs of documents shown under a member
+
+    const sections = members.map(m => {
+      const own = documentsFor(m);
+      own.forEach(d => claimed.add(d.id));
+      return `
+      <section class="card" style="margin-bottom:20px;">
+        <header class="card__header" style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
+          <div style="display:flex; gap:12px; align-items:center;">${avatar(m.name, 36)}<div><h2 class="card__title">${escapeHTML$1(m.name)}</h2><p class="card__caption">${escapeHTML$1(memberSubtitle(m))} · ${own.length} report${own.length === 1 ? '' : 's'}</p></div></div>
+          <button class="button button--sm" type="button" data-open-upload-modal data-person-name="${escapeHTML$1(m.name)}">${icon('upload')}Upload</button>
+        </header>
+        <div class="card__body">${own.length === 0 ? `<p style="margin:0; font-size:13px; color:var(--color-text-muted);">No reports for ${escapeHTML$1(m.name)} yet.</p>` : documentGrid(own)}</div>
+      </section>`;
+    }).join('');
+
+    const others = docs.filter(d => !claimed.has(d.id));
+    const otherSection = others.length === 0 ? '' : `
+    <section class="card" style="margin-bottom:20px;">
+      <header class="card__header"><div><h2 class="card__title">Other documents</h2><p class="card__caption">Not linked to a family member</p></div></header>
+      <div class="card__body">${documentGrid(others)}</div>
+    </section>`;
+
+    const actions = `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload a report</button>${unsynced > 0 ? `<button class="button button--ghost" type="button" data-auto-sync-drive style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')}Save ${unsynced} to Drive</button>` : ''}`;
+
+    if (members.length === 0 && docs.length === 0) {
+      return `${heading('Reports & documents', 'Reports for everyone in your family, saved to your Google Drive.', actions)}
+    <section class="card"><div class="card__body">${emptyState('file', 'Add a family member first', 'Reports are kept per person, so start by adding someone.', addMemberButton())}</div></section>`;
+    }
+    return `${heading('Reports & documents', 'Reports for everyone in your family, saved to your Google Drive.', actions)}${sections}${otherSection}`;
+  }
+
   /* ═══════════════════════════════════════════════════════
      NAVIGATION
      ═══════════════════════════════════════════════════════ */
@@ -36725,6 +37429,22 @@
     'register-child': 'Register child',
     documents: 'Health records & documents',
     reports: 'Health reports',
+    settings: 'Settings'
+  };
+
+  /** A family space has its own menu; the routes are the same, so links work in both. */
+  const familyNav = [
+    { section: 'Overview', items: [['dashboard', 'Overview', 'grid']] },
+    { section: 'Family & Health', items: [['children', 'Family members', 'users'], ['documents', 'Reports & documents', 'file'], ['appointments', 'Appointments', 'calendar']] }
+  ];
+
+  const familyPageTitles = {
+    dashboard: 'Overview',
+    children: 'Family members',
+    appointments: 'Appointments',
+    'child-profile': 'Health profile',
+    'register-child': 'Add family member',
+    documents: 'Reports & documents',
     settings: 'Settings'
   };
 
@@ -36746,7 +37466,9 @@
     const photoURL = session.photoURL;
     const userInitials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'AD';
 
-    const navHTML = nav.map(group => group.items.map(item => navItem(item, page)).join('')).join('');
+    const family = isFamilySpace();
+    const navHTML = (family ? familyNav : nav).map(group => group.items.map(item => navItem(item, page)).join('')).join('');
+    const titles = family ? familyPageTitles : pageTitles;
 
     const alerts = getAlerts();
     const unreadAlerts = alerts.filter(a => !a.dismissed);
@@ -36797,8 +37519,8 @@
       <header class="topbar">
         <button class="icon-button u-mobile-only" type="button" data-open-sidebar aria-label="Open navigation">${icon('menu')}</button>
         ${page === 'dashboard' ? '' : `<button class="icon-button" data-topbar-back aria-label="Go back">${icon('chevronLeft')}</button>`}
-        <div class="topbar__crumbs"><span>${escapeHTML$1(ngoName)}</span><span aria-hidden="true"> / </span><b>${pageTitles[page] || 'Workspace'}</b></div>
-        <label class="topbar-search"><span class="sr-only">Search child records</span>${icon('search')}<input type="search" placeholder="Search children, health records…" data-global-search><kbd>⌘ K</kbd></label>
+        <div class="topbar__crumbs"><span>${escapeHTML$1(ngoName)}</span><span aria-hidden="true"> / </span><b>${titles[page] || 'Workspace'}</b></div>
+        <label class="topbar-search"><span class="sr-only">${term('searchLabel')}</span>${icon('search')}<input type="search" placeholder="${term('searchPlaceholder')}" data-global-search><kbd>⌘ K</kbd></label>
         <div class="topbar__actions">
           <button class="icon-button" data-theme-toggle type="button" aria-label="Toggle color theme" style="cursor: pointer;">
             <span class="theme-icon-container">
@@ -36841,7 +37563,7 @@
               <div style="padding:12px 14px; border-bottom:1px solid var(--color-border); font-size:12px;">
                 <div style="font-weight:700; color:var(--color-text);">${escapeHTML$1(displayName)}</div>
                 <div style="color:var(--color-text-muted); font-size:11px; margin-top:2px;">${escapeHTML$1(email)}</div>
-                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">Connected NGO: ${escapeHTML$1(ngoName)}</span></div>
+                <div style="margin-top:6px; font-size:11px;"><span class="badge badge--success">${term('workspaceBadge')}: ${escapeHTML$1(ngoName)}</span></div>
               </div>
               <a class="dropdown__item" href="${pagePath('settings')}">${icon('settings')}Account & Google Workspace</a>
               <div class="divider" style="margin: 4px 0; border-top: 1px solid var(--color-border);"></div>
@@ -36867,40 +37589,7 @@
   </div>`;
   }
 
-  const heading = (title, description, actions) => `<div class="page-heading"><div class="page-heading__copy"><h1>${title}</h1><p>${description}</p></div>${actions ? `<div class="page-heading__actions">${actions}</div>` : ''}</div>`;
 
-  function getDynamicGreeting() {
-    const hour = new Date().getHours();
-    const session = getSession() || {};
-    const firstName = escapeHTML$1(String(session.displayName || '').trim().split(/\s+/)[0] || 'there');
-    if (hour < 12) return `Good morning, ${firstName}`;
-    if (hour < 17) return `Good afternoon, ${firstName}`;
-    return `Good evening, ${firstName}`;
-  }
-
-  const statCard = (label, value, glyph, color = 'blue') => `
-  <article class="stat-card stat-card--${color}">
-    <div class="stat-card__top">
-      <span class="stat-card__label" title="${escapeHTML$1(label)}">${label}</span>
-      <span class="stat-card__icon stat-card__icon--${color}">${icon(glyph)}</span>
-    </div>
-    <div class="stat-card__number">${value}</div>
-  </article>
-`;
-
-  const field = (label, name, placeholder, type = 'text', hint = '', value = '', extra = '') => `<label class="field"><span class="field__label">${label}</span><input class="input" name="${name}" type="${type}" placeholder="${placeholder}" value="${escapeHTML$1(value)}" ${extra}>${hint ? `<span class="field__hint">${hint}</span>` : ''}</label>`;
-
-  function formatDateForInput(dateStr) {
-    if (!dateStr) return '';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-    const matchDMY = dateStr.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/);
-    if (matchDMY) {
-      const [_, d, m, y] = matchDMY;
-      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
-    }
-    try { const d = new Date(dateStr); if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10); } catch (e) { }
-    return '';
-  }
 
   /* ═══════════════════════════════════════════════════════
      DASHBOARD — Child Health Platform
@@ -36987,16 +37676,6 @@
      CHILD HEALTH PROFILE
      ═══════════════════════════════════════════════════════ */
 
-  function getURLParam(key) {
-    let searchParams = new URLSearchParams(window.location.search);
-    let val = searchParams.get(key);
-    if (!val && window.location.hash.includes('?')) {
-      const hashQuery = window.location.hash.split('?')[1];
-      val = new URLSearchParams(hashQuery).get(key);
-    }
-    return val;
-  }
-
   function childProfilePage() {
     const id = getURLParam('id');
     const child = getChild(id);
@@ -37026,7 +37705,7 @@
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px; gap:8px;">
             <h3 style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${d.name || d.title || 'Medical Document'}</h3>
             <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
-              ${d.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:13px; height:13px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Local</span>`}
+              ${d.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:13px; height:13px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Not in Drive yet</span>`}
               <span class="badge badge--success">${d.status || 'Verified'}</span>
             </div>
           </div>
@@ -37300,140 +37979,8 @@
     </div>
   `;
 
-    // Clinical & Google Sheet Sync HTML
     const latestBlood = healthRecs[0] || {};
-    const childBloodSheetUrl = getBloodTestSheetUrl(child.id, child.name);
-    const allClinicalHistory = [
-      ...growth.map(g => ({ ...g, entryType: 'checkup', sortDate: g.date || '1970-01-01' })),
-      ...healthRecs.map(h => ({ ...h, entryType: 'blood', sortDate: h.date || '1970-01-01' }))
-    ].sort((a, b) => (new Date(b.sortDate).getTime() || 0) - (new Date(a.sortDate).getTime() || 0));
-
-    const historyClinicalRowsHTML = allClinicalHistory.length === 0 ? `
-    <tr><td colspan="5" class="empty-state" style="padding: 24px; text-align: center;">No clinical checkups or blood tests recorded yet for ${escapeHTML$1(child.name)}.</td></tr>
-  ` : allClinicalHistory.map(item => {
-      const isCheckup = item.entryType === 'checkup';
-      const typeBadge = isCheckup
-        ? `<span class="badge badge--blue" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Routine Checkup (Row 3)</span>`
-        : `<span class="badge badge--danger" style="font-size:11px; display:inline-flex; align-items:center; gap:4px;"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg> Blood Test (Row 19)</span>`;
-
-      const summaryHTML = isCheckup
-        ? `<span>${[
-          item.temperature ? `${item.temperature}°F` : '',
-          item.bp ? `BP ${item.bp}` : '',
-          item.weight ? `${item.weight}kg` : '',
-          item.pulse ? `${item.pulse}bpm` : '',
-          item.spo2 ? `SpO2 ${item.spo2}%` : ''
-        ].filter(Boolean).join(' · ') || 'Vitals recorded'}</span>`
-        : `<span>${[
-          item.hemoglobin ? `Hb: ${item.hemoglobin} g/dL` : '',
-          item.wbc ? `WBC: ${item.wbc}` : '',
-          item.platelets ? `Platelets: ${item.platelets} Lakhs` : '',
-          item.rbc ? `RBC: ${item.rbc}` : ''
-        ].filter(Boolean).join(' · ') || 'Lab values recorded'}</span>`;
-
-      const detailsHTML = isCheckup
-        ? `${item.prescription ? `<b>Rx:</b> ${escapeHTML$1(item.prescription)} ` : ''}${item.complaint ? `<i>(${escapeHTML$1(item.complaint)})</i>` : ''}${item.eyeCheckup ? ` · Eye: ${escapeHTML$1(item.eyeCheckup)}` : ''}${item.clinicName || item.doctorName ? ` · ${escapeHTML$1([item.doctorName, item.clinicName].filter(Boolean).join(', '))}` : ''}` || '—'
-        : `${item.rbcMorphology ? `RBC: ${escapeHTML$1(item.rbcMorphology)} ` : ''}${item.plateletsAdequacy ? `· Platelets: ${escapeHTML$1(item.plateletsAdequacy)}` : ''}` || '—';
-
-      const rawData = JSON.stringify(item).replace(/"/g, '&quot;');
-
-      return `
-      <tr>
-        <td style="font-weight:600; white-space:nowrap;">${item.date ? formatDate(item.date) : 'Recent'}</td>
-        <td style="white-space:nowrap;">${typeBadge}</td>
-        <td style="font-size:13px;">${summaryHTML}</td>
-        <td style="font-size:12.5px; color:var(--color-text-muted); max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${detailsHTML}</td>
-        <td style="text-align:right; white-space:nowrap;">
-          <button class="button button--ghost button--sm" type="button" data-load-clinical-item="${rawData}" style="display:inline-flex; align-items:center; gap:4px;">
-            ${icon('pencil')} Load into Form
-          </button>
-          <button class="icon-button tooltip" type="button" data-tooltip="Delete entry" data-delete-clinical-item="${item.id}" data-clinical-type="${item.entryType}" style="color:var(--color-danger); margin-left:6px;">
-            ${icon('trash')}
-          </button>
-        </td>
-      </tr>
-    `;
-    }).join('');
-
-    const clinicalHTML = `
-    <!-- Main Data Entry Form -->
-    <section class="card" style="margin-bottom: 24px;">
-      <form id="profile-clinical-data-form" class="clinical-sync-form" style="padding: 24px;">
-        <input type="hidden" name="childId" value="${child.id}" />
-        <input type="hidden" name="childName" value="${escapeHTML$1(child.name)}" />
-        <input type="hidden" name="existingGrowthId" id="prof-growth-id" value="" />
-        <input type="hidden" name="existingBloodId" id="prof-blood-id" value="" />
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); flex-wrap: wrap; gap: 12px;">
-          <div>
-            <h2 class="card__title" style="margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#2563eb" stroke-width="2.2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-              Clinical Details &amp; Google Sheet Sync Form
-            </h2>
-            <p class="card__caption" style="margin: 0;">Fill in clinical checkup vitals and blood test parameters. Saving automatically updates both local records and Google Sheets.</p>
-          </div>
-          <button class="button button--primary" id="btn-save-profile-clinical" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Save &amp; Sync to Sheet
-          </button>
-        </div>
-
-        <div id="prof-edit-banner" style="display: none; margin-bottom: 18px; padding: 10px 16px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-          <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #1d4ed8; font-weight: 600;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            <span id="prof-edit-banner-text">Editing historical clinical entry</span>
-          </div>
-          <button type="button" class="button button--ghost button--sm" id="prof-cancel-edit-btn" style="color: #1d4ed8; font-size: 12px; padding: 4px 12px; border-color: #bfdbfe;">
-            Cancel &amp; New Entry
-          </button>
-        </div>
-
-        ${renderClinicalSectionsMarkup({
-          existingGrowth: {},
-          existingBlood: {},
-          targetDate: new Date().toISOString().slice(0, 10),
-          prefix: 'prof-'
-        })}
-
-        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--color-border);">
-          <button class="button button--primary" id="btn-save-profile-clinical-bottom" type="submit" style="display: inline-flex; align-items: center; gap: 8px; font-weight: 600; padding: 8px 18px;">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-            Save &amp; Sync to Sheet
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <!-- History Table -->
-    <section class="card">
-      <header class="card__header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <h2 class="card__title">Clinical &amp; Lab History</h2>
-          <p class="card__caption">All routine clinical checkups and blood test reports recorded for ${escapeHTML$1(child.name)}</p>
-        </div>
-        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-          ${childBloodSheetUrl ? `<a href="${escapeHTML$1(childBloodSheetUrl)}" target="_blank" class="button button--ghost button--sm" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border);">🩸 Blood test sheet ↗</a>` : ''}
-          <span class="badge badge--neutral">${allClinicalHistory.length} total entries</span>
-        </div>
-      </header>
-      <div class="data-table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Category</th>
-              <th>Measurements / Key Values</th>
-              <th>Clinical Remarks / Prescription</th>
-              <th style="text-align: right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${historyClinicalRowsHTML}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `;
+    const clinicalHTML = clinicalSectionHTML(child, growth, healthRecs);
 
     const activeTab = (typeof sessionStorage !== 'undefined' && sessionStorage.getItem('chm_active_profile_tab')) || 'overview';
 
@@ -37768,7 +38315,7 @@
             <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
               <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${doc.name}</h2>
               <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
-                ${doc.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:12px; height:12px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Local</span>`}
+                ${doc.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:12px; height:12px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Not in Drive yet</span>`}
                 ${statusBadge(doc.status || 'Verified')}
               </div>
             </div>
@@ -37882,7 +38429,7 @@
     </nav>
     <section class="card settings-panel">
       <h2>Google Workspace Connections</h2>
-      <p class="muted">Manage real-time Google Sheets Live Synchronization for child health records.</p>
+      <p class="muted">${isFamilySpace() ? 'Keep a copy of your family\u2019s health records in your own Google Sheets, and reports in Google Drive.' : 'Manage real-time Google Sheets Live Synchronization for child health records.'}</p>
       
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 20px 0;">
         <!-- Google Sheets Live Sync Highlight Card (TOP) -->
@@ -37923,8 +38470,8 @@
           ` : `
             <p style="font-size: 13px; color: var(--color-text); margin: 0 0 16px 0; line-height: 1.5;">
               ${isConnected 
-                ? `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`
-                : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`
+                ? (isFamilySpace() ? `Sync is on for your Google account (${escapeHTML$1(adminEmail)}). Every health record you add or change is copied to your Google Sheets, and reports you upload are saved in your Google Drive.` : `Real-time automated sync is active for your NGO's Google Account (${escapeHTML$1(adminEmail)}). Every child health record registered or updated is automatically synchronized directly to your Google Spreadsheets.`)
+                : (isFamilySpace() ? `Connect your Google account once to keep a copy of every health record in your own Google Sheets, and every report you upload in your Google Drive.` : `Authorize your NGO Google Account once to enable real-time Google Sheets synchronization. All master health records and individual student medical tabs are stored directly in your own Google Spreadsheets.`)
               }
             </p>
           `}
@@ -37946,7 +38493,7 @@
             ${clinicalSheetUrl ? `
               <a href="${escapeHTML$1(clinicalSheetUrl)}" target="_blank" class="button button--primary" style="font-weight: 700; background: #0b8043; border-color: #0b8043; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px;">
                 ${icon('googleSheets')}
-                Open Student Medical Records Workbook ↗
+                Open ${term('medicalWorkbook')} Workbook ↗
               </a>
             ` : ''}
 
@@ -37970,7 +38517,7 @@
 
             ${masterSheetUrl ? `
               <a href="${escapeHTML$1(masterSheetUrl)}" target="_blank" class="button button--ghost" style="font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border: 1px solid var(--color-border);">
-                📄 Master Directory Sheet ↗
+                📄 ${isFamilySpace() ? 'Family Members Sheet' : 'Master Directory Sheet'} ↗
               </a>
             ` : ''}
 
@@ -38029,7 +38576,7 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Child</th>
+              <th>${term('person')}</th>
               <th>Appointment Type</th>
               <th>Doctor / Clinic</th>
               <th>Date & Time</th>
@@ -38052,8 +38599,8 @@
                     <div style="display:flex; align-items:center; gap:10px;">
                       <div class="avatar avatar--sm" style="background:#e8f0fe; color:#1a73e8; font-weight:700; font-size:12px; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;">${initials(a.childName || 'C')}</div>
                       <div>
-                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML$1(a.childName || 'Child')}</strong>
-                        <span style="font-size:11px; color:var(--color-text-muted);">${a.childId ? `ID: ${a.childId}` : ''}</span>
+                        <strong style="font-size:13.5px; display:block; color:var(--color-text);">${escapeHTML$1(personLabel(a.childName) || term('person'))}</strong>
+                        <span style="font-size:11px; color:var(--color-text-muted);">${a.childId && !isFamilySpace() ? `ID: ${a.childId}` : ''}</span>
                       </div>
                     </div>
                   </td>
@@ -38097,7 +38644,7 @@
         </table>
       </div>`;
 
-    return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}View Children</a>`)}
+    return shell('appointments', `${heading('Appointments', 'Book and manage health appointments — synced to Google Calendar', `<a class="button button--primary" href="${pagePath('children')}">${icon('users')}${term('viewPeople')}</a>`)}
   <div class="stat-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 20px;">
     ${statCard('Total Appointments', appointments.length.toLocaleString(), 'calendar', 'blue')}
     ${statCard('Upcoming', upcomingCount.toLocaleString(), 'clock', 'amber')}
@@ -38109,7 +38656,7 @@
       <header class="card__header">
         <div>
           <h2 class="card__title">All Appointments</h2>
-          <p class="card__caption">Complete appointment history across all children</p>
+          <p class="card__caption">${isFamilySpace() ? 'Every appointment for the family' : 'Complete appointment history across all children'}</p>
         </div>
         <span class="badge badge--blue">${appointments.length} total</span>
       </header>
@@ -38124,7 +38671,27 @@
      PAGE ROUTER
      ═══════════════════════════════════════════════════════ */
 
+  /** Pages a family space draws with its own screens; the others are shared. */
+  const familyPages = {
+    dashboard: familyOverviewContent,
+    children: familyMembersContent,
+    'child-profile': familyMemberContent,
+    'child_profile': familyMemberContent,
+    'register-child': familyMemberFormContent,
+    documents: familyDocumentsContent
+  };
+
+  function renderFamilyPage(page) {
+    if (page === 'login') return loginPage();
+    if (page === 'appointments') return appointmentsPage();
+    if (page === 'settings') return settingsPage();
+    // Children's-home pages (growth charts, reports, medicine stock) open the overview.
+    const key = familyPages[page] ? page : 'dashboard';
+    return shell(key === 'child_profile' ? 'child-profile' : key, familyPages[key]());
+  }
+
   function renderPage(page) {
+    if (isFamilySpace()) return renderFamilyPage(page);
     const pages = {
       login: loginPage,
       dashboard: dashboardPage,
@@ -38177,12 +38744,12 @@
   }
 
   function getQuickCommands(query = '') {
-    const term = query.trim().toLowerCase();
+    const term$1 = query.trim().toLowerCase();
     const commands = [
       {
         id: 'cmd-register',
-        title: 'Register New Student',
-        subtitle: 'Enroll child with Aadhaar, parent details & vitals',
+        title: term('searchCmdRegister'),
+        subtitle: term('searchCmdRegisterHint'),
         iconSvg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>',
         badge: 'Create',
         url: `${pagePath('register-child')}`,
@@ -38190,7 +38757,7 @@
       },
       {
         id: 'cmd-calendar',
-        title: 'Google Calendar & Health Camps',
+        title: term('searchCmdCalendar'),
         subtitle: 'Schedule medical checkups, dental visits & vaccinations',
         iconSvg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
         badge: 'Calendar',
@@ -38235,11 +38802,13 @@
       }
     ];
 
-    if (!term) return commands;
-    return commands.filter(c => 
-      c.title.toLowerCase().includes(term) ||
-      c.subtitle.toLowerCase().includes(term) ||
-      c.badge.toLowerCase().includes(term)
+    // A family has no growth charts or medicine stock pages.
+    const available = isFamilySpace() ? commands.filter(c => c.id !== 'cmd-growth' && c.id !== 'cmd-medicines') : commands;
+    if (!term$1) return available;
+    return available.filter(c => 
+      c.title.toLowerCase().includes(term$1) ||
+      c.subtitle.toLowerCase().includes(term$1) ||
+      c.badge.toLowerCase().includes(term$1)
     );
   }
 
@@ -38293,7 +38862,7 @@
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         </div>
         <h4 style="margin:8px 0 4px 0; font-size:15px; font-weight:700; color:var(--color-text);">No matching records found</h4>
-        <p style="font-size:12.5px; color:var(--color-text-muted); margin:0;">Try searching by student name, guardian, ID (CH-XXXX), blood group, checkup type, or command.</p>
+        <p style="font-size:12.5px; color:var(--color-text-muted); margin:0;">${term('searchEmptyHint')}</p>
       </div>
     `;
     }
@@ -38306,10 +38875,10 @@
 
       if (itemType === 'student') {
         iconHtml = `<div class="spotlight-item-avatar">${initials(item.name)}</div>`;
-        badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">Student</span>`;
+        badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">${term('searchBadge')}</span>`;
       } else if (itemType === 'appointment') {
         iconHtml = `<div class="spotlight-item-icon spotlight-item-icon--cal"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>`;
-        badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">Camp / Appt</span>`;
+        badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">${isFamilySpace() ? 'Appointment' : 'Camp / Appt'}</span>`;
       } else if (itemType === 'alert') {
         iconHtml = `<div class="spotlight-item-icon spotlight-item-icon--alert"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#dc2626" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>`;
         badgeHtml = `<span class="badge badge--danger" style="font-size:10px; padding:2px 8px; border-radius:10px;">Attention</span>`;
@@ -38342,7 +38911,7 @@
       <div class="spotlight-preview-empty">
         <div style="font-size:40px; margin-bottom:12px;">✨</div>
         <div style="font-size:15px; font-weight:700; color:var(--color-text); margin-bottom:4px;">Spotlight Command Center</div>
-        <div style="font-size:12.5px; color:var(--color-text-muted); line-height:1.5;">Type to search students, schedule camps, inspect clinical health records, or run instant commands.</div>
+        <div style="font-size:12.5px; color:var(--color-text-muted); line-height:1.5;">${term('searchIntro')}</div>
       </div>
     `;
     }
@@ -38360,12 +38929,12 @@
           <div class="spotlight-preview-avatar">${initials(item.name)}</div>
           <div style="min-width:0; flex:1;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-              <span class="badge badge--primary" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">STUDENT</span>
+              <span class="badge badge--primary" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">${term('searchBadgeCaps')}</span>
               <span class="badge ${statusClass}" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">${healthLabel.toUpperCase()}</span>
               <span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:var(--color-bg-alt); padding:2px 8px; border-radius:10px;">${item.id}</span>
             </div>
             <h3 style="margin:0; font-size:18px; font-weight:700; color:var(--color-text); line-height:1.2;">${escapeHTML$1(item.name)}</h3>
-            <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">Student Profile</div>
+            <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">${term('searchProfileLabel')}</div>
           </div>
         </div>
 
@@ -38384,8 +38953,8 @@
             <span class="spotlight-cell-val" style="color:#ef4444; font-weight:700;">${item.blood || '—'}</span>
           </div>
           <div class="spotlight-preview-cell">
-            <span class="spotlight-cell-label">Guardian Contact</span>
-            <span class="spotlight-cell-val">${item.father || item.guardian || 'Guardian'}${item.phone ? ` • <a href="tel:${item.phone}" style="color:var(--color-primary); text-decoration:none;">${item.phone}</a>` : ''}</span>
+            <span class="spotlight-cell-label">${term('searchContactLabel')}</span>
+            <span class="spotlight-cell-val">${isFamilySpace() ? escapeHTML$1(item.relation || '—') : (item.father || item.guardian || 'Guardian')}${item.phone ? ` • <a href="tel:${item.phone}" style="color:var(--color-primary); text-decoration:none;">${item.phone}</a>` : ''}</span>
           </div>
         </div>
 
@@ -38397,7 +38966,7 @@
           </a>
           <a class="button button--secondary button--sm" href="${pagePath('appointments')}" style="flex:1; justify-content:center; gap:6px; font-size:12px; padding:7px 12px; text-decoration:none;">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Book Camp
+            ${isFamilySpace() ? 'Book appointment' : 'Book Camp'}
           </a>
         </div>
       </div>
@@ -38482,7 +39051,7 @@
             id="spotlight-search-input" 
             class="spotlight-input" 
             type="search" 
-            placeholder="Search students, health records, appointments, or commands…" 
+            placeholder="${term('searchInputPlaceholder')}" 
             value="${escapeHTML$1(query)}" 
             autocomplete="off" 
             spellcheck="false" 
@@ -38499,10 +39068,10 @@
             All <span class="spotlight-tab-count">${data.all.length}</span>
           </button>
           <button type="button" class="spotlight-tab" data-spotlight-tab="students">
-            Students <span class="spotlight-tab-count">${data.students.length}</span>
+            ${term('searchTabPeople')} <span class="spotlight-tab-count">${data.students.length}</span>
           </button>
           <button type="button" class="spotlight-tab" data-spotlight-tab="appointments">
-            Camps & Appts <span class="spotlight-tab-count">${data.appointments.length}</span>
+            ${term('searchTabAppointments')} <span class="spotlight-tab-count">${data.appointments.length}</span>
           </button>
           <button type="button" class="spotlight-tab" data-spotlight-tab="commands">
             Quick Actions <span class="spotlight-tab-count">${data.commands.length}</span>
@@ -38535,7 +39104,7 @@
             <span class="spotlight-key-item"><kbd>Esc</kbd> Close</span>
           </div>
           <div class="spotlight-footer-brand">
-            Child Health Management Spotlight
+            ${term('searchTitle')}
           </div>
         </div>
 
@@ -38636,6 +39205,8 @@
    * Automatically sync executive report to Google Docs in background via OAuth API
    */
   async function autoSyncToGoogleDocs() {
+    // A family space has no executive audit report.
+    if (isFamilySpace()) return;
     const session = getSession() || {};
     const ngoSlug = String(session.ngoSlug || session.ngo || 'ayusha-nilayam').toLowerCase().trim().replace(/[^a-z0-9_-]/g, '-') || 'ayusha-nilayam';
     const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
@@ -38725,7 +39296,9 @@
       hygieneIndex: values.hygieneIndex || '',
       emergencyContact: values.emergencyContact || '',
       emergencyPhone: values.emergencyPhone || '',
-      hospitalName: values.hospitalName || ''
+      hospitalName: values.hospitalName || '',
+      // Only the family member form has this field; a child record is unchanged.
+      ...(values.relation !== undefined ? { relation: values.relation } : {})
     };
   }
 
@@ -39116,6 +39689,12 @@
     const unsynced = docs.filter(d => !d.driveUrl && (d.fileData || d.image) && !activeSyncDocIds.has(d.id));
     if (unsynced.length === 0) {
       return { total: 0, synced: 0, failed: 0 };
+    }
+    // In the background, wait until Google is connected instead of re-sending
+    // every file on each page view. A manual "Sync to Drive" still tries now.
+    const config = getSheetsConfig();
+    if (!showToasts && config && !config.connected) {
+      return { total: unsynced.length, synced: 0, failed: 0 };
     }
 
     isAutoSyncing = true;
@@ -39642,7 +40221,8 @@
     if (signOutBtn) {
       event.preventDefault();
       clearLocalRecords().then(logoutUser).then(() => {
-        toast('Signed Out', 'Signed out and removed the records from this browser.');
+        forgetSpaceType();
+        toast('Signed Out', 'You have been signed out.');
         window.location.hash = '#/login';
         if (renderCurrentPage) renderCurrentPage();
       });
@@ -40062,16 +40642,16 @@
     if (target.matches('[data-delete]')) {
       const id = target.dataset.delete;
       const child = getChildren().find((item) => item.id === id);
-      const childName = child?.name || 'child';
+      const childName = child?.name || term('personLower');
       modal({
         title: `Remove ${childName}?`,
-        body: 'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
-        confirmText: 'Remove child',
+        body: term('removeBody'),
+        confirmText: term('removeConfirm'),
         confirmClass: 'button--danger',
         onConfirm: async () => {
           deleteChild(id);
           applyTableFilters();
-          toast('Child removed', `The record for ${childName} has been removed.`);
+          toast(term('removedToast'), `The record for ${childName} has been removed.`);
           await autoSyncDeleteChildFromGoogleSheets(id, childName);
           await syncWithServer();
           if (typeof renderCurrentPage === 'function') {
@@ -40120,18 +40700,18 @@
         <form id="profile-doc-upload-form" class="form-layout" style="display:flex; flex-direction:column; gap:14px;">
           <label class="field">
             <span class="field__label">Document Title *</span>
-            <input class="input" type="text" name="title" placeholder="e.g. Aadhaar Card, Vaccination Certificate, Blood Report" required />
+            <input class="input" type="text" name="title" placeholder="${term('uploadTitlePlaceholder')}" required />
           </label>
           <label class="field">
             <span class="field__label">Category / Document Type *</span>
             <select class="select" name="docType">
-              <option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
+              ${isFamilySpace() ? familyCategoryOptions() : `<option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
               <option value="Medical Report">Medical Report / Lab Test</option>
               <option value="Aadhaar Card">Aadhaar Card / Govt ID</option>
               <option value="Birth Certificate">Birth Certificate</option>
               <option value="Vaccination Record">Immunization / Vaccination Record</option>
               <option value="Prescription">Doctor Prescription</option>
-              <option value="School Certificate">School / Admission Certificate</option>
+              <option value="School Certificate">School / Admission Certificate</option>`}
             </select>
           </label>
           <label class="field">
@@ -40517,7 +41097,7 @@
       const growthChildId = delGrowthBtn.dataset.childId;
       modal({
         title: 'Delete Growth Record?',
-        body: 'Are you sure you want to remove this historical measurement? This will update your local records and sync to cloud database.',
+        body: 'Are you sure you want to remove this historical measurement? This updates the database and Google Sheets.',
         confirmText: 'Delete Record',
         confirmClass: 'button--danger',
         onConfirm: async () => {
@@ -40551,34 +41131,35 @@
     // Open Direct Document Upload Modal
     if (target.closest('[data-open-upload-modal]')) {
       const children = getChildren();
-      const selectedFilter = document.querySelector('[data-child-document-filter]')?.value || '';
-      const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name} (${c.id})</option>`).join('');
+      // A family's per-person "Upload" buttons name the person to preselect.
+      const selectedFilter = (target.closest('[data-open-upload-modal]').dataset.personName || document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
+      const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name}${isFamilySpace() ? '' : ` (${c.id})`}</option>`).join('');
 
       modal({
-        title: 'Upload Document for Child',
+        title: term('uploadForPerson'),
         body: `
           <form id="direct-doc-form" style="display:flex; flex-direction:column; gap:14px;">
             <label class="field">
-              <span class="field__label">Select Child *</span>
+              <span class="field__label">${isFamilySpace() ? 'Family member' : 'Select Child'} *</span>
               <select class="select" name="childName" required>
-                <option value="">Choose child</option>
+                <option value="">${term('choosePerson')}</option>
                 ${childOptions}
               </select>
             </label>
             <label class="field">
               <span class="field__label">Document Title / Name *</span>
-              <input class="input" name="docName" placeholder="e.g. Aadhaar Card, Blood Test Report" required>
+              <input class="input" name="docName" placeholder="${term('uploadDocPlaceholder')}" required>
             </label>
             <label class="field">
               <span class="field__label">Category *</span>
               <select class="select" name="docType" required>
-                <option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
+                ${isFamilySpace() ? familyCategoryOptions() : `<option value="Bi-Annual CBC">Bi-Annual CBC (Complete Blood Count)</option>
                 <option value="Aadhaar Card">Aadhaar Card</option>
                 <option value="Medical Report">Medical Report / Lab Test</option>
                 <option value="Birth Certificate">Birth Certificate</option>
                 <option value="Vaccination Record">Vaccination Record</option>
                 <option value="Prescription">Prescription</option>
-                <option value="School Record">School / NGO Document</option>
+                <option value="School Record">School / NGO Document</option>`}
               </select>
             </label>
             <label class="field">
@@ -41026,7 +41607,7 @@
       form.querySelector('input[name="id"]')?.remove();
 
       showSheetsSyncLoader(child.name, () => {
-        toast('Child saved & synced', `${child.name}'s record generated in Google Sheets.`);
+        toast(term('savedToast'), `${child.name}'s record generated in Google Sheets.`);
         window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
       });
     });
@@ -41702,7 +42283,7 @@
     }
     sessionStorage.setItem('chm_migrated_to_live', '1');
     if (result.totalAdded > 0) {
-      toast('Records copied to ayushahealth.in', `${result.totalAdded} records from this browser are now on the live site.`);
+      toast('Records copied to ayushahealth.in', `${result.totalAdded} records are now on the live site.`);
     } else {
       toast('Live site is up to date', 'Every record is already on ayushahealth.in.');
     }

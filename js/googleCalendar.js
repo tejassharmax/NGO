@@ -7,6 +7,7 @@
 
 import { getAppointments, addAppointment } from './storage.js';
 import { getChildren, getGrowthRecords, getHealthRecords, getLastClinicDoctor } from './storage.js';
+import { isFamilySpace, term } from './space.js';
 import { toast } from './toast.js';
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -57,29 +58,29 @@ export function buildGoogleCalendarUrl(appointment, isGroupPlan = false, allChil
     const list = allChildrenList && allChildrenList.length > 0 ? allChildrenList : getChildren();
     const groupCount = list.length;
     const titlePrefix = appointment.doctor ? `${appointment.doctor.trim()} — ` : '';
-    titleStr = `${titlePrefix}All Children (${groupCount}) — ${appointment.type}`;
+    titleStr = `${titlePrefix}${term('everyone')} (${groupCount}) — ${appointment.type}`;
 
     const childrenNames = list.map((c, i) => `  ${i + 1}. ${c.name} (ID: ${c.id || 'N/A'})`).join('\n');
     detailsStr =
-      `📋 GROUP APPOINTMENT: All Children — ${appointment.type}\n` +
+      `📋 GROUP APPOINTMENT: ${term('everyone')} — ${appointment.type}\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `👥 Target: All Registered Children (${groupCount} Students)\n` +
+      (isFamilySpace() ? `👥 Everyone in the family (${groupCount})\n` : `👥 Target: All Registered Children (${groupCount} Students)\n`) +
       `🩺 Doctor / Title: ${appointment.doctor || 'Routine Healthcare Session'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
       `📅 Date: ${appointment.date}\n` +
       `⏰ Time: ${formatSingleDisplayTime(appointment.time || '10:00')}\n\n` +
-      `📋 Children Included in this Plan (${groupCount}):\n${childrenNames}\n\n` +
+      `📋 ${isFamilySpace() ? 'Family members included' : 'Children Included in this Plan'} (${groupCount}):\n${childrenNames}\n\n` +
       `📝 Notes: ${appointment.notes || 'No additional notes'}\n\n` +
       `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
-      `Created from Child Health Management App`;
+      term('calendarFooter');
   } else {
     titleStr = `${appointment.childName} — ${appointment.type}${appointment.vaccineName ? ` (${appointment.vaccineName})` : ''}`;
     detailsStr =
       `Doctor: ${appointment.doctor || 'N/A'}${appointment.specialty ? ` (${appointment.specialty})` : ''}\n` +
-      `Child: ${appointment.childName}\n` +
+      `${term('person')}: ${appointment.childName}\n` +
       `Type: ${appointment.type}\n` +
       (appointment.vaccineName ? `Vaccination: ${appointment.vaccineName}\n` : '') +
       `Notes: ${appointment.notes || 'No notes'}\n\n` +
-      `Created from Child Health Management App`;
+      term('calendarFooter');
   }
 
   const title = encodeURIComponent(titleStr);
@@ -386,7 +387,7 @@ export function renderDayView(year, month, day) {
 
 export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
   const children = getChildren();
-  const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
+  const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)}${isFamilySpace() ? '' : ` (${c.id})`}</option>`).join('');
   const specialtyOptions = DOCTOR_SPECIALTIES.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
   const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
   const lastUsed = getLastClinicDoctor();
@@ -428,15 +429,15 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
           </div>
           <div class="gcal-popup-row-content" style="display: flex; align-items: center; gap: 8px; width: 100%;">
             <select class="gcal-popup-select" name="childId" id="cal-child-select" required style="flex: 1; min-width: 0;">
-              <option value="">Select child</option>
-              <option value="ALL">All Children (${children.length})</option>
+              <option value="">${term('selectPerson')}</option>
+              <option value="ALL">${term('everyone')} (${children.length})</option>
               ${childOptions}
             </select>
-            <label class="gcal-all-pill" id="cal-all-pill" title="Toggle all ${children.length} registered children" role="button" aria-pressed="false" tabindex="0">
+            <label class="gcal-all-pill" id="cal-all-pill" title="Toggle all ${children.length} ${isFamilySpace() ? 'family members' : 'registered children'}" role="button" aria-pressed="false" tabindex="0">
               <input type="checkbox" id="cal-all-children-check" name="selectAllChildren" value="true" />
               <svg class="gcal-all-pill-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none; flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>
               <svg class="gcal-all-pill-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-              <span>All Children</span>
+              <span>${term('everyone')}</span>
             </label>
           </div>
         </div>
@@ -512,7 +513,7 @@ export function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
           <div class="gcal-popup-row-content">
             <span class="gcal-popup-cal-label">
               <span class="gcal-popup-cal-dot"></span>
-              Child Health Calendar
+              ${term('calendarName')}
             </span>
           </div>
         </div>
@@ -767,7 +768,7 @@ export function renderClinicalSectionsMarkup({ existingGrowth = {}, existingBloo
           </div>
           <div class="clinical-field-group">
             <label class="clinical-field-label" for="${prefix}checkup-doctor">DOCTOR NAME</label>
-            <input class="clinical-input" id="${prefix}checkup-doctor" type="text" name="doctorName" placeholder="Doctor who examined the child" value="${escapeHTML(doctorVal)}" autocomplete="off" />
+            <input class="clinical-input" id="${prefix}checkup-doctor" type="text" name="doctorName" placeholder="${term('doctorPlaceholder')}" value="${escapeHTML(doctorVal)}" autocomplete="off" />
           </div>
         </div>
 
@@ -930,7 +931,7 @@ export function renderClinicalDataModalMarkup(eventId, childIdParam = null, chil
   const healthRecords = childId ? getHealthRecords(childId) : [];
   const existingBlood = (targetDate ? healthRecords.find(h => h.date === targetDate) : null) || {};
 
-  const subTitle = appt ? `${escapeHTML(appt.type || 'Appointment')} (${appt.date})` : 'Student Medical Records';
+  const subTitle = appt ? `${escapeHTML(appt.type || 'Appointment')} (${appt.date})` : term('medicalWorkbook');
 
   return `
     <div class="gcal-popup-backdrop" id="cal-booking-modal" data-close-cal-modal-bg role="presentation">
@@ -987,7 +988,7 @@ export function renderEditAppointmentModalMarkup(eventId) {
 
   const children = getChildren();
   const childOptions = children.map(c => 
-    `<option value="${c.id}" ${c.id === appt.childId ? 'selected' : ''}>${escapeHTML(c.name)} (${c.id})</option>`
+    `<option value="${c.id}" ${c.id === appt.childId ? 'selected' : ''}>${escapeHTML(c.name)}${isFamilySpace() ? '' : ` (${c.id})`}</option>`
   ).join('');
 
   const typeOptions = [
@@ -1054,7 +1055,7 @@ export function renderEditAppointmentModalMarkup(eventId) {
               </div>
               <div class="gcal-popup-row-content">
                 <select class="gcal-popup-select" name="childId" required>
-                  <option value="">Select child</option>
+                  <option value="">${term('selectPerson')}</option>
                   ${childOptions}
                 </select>
               </div>

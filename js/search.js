@@ -1,5 +1,6 @@
 import { icon, initials, pagePath, escapeHTML } from './utils.js';
 import { getChildren, calculateAge, getAppointments, getAlerts, healthStatus } from './storage.js';
+import { isFamilySpace, term as spaceTerm } from './space.js';
 
 export function searchChildren(query = '') {
   const term = query.trim().toLowerCase();
@@ -40,8 +41,8 @@ export function getQuickCommands(query = '') {
   const commands = [
     {
       id: 'cmd-register',
-      title: 'Register New Student',
-      subtitle: 'Enroll child with Aadhaar, parent details & vitals',
+      title: spaceTerm('searchCmdRegister'),
+      subtitle: spaceTerm('searchCmdRegisterHint'),
       iconSvg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>',
       badge: 'Create',
       url: `${pagePath('register-child')}`,
@@ -49,7 +50,7 @@ export function getQuickCommands(query = '') {
     },
     {
       id: 'cmd-calendar',
-      title: 'Google Calendar & Health Camps',
+      title: spaceTerm('searchCmdCalendar'),
       subtitle: 'Schedule medical checkups, dental visits & vaccinations',
       iconSvg: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
       badge: 'Calendar',
@@ -94,8 +95,10 @@ export function getQuickCommands(query = '') {
     }
   ];
 
-  if (!term) return commands;
-  return commands.filter(c => 
+  // A family has no growth charts or medicine stock pages.
+  const available = isFamilySpace() ? commands.filter(c => c.id !== 'cmd-growth' && c.id !== 'cmd-medicines') : commands;
+  if (!term) return available;
+  return available.filter(c => 
     c.title.toLowerCase().includes(term) ||
     c.subtitle.toLowerCase().includes(term) ||
     c.badge.toLowerCase().includes(term)
@@ -152,7 +155,7 @@ export function renderSpotlightItemsHTML(items, activeIndex = 0, currentTab = 'a
           <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         </div>
         <h4 style="margin:8px 0 4px 0; font-size:15px; font-weight:700; color:var(--color-text);">No matching records found</h4>
-        <p style="font-size:12.5px; color:var(--color-text-muted); margin:0;">Try searching by student name, guardian, ID (CH-XXXX), blood group, checkup type, or command.</p>
+        <p style="font-size:12.5px; color:var(--color-text-muted); margin:0;">${spaceTerm('searchEmptyHint')}</p>
       </div>
     `;
   }
@@ -167,10 +170,10 @@ export function renderSpotlightItemsHTML(items, activeIndex = 0, currentTab = 'a
 
     if (itemType === 'student') {
       iconHtml = `<div class="spotlight-item-avatar">${initials(item.name)}</div>`;
-      badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">Student</span>`;
+      badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">${spaceTerm('searchBadge')}</span>`;
     } else if (itemType === 'appointment') {
       iconHtml = `<div class="spotlight-item-icon spotlight-item-icon--cal"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#2563eb" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>`;
-      badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">Camp / Appt</span>`;
+      badgeHtml = `<span class="badge badge--primary" style="font-size:10px; padding:2px 8px; border-radius:10px;">${isFamilySpace() ? 'Appointment' : 'Camp / Appt'}</span>`;
     } else if (itemType === 'alert') {
       iconHtml = `<div class="spotlight-item-icon spotlight-item-icon--alert"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#dc2626" stroke-width="2"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>`;
       badgeHtml = `<span class="badge badge--danger" style="font-size:10px; padding:2px 8px; border-radius:10px;">Attention</span>`;
@@ -203,7 +206,7 @@ export function renderSpotlightPreviewHTML(item) {
       <div class="spotlight-preview-empty">
         <div style="font-size:40px; margin-bottom:12px;">✨</div>
         <div style="font-size:15px; font-weight:700; color:var(--color-text); margin-bottom:4px;">Spotlight Command Center</div>
-        <div style="font-size:12.5px; color:var(--color-text-muted); line-height:1.5;">Type to search students, schedule camps, inspect clinical health records, or run instant commands.</div>
+        <div style="font-size:12.5px; color:var(--color-text-muted); line-height:1.5;">${spaceTerm('searchIntro')}</div>
       </div>
     `;
   }
@@ -221,12 +224,12 @@ export function renderSpotlightPreviewHTML(item) {
           <div class="spotlight-preview-avatar">${initials(item.name)}</div>
           <div style="min-width:0; flex:1;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
-              <span class="badge badge--primary" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">STUDENT</span>
+              <span class="badge badge--primary" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">${spaceTerm('searchBadgeCaps')}</span>
               <span class="badge ${statusClass}" style="font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:10px;">${healthLabel.toUpperCase()}</span>
               <span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:var(--color-bg-alt); padding:2px 8px; border-radius:10px;">${item.id}</span>
             </div>
             <h3 style="margin:0; font-size:18px; font-weight:700; color:var(--color-text); line-height:1.2;">${escapeHTML(item.name)}</h3>
-            <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">Student Profile</div>
+            <div style="font-size:12px; color:var(--color-text-muted); margin-top:2px;">${spaceTerm('searchProfileLabel')}</div>
           </div>
         </div>
 
@@ -245,8 +248,8 @@ export function renderSpotlightPreviewHTML(item) {
             <span class="spotlight-cell-val" style="color:#ef4444; font-weight:700;">${item.blood || '—'}</span>
           </div>
           <div class="spotlight-preview-cell">
-            <span class="spotlight-cell-label">Guardian Contact</span>
-            <span class="spotlight-cell-val">${item.father || item.guardian || 'Guardian'}${item.phone ? ` • <a href="tel:${item.phone}" style="color:var(--color-primary); text-decoration:none;">${item.phone}</a>` : ''}</span>
+            <span class="spotlight-cell-label">${spaceTerm('searchContactLabel')}</span>
+            <span class="spotlight-cell-val">${isFamilySpace() ? escapeHTML(item.relation || '—') : (item.father || item.guardian || 'Guardian')}${item.phone ? ` • <a href="tel:${item.phone}" style="color:var(--color-primary); text-decoration:none;">${item.phone}</a>` : ''}</span>
           </div>
         </div>
 
@@ -258,7 +261,7 @@ export function renderSpotlightPreviewHTML(item) {
           </a>
           <a class="button button--secondary button--sm" href="${pagePath('appointments')}" style="flex:1; justify-content:center; gap:6px; font-size:12px; padding:7px 12px; text-decoration:none;">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-            Book Camp
+            ${isFamilySpace() ? 'Book appointment' : 'Book Camp'}
           </a>
         </div>
       </div>
@@ -343,7 +346,7 @@ export function globalSearchMarkup(query = '') {
             id="spotlight-search-input" 
             class="spotlight-input" 
             type="search" 
-            placeholder="Search students, health records, appointments, or commands…" 
+            placeholder="${spaceTerm('searchInputPlaceholder')}" 
             value="${escapeHTML(query)}" 
             autocomplete="off" 
             spellcheck="false" 
@@ -360,10 +363,10 @@ export function globalSearchMarkup(query = '') {
             All <span class="spotlight-tab-count">${data.all.length}</span>
           </button>
           <button type="button" class="spotlight-tab" data-spotlight-tab="students">
-            Students <span class="spotlight-tab-count">${data.students.length}</span>
+            ${spaceTerm('searchTabPeople')} <span class="spotlight-tab-count">${data.students.length}</span>
           </button>
           <button type="button" class="spotlight-tab" data-spotlight-tab="appointments">
-            Camps & Appts <span class="spotlight-tab-count">${data.appointments.length}</span>
+            ${spaceTerm('searchTabAppointments')} <span class="spotlight-tab-count">${data.appointments.length}</span>
           </button>
           <button type="button" class="spotlight-tab" data-spotlight-tab="commands">
             Quick Actions <span class="spotlight-tab-count">${data.commands.length}</span>
@@ -396,7 +399,7 @@ export function globalSearchMarkup(query = '') {
             <span class="spotlight-key-item"><kbd>Esc</kbd> Close</span>
           </div>
           <div class="spotlight-footer-brand">
-            Child Health Management Spotlight
+            ${spaceTerm('searchTitle')}
           </div>
         </div>
 

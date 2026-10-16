@@ -7,6 +7,7 @@
 import { apiFetch } from './apiClient.js';
 import { getUploadedDocs, updateUploadedDoc } from './storage.js';
 import { toast } from './toast.js';
+import { getSheetsConfig } from './googleSheetsSync.js';
 
 let isAutoSyncing = false;
 
@@ -148,6 +149,12 @@ export async function autoSyncPendingDocuments(showToasts = false) {
   const unsynced = docs.filter(d => !d.driveUrl && (d.fileData || d.image) && !activeSyncDocIds.has(d.id));
   if (unsynced.length === 0) {
     return { total: 0, synced: 0, failed: 0 };
+  }
+  // In the background, wait until Google is connected instead of re-sending
+  // every file on each page view. A manual "Sync to Drive" still tries now.
+  const config = getSheetsConfig();
+  if (!showToasts && config && !config.connected) {
+    return { total: unsynced.length, synced: 0, failed: 0 };
   }
 
   isAutoSyncing = true;

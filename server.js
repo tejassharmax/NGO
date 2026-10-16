@@ -123,7 +123,7 @@ app.use('/assets', express.static(path.join(__dirname, 'assets'), { etag: true }
    ─────────────────────────────────────────────────────── */
 const { isFirestoreEnabled, getStatus: firestoreStatus } = require('./js/server/firebaseAdmin');
 const { mergeNamespace } = require('./js/server/syncMerge');
-const { resolveNgoForEmail, writeSnapshot } = require('./js/server/ngoStore');
+const { resolveNgoForEmail, writeSnapshot, spaceTypeFor } = require('./js/server/ngoStore');
 const {
   DB_FILE,
   readFileStore,
@@ -414,8 +414,17 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
     connected = false;
   }
 
+  // A family space has no Monthly Checkup Register (a children's-home register).
+  let spaceType;
+  try {
+    spaceType = await spaceTypeFor(ngoSlug);
+  } catch (e) {
+    console.warn('[Sheets Config] Space type lookup notice:', e.message);
+  }
+  const needsMonthly = spaceType !== 'family';
+
   // Auto-create/sync Student Medical Records sheet if connected but not yet generated
-  if (connected && (!integration.clinicalSheetId || !integration.sheetId || !integration.monthlySheetId || !integration.bloodSheetId)) {
+  if (connected && (!integration.clinicalSheetId || !integration.sheetId || (needsMonthly && !integration.monthlySheetId) || !integration.bloodSheetId)) {
     try {
       const children = await readChildrenFor({ slug: ngoSlug });
       await oauthSyncSheets(children, ngoSlug, ngoName);
@@ -428,6 +437,7 @@ app.get('/api/sheets/config', requireAuth, async (req, res) => {
   res.json({
     connected,
     tokenExpired,
+    spaceType,
     driveOwnerEmail: driveOwnerFor(ngoSlug),
     adminEmail: integration.adminEmail || null,
     secondaryEmail: integration.secondaryEmail || null,
