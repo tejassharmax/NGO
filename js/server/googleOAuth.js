@@ -66,6 +66,17 @@ const DRIVE_EDITOR_EMAILS = (process.env.GOOGLE_DRIVE_EDITOR_EMAILS || 'tejassac
   .split(',').map(e => e.trim().toLowerCase()).filter(e => e && e !== DRIVE_OWNER_EMAIL);
 
 /**
+ * The developer editors are added to the default home's files only. Other
+ * spaces, such as a family's personal records, are shared with their own
+ * members and nobody else.
+ * @param {string} ngoSlug
+ * @returns {string[]}
+ */
+function driveEditorsFor(ngoSlug) {
+  return sanitizeNgoSlug(ngoSlug) === sanitizeNgoSlug(DEFAULT_NGO) ? DRIVE_EDITOR_EMAILS : [];
+}
+
+/**
  * Sanitize NGO slug for filename safety
  */
 function sanitizeNgoSlug(ngoSlug) {
@@ -966,7 +977,7 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   }
 
   // Ensure both spreadsheets are shared with link access and secondary admin (tejassachin2010@gmail.com)
-  const secondaryList = [...DRIVE_EDITOR_EMAILS, integration.secondaryEmail, ...(await ngoStaffEmails(safeSlug))];
+  const secondaryList = [...driveEditorsFor(safeSlug), ...(await ngoStaffEmails(safeSlug))];
   if (sheetId) {
     ensureSpreadsheetSharing(client, sheetId, secondaryList).catch(() => {});
   }
@@ -2062,14 +2073,15 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
 
   // 3. If still not found, create a single clean root folder
   if (!rootFolderId) {
-    const rootFolder = await findOrCreateFolder(authClient, 'Child Health Documents — Ayusha Nilayam', null);
+    const homeName = ngoDisplayName || (safeSlug === sanitizeNgoSlug(DEFAULT_NGO) ? DEFAULT_NGO : safeSlug);
+    const rootFolder = await findOrCreateFolder(authClient, `Child Health Documents — ${homeName}`, null);
     rootFolderId = rootFolder.id;
     rootFolderUrl = rootFolder.webViewLink;
   }
 
   // The editors get the whole documents tree through its root folder.
   // The root folder is shared with the staff; child folders and files inherit it.
-  await ensureSpreadsheetSharing(authClient, rootFolderId, [...DRIVE_EDITOR_EMAILS, ...(await ngoStaffEmails(safeSlug))]);
+  await ensureSpreadsheetSharing(authClient, rootFolderId, [...driveEditorsFor(safeSlug), ...(await ngoStaffEmails(safeSlug))]);
 
   // Save root folder ID for this NGO
   integration.documentsRootFolderId = rootFolderId;
@@ -2098,6 +2110,7 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
 module.exports = {
   driveOwnerFor,
   DRIVE_EDITOR_EMAILS,
+  driveEditorsFor,
   buildOAuthClient,
   getAuthUrl,
   getClientForNgo,

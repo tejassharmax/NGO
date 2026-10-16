@@ -17,7 +17,7 @@ require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
 // Per-NGO OAuth Integration Module
 const {
   driveOwnerFor,
-  DRIVE_EDITOR_EMAILS,
+  driveEditorsFor,
   buildOAuthClient,
   getAuthUrl,
   getClientForNgo,
@@ -305,7 +305,7 @@ app.get('/auth/google/callback', async (req, res) => {
       tokenExpired: false,
       connectedAt: new Date().toISOString(),
       adminEmail: connectingAccount,
-      secondaryEmail: DRIVE_EDITOR_EMAILS[0] || null
+      secondaryEmail: driveEditorsFor(ngoSlug)[0] || null
     };
     await saveNgoIntegration(ngoSlug, updated);
 
