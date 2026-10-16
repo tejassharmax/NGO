@@ -33632,24 +33632,6 @@
     'sample-org-name', 'sample-org-code', 'sample-org-email', 'sample-org-timezone'
   ];
 
-  /** Same record identity rule as the sync server (js/server/syncMerge.js). */
-  function recordKey(item) {
-    if (!item || typeof item !== 'object') return '';
-    if (item.id) return String(item.id);
-    if (item.childId && item.date && item.time && item.type) return `APT_${item.childId}_${item.date}_${item.time}_${item.type}`;
-    if (item.childId && item.date) return `${item.childId}_${item.date}_${item.recordType || ''}`;
-    return JSON.stringify(item);
-  }
-
-  function parseArray(raw) {
-    try {
-      const value = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      return Array.isArray(value) ? value : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
   /**
    * Build a backup object from a key -> raw localStorage string map.
    * @param {Record<string, string|null>} storage
@@ -33661,72 +33643,6 @@
       if (storage[key] !== null && storage[key] !== undefined) data[key] = storage[key];
     });
     return { format: BACKUP_FORMAT, version: 1, source, exportedAt: new Date().toISOString(), data };
-  }
-
-  /**
-   * Validate a parsed backup file. Returns an error message, or '' when usable.
-   * @param {any} backup
-   */
-  function validateBackup(backup) {
-    if (!backup || typeof backup !== 'object') return 'This file is not a backup.';
-    if (backup.format !== BACKUP_FORMAT) return 'This file is not a Child Health backup.';
-    if (!backup.data || typeof backup.data !== 'object') return 'The backup file is empty.';
-    return '';
-  }
-
-  /**
-   * Work out what a restore would add, without changing anything.
-   *
-   * Deleted records (tombstones in either copy) are never brought back.
-   *
-   * @param {Record<string, string|null>} current destination's raw values
-   * @param {{data: Record<string, string>}} backup
-   * @returns {{merged: Record<string, string>, added: Record<string, number>, totalAdded: number}}
-   *   `merged` holds the new raw value for every key that gains records.
-   */
-  function planRestore(current, backup) {
-    const tombstones = [...parseArray(current['chm-deleted']), ...parseArray(backup.data['chm-deleted'])];
-    const deletedIds = new Map(); // key -> Set(recordId)
-    tombstones.forEach(t => {
-      if (!t || !t.key || t.recordId === undefined) return;
-      if (!deletedIds.has(t.key)) deletedIds.set(t.key, new Set());
-      deletedIds.get(t.key).add(String(t.recordId));
-    });
-
-    const merged = {};
-    const added = {};
-    let totalAdded = 0;
-
-    BACKUP_KEYS.filter(key => key.startsWith('chm-')).forEach(key => {
-      const existing = parseArray(current[key]);
-      const incoming = parseArray(backup.data[key]);
-      if (incoming.length === 0) return;
-
-      const known = new Set(existing.map(recordKey));
-      const gone = deletedIds.get(key) || new Set();
-      const additions = incoming.filter(item => {
-        if (!item || typeof item !== 'object') return false;
-        if (item.id !== undefined && gone.has(String(item.id))) return false;
-        const k = recordKey(item);
-        if (known.has(k)) return false;
-        known.add(k);
-        return true;
-      });
-
-      if (additions.length > 0) {
-        merged[key] = JSON.stringify([...existing, ...additions]);
-        added[key] = additions.length;
-        totalAdded += additions.length;
-      }
-    });
-
-    // Org settings: only fill in values the destination does not have yet.
-    BACKUP_KEYS.filter(key => !key.startsWith('chm-')).forEach(key => {
-      const value = backup.data[key];
-      if (value && !current[key]) merged[key] = value;
-    });
-
-    return { merged, added, totalAdded };
   }
 
   /* ═══════════════════════════════════════════════════════
@@ -34551,7 +34467,7 @@
   }
   moveRecordsOutOfLocalStorage();
 
-  /* ─── Backup & restore (move records between sites) ─── */
+  /* ─── Moving records from the retired Render site ─── */
 
   function readBackupKeys() {
     const raw = {};
@@ -34559,23 +34475,9 @@
     return raw;
   }
 
-  /** Everything this browser holds, as a downloadable backup object. */
+  /** The records this tab holds, packed for /api/import on the live site. */
   function exportBackup() {
     return buildBackup(readBackupKeys(), window.location.host);
-  }
-
-  /** What restoring `backup` would add here, without changing anything. */
-  function previewRestore(backup) {
-    return planRestore(readBackupKeys(), backup);
-  }
-
-  /**
-   * Apply a restore plan from previewRestore(), then save it to the server
-   * (Firestore) and Google Sheets through the normal sync.
-   */
-  async function applyRestore(plan) {
-    Object.entries(plan.merged).forEach(([key, value]) => writeQuietly(key, value));
-    await syncWithServer();
   }
 
   const DEFAULT_COLUMN_ORDER = ['child', 'age', 'gender', 'blood', 'status'];
@@ -35482,7 +35384,7 @@
           if (!cachedSheetsConfig) cachedSheetsConfig = {};
           cachedSheetsConfig.connected = false;
           cachedSheetsConfig.tokenExpired = true;
-          toast('Google Authorization Expired', 'Google Workspace session expired. Please reconnect in Settings.', 'warning');
+          toast('Google connection expired', 'Records are saved. The main admin needs to reconnect Google once in Settings.', 'warning');
         } else if (data && data.message === 'Not connected') {
           console.log('[Google Sheets] Skip auto-sync: NGO is not connected to Google Workspace.');
         }
@@ -36961,8 +36863,7 @@
     if (!/\.onrender\.com$/i.test(window.location.hostname)) return '';
     return `<div class="card" style="padding: 14px 18px; margin-bottom: 18px; border: 1px solid #f59e0b; background: #fffbeb; color: #92400e; font-size: 13px; line-height: 1.5;">
     <b>This old address is being retired.</b> The live site is <a href="https://ayushahealth.in" style="color: #b45309; font-weight: 700;">ayushahealth.in</a>.
-    Records entered here are not on the new site yet: open <a href="${pagePath('settings')}" style="color: #b45309; font-weight: 700;">Settings</a> →
-    <b>Download backup</b>, then on ayushahealth.in open Settings → <b>Restore from backup</b>.
+    Records entered here are copied to the live site automatically when this page opens. Please use ayushahealth.in from now on.
   </div>`;
   }
 
@@ -37992,7 +37893,7 @@
               Google Sheets Live Sync
             </b>
             ${isTokenExpired 
-              ? `<span class="badge" style="background: rgba(234, 67, 53, 0.12); color: #ea4335; border: 1px solid rgba(234, 67, 53, 0.3); font-weight: 700;">⚠️ Authorization Expired</span>`
+              ? `<span class="badge" style="background: rgba(234, 67, 53, 0.12); color: #ea4335; border: 1px solid rgba(234, 67, 53, 0.3); font-weight: 700;">⚠️ Reconnect needed</span>`
               : isConnected 
                 ? `<span class="badge badge--success">Connected as ${escapeHTML$1(adminEmail)}</span>` 
                 : `<span class="badge badge--neutral">Not Connected</span>`
@@ -38011,9 +37912,12 @@
 
           ${isTokenExpired ? `
             <div style="background: rgba(234, 67, 53, 0.08); border-left: 4px solid #ea4335; padding: 12px 14px; border-radius: 4px; margin-bottom: 16px;">
-              <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">Google Workspace Authorization Expired</div>
+              <div style="font-size: 13.5px; font-weight: 700; color: #ea4335; margin-bottom: 4px;">The Google connection needs to be renewed</div>
               <div style="font-size: 12.5px; color: var(--color-text); line-height: 1.4;">
-                Google OAuth tokens in Testing mode expire periodically. Click <strong>Reconnect Google Sheets Sync</strong> below to refresh authorization and resume syncing your records to Google Sheets.
+                Google no longer accepts this connection, so new records are not reaching Google Sheets yet. They are safe in the database and will sync once it is renewed.
+                ${driveOwnerEmail
+                  ? `<b>${escapeHTML$1(driveOwnerEmail)}</b> needs to click <strong>Reconnect</strong> below once and sign in with that account.`
+                  : `An admin needs to click <strong>Reconnect</strong> below once.`}
               </div>
             </div>
           ` : `
@@ -38035,7 +37939,7 @@
             ${(!isConnected || isTokenExpired) ? `
               <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; border-color: ${isTokenExpired ? '#ea4335' : '#0F9D58'};">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-                ${isTokenExpired ? 'Reconnect Google Sheets Sync ↗' : 'Connect Google Sheets Sync'}
+                ${isTokenExpired ? `Reconnect${driveOwnerEmail ? ` as ${escapeHTML$1(driveOwnerEmail)}` : ''} ↗` : 'Connect Google Sheets Sync'}
               </a>
             ` : ''}
 
@@ -38095,22 +37999,6 @@
           </p>
         </div>
 
-        <div class="card" style="padding: 16px; border: 1px solid var(--color-border); background: var(--color-bg);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <b style="font-size: 14px; font-weight: 600;">Backup &amp; restore</b>
-          </div>
-          <p style="font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px 0;">
-            Download every record stored in this browser, or restore a backup from another site.
-            Restoring only adds missing records; nothing here is overwritten.
-          </p>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-            <button class="button button--sm button--primary" type="button" data-export-backup>${icon('download')} Download backup</button>
-            <label class="button button--sm button--ghost" style="cursor: pointer; border: 1px solid var(--color-border);">
-              ${icon('upload')} Restore from backup
-              <input type="file" accept=".json,application/json" data-import-backup hidden>
-            </label>
-          </div>
-        </div>
       </div>
     </section>
   </div>`);
@@ -40264,7 +40152,7 @@
             return;
           }
           const file = fileInput.files[0];
-          toast('Saving document...', 'Saving locally and syncing to Google Drive...');
+          toast('Saving document...', 'Saving and syncing to Google Drive...');
           const reader = new FileReader();
           reader.onload = async function(e) {
             const newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
@@ -40281,11 +40169,11 @@
                 });
                 toast('Google Drive Synced', `${title} backed up in ${childName}'s Google Drive folder.`, 'success');
               } else {
-                toast('Document saved', `${title} saved locally.`);
+                toast('Document saved', `${title} saved.`);
               }
             } catch (uploadErr) {
               console.warn('[Drive Upload]', uploadErr);
-              toast('Document saved', `${title} saved locally.`);
+              toast('Document saved', `${title} saved.`);
             } finally {
               window.setTimeout(() => { window.location.reload(); }, 300);
             }
@@ -40356,21 +40244,6 @@
 
     if (target.matches('[data-report-print], [data-profile-print]')) window.print();
 
-    // Backup: download everything this browser holds as a JSON file
-    if (target.closest('[data-export-backup]')) {
-      const backup = exportBackup();
-      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `child-health-backup-${window.location.hostname}-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-      const children = JSON.parse(backup.data['chm-children'] || '[]').length;
-      const checkups = JSON.parse(backup.data['chm-growth'] || '[]').length;
-      toast('Backup downloaded', `${children} children and ${checkups} checkup records saved to your Downloads folder.`);
-    }
 
 
     if (target.closest('[data-add-measurement]')) {
@@ -40726,7 +40599,7 @@
 
           if (fileInput && fileInput.files && fileInput.files[0]) {
             const file = fileInput.files[0];
-            toast('Saving document...', 'Saving locally and syncing to Google Drive...');
+            toast('Saving document...', 'Saving and syncing to Google Drive...');
             const reader = new FileReader();
             reader.onload = async function (e) {
               const newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
@@ -40743,11 +40616,11 @@
                   });
                   toast('Google Drive Synced', `${docName} backed up in ${childName}'s Google Drive folder.`, 'success');
                 } else {
-                  toast('Document saved', `${docName} saved locally.`);
+                  toast('Document saved', `${docName} saved.`);
                 }
               } catch (uploadErr) {
                 console.warn('[Drive Upload]', uploadErr);
-                toast('Document saved', `${docName} saved locally.`);
+                toast('Document saved', `${docName} saved.`);
               } finally {
                 window.setTimeout(() => window.location.reload(), 300);
               }
@@ -40899,42 +40772,6 @@
       applyTableFilters();
     }
     if (event.target.matches('#select-all')) document.querySelectorAll('[data-select-row]').forEach((input) => { input.checked = event.target.checked; });
-
-    // Restore: add the records from a backup file that are missing here
-    if (event.target.matches('[data-import-backup]') && event.target.files?.length) {
-      const input = event.target;
-      const reader = new FileReader();
-      reader.onload = () => {
-        input.value = '';
-        let backup;
-        try { backup = JSON.parse(reader.result); } catch (e) { backup = null; }
-        const problem = validateBackup(backup);
-        if (problem) {
-          toast('Restore failed', problem);
-          return;
-        }
-        const plan = previewRestore(backup);
-        if (plan.totalAdded === 0) {
-          toast('Nothing to restore', 'Every record in this backup is already here.');
-          return;
-        }
-        const labels = { 'chm-children': 'children', 'chm-growth': 'checkups / measurements', 'chm-health-records': 'blood test reports', 'chm-appointments': 'appointments', 'chm-medicines': 'prescriptions', 'chm-documents': 'documents', 'chm-activity': 'activity entries', 'chm-alerts': 'alerts', 'chm-deleted': 'deletion records' };
-        const lines = Object.entries(plan.added).map(([key, count]) => `<li><b>${count}</b> ${escapeHTML$1(labels[key] || key)}</li>`).join('');
-        modal({
-          title: 'Restore records from backup?',
-          body: `<p style="margin-bottom:8px;">From <b>${escapeHTML$1(backup.source || 'another site')}</b>, exported ${escapeHTML$1(formatDate(backup.exportedAt))}. These will be added:</p><ul style="margin:0 0 8px 18px;">${lines}</ul><p style="font-size:12px; color:var(--color-text-muted);">Records already here are not changed. They will be saved to the database and Google Sheets.</p>`,
-          confirmText: 'Restore',
-          onConfirm: async () => {
-            showProgressBar(40);
-            await applyRestore(plan);
-            hideProgressBar();
-            toast('Restore complete', `${plan.totalAdded} records added and saved.`);
-            if (renderCurrentPage) await renderCurrentPage();
-          }
-        });
-      };
-      reader.readAsText(event.target.files[0]);
-    }
   });
 
   // ─── Drag-and-Drop Row Reorder (Apple-style) ───
@@ -41867,7 +41704,7 @@
     if (result.totalAdded > 0) {
       toast('Records copied to ayushahealth.in', `${result.totalAdded} records from this browser are now on the live site.`);
     } else {
-      toast('Live site is up to date', 'Every record in this browser is already on ayushahealth.in.');
+      toast('Live site is up to date', 'Every record is already on ayushahealth.in.');
     }
   }
 
