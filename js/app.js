@@ -909,7 +909,14 @@ document.addEventListener('click', (event) => {
         toast('Saving document...', 'Saving and syncing to Google Drive...', 'info');
         const reader = new FileReader();
         reader.onload = async function(e) {
-          const newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+          let newDoc;
+          try {
+            newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+          } catch (storageErr) {
+            console.warn('[Upload] Could not keep the file:', storageErr);
+            toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
+            return;
+          }
           logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
 
           try {
@@ -1357,7 +1364,14 @@ document.addEventListener('click', (event) => {
           toast('Saving document...', 'Saving and syncing to Google Drive...', 'info');
           const reader = new FileReader();
           reader.onload = async function (e) {
-            const newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+            let newDoc;
+            try {
+              newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+            } catch (storageErr) {
+              console.warn('[Upload] Could not keep the file:', storageErr);
+              toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
+              return;
+            }
             logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
 
             try {

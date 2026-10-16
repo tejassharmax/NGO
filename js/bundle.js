@@ -33984,6 +33984,12 @@
     const doc = docs.find(d => d.id === docId);
     if (doc) {
       Object.assign(doc, updates);
+      // Once a family's report is in Google Drive, the record keeps only the
+      // Drive link; carrying every file would soon fill the tab's working copy.
+      if (updates.driveUrl && isFamilySpace()) {
+        delete doc.image;
+        delete doc.fileData;
+      }
       records.setItem(DOCS_KEY, JSON.stringify(docs));
       return doc;
     }
@@ -40735,7 +40741,14 @@
           toast('Saving document...', 'Saving and syncing to Google Drive...');
           const reader = new FileReader();
           reader.onload = async function(e) {
-            const newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+            let newDoc;
+            try {
+              newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+            } catch (storageErr) {
+              console.warn('[Upload] Could not keep the file:', storageErr);
+              toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
+              return;
+            }
             logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
 
             try {
@@ -41183,7 +41196,14 @@
             toast('Saving document...', 'Saving and syncing to Google Drive...');
             const reader = new FileReader();
             reader.onload = async function (e) {
-              const newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+              let newDoc;
+              try {
+                newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
+              } catch (storageErr) {
+                console.warn('[Upload] Could not keep the file:', storageErr);
+                toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
+                return;
+              }
               logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
 
               try {
