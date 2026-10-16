@@ -1989,7 +1989,9 @@ async function uploadFileToDrive(authClient, fileBuffer, fileName, mimeType, fol
 
 /**
  * Upload a child health document into the NGO's Google Drive organized by child name.
- * Creates: "Child Health Documents — [NGO Name]" / "[Child Name]" / "[File]"
+ * Creates: "<root folder>" / "[Child Name]" / "[File]", where the root folder is
+ * "Child Health Documents — Ayusha Nilayam" for the default home and
+ * "[Space Name] Documents" for every other space.
  * @param {string} ngoSlug
  * @param {string} childName
  * @param {Buffer} fileBuffer
@@ -2025,11 +2027,16 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
     }
   }
 
-  // 2. If no valid rootFolderId, search for ANY existing "Child Health Documents" root folder
+  const isDefaultHome = safeSlug === sanitizeNgoSlug(DEFAULT_NGO);
+  const homeName = ngoDisplayName || (isDefaultHome ? DEFAULT_NGO : safeSlug);
+  const rootFolderName = isDefaultHome ? `Child Health Documents — ${homeName}` : `${homeName} Documents`;
+
+  // 2. If no valid rootFolderId, search for an existing root folder
   if (!rootFolderId) {
     try {
+      const quotedName = rootFolderName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       const listRoots = await drive.files.list({
-        q: "mimeType = 'application/vnd.google-apps.folder' and name contains 'Child Health Documents' and trashed = false",
+        q: `mimeType = 'application/vnd.google-apps.folder' and (name contains 'Child Health Documents' or name = '${quotedName}') and trashed = false`,
         fields: 'files(id, name, webViewLink, createdTime)',
         spaces: 'drive'
       });
@@ -2073,8 +2080,7 @@ async function uploadDocumentToChildDrive(ngoSlug, childName, fileBuffer, fileNa
 
   // 3. If still not found, create a single clean root folder
   if (!rootFolderId) {
-    const homeName = ngoDisplayName || (safeSlug === sanitizeNgoSlug(DEFAULT_NGO) ? DEFAULT_NGO : safeSlug);
-    const rootFolder = await findOrCreateFolder(authClient, `Child Health Documents — ${homeName}`, null);
+    const rootFolder = await findOrCreateFolder(authClient, rootFolderName, null);
     rootFolderId = rootFolder.id;
     rootFolderUrl = rootFolder.webViewLink;
   }
