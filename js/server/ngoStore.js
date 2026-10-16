@@ -171,14 +171,12 @@ async function resolveNgoForEmail(email) {
   const db = getDb();
 
   if (db && normalized) {
-    try {
-      const snap = await db.collection('authorized_users').doc(emailToDocId(normalized)).get();
-      if (snap.exists) {
-        const data = snap.data() || {};
-        if (data.ngo) name = String(data.ngo);
-      }
-    } catch (e) {
-      console.warn(`[ngoStore] Tenant lookup failed for ${normalized}: ${e.message}`);
+    // A failed lookup is an error, never a guess: falling back to the default
+    // home here would put another home's records into it.
+    const snap = await db.collection('authorized_users').doc(emailToDocId(normalized)).get();
+    if (snap.exists) {
+      const data = snap.data() || {};
+      if (data.ngo) name = String(data.ngo);
     }
   }
 
