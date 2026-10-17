@@ -167,6 +167,14 @@ async function verifyIdToken(token) {
 }
 
 /**
+ * Accounts approved from Firestore, remembered for a few minutes so each request
+ * does not read the database. They expire so that deactivating or removing a
+ * user takes effect within minutes, not at the next server restart.
+ */
+const firestoreApproved = new Map(); // email -> expiry time (ms)
+const FIRESTORE_APPROVAL_TTL_MS = 5 * 60 * 1000;
+
+/**
  * Check if an email is authorized:
  * 1. Matches static environment allowlist (fast path)
  * 2. Or matches an active document in Firebase Firestore `authorized_users` collection
@@ -179,6 +187,8 @@ async function isAuthorizedEmail(email) {
 
   // 1. Static allowlist
   if (ALLOWED_EMAILS.has(normalized)) return true;
+  const approvedUntil = firestoreApproved.get(normalized);
+  if (approvedUntil && Date.now() < approvedUntil) return true;
 
   // 2. Dynamic check in Firestore authorized_users collection
   try {
@@ -191,8 +201,7 @@ async function isAuthorizedEmail(email) {
         const data = snap.data() || {};
         const storedEmail = String(data.email || '').trim().toLowerCase();
         if ((!storedEmail || storedEmail === normalized) && data.active === true) {
-          // Cache this newly verified admin in memory so subsequent API requests are fast
-          ALLOWED_EMAILS.add(normalized);
+          firestoreApproved.set(normalized, Date.now() + FIRESTORE_APPROVAL_TTL_MS);
           console.log(`[auth] Dynamically authorized admin from Firestore authorized_users: ${normalized} (NGO: ${data.ngo || 'default'})`);
           return true;
         }
@@ -202,6 +211,7 @@ async function isAuthorizedEmail(email) {
     console.warn(`[auth] Dynamic authorization lookup error for ${normalized}:`, err.message);
   }
 
+  firestoreApproved.delete(normalized);
   return false;
 }
 

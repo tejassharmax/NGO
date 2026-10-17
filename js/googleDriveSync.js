@@ -54,6 +54,12 @@ export async function uploadDocumentToDrive(fileOrBlob, metadata = {}) {
     docType = 'Medical Report'
   } = metadata;
 
+  // Drive is reached through the space's Google connection; without one the
+  // upload can only fail, so the caller keeps the file instead.
+  if (getSheetsConfig()?.connected === false) {
+    return { success: false, notConnected: true, message: 'Google Workspace is not connected.' };
+  }
+
   const formData = new FormData();
   const fileName = docName || fileOrBlob.name || 'document';
 

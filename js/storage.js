@@ -36,7 +36,13 @@ export const records = {
   getItem: key => sessionStorage.getItem(key),
   setItem(key, value) {
     sessionStorage.setItem(key, value);
-    if (!isSyncing) triggerSync();
+    if (isSyncing) {
+      // The running sync packed its copy already: send this edit right after it.
+      writesDuringSync.add(key);
+      syncPending = true;
+    } else {
+      triggerSync();
+    }
   },
   removeItem: key => sessionStorage.removeItem(key)
 };
@@ -81,10 +87,13 @@ export function deleteChild(id) {
       if (raw) {
         const arr = JSON.parse(raw);
         if (Array.isArray(arr)) {
-          const filtered = arr.filter(item => item && item.childId !== id);
+          // Alerts carry no childId: theirs is in the alert ID (e.g. ALR-MISSING-ID-<childId>) or its childName.
+          const belongs = item => item && (item.childId === id || (key === ALERTS_KEY &&
+            (String(item.id || '').includes(id) || (child && item.childName === child.name))));
+          const filtered = arr.filter(item => item && !belongs(item));
           if (filtered.length !== arr.length) {
             // Documents are client-authoritative on the server; the rest need tombstones.
-            if (key !== DOCS_KEY) recordDeletions(key, arr.filter(item => item && item.childId === id));
+            if (key !== DOCS_KEY) recordDeletions(key, arr.filter(belongs));
             records.setItem(key, JSON.stringify(filtered));
           }
         }
@@ -132,9 +141,11 @@ export function getChild(id) {
 export function reorderChildren(orderedIds) {
   const children = getChildren();
   const map = new Map(children.map(c => [c.id, c]));
-  const reordered = orderedIds.map(id => map.get(id)).filter(Boolean);
-  // Append any children not in orderedIds (safety net)
-  children.forEach(c => { if (!orderedIds.includes(c.id)) reordered.push(c); });
+  // Only the rows on screen were rearranged (one page of the table): they swap
+  // places among the slots they already held, and everyone else stays put.
+  const moved = orderedIds.map(id => map.get(id)).filter(Boolean);
+  const onScreen = new Set(moved.map(c => c.id));
+  const reordered = children.map(c => (onScreen.has(c.id) ? moved.shift() : c));
   records.setItem(CHILDREN_KEY, JSON.stringify(reordered));
 }
 
@@ -587,6 +598,10 @@ function seedDatabase() {
    ─────────────────────────────────────────────────────── */
 let isSyncing = false;
 let serverRejectedSignIn = false;
+/** A sync was asked for while another load or sync was running. */
+let syncPending = false;
+/** Keys edited while a sync was running. Its reply predates those edits, so it must not replace them. */
+const writesDuringSync = new Set();
 
 /** Which NGO the records cached in this browser belong to. */
 const TENANT_KEY = 'chm-tenant';
@@ -629,6 +644,7 @@ export async function hydrateFromServer() {
   guardTenantCache();
   try {
     isSyncing = true;
+    writesDuringSync.clear();
     const res = await apiFetch('/api/sync');
     serverRejectedSignIn = res.status === 401;
     if (res.ok) {
@@ -678,6 +694,7 @@ export async function hydrateFromServer() {
                 } catch (e) { }
               }
             }
+            if (writesDuringSync.has(k)) return;
             writeQuietly(k, serverData[k]);
           }
         });
@@ -691,11 +708,13 @@ export async function hydrateFromServer() {
     console.warn('[Storage] Hydration notice:', e);
   } finally {
     isSyncing = false;
+    if (syncPending) {
+      syncPending = false;
+      syncWithServer().catch(() => {});
+    }
   }
   return false;
 }
-
-let syncPending = false;
 
 export async function syncWithServer() {
   if (syncDebounceTimer) {
@@ -710,6 +729,7 @@ export async function syncWithServer() {
   let synced = false;
   try {
     isSyncing = true;
+    writesDuringSync.clear();
     showProgressBar(45);
     const keys = [
       CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
@@ -735,6 +755,7 @@ export async function syncWithServer() {
       const serverData = await res.json();
       // Apply merged state from server without scheduling another sync
       Object.keys(serverData).forEach(k => {
+        if (writesDuringSync.has(k)) return;
         if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
           writeQuietly(k, serverData[k]);
         }
@@ -757,6 +778,19 @@ export async function syncWithServer() {
   return synced;
 }
 
+/**
+ * Finish saving this tab's edits: waits for a save in progress, then sends any
+ * edit still waiting to be sent. Resolves false when the edits could not be saved.
+ */
+export async function saveNow({ always = false } = {}) {
+  for (let waited = 0; isSyncing && waited < 15000; waited += 100) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  if (isSyncing) return false;
+  if (always || syncDebounceTimer || syncPending) return syncWithServer();
+  return true;
+}
+
 /** The server could not save (offline or a database error): try again shortly. */
 function retrySyncLater() {
   if (syncDebounceTimer) return;
@@ -772,7 +806,7 @@ function retrySyncLater() {
  * so the edits can still be retried.
  */
 export async function clearLocalRecords() {
-  const saved = await syncWithServer().catch(() => false);
+  const saved = await saveNow({ always: true }).catch(() => false);
   if (!saved) return false;
   [...TENANT_DATA_KEYS, TENANT_KEY].forEach(key => sessionStorage.removeItem(key));
   return true;

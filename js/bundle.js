@@ -33821,7 +33821,13 @@
     getItem: key => sessionStorage.getItem(key),
     setItem(key, value) {
       sessionStorage.setItem(key, value);
-      if (!isSyncing) triggerSync();
+      if (isSyncing) {
+        // The running sync packed its copy already: send this edit right after it.
+        writesDuringSync.add(key);
+        syncPending = true;
+      } else {
+        triggerSync();
+      }
     },
     removeItem: key => sessionStorage.removeItem(key)
   };
@@ -33866,10 +33872,13 @@
         if (raw) {
           const arr = JSON.parse(raw);
           if (Array.isArray(arr)) {
-            const filtered = arr.filter(item => item && item.childId !== id);
+            // Alerts carry no childId: theirs is in the alert ID (e.g. ALR-MISSING-ID-<childId>) or its childName.
+            const belongs = item => item && (item.childId === id || (key === ALERTS_KEY &&
+              (String(item.id || '').includes(id) || (child && item.childName === child.name))));
+            const filtered = arr.filter(item => item && !belongs(item));
             if (filtered.length !== arr.length) {
               // Documents are client-authoritative on the server; the rest need tombstones.
-              if (key !== DOCS_KEY) recordDeletions(key, arr.filter(item => item && item.childId === id));
+              if (key !== DOCS_KEY) recordDeletions(key, arr.filter(belongs));
               records.setItem(key, JSON.stringify(filtered));
             }
           }
@@ -33917,9 +33926,11 @@
   function reorderChildren(orderedIds) {
     const children = getChildren();
     const map = new Map(children.map(c => [c.id, c]));
-    const reordered = orderedIds.map(id => map.get(id)).filter(Boolean);
-    // Append any children not in orderedIds (safety net)
-    children.forEach(c => { if (!orderedIds.includes(c.id)) reordered.push(c); });
+    // Only the rows on screen were rearranged (one page of the table): they swap
+    // places among the slots they already held, and everyone else stays put.
+    const moved = orderedIds.map(id => map.get(id)).filter(Boolean);
+    const onScreen = new Set(moved.map(c => c.id));
+    const reordered = children.map(c => (onScreen.has(c.id) ? moved.shift() : c));
     records.setItem(CHILDREN_KEY, JSON.stringify(reordered));
   }
 
@@ -34372,6 +34383,10 @@
      ─────────────────────────────────────────────────────── */
   let isSyncing = false;
   let serverRejectedSignIn = false;
+  /** A sync was asked for while another load or sync was running. */
+  let syncPending = false;
+  /** Keys edited while a sync was running. Its reply predates those edits, so it must not replace them. */
+  const writesDuringSync = new Set();
 
   /** Which NGO the records cached in this browser belong to. */
   const TENANT_KEY = 'chm-tenant';
@@ -34414,6 +34429,7 @@
     guardTenantCache();
     try {
       isSyncing = true;
+      writesDuringSync.clear();
       const res = await apiFetch('/api/sync');
       serverRejectedSignIn = res.status === 401;
       if (res.ok) {
@@ -34463,6 +34479,7 @@
                   } catch (e) { }
                 }
               }
+              if (writesDuringSync.has(k)) return;
               writeQuietly(k, serverData[k]);
             }
           });
@@ -34476,11 +34493,13 @@
       console.warn('[Storage] Hydration notice:', e);
     } finally {
       isSyncing = false;
+      if (syncPending) {
+        syncPending = false;
+        syncWithServer().catch(() => {});
+      }
     }
     return false;
   }
-
-  let syncPending = false;
 
   async function syncWithServer() {
     if (syncDebounceTimer) {
@@ -34495,6 +34514,7 @@
     let synced = false;
     try {
       isSyncing = true;
+      writesDuringSync.clear();
       showProgressBar(45);
       const keys = [
         CHILDREN_KEY, ACTIVITY_KEY, PENDING_KEY, DOCS_KEY, GROWTH_KEY,
@@ -34520,6 +34540,7 @@
         const serverData = await res.json();
         // Apply merged state from server without scheduling another sync
         Object.keys(serverData).forEach(k => {
+          if (writesDuringSync.has(k)) return;
           if (serverData[k] !== null && serverData[k] !== undefined && serverData[k] !== 'null') {
             writeQuietly(k, serverData[k]);
           }
@@ -34542,6 +34563,19 @@
     return synced;
   }
 
+  /**
+   * Finish saving this tab's edits: waits for a save in progress, then sends any
+   * edit still waiting to be sent. Resolves false when the edits could not be saved.
+   */
+  async function saveNow({ always = false } = {}) {
+    for (let waited = 0; isSyncing && waited < 15000; waited += 100) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (isSyncing) return false;
+    if (always || syncDebounceTimer || syncPending) return syncWithServer();
+    return true;
+  }
+
   /** The server could not save (offline or a database error): try again shortly. */
   function retrySyncLater() {
     if (syncDebounceTimer) return;
@@ -34557,7 +34591,7 @@
    * so the edits can still be retried.
    */
   async function clearLocalRecords() {
-    const saved = await syncWithServer().catch(() => false);
+    const saved = await saveNow({ always: true }).catch(() => false);
     if (!saved) return false;
     [...TENANT_DATA_KEYS, TENANT_KEY].forEach(key => sessionStorage.removeItem(key));
     return true;
@@ -35563,7 +35597,8 @@
       if (res.ok) {
         const data = await res.json();
         if (data && data.success && Array.isArray(data.children)) {
-          records.setItem('chm-children', JSON.stringify(data.children));
+          // The person is already gone from this tab's list. The server's list can
+          // lag behind it by a save, so it does not replace this one.
           toast('Google Sheets Updated', `Removed ${childName || term('personLower')} from connected Google Sheet.`);
           return data;
         }
@@ -35571,6 +35606,28 @@
     } catch (e) {
       console.warn('[Google Sheets] Delete sync exception:', e);
     }
+  }
+
+  /**
+   * The pulled roster, plus this tab's copies of anyone saved here after the
+   * sheet was last written. Those saves may not have reached the database when
+   * the pull read it, so the pulled roster can lack them or hold an older copy.
+   * @param {object[]} pulled  children returned by the pull
+   * @param {number} sheetsSyncedAt  when the sheets were last written (ms), 0 if unknown
+   */
+  function keepUnsavedChildren(pulled, sheetsSyncedAt) {
+    if (!sheetsSyncedAt) return pulled;
+    let local = [];
+    try { local = JSON.parse(records.getItem('chm-children') || '[]'); } catch (e) { }
+    if (!Array.isArray(local)) return pulled;
+    const merged = [...pulled];
+    local.forEach(child => {
+      if (!child || !child.id || (Number(child.updatedAt) || 0) <= sheetsSyncedAt) return;
+      const idx = merged.findIndex(c => c && c.id === child.id);
+      if (idx === -1) merged.unshift(child);
+      else if ((Number(child.updatedAt) || 0) > (Number(merged[idx].updatedAt) || 0)) merged[idx] = child;
+    });
+    return merged;
   }
 
   /**
@@ -35588,6 +35645,11 @@
     showProgressBar(50);
 
     try {
+      // The pull compares the sheet with the database, so recent edits must be there first.
+      if (!(await saveNow().catch(() => false))) {
+        if (!options.silent) toast('Sync Notice', 'Your latest changes are still being saved. Please try again in a moment.');
+        return { success: false };
+      }
       const res = await apiFetch('/api/sheets/pull', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -35597,6 +35659,7 @@
       if (res.ok) {
         const data = await res.json();
         if (data && data.success && Array.isArray(data.children)) {
+          data.children = keepUnsavedChildren(data.children, Number(data.sheetsSyncedAt) || 0);
           records.setItem('chm-children', JSON.stringify(data.children));
 
           if (data.addedCount > 0) {
@@ -39600,6 +39663,12 @@
       docType = 'Medical Report'
     } = metadata;
 
+    // Drive is reached through the space's Google connection; without one the
+    // upload can only fail, so the caller keeps the file instead.
+    if (getSheetsConfig()?.connected === false) {
+      return { success: false, notConnected: true, message: 'Google Workspace is not connected.' };
+    }
+
     const formData = new FormData();
     const fileName = docName || fileOrBlob.name || 'document';
 
@@ -39849,7 +39918,8 @@
     }
   }
 
-  let activeSort = { field: 'name', direction: 'asc' };
+  /** Column the children table is sorted by; null keeps the saved (drag-and-drop) order. */
+  let activeSort = null;
   let currentPage = 1;
   const itemsPerPage = 5;
   let page = 'dashboard';
@@ -40046,6 +40116,9 @@
         applyColumnVisibility();
         initFormListeners();
         if (page === 'children') {
+          // The page is drawn at page 1 in the saved order; match the table state to it.
+          currentPage = 1;
+          activeSort = null;
           initDragReorder();
           initColumnDragReorder();
           const now = Date.now();
@@ -40268,27 +40341,37 @@
     const deleteBtn = target.closest('[data-delete-event-id]');
     if (deleteBtn) {
       const id = deleteBtn.getAttribute('data-delete-event-id');
-      deleteAppointment(id);
-      toast('Appointment Deleted', 'Appointment removed permanently from schedule.');
-      
-      // 1. Remove popover modal if open
-      document.querySelector('#cal-booking-modal')?.remove();
+      const appt = getAppointments().find(a => String(a.id) === String(id));
+      const label = appt ? `${appt.type || 'Appointment'} for ${appt.childName || 'this person'} on ${formatDate(appt.date) || appt.date}` : 'this appointment';
+      modal({
+        title: 'Delete appointment?',
+        body: `This removes <strong>${escapeHTML$1(label)}</strong> from the schedule. This cannot be undone.`,
+        confirmText: 'Delete',
+        confirmClass: 'button--danger',
+        onConfirm: () => {
+          deleteAppointment(id);
+          toast('Appointment Deleted', 'Appointment removed permanently from schedule.');
 
-      // 2. Remove table row if deleted from data table
-      deleteBtn.closest('tr.gcal-appt-row')?.remove();
+          // 1. Remove popover modal if open
+          document.querySelector('#cal-booking-modal')?.remove();
 
-      // 3. Remove all matching event chips and cards from DOM
-      document.querySelectorAll(`[data-event-id="${id}"]`).forEach(el => el.remove());
+          // 2. Remove table row if deleted from data table
+          deleteBtn.closest('tr.gcal-appt-row')?.remove();
 
-      // 4. Refresh calendar grid view dynamically if present
-      const calRoot = document.querySelector('[data-calendar-root]');
-      if (calRoot) {
-        const mode = calRoot.getAttribute('data-cal-view-mode') || 'month';
-        const year = parseInt(calRoot.getAttribute('data-cal-year')) || new Date().getFullYear();
-        const month = parseInt(calRoot.getAttribute('data-cal-month')) || new Date().getMonth();
-        const day = parseInt(calRoot.getAttribute('data-cal-day')) || new Date().getDate();
-        updateCalendarView(calRoot, mode, year, month, day);
-      }
+          // 3. Remove all matching event chips and cards from DOM
+          document.querySelectorAll(`[data-event-id="${id}"]`).forEach(el => el.remove());
+
+          // 4. Refresh calendar grid view dynamically if present
+          const calRoot = document.querySelector('[data-calendar-root]');
+          if (calRoot) {
+            const mode = calRoot.getAttribute('data-cal-view-mode') || 'month';
+            const year = parseInt(calRoot.getAttribute('data-cal-year')) || new Date().getFullYear();
+            const month = parseInt(calRoot.getAttribute('data-cal-month')) || new Date().getMonth();
+            const day = parseInt(calRoot.getAttribute('data-cal-day')) || new Date().getDate();
+            updateCalendarView(calRoot, mode, year, month, day);
+          }
+        }
+      });
       return;
     }
 
@@ -40594,7 +40677,7 @@
 
     if (target.matches('[data-global-search]')) openGlobalSearch();
     if (target.matches('[data-filter-toggle]')) { const row = document.querySelector('[data-filter-row]'); row.hidden = !row.hidden; }
-    if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }
+    if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort && activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }
     if (target.matches('[data-clear-filters]')) { document.querySelectorAll('[data-filter-status], [data-filter-blood]').forEach((input) => { input.value = ''; }); applyTableFilters(); }
     if (target.matches('[data-column-visibility-toggle]')) {
       const columns = [
@@ -41400,7 +41483,7 @@
    * sent once Google is connected.
    */
   async function saveFamilyReport(file, { title, childName, childId = null, docType }) {
-    toast('Uploading report...', 'Saving it to your Google Drive...');
+    toast('Uploading report...', getSheetsConfig()?.connected ? 'Saving it to your Google Drive...' : 'Saving it...');
     let driveRes = null;
     try {
       driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
@@ -41680,6 +41763,13 @@
       const child = saveChild(form);
       form.reset();
       form.querySelector('input[name="id"]')?.remove();
+
+      // Without a Google connection nothing goes to Sheets, so don't show it happening.
+      if (!getSheetsConfig()?.connected) {
+        toast(term('savedToast').replace(/ & synced$/, ''), `${child.name}'s record is saved.`);
+        window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
+        return;
+      }
 
       showSheetsSyncLoader(child.name, () => {
         toast(term('savedToast'), `${child.name}'s record generated in Google Sheets.`);
@@ -42300,7 +42390,8 @@
   }
 
   function applyTableFilters() {
-    const children = filteredChildren().sort((a, b) => String(a[activeSort.field] || '').localeCompare(String(b[activeSort.field] || '')) * (activeSort.direction === 'asc' ? 1 : -1));
+    const children = filteredChildren();
+    if (activeSort) children.sort((a, b) => String(a[activeSort.field] || '').localeCompare(String(b[activeSort.field] || '')) * (activeSort.direction === 'asc' ? 1 : -1));
 
     const totalItems = children.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;

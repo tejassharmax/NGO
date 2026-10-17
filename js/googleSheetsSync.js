@@ -9,7 +9,7 @@
 import { getSession } from './session.js';
 import { toast } from './toast.js';
 import { modal } from './modal.js';
-import { getChildren, calculateAge, logActivity, records } from './storage.js';
+import { getChildren, calculateAge, logActivity, records, saveNow } from './storage.js';
 import { escapeHTML, icon, showProgressBar, hideProgressBar } from './utils.js';
 import { apiFetch } from './apiClient.js';
 import { rememberSpaceType, isFamilySpace, term } from './space.js';
@@ -696,7 +696,8 @@ export async function autoSyncDeleteChildFromGoogleSheets(deletedChildId, childN
     if (res.ok) {
       const data = await res.json();
       if (data && data.success && Array.isArray(data.children)) {
-        records.setItem('chm-children', JSON.stringify(data.children));
+        // The person is already gone from this tab's list. The server's list can
+        // lag behind it by a save, so it does not replace this one.
         toast('Google Sheets Updated', `Removed ${childName || term('personLower')} from connected Google Sheet.`);
         return data;
       }
@@ -704,6 +705,28 @@ export async function autoSyncDeleteChildFromGoogleSheets(deletedChildId, childN
   } catch (e) {
     console.warn('[Google Sheets] Delete sync exception:', e);
   }
+}
+
+/**
+ * The pulled roster, plus this tab's copies of anyone saved here after the
+ * sheet was last written. Those saves may not have reached the database when
+ * the pull read it, so the pulled roster can lack them or hold an older copy.
+ * @param {object[]} pulled  children returned by the pull
+ * @param {number} sheetsSyncedAt  when the sheets were last written (ms), 0 if unknown
+ */
+function keepUnsavedChildren(pulled, sheetsSyncedAt) {
+  if (!sheetsSyncedAt) return pulled;
+  let local = [];
+  try { local = JSON.parse(records.getItem('chm-children') || '[]'); } catch (e) { }
+  if (!Array.isArray(local)) return pulled;
+  const merged = [...pulled];
+  local.forEach(child => {
+    if (!child || !child.id || (Number(child.updatedAt) || 0) <= sheetsSyncedAt) return;
+    const idx = merged.findIndex(c => c && c.id === child.id);
+    if (idx === -1) merged.unshift(child);
+    else if ((Number(child.updatedAt) || 0) > (Number(merged[idx].updatedAt) || 0)) merged[idx] = child;
+  });
+  return merged;
 }
 
 /**
@@ -721,6 +744,11 @@ export async function pullChildrenFromGoogleSheets(options = {}) {
   showProgressBar(50);
 
   try {
+    // The pull compares the sheet with the database, so recent edits must be there first.
+    if (!(await saveNow().catch(() => false))) {
+      if (!options.silent) toast('Sync Notice', 'Your latest changes are still being saved. Please try again in a moment.');
+      return { success: false };
+    }
     const res = await apiFetch('/api/sheets/pull', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -730,6 +758,7 @@ export async function pullChildrenFromGoogleSheets(options = {}) {
     if (res.ok) {
       const data = await res.json();
       if (data && data.success && Array.isArray(data.children)) {
+        data.children = keepUnsavedChildren(data.children, Number(data.sheetsSyncedAt) || 0);
         records.setItem('chm-children', JSON.stringify(data.children));
 
         if (data.addedCount > 0) {
