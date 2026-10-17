@@ -40738,6 +40738,10 @@
             return;
           }
           const file = fileInput.files[0];
+          if (isFamilySpace()) {
+            saveFamilyReport(file, { title, childName, childId, docType });
+            return;
+          }
           toast('Saving document...', 'Saving and syncing to Google Drive...');
           const reader = new FileReader();
           reader.onload = async function(e) {
@@ -41193,6 +41197,10 @@
 
           if (fileInput && fileInput.files && fileInput.files[0]) {
             const file = fileInput.files[0];
+            if (isFamilySpace()) {
+              saveFamilyReport(file, { title: docName, childName, docType });
+              return;
+            }
             toast('Saving document...', 'Saving and syncing to Google Drive...');
             const reader = new FileReader();
             reader.onload = async function (e) {
@@ -41374,6 +41382,53 @@
     }
     if (event.target.matches('#select-all')) document.querySelectorAll('[data-select-row]').forEach((input) => { input.checked = event.target.checked; });
   });
+
+  /** The file's contents as a data: URL. */
+  function readFileAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * Save a family's report. It goes to Google Drive first and the record keeps
+   * only the Drive link, so a large PDF never has to fit in the tab's working
+   * copy. Only when Drive cannot take it is the file kept in the record, to be
+   * sent once Google is connected.
+   */
+  async function saveFamilyReport(file, { title, childName, childId = null, docType }) {
+    toast('Uploading report...', 'Saving it to your Google Drive...');
+    let driveRes = null;
+    try {
+      driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
+    } catch (err) {
+      console.warn('[Drive Upload]', err);
+    }
+
+    if (driveRes && driveRes.success && driveRes.driveUrl) {
+      const doc = addUploadedDoc(title, childName, null, 'Verified', docType, childId, driveRes.driveFileId, driveRes.driveUrl);
+      updateUploadedDoc(doc.id, { childFolderId: driveRes.childFolderId, childFolderUrl: driveRes.childFolderUrl });
+      logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
+      toast('Saved to Google Drive', `${title} is in ${childName}'s folder in your Google Drive.`);
+    } else {
+      const connected = !!getSheetsConfig()?.connected;
+      try {
+        addUploadedDoc(title, childName, await readFileAsDataURL(file), 'Verified', docType, childId);
+        logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
+        toast('Report saved', connected ? `${title} is saved and will be sent to Google Drive shortly.` : `${title} is saved. Connect Google in Settings to keep it in your Google Drive.`);
+      } catch (storageErr) {
+        console.warn('[Upload] Could not keep the file:', storageErr);
+        toast('Could not upload this report', connected
+          ? 'Google Drive did not accept it just now. Please try again in a moment.'
+          : 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
+        return;
+      }
+    }
+    window.setTimeout(() => window.location.reload(), 300);
+  }
 
   // ─── Drag-and-Drop Row Reorder (Apple-style) ───
   function initDragReorder() {
