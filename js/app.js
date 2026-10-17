@@ -17,7 +17,8 @@ import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEv
 import { initCombobox } from './combobox.js';
 import { apiFetch } from './apiClient.js';
 
-let activeSort = { field: 'name', direction: 'asc' };
+/** Column the children table is sorted by; null keeps the saved (drag-and-drop) order. */
+let activeSort = null;
 let currentPage = 1;
 const itemsPerPage = 5;
 let page = 'dashboard';
@@ -214,6 +215,9 @@ let renderCurrentPage = null;
       applyColumnVisibility();
       initFormListeners();
       if (page === 'children') {
+        // The page is drawn at page 1 in the saved order; match the table state to it.
+        currentPage = 1;
+        activeSort = null;
         initDragReorder();
         initColumnDragReorder();
         const now = Date.now();
@@ -436,27 +440,37 @@ document.addEventListener('click', (event) => {
   const deleteBtn = target.closest('[data-delete-event-id]');
   if (deleteBtn) {
     const id = deleteBtn.getAttribute('data-delete-event-id');
-    deleteAppointment(id);
-    toast('Appointment Deleted', 'Appointment removed permanently from schedule.');
-    
-    // 1. Remove popover modal if open
-    document.querySelector('#cal-booking-modal')?.remove();
+    const appt = getAppointments().find(a => String(a.id) === String(id));
+    const label = appt ? `${appt.type || 'Appointment'} for ${appt.childName || 'this person'} on ${formatDate(appt.date) || appt.date}` : 'this appointment';
+    modal({
+      title: 'Delete appointment?',
+      body: `This removes <strong>${escapeHTML(label)}</strong> from the schedule. This cannot be undone.`,
+      confirmText: 'Delete',
+      confirmClass: 'button--danger',
+      onConfirm: () => {
+        deleteAppointment(id);
+        toast('Appointment Deleted', 'Appointment removed permanently from schedule.');
 
-    // 2. Remove table row if deleted from data table
-    deleteBtn.closest('tr.gcal-appt-row')?.remove();
+        // 1. Remove popover modal if open
+        document.querySelector('#cal-booking-modal')?.remove();
 
-    // 3. Remove all matching event chips and cards from DOM
-    document.querySelectorAll(`[data-event-id="${id}"]`).forEach(el => el.remove());
+        // 2. Remove table row if deleted from data table
+        deleteBtn.closest('tr.gcal-appt-row')?.remove();
 
-    // 4. Refresh calendar grid view dynamically if present
-    const calRoot = document.querySelector('[data-calendar-root]');
-    if (calRoot) {
-      const mode = calRoot.getAttribute('data-cal-view-mode') || 'month';
-      const year = parseInt(calRoot.getAttribute('data-cal-year')) || new Date().getFullYear();
-      const month = parseInt(calRoot.getAttribute('data-cal-month')) || new Date().getMonth();
-      const day = parseInt(calRoot.getAttribute('data-cal-day')) || new Date().getDate();
-      updateCalendarView(calRoot, mode, year, month, day);
-    }
+        // 3. Remove all matching event chips and cards from DOM
+        document.querySelectorAll(`[data-event-id="${id}"]`).forEach(el => el.remove());
+
+        // 4. Refresh calendar grid view dynamically if present
+        const calRoot = document.querySelector('[data-calendar-root]');
+        if (calRoot) {
+          const mode = calRoot.getAttribute('data-cal-view-mode') || 'month';
+          const year = parseInt(calRoot.getAttribute('data-cal-year')) || new Date().getFullYear();
+          const month = parseInt(calRoot.getAttribute('data-cal-month')) || new Date().getMonth();
+          const day = parseInt(calRoot.getAttribute('data-cal-day')) || new Date().getDate();
+          updateCalendarView(calRoot, mode, year, month, day);
+        }
+      }
+    });
     return;
   }
 
@@ -762,7 +776,7 @@ document.addEventListener('click', (event) => {
 
   if (target.matches('[data-global-search]')) openGlobalSearch();
   if (target.matches('[data-filter-toggle]')) { const row = document.querySelector('[data-filter-row]'); row.hidden = !row.hidden; }
-  if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }
+  if (target.matches('[data-sort]')) { const field = target.dataset.sort; activeSort = { field, direction: activeSort && activeSort.field === field && activeSort.direction === 'asc' ? 'desc' : 'asc' }; applyTableFilters(); }
   if (target.matches('[data-clear-filters]')) { document.querySelectorAll('[data-filter-status], [data-filter-blood]').forEach((input) => { input.value = ''; }); applyTableFilters(); }
   if (target.matches('[data-column-visibility-toggle]')) {
     const columns = [
@@ -1568,7 +1582,7 @@ function readFileAsDataURL(file) {
  * sent once Google is connected.
  */
 async function saveFamilyReport(file, { title, childName, childId = null, docType }) {
-  toast('Uploading report...', 'Saving it to your Google Drive...', 'info');
+  toast('Uploading report...', getSheetsConfig()?.connected ? 'Saving it to your Google Drive...' : 'Saving it...', 'info');
   let driveRes = null;
   try {
     driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
@@ -1848,6 +1862,13 @@ function initFormListeners() {
     const child = saveChild(form);
     form.reset();
     form.querySelector('input[name="id"]')?.remove();
+
+    // Without a Google connection nothing goes to Sheets, so don't show it happening.
+    if (!getSheetsConfig()?.connected) {
+      toast(term('savedToast').replace(/ & synced$/, ''), `${child.name}'s record is saved.`);
+      window.location.href = `${pagePath('child-profile')}?id=${child.id}`;
+      return;
+    }
 
     showSheetsSyncLoader(child.name, () => {
       toast(term('savedToast'), `${child.name}'s record generated in Google Sheets.`);
@@ -2468,7 +2489,8 @@ function filteredChildren() {
 }
 
 function applyTableFilters() {
-  const children = filteredChildren().sort((a, b) => String(a[activeSort.field] || '').localeCompare(String(b[activeSort.field] || '')) * (activeSort.direction === 'asc' ? 1 : -1));
+  const children = filteredChildren();
+  if (activeSort) children.sort((a, b) => String(a[activeSort.field] || '').localeCompare(String(b[activeSort.field] || '')) * (activeSort.direction === 'asc' ? 1 : -1));
 
   const totalItems = children.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;

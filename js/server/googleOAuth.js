@@ -969,6 +969,8 @@ async function syncBloodTestSheet(sheets, client, integration, safeSlug, display
  */
 async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   const safeSlug = sanitizeNgoSlug(ngoSlug);
+  // Records saved after this moment may not be in the sheet this run writes.
+  const startedAt = Date.now();
   const client = await getClientForNgo(safeSlug);
 
   if (!client) {
@@ -1073,6 +1075,7 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
   const masterTableData = masterDirectoryTable(cleanChildren, family);
 
   // A. Sync File 1: Master Directory Spreadsheet
+  let masterWritten = false;
   try {
     await sheets.spreadsheets.values.clear({
       spreadsheetId: sheetId,
@@ -1084,6 +1087,7 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
       valueInputOption: 'USER_ENTERED',
       requestBody: { values: masterTableData }
     });
+    masterWritten = true;
   } catch (err1) {
     if (err1.message?.includes('invalid_grant') || err1.response?.data?.error === 'invalid_grant') {
       integration.tokenExpired = true;
@@ -1384,6 +1388,8 @@ async function syncChildrenToGoogleSheetsInternal(children, ngoSlug, ngoName) {
 
   // Save gid map and URLs to integration config
   integration.childSheetGids = childSheetGids;
+  // The pull trusts the master sheet only as of its last complete write.
+  if (masterWritten) integration.sheetsSyncedAt = startedAt;
   await saveNgoIntegration(safeSlug, integration);
 
   return {
@@ -1491,6 +1497,20 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
     return { success: false, message: 'No Google Sheet found for this organization. Please sync or create one first.' };
   }
 
+  // While the app is writing this space's sheets, the master sheet may not yet
+  // list what was just saved; reading it now would undo those saves.
+  const pushQueue = ngoSyncQueues.get(safeSlug);
+  if (pushQueue && (pushQueue.active || pushQueue.pending)) {
+    return { success: true, skipped: true, addedCount: 0, updatedCount: 0, removedCount: 0, message: 'Google Sheets is being updated. Please try again in a moment.' };
+  }
+
+  // A record saved in the app after the sheet was last written is newer than the
+  // sheet: its row there is stale or missing, so the sheet must not overrule it.
+  // Spaces whose sheets were last written before this time was recorded keep the
+  // old rule (the sheet wins) until their next Sheets update.
+  const sheetsSyncedAt = Number(integration.sheetsSyncedAt) || 0;
+  const newerThanSheet = c => sheetsSyncedAt > 0 && (Number(c.updatedAt) || 0) > sheetsSyncedAt;
+
   const sheets = google.sheets({ version: 'v4', auth: client });
 
   const IGNORED_NAMES = ['unnamed child', 'child', 'name', 'child name', 'student name', 'sample', 'template'];
@@ -1593,7 +1613,9 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
         const existingMatch = existingMap.get(id.toLowerCase()) || existingMap.get(name.toLowerCase());
 
-        if (existingMatch) {
+        if (existingMatch && newerThanSheet(existingMatch)) {
+          validSheetChildren.push(existingMatch);
+        } else if (existingMatch) {
           let changed = false;
           if (rawDob !== existingMatch.dob) { existingMatch.dob = rawDob; changed = true; }
           if (rawGender !== existingMatch.gender) { existingMatch.gender = rawGender; changed = true; }
@@ -1647,7 +1669,8 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
         const idKey = (ec.id || '').toLowerCase().trim();
         const nameKey = (ec.name || '').toLowerCase().trim();
         if (!sheetSeenIds.has(idKey) && !sheetSeenNames.has(nameKey)) {
-          removedCount++;
+          if (newerThanSheet(ec)) validSheetChildren.push(ec);
+          else removedCount++;
         }
       });
     }
@@ -1685,6 +1708,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
     removedCount,
     totalCount: cleanedChildren.length,
     children: cleanedChildren,
+    sheetsSyncedAt,
     message: statusMsg
   };
 }

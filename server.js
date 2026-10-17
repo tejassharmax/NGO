@@ -31,7 +31,7 @@ const {
 } = require('./js/server/googleOAuth');
 
 // Server-side authentication (Firebase ID token + email allowlist)
-const { requireAuth, ALLOWED_EMAILS } = require('./js/server/auth');
+const { requireAuth, isAuthorizedEmail } = require('./js/server/auth');
 
 const { createRateLimiter } = require('./js/server/rateLimiter');
 
@@ -265,7 +265,7 @@ app.get('/auth/google/callback', async (req, res) => {
     // URL it let a stranger with a lookalike Gmail address bind their own Google
     // account to this NGO, which would then receive every synced medical record.
     const connectingEmail = String(adminEmail || '').trim().toLowerCase();
-    const isAuthorized = ALLOWED_EMAILS.has(connectingEmail);
+    const isAuthorized = await isAuthorizedEmail(connectingEmail);
 
     if (!isAuthorized) {
       console.warn(`[oauth] Refused workspace connect from non-allowlisted account: ${connectingEmail}`);
