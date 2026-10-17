@@ -48,6 +48,16 @@ const app = express();
 // its local-development bypass on the TCP peer address, never on a proxy header.
 app.set('trust proxy', 1);
 
+// One address for the site: "www." visitors go to the bare domain, which is the
+// address registered with Google for sign-in and the Google Workspace connection.
+app.use((req, res, next) => {
+  const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+  if (/^www\./i.test(host)) {
+    return res.redirect(301, `https://${host.replace(/^www\./i, '')}${req.originalUrl}`);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } }); // Max 15MB
