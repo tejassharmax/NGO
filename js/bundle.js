@@ -35129,7 +35129,7 @@
             <div style="width:52px; height:52px; border-radius:50%; background:rgba(16,185,129,0.12); color:#059669; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
               ${icon('googleSheets')}
             </div>
-            <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
+            <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect to Google Workspace</h3>
             <p style="font-size:13.5px; color:var(--color-text-muted); margin:0 0 20px 0; line-height:1.5;">
               To view <b>${escapeHTML$1(childName || `this ${term('personLower')}`)}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
             </p>
@@ -35457,9 +35457,9 @@
                   title: 'Google Workspace Not Connected',
                   body: `<div style="text-align:center; padding:16px 8px;">
                   <div style="font-size:44px; margin-bottom:8px;">📊</div>
-                  <h3 style="color:var(--color-primary); margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
+                  <h3 style="color:var(--color-primary); margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect to Google Workspace</h3>
                   <p style="font-size:13px; color:var(--color-text); margin:0 0 16px 0; line-height:1.5;">
-                    To view and open your live Google Sheet in real-time, please click <b>Connect Google Sheets Sync</b> once under <b>Settings</b>.
+                    To view and open your live Google Sheet in real-time, please click <b>Connect to Google Workspace</b> once under <b>Settings</b>.
                   </p>
                 </div>`,
                   confirmText: 'Go to Settings',
@@ -38492,7 +38492,7 @@
             ${(!isConnected || isTokenExpired) ? `
               <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; border-color: ${isTokenExpired ? '#ea4335' : '#0F9D58'};">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-                ${isTokenExpired ? `Reconnect${driveOwnerEmail ? ` as ${escapeHTML$1(driveOwnerEmail)}` : ''} ↗` : 'Connect Google Sheets Sync'}
+                ${isTokenExpired ? `Reconnect${driveOwnerEmail ? ` as ${escapeHTML$1(driveOwnerEmail)}` : ''} ↗` : 'Connect to Google Workspace'}
               </a>
             ` : ''}
 

@@ -1108,7 +1108,7 @@ export function settingsPage() {
             ${(!isConnected || isTokenExpired) ? `
               <a href="/api/google/connect?ngo=${encodeURIComponent(ngoSlug)}" class="button button--primary" style="font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; background: ${isTokenExpired ? '#ea4335' : '#0F9D58'}; border-color: ${isTokenExpired ? '#ea4335' : '#0F9D58'};">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1-2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
-                ${isTokenExpired ? `Reconnect${driveOwnerEmail ? ` as ${escapeHTML(driveOwnerEmail)}` : ''} ↗` : 'Connect Google Sheets Sync'}
+                ${isTokenExpired ? `Reconnect${driveOwnerEmail ? ` as ${escapeHTML(driveOwnerEmail)}` : ''} ↗` : 'Connect to Google Workspace'}
               </a>
             ` : ''}
 
