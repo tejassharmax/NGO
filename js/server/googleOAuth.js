@@ -126,7 +126,8 @@ function buildOAuthClient(req = null) {
     // Otherwise derive it from the live request. A public host is assumed to be
     // served over HTTPS; behind some proxies req.protocol reports "http" even
     // though the browser used HTTPS, which produced a mismatching redirect URI.
-    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    // "www." is dropped: only the bare domain is registered with Google.
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim().replace(/^www\./i, '');
     if (host && !isLocalUrl(host)) {
       const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim();
       redirectUri = `${forwardedProto || 'https'}://${host}/auth/google/callback`;
