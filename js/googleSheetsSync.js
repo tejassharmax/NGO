@@ -262,7 +262,7 @@ export async function openChildGoogleSheet(childId, childName) {
             <div style="width:52px; height:52px; border-radius:50%; background:rgba(16,185,129,0.12); color:#059669; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
               ${icon('googleSheets')}
             </div>
-            <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
+            <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect to Google Workspace</h3>
             <p style="font-size:13.5px; color:var(--color-text-muted); margin:0 0 20px 0; line-height:1.5;">
               To view <b>${escapeHTML(childName || `this ${term('personLower')}`)}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
             </p>
@@ -590,9 +590,9 @@ export function showSheetsSyncLoader(childName, onComplete) {
                 title: 'Google Workspace Not Connected',
                 body: `<div style="text-align:center; padding:16px 8px;">
                   <div style="font-size:44px; margin-bottom:8px;">📊</div>
-                  <h3 style="color:var(--color-primary); margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect Google Sheets Sync</h3>
+                  <h3 style="color:var(--color-primary); margin:0 0 8px 0; font-size:18px; font-weight:700;">Connect to Google Workspace</h3>
                   <p style="font-size:13px; color:var(--color-text); margin:0 0 16px 0; line-height:1.5;">
-                    To view and open your live Google Sheet in real-time, please click <b>Connect Google Sheets Sync</b> once under <b>Settings</b>.
+                    To view and open your live Google Sheet in real-time, please click <b>Connect to Google Workspace</b> once under <b>Settings</b>.
                   </p>
                 </div>`,
                 confirmText: 'Go to Settings',
