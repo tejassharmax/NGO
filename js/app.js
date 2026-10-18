@@ -1687,7 +1687,7 @@ function initDragReorder() {
     dragRow.classList.add('drag-flash');
     setTimeout(() => dragRow?.classList.remove('drag-flash'), 2000);
 
-    toast('Row position updated', 'Saved child record order.');
+    toast('Row position updated', 'Saved the new record order.');
     syncWithServer().catch(() => {});
   });
 
@@ -1942,7 +1942,7 @@ function initFormListeners() {
         height: parseFloat(values.height),
         weight: parseFloat(values.weight)
       });
-      toast('Growth recorded', `Measurement for ${child ? child.name : 'Child'} has been saved.`);
+      toast('Growth recorded', `Measurement for ${child ? child.name : 'this record'} has been saved.`);
       window.setTimeout(() => window.location.reload(), 500);
     }
   });
@@ -2020,9 +2020,9 @@ function initFormListeners() {
         }, true, allChildren);
 
         window.open(groupCalUrl, '_blank');
-        toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} children on ${values.date}. Google Calendar synced.`);
+        toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} records on ${values.date}. Google Calendar synced.`);
       } else {
-        toast('No Children Registered', 'Please register children before booking group appointments.');
+        toast('No Records Yet', 'Please add records before booking group appointments.');
       }
     } else {
       const child = getChild(values.childId);

@@ -333,7 +333,7 @@ export function copySheetDataToClipboard() {
     navigator.clipboard.writeText(tsvData).then(() => {
       toast(
         'Dataset Copied to Clipboard!',
-        `Copied ${children.length} child records (15 columns). Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
+        `Copied ${children.length} records (15 columns). Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
       );
     }).catch(err => {
       console.warn('Clipboard write notice:', err);
@@ -739,7 +739,7 @@ export async function pullChildrenFromGoogleSheets(options = {}) {
   const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
 
   if (!options.silent) {
-    toast('Syncing with Google Sheets', 'Checking for newly added children and updates in Google Sheets...');
+    toast('Syncing with Google Sheets', 'Checking for new records and updates in Google Sheets...');
   }
   showProgressBar(50);
 
@@ -762,17 +762,17 @@ export async function pullChildrenFromGoogleSheets(options = {}) {
         records.setItem('chm-children', JSON.stringify(data.children));
 
         if (data.addedCount > 0) {
-          logActivity('child_added', `${data.addedCount} student(s)`, `Imported ${data.addedCount} new child record(s) from Google Sheets.`);
+          logActivity('child_added', `${data.addedCount} record(s)`, `Imported ${data.addedCount} new record(s) from Google Sheets.`);
         }
         if (data.removedCount > 0) {
-          logActivity('child_removed', `${data.removedCount} student(s)`, `Removed ${data.removedCount} child record(s) deleted from Google Sheets.`);
+          logActivity('child_removed', `${data.removedCount} record(s)`, `Removed ${data.removedCount} record(s) deleted from Google Sheets.`);
         }
 
         if (!options.silent) {
           if (data.addedCount > 0 || data.updatedCount > 0 || data.removedCount > 0) {
-            toast('Google Sheets Sync Complete', data.message || `Updated ${data.totalCount || 0} children records.`);
+            toast('Google Sheets Sync Complete', data.message || `Updated ${data.totalCount || 0} records.`);
           } else {
-            toast('Google Sheets Up to Date', 'All children records are already in sync with Google Sheets.');
+            toast('Google Sheets Up to Date', 'All records are already in sync with Google Sheets.');
           }
         }
         return data;
