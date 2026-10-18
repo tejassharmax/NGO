@@ -1693,11 +1693,11 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
     console.log(`[Google OAuth] Pulled from Child Health Records master sheet: ${addedCount} added, ${updatedCount} updated, ${removedCount} removed.`);
   }
 
-  let statusMsg = 'Synced with Child Health Records: ';
+  let statusMsg = 'Synced with Google Sheets: ';
   const parts = [];
-  if (addedCount > 0) parts.push(`${addedCount} new child(ren) imported`);
+  if (addedCount > 0) parts.push(`${addedCount} new record(s) imported`);
   if (updatedCount > 0) parts.push(`${updatedCount} updated`);
-  if (removedCount > 0) parts.push(`${removedCount} deleted child(ren) removed`);
+  if (removedCount > 0) parts.push(`${removedCount} deleted record(s) removed`);
   if (parts.length === 0) parts.push('All records up to date');
   statusMsg += parts.join(', ') + '.';
 
@@ -1718,7 +1718,7 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
  * Safely removes ONLY the targeted child, updates Sheet1, and removes the child's tab in clinicalSheetId
  */
 async function deleteChildFromGoogleSheets(childId, ngoSlug, ngoName) {
-  if (!childId) return { success: false, message: 'Child ID is required' };
+  if (!childId) return { success: false, message: 'Record ID is required' };
 
   const safeSlug = sanitizeNgoSlug(ngoSlug);
   const loaded = await readTenantArrays(safeSlug, ['chm-children']);

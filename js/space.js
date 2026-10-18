@@ -97,9 +97,9 @@ const TERMS = {
   calendarFooter: ['Created from Child Health Management App', 'Created from Ayusha Health'],
 
   // Messages
-  savedToast: ['Child saved & synced', 'Saved & synced'],
+  savedToast: ['Record saved & synced', 'Saved & synced'],
   removeConfirm: ['Remove child', 'Remove member'],
-  removedToast: ['Child removed', 'Family member removed'],
+  removedToast: ['Record removed', 'Family member removed'],
   removeBody: [
     'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
     'This removes this person from your family space and updates your connected Google Sheet. This action cannot be undone.'

@@ -33744,9 +33744,9 @@
     calendarFooter: ['Created from Child Health Management App', 'Created from Ayusha Health'],
 
     // Messages
-    savedToast: ['Child saved & synced', 'Saved & synced'],
+    savedToast: ['Record saved & synced', 'Saved & synced'],
     removeConfirm: ['Remove child', 'Remove member'],
-    removedToast: ['Child removed', 'Family member removed'],
+    removedToast: ['Record removed', 'Family member removed'],
     removeBody: [
       'This removes the child record from this workspace and automatically updates your connected Google Sheet. This action cannot be undone.',
       'This removes this person from your family space and updates your connected Google Sheet. This action cannot be undone.'
@@ -35234,7 +35234,7 @@
       navigator.clipboard.writeText(tsvData).then(() => {
         toast(
           'Dataset Copied to Clipboard!',
-          `Copied ${children.length} child records (15 columns). Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
+          `Copied ${children.length} records (15 columns). Press Ctrl+V (or Cmd+V) on cell A1 in Google Sheets to paste!`
         );
       }).catch(err => {
         console.warn('Clipboard write notice:', err);
@@ -35640,7 +35640,7 @@
     const ngoName = session.ngoName || session.ngo || 'Ayusha Nilayam';
 
     if (!options.silent) {
-      toast('Syncing with Google Sheets', 'Checking for newly added children and updates in Google Sheets...');
+      toast('Syncing with Google Sheets', 'Checking for new records and updates in Google Sheets...');
     }
     showProgressBar(50);
 
@@ -35663,17 +35663,17 @@
           records.setItem('chm-children', JSON.stringify(data.children));
 
           if (data.addedCount > 0) {
-            logActivity('child_added', `${data.addedCount} student(s)`, `Imported ${data.addedCount} new child record(s) from Google Sheets.`);
+            logActivity('child_added', `${data.addedCount} record(s)`, `Imported ${data.addedCount} new record(s) from Google Sheets.`);
           }
           if (data.removedCount > 0) {
-            logActivity('child_removed', `${data.removedCount} student(s)`, `Removed ${data.removedCount} child record(s) deleted from Google Sheets.`);
+            logActivity('child_removed', `${data.removedCount} record(s)`, `Removed ${data.removedCount} record(s) deleted from Google Sheets.`);
           }
 
           if (!options.silent) {
             if (data.addedCount > 0 || data.updatedCount > 0 || data.removedCount > 0) {
-              toast('Google Sheets Sync Complete', data.message || `Updated ${data.totalCount || 0} children records.`);
+              toast('Google Sheets Sync Complete', data.message || `Updated ${data.totalCount || 0} records.`);
             } else {
-              toast('Google Sheets Up to Date', 'All children records are already in sync with Google Sheets.');
+              toast('Google Sheets Up to Date', 'All records are already in sync with Google Sheets.');
             }
           }
           return data;
@@ -41588,7 +41588,7 @@
       dragRow.classList.add('drag-flash');
       setTimeout(() => dragRow?.classList.remove('drag-flash'), 2000);
 
-      toast('Row position updated', 'Saved child record order.');
+      toast('Row position updated', 'Saved the new record order.');
       syncWithServer().catch(() => {});
     });
 
@@ -41843,7 +41843,7 @@
           height: parseFloat(values.height),
           weight: parseFloat(values.weight)
         });
-        toast('Growth recorded', `Measurement for ${child ? child.name : 'Child'} has been saved.`);
+        toast('Growth recorded', `Measurement for ${child ? child.name : 'this record'} has been saved.`);
         window.setTimeout(() => window.location.reload(), 500);
       }
     });
@@ -41921,9 +41921,9 @@
           }, true, allChildren);
 
           window.open(groupCalUrl, '_blank');
-          toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} children on ${values.date}. Google Calendar synced.`);
+          toast('Group Appointment Scheduled', `Scheduled ${values.type} for all ${allChildren.length} records on ${values.date}. Google Calendar synced.`);
         } else {
-          toast('No Children Registered', 'Please register children before booking group appointments.');
+          toast('No Records Yet', 'Please add records before booking group appointments.');
         }
       } else {
         const child = getChild(values.childId);
