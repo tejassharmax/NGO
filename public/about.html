@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About · Ayusha Health</title>
+<meta name="description" content="About Ayusha Health: a health record system that keeps every person's records in one place and in sync with the owner's own Google Sheets and Drive.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root { --ink: #0E2A2F; --muted: #3D5257; --paper: #F6F3EC; --card: #FDFCF8; --teal: #0F9D8A; --teal-dark: #0B7A6B; --line: #E4E0D6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'IBM Plex Sans', Arial, sans-serif; color: var(--ink); background: var(--paper); line-height: 1.65; }
+  a { color: var(--teal-dark); }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 24px 64px; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 28px 0 8px; }
+  .brand { font-family: 'Space Grotesk', Arial, sans-serif; font-weight: 700; font-size: 24px; color: var(--ink); text-decoration: none; }
+  .brand span { color: var(--teal); }
+  h1 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 44px; letter-spacing: -1px; margin: 32px 0 4px; }
+  h2 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 24px; margin: 36px 0 8px; }
+  p, li { color: var(--muted); }
+  .meta { color: var(--muted); margin-bottom: 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 16px 0 8px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; }
+  .card h3 { font-family: 'Space Grotesk', Arial, sans-serif; font-size: 18px; margin: 0 0 6px; }
+  .card p { margin: 0; }
+  footer { border-top: 1px solid var(--line); margin-top: 48px; padding-top: 20px; font-size: 15px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><a class="brand" href="/">Ayusha <span>Health</span></a><a href="/app">Sign in</a></header>
+
+  <h1>About Ayusha Health</h1>
+  <p class="meta">Version 1.0</p>
+
+  <p>Ayusha Health keeps health records in one place: checkups, prescriptions, blood test reports, vaccinations, appointments and documents. Every record is also kept in sync with the owner's own Google Sheets and Google Drive, so the records always stay with the people they belong to.</p>
+
+  <h2>Who it is for</h2>
+  <ul>
+    <li><b>Children's homes</b> (child care institutions), whose staff keep the health records they are required to maintain for every child in their care.</li>
+    <li><b>Families</b>, who keep each family member's medical reports and checkups together in one private space.</li>
+  </ul>
+  <p>Ayusha Health is not a public service. Only people whose email address has been authorised can sign in, and every home or family sees only its own records.</p>
+
+  <h2>What it does</h2>
+  <div class="grid">
+    <div class="card"><h3>One profile per person</h3><p>A complete, ordered health history: checkups, vitals, growth, blood tests and prescriptions.</p></div>
+    <div class="card"><h3>Google Sheets, kept up to date</h3><p>A master directory, medical records and blood test workbooks are created and updated in the owner's Google account.</p></div>
+    <div class="card"><h3>Documents in Google Drive</h3><p>Uploaded reports are saved in one folder per person in the owner's Google Drive.</p></div>
+    <div class="card"><h3>Appointments and reports</h3><p>Appointments with Google Calendar, a monthly checkup register and reports ready for inspections.</p></div>
+  </div>
+
+  <h2>Privacy and security</h2>
+  <p>Sign-in uses Google, and every request is checked against the list of authorised people. Records are stored in Google Cloud Firestore in India and in the owner's own Google account; they are never sold or used for advertising. Read the <a href="/privacy">privacy policy</a> and <a href="/terms">terms of service</a> for details.</p>
+
+  <h2>Who makes it</h2>
+  <p>Ayusha Health is provided by Empowered Margins Foundation.</p>
+
+  <h2>Contact</h2>
+  <p>Questions, support or feedback: <a href="mailto:tejassachin2010@gmail.com">tejassachin2010@gmail.com</a></p>
+
+  <footer>© 2026 Ayusha Health · Provided by Empowered Margins Foundation · <a href="/privacy">Privacy policy</a> · <a href="/terms">Terms of service</a></footer>
+</div>
+</body>
+</html>

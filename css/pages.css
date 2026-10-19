@@ -508,6 +508,28 @@ body.theme-dark .login-card__hero-icon {
   padding: 5px 12px;
 }
 
+.login-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.login-links a {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.login-links a:hover,
+.login-links a:focus-visible {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
 .login-feature svg {
   width: 13px;
   height: 13px;

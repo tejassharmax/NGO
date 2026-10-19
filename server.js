@@ -109,6 +109,7 @@ const sendPublicFile = (relativePath) => (req, res) => {
 };
 // Public pages anyone can open (also what Google's OAuth review reads), then the app.
 app.get('/', sendPublicFile('public/home.html'));
+app.get('/about', sendPublicFile('public/about.html'));
 app.get('/privacy', sendPublicFile('public/privacy.html'));
 app.get('/terms', sendPublicFile('public/terms.html'));
 app.get(['/app', '/index.html'], sendPublicFile('index.html'));
