@@ -37721,6 +37721,12 @@
           <div class="login-feature">${icon('activity')}<span>Health Tracking</span></div>
           <div class="login-feature">${icon('heart')}<span>Child Care</span></div>
         </div>
+
+        <nav class="login-links" aria-label="About Ayusha Health">
+          <a href="/about">About App</a>
+          <span aria-hidden="true">·</span>
+          <a href="/privacy">Privacy</a>
+        </nav>
       </div>
     </section>
   </main>`;
