@@ -39618,6 +39618,712 @@
   }
 
   /**
+   * reportReader.js
+   * Turns an uploaded report (PDF or photo) into text, in the browser, so the
+   * report never leaves the device for this step.
+   *
+   * Digital PDFs carry their text, which pdf.js reads exactly. Scanned PDFs and
+   * photos have none, so they go through Tesseract OCR. Both libraries are
+   * served from this site (/vendor, see scripts/copy-vendor.mjs) and loaded only
+   * when someone asks for a report to be read.
+   */
+
+  const PDFJS_URL = '/vendor/pdfjs/pdf.min.mjs';
+  const PDFJS_WORKER_URL = '/vendor/pdfjs/pdf.worker.min.mjs';
+  const TESSERACT_URL = '/vendor/tesseract/tesseract.min.js';
+  const TESSERACT_PATHS = {
+    workerPath: '/vendor/tesseract/worker.min.js',
+    corePath: '/vendor/tesseract/core',
+    langPath: '/vendor/tesseract/lang',
+    gzip: true
+  };
+
+  /** Pages read from one PDF; lab reports are short, and OCR takes seconds a page. */
+  const MAX_PAGES = 6;
+
+  /** Fewer characters than this on a PDF page means it is a scan with no text to read. */
+  const MIN_TEXT_PER_PAGE = 60;
+
+  /** Longest a report may take to read: a slow phone, several scanned pages. */
+  const READ_TIME_LIMIT_MS = 3 * 60 * 1000;
+
+  let pdfjsPromise = null;
+  let tesseractPromise = null;
+
+  function loadPdfJs() {
+    if (!pdfjsPromise) {
+      const url = PDFJS_URL;
+      pdfjsPromise = import(/* @vite-ignore */ url).then(pdfjs => {
+        pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER_URL;
+        return pdfjs;
+      }).catch(err => { pdfjsPromise = null; throw err; });
+    }
+    return pdfjsPromise;
+  }
+
+  function loadTesseract() {
+    if (!tesseractPromise) {
+      tesseractPromise = new Promise((resolve, reject) => {
+        if (window.Tesseract) return resolve(window.Tesseract);
+        const script = document.createElement('script');
+        script.src = TESSERACT_URL;
+        script.onload = () => (window.Tesseract ? resolve(window.Tesseract) : reject(new Error('OCR library did not load')));
+        script.onerror = () => reject(new Error('OCR library could not be downloaded'));
+        document.head.appendChild(script);
+      }).catch(err => { tesseractPromise = null; throw err; });
+    }
+    return tesseractPromise;
+  }
+
+  /**
+   * A PDF page's text as printed lines. pdf.js gives positioned fragments; those
+   * at the same height form a line, read left to right, and a wide horizontal
+   * gap becomes a run of spaces so table columns stay apart.
+   */
+  function pageLines(items) {
+    const parts = items
+      .filter(it => it.str && it.str.trim())
+      .map(it => ({ text: it.str, x: it.transform[4], y: it.transform[5], w: it.width || 0, h: Math.abs(it.height || it.transform[3]) || 8 }));
+    parts.sort((a, b) => b.y - a.y || a.x - b.x);
+
+    const lines = [];
+    parts.forEach(p => {
+      const line = lines.find(l => Math.abs(l.y - p.y) <= Math.max(2, Math.min(l.h, p.h) * 0.5));
+      if (line) line.parts.push(p);
+      else lines.push({ y: p.y, h: p.h, parts: [p] });
+    });
+
+    return lines
+      .sort((a, b) => b.y - a.y)
+      .map(line => {
+        const sorted = line.parts.sort((a, b) => a.x - b.x);
+        let text = '';
+        let end = null;
+        sorted.forEach(p => {
+          if (end !== null) {
+            const gap = p.x - end;
+            if (gap > p.h * 1.2) text += '   ';
+            else if (gap > p.h * 0.15 && !/\s$/.test(text) && !/^\s/.test(p.text)) text += ' ';
+          }
+          text += p.text;
+          end = p.x + p.w;
+        });
+        return text.replace(/\s+$/, '');
+      })
+      .join('\n');
+  }
+
+  /** A canvas holding the image, enlarged when small and in greyscale: both help OCR. */
+  async function preparedImage(source) {
+    const bitmap = source instanceof HTMLCanvasElement ? source : await createImageBitmap(source);
+    const longSide = Math.max(bitmap.width, bitmap.height);
+    const scale = longSide < 1800 ? 1800 / longSide : longSide > 4000 ? 4000 / longSide : 1;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.filter = 'grayscale(1) contrast(1.15)';
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  async function createOcrWorker(onProgress) {
+    const Tesseract = await loadTesseract();
+    const worker = await Tesseract.createWorker('eng', 1, {
+      ...TESSERACT_PATHS,
+      logger: m => {
+        if (m && m.status === 'recognizing text' && typeof m.progress === 'number') onProgress({ stage: 'ocr', progress: m.progress });
+        else if (m && m.status) onProgress({ stage: 'loading', progress: m.progress || 0 });
+      }
+    });
+    // Keep the wide gaps between table columns, which the value finder relies on.
+    await worker.setParameters({ preserve_interword_spaces: '1' });
+    return worker;
+  }
+
+  async function ocrImages(images, onProgress) {
+    const worker = await createOcrWorker(onProgress);
+    try {
+      const pages = [];
+      for (let i = 0; i < images.length; i++) {
+        onProgress({ stage: 'ocr', page: i + 1, pages: images.length, progress: 0 });
+        const { data } = await worker.recognize(await preparedImage(images[i]));
+        pages.push(data.text || '');
+      }
+      return pages.join('\n');
+    } finally {
+      await worker.terminate().catch(() => {});
+    }
+  }
+
+  async function readPdf(file, onProgress) {
+    const pdfjs = await loadPdfJs();
+    const task = pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) });
+    const pdf = await task.promise;
+    try {
+      const count = Math.min(pdf.numPages, MAX_PAGES);
+      const texts = [];
+      const scanned = [];
+      for (let n = 1; n <= count; n++) {
+        onProgress({ stage: 'pdf', page: n, pages: count });
+        const page = await pdf.getPage(n);
+        const content = await page.getTextContent();
+        const text = pageLines(content.items);
+        if (text.replace(/\s/g, '').length >= MIN_TEXT_PER_PAGE) {
+          texts.push(text);
+        } else {
+          const viewport = page.getViewport({ scale: 2.5 });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.ceil(viewport.width);
+          canvas.height = Math.ceil(viewport.height);
+          // "print" draws without waiting for animation frames, which stop while the tab is hidden.
+          await page.render({ canvasContext: canvas.getContext('2d'), canvas, viewport, intent: 'print' }).promise;
+          scanned.push(canvas);
+        }
+      }
+      if (scanned.length) texts.push(await ocrImages(scanned, onProgress));
+      return { text: texts.join('\n'), source: scanned.length ? (texts.length > 1 ? 'pdf+ocr' : 'ocr') : 'pdf' };
+    } finally {
+      Promise.resolve().then(() => task.destroy()).catch(() => {});
+    }
+  }
+
+  /**
+   * Read a report's text.
+   * @param {File} file PDF, JPG or PNG
+   * @param {(p: {stage: string, page?: number, pages?: number, progress?: number}) => void} [onProgress]
+   * @returns {Promise<{text: string, source: 'pdf'|'ocr'|'pdf+ocr'}>}
+   */
+  async function readReportText(file, onProgress = () => {}) {
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name || '');
+    const isImage = /^image\//.test(file.type) || /\.(jpe?g|png)$/i.test(file.name || '');
+    if (!isPdf && !isImage) throw new Error('Only PDF, JPG and PNG reports can be read.');
+    const reading = isPdf
+      ? readPdf(file, onProgress)
+      : ocrImages([file], onProgress).then(text => ({ text, source: 'ocr' }));
+    // Never leave the person waiting: past this, the report is saved without values.
+    let timer;
+    const limit = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('Reading the report took too long')), READ_TIME_LIMIT_MS); });
+    try {
+      return await Promise.race([reading, limit]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * bloodReportParser.js
+   * Finds blood count values in the text of a lab report, whatever the lab's
+   * layout. Pure functions only; reading the PDF or image is reportReader.js.
+   *
+   * Labs name, order and format the same test differently ("Haemoglobin",
+   * "Hb", "HGB"; platelets in lakhs, x10³/µL or /cumm), so each test is found by
+   * its names, and every number is checked against what is possible for that
+   * test before it is used. A value that cannot be read with confidence is left
+   * blank: the person checks the form before anything is saved.
+   *
+   * Output keys match the blood test form and the Blood Test Reports sheet
+   * (js/server/bloodTestRegister.js), in the form's units.
+   */
+
+  /** A number as printed: 13.2, 7,500, 2,50,000 (Indian grouping) or .5 */
+  const NUMBER = /(?<![\w.])(\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d*\.\d+|\d+)(?![\w])/g;
+
+  /** Reference intervals and limits, which must never be read as the result. */
+  const RANGE = /(\d*\.?\d+)\s*(?:-|–|—|to)\s*(\d*\.?\d+)/gi;
+  const LIMIT = /(?:<|>|≤|≥|<=|>=|upto|up to|less than|more than)\s*\d*\.?\d+/gi;
+
+  /** Multipliers printed in units, e.g. x10^3/µL, 10³/cumm, 10*9/L, which are not results. */
+  // OCR often reads the caret as 7, ' or ° ("x10^3" → "x1073"), so after an "x" those count too.
+  const EXPONENT = /(?:[x×*]\s*10\s*(?:\^|\*\*?|e|7|'|°|")?\s*[369³⁶⁹]|\b10\s*(?:\^|\*\*?)\s*[369]|\b10[³⁶⁹])(?!\d)/gi;
+
+  const SUPERSCRIPT = { '³': '3', '⁶': '6', '⁹': '9' };
+
+  /**
+   * Each test: the names labs print, names that look alike but are other tests,
+   * and how to turn a printed number into the form's unit (null when impossible).
+   */
+  const TESTS = [
+    {
+      key: 'hemoglobin',
+      names: /\b(?:ha?emoglobin|hgb|hb)\b/i,
+      not: /mean\s+cell|mean\s+corpuscular|\bmch|glyc|a1c|electrophoresis|\bhb\s*[af]\d?\b|plasma/i,
+      toUnit: (n, unit) => {
+        if (/g\s*\/\s*l\b/i.test(unit) && n >= 30) return n / 10;
+        if (n >= 3 && n <= 25) return n;
+        if (n >= 30 && n <= 250) return n / 10; // g/L
+        return null;
+      }
+    },
+    {
+      key: 'wbc',
+      names: /\b(?:total\s+)?(?:w\.?\s?b\.?\s?c\.?(?:\s*count)?|white\s+(?:blood\s+)?cells?(?:\s+count)?|total\s+leu[ck]ocytes?(?:\s+count)?|t\.?\s?l\.?\s?c\.?|leu[ck]ocytes?(?:\s+count)?)\b/i,
+      not: /morpholog|differential|\bdlc\b|absolute|\bseries\b|urine|stool|esterase|pus\s+cells/i,
+      toUnit: (n, unit) => {
+        if (/lakh/i.test(unit)) return null;
+        if (n >= 500 && n <= 100000) return Math.round(n);
+        if (n >= 0.5 && n <= 100) return Math.round(n * 1000); // x10³/µL or 10⁹/L
+        return null;
+      }
+    },
+    {
+      key: 'platelets',
+      names: /\b(?:platelets?(?:\s+count)?|plt(?:\s+count)?|thrombocytes?(?:\s+count)?)\b/i,
+      not: /mean\s+platelet|\bmpv\b|\bpdw\b|plateletcrit|\bpct\b|large|adequa|morpholog|clump|distribution|ratio|p-?lcr|on\s+smear/i,
+      toUnit: (n, unit) => {
+        const lakhs = /lakh|lac\b/i.test(unit);
+        if (lakhs && n > 0 && n <= 15) return round(n, 2);
+        if (n >= 10000 && n <= 1500000) return round(n / 100000, 2); // /cumm
+        if (n >= 10 && n <= 1500) return round(n / 100, 2); // x10³/µL
+        if (n > 0 && n <= 15) return round(n, 2); // already in lakhs
+        return null;
+      }
+    },
+    {
+      key: 'rbc',
+      names: /\b(?:total\s+)?(?:r\.?\s?b\.?\s?c\.?(?:\s*count)?|red\s+(?:blood\s+)?cells?(?:\s+count)?|erythrocytes?(?:\s+count)?)\b/i,
+      not: /morpholog|distribution|\brdw|nucleated|\bnrbc|indices|urine|stool|series|on\s+smear|sedimentation|\besr\b/i,
+      toUnit: (n) => {
+        if (n >= 1 && n <= 9) return round(n, 2);
+        if (n >= 1000000 && n <= 9000000) return round(n / 1000000, 2); // /cumm
+        return null;
+      }
+    },
+    {
+      key: 'pcv',
+      names: /\b(?:p\.?\s?c\.?\s?v\.?|packed\s+cell\s+volume|ha?ematocrit|hct)\b/i,
+      not: /mean/i,
+      toUnit: (n) => (n >= 10 && n <= 75 ? n : null)
+    },
+    percentTest('neutrophil', /\b(?:neutrophils?|polymorphs?|segmented(?:\s+neutrophils?)?|polys)\b/i),
+    percentTest('lymphocytes', /\blymphocytes?\b/i, /atypical|reactive/i),
+    percentTest('eosinophils', /\beosinophils?\b/i),
+    percentTest('monocytes', /\bmonocytes?\b/i),
+    percentTest('basophils', /\bbasophils?\b/i)
+  ];
+
+  /** A differential count, which the form takes as a percentage, never an absolute count. */
+  function percentTest(key, names, extraNot) {
+    return {
+      key,
+      names,
+      not: new RegExp(`absolute|\\babs\\b|\\ba[nlemb]c\\b|count\\s*\\(abs${extraNot ? `|${extraNot.source}` : ''}`, 'i'),
+      toUnit: (n, unit) => {
+        if (/cumm|µl|ul\b|10\s*\^|\/l\b|cells/i.test(unit) && !/%/.test(unit)) return null;
+        return n >= 0 && n <= 100 ? n : null;
+      }
+    };
+  }
+
+  /** Text findings from the peripheral smear, copied as written. */
+  const SMEAR_FINDINGS = [
+    { key: 'rbcMorphology', names: /\b(?:rbc|r\.b\.c\.?|red\s+(?:blood\s+)?cells?)\s*(?:morphology|:)/i },
+    { key: 'wbcMorphology', names: /\b(?:wbc|w\.b\.c\.?|white\s+(?:blood\s+)?cells?|leu[ck]ocytes?)\s*(?:morphology|:)/i },
+    { key: 'plateletsAdequacy', names: /\bplatelets?\s*(?:adequacy|on\s+smear|morphology|:)/i }
+  ];
+
+  function round(n, places) {
+    const f = 10 ** places;
+    return Math.round(n * f) / f;
+  }
+
+  /** Repair common OCR slips inside numbers: O→0, l/I→1, and "13 .2" → "13.2". */
+  function repairNumbers(line) {
+    return line
+      .replace(/(\d)[.,]{2,}(\d)/g, '$1,$2') // "2.,80,000" → "2,80,000"
+      .replace(/(?<=\d)[oO](?=[\d.\s]|$)|(?<=\d[.,])[oO]/g, '0')
+      .replace(/(?<=\d)[lI](?=\d)|(?<=\s)[lI](?=\d)/g, '1')
+      .replace(/(\d)\s+\.\s*(\d)/g, '$1.$2')
+      .replace(/(\d)\.\s+(\d)/g, '$1.$2');
+  }
+
+  /** The part of a line after the test's name, with ranges, limits and unit exponents taken out. */
+  function valueText(rest) {
+    return rest
+      .replace(EXPONENT, ' ')
+      .replace(RANGE, ' ')
+      .replace(LIMIT, ' ')
+      .replace(/\(\s*[a-z]{1,8}\s*\)/gi, ' '); // "(Hb)", "(PCV)" after the name
+  }
+
+  /** Words that may sit between a test's name and its result ("RBC Count 4.5"). */
+  /** Method and flag columns some labs print between the name and the result. */
+  const METHOD_WORDS = /^(?:photometr\w*|calculat\w*|impedance|cytometr\w*|flow|microscop\w*|derived|sls|colorimetr\w*|spectrophotometr\w*|electrical|optical|hydrodynamic|focusing|coulter|fluorescen\w*|manual|smear|counter|analy[sz]er|vcs|high|low|normal|abnormal)$/i;
+
+  const LABEL_WORDS =/^(?:count|level|result|value|total|conc|concentration|estimation|automated|whole|blood|cells?|by|method|tests?)$/i;
+
+  /**
+   * The first number in the text, or null. Words other than label words before
+   * it mean the name is part of a sentence, not a result.
+   */
+  function firstNumber(text) {
+    NUMBER.lastIndex = 0;
+    const m = NUMBER.exec(text);
+    if (!m) return null;
+    const between = text.slice(0, m.index);
+    const words = between.split(/[\s:|=]+/).filter(w => /^[a-z]{2,}$/i.test(w));
+    const unknown = words.filter(w => !LABEL_WORDS.test(w) && !METHOD_WORDS.test(w));
+    // A short column (method, flag) set apart by a wide gap is still a table row.
+    if (unknown.length && !(/\s{2,}/.test(between) && words.length <= 3)) return null;
+    const n = Number(m[1].replace(/,/g, ''));
+    return Number.isFinite(n) ? n : null;
+  }
+
+  /** Unit words and exponents printed on the line, used to convert the result. */
+  function unitHint(rest) {
+    return rest.replace(/[³⁶⁹]/g, s => SUPERSCRIPT[s]);
+  }
+
+  /** Lines of text, tidied: OCR number slips fixed and runs of spaces kept as a column gap. */
+  function toLines(text) {
+    return String(text || '')
+      .replace(/\r/g, '')
+      .split('\n')
+      .map(l => repairNumbers(l.replace(/\t/g, '   ')).trim())
+      .filter(Boolean);
+  }
+
+  /**
+   * Find one test in the report. The name must start the line or a column (labs
+   * put the test name first), and the result is the first number after it that
+   * is not part of a reference range and is possible for that test. When the
+   * result sits on the next line (some table layouts), that line is used.
+   */
+  function findTest(lines, test) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const m = test.names.exec(line);
+      if (!m) continue;
+      const before = line.slice(0, m.index);
+      // Names inside sentences ("...low haemoglobin may indicate...") are not results.
+      if (before.trim() && !/\s{2,}$|[|:]\s*$/.test(before) && before.trim().split(/\s+/).length > 2) continue;
+      const label = line.slice(0, m.index + m[0].length);
+      if (test.not && test.not.test(line)) continue;
+      let rest = line.slice(m.index + m[0].length);
+      let n = firstNumber(valueText(rest));
+      if (n === null && i + 1 < lines.length && /^\s*[<>]?\s*\d/.test(lines[i + 1]) && !TESTS.some(t => t.names.test(lines[i + 1]))) {
+        rest = lines[i + 1];
+        n = firstNumber(valueText(rest));
+      }
+      if (n === null) continue;
+      const value = test.toUnit(n, unitHint(rest + ' ' + label));
+      if (value !== null && value !== undefined) return { value, line };
+    }
+    return null;
+  }
+
+  function findSmear(lines, finding) {
+    for (const line of lines) {
+      const m = finding.names.exec(line);
+      if (!m) continue;
+      const text = line.slice(m.index + m[0].length).replace(/^[\s:\-–]+/, '').replace(/\s{2,}.*$/, '').trim();
+      if (text && /[a-z]/i.test(text) && text.length <= 120 && !/^\d/.test(text)) return { value: text, line };
+    }
+    return null;
+  }
+
+  const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+
+  function isoDate(y, mo, d) {
+    y = Number(y); mo = Number(mo); d = Number(d);
+    if (y < 100) y += 2000;
+    if (!(mo >= 1 && mo <= 12 && d >= 1 && d <= 31 && y >= 1990 && y <= 2100)) return null;
+    const iso = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    return new Date(iso + 'T00:00:00Z').getUTCDate() === d ? iso : null;
+  }
+
+  /** Every date in a piece of text, as YYYY-MM-DD. Numeric dates are read day first (Indian labs). */
+  function datesIn(text) {
+    const out = [];
+    const re = /(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})|(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})|(\d{1,2})(?:st|nd|rd|th)?[\s\-\/]*([a-z]{3,9})[,\s\-\/]*(\d{2,4})|([a-z]{3,9})[\s\-]+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})/gi;
+    let m;
+    while ((m = re.exec(text))) {
+      let iso = null;
+      if (m[1]) iso = isoDate(m[1], m[2], m[3]);
+      else if (m[4]) iso = isoDate(m[6], m[5], m[4]);
+      else if (m[7]) iso = MONTHS[m[8].slice(0, 4).toLowerCase()] || MONTHS[m[8].slice(0, 3).toLowerCase()] ? isoDate(m[9], MONTHS[m[8].slice(0, 4).toLowerCase()] || MONTHS[m[8].slice(0, 3).toLowerCase()], m[7]) : null;
+      else if (m[10]) iso = MONTHS[m[10].slice(0, 3).toLowerCase()] ? isoDate(m[12], MONTHS[m[10].slice(0, 3).toLowerCase()], m[11]) : null;
+      if (iso) out.push(iso);
+    }
+    return out;
+  }
+
+  /**
+   * The date the sample was taken or the report issued. Labels are tried in that
+   * order of preference; birth dates and printing dates are ignored.
+   */
+  function findReportDate(lines) {
+    const today = new Date().toISOString().slice(0, 10);
+    const labels = [
+      /(?:sample|specimen)\s*(?:collect(?:ed|ion)|drawn|date|received)|collect(?:ed|ion)\s*(?:on|date|at)?|drawn\s*on/i,
+      /report(?:ed)?\s*(?:on|date|time)?|result\s*date|authori[sz]ed\s*on|approved\s*on|validated\s*on/i,
+      /\bdate\b/i
+    ];
+    for (const label of labels) {
+      for (const line of lines) {
+        if (/birth|\bdob\b|d\.o\.b|print/i.test(line)) continue;
+        const m = label.exec(line);
+        if (!m) continue;
+        const found = datesIn(line.slice(m.index)).filter(d => d <= today);
+        if (found.length) return found[0];
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Read a blood count report.
+   * @param {string} text the report's text, one printed line per line
+   * @returns {{ values: Record<string, string>, found: string[], date: string|null, lines: Record<string,string> }}
+   *   values holds only what was found, as strings in the form's units; lines
+   *   holds the report line each value was read from, for checking.
+   */
+  function parseBloodReport(text) {
+    const lines = toLines(text);
+    const values = {};
+    const sources = {};
+    TESTS.forEach(test => {
+      const hit = findTest(lines, test);
+      if (hit) { values[test.key] = String(hit.value); sources[test.key] = hit.line; }
+    });
+    SMEAR_FINDINGS.forEach(finding => {
+      const hit = findSmear(lines, finding);
+      if (hit) { values[finding.key] = hit.value; sources[finding.key] = hit.line; }
+    });
+    return { values, found: Object.keys(values), date: findReportDate(lines), lines: sources };
+  }
+
+  /**
+   * reportReading.js
+   * "Read the values from this report": the choice in the upload dialogs, the
+   * progress window while a report is read, and filling the person's blood test
+   * form with what was found.
+   *
+   * Nothing is saved from here. The values go into the blood test form on the
+   * person's Checkups & tests tab, marked for checking, and are saved only when
+   * the person presses Save there: the same path, and the same Google Sheet
+   * columns, as values typed by hand.
+   */
+
+
+  const PREFILL_KEY = 'chm-report-prefill';
+
+  /** Upload categories that hold blood test results. */
+  function isBloodReportType(docType) {
+    return /lab report|cbc|blood|medical report/i.test(String(docType || ''));
+  }
+
+  /** Form field id (after the "prof-" prefix) for each value the reader finds. */
+  const FIELD_IDS = {
+    hemoglobin: 'blood-hb',
+    wbc: 'blood-wbc',
+    platelets: 'blood-platelets',
+    rbc: 'blood-rbc',
+    pcv: 'blood-pcv',
+    neutrophil: 'blood-neutrophil',
+    lymphocytes: 'blood-lymphocytes',
+    eosinophils: 'blood-eosinophils',
+    monocytes: 'blood-monocytes',
+    basophils: 'blood-basophils',
+    plateletsAdequacy: 'blood-platelets-adequacy',
+    rbcMorphology: 'blood-rbc-morph',
+    wbcMorphology: 'blood-wbc-morph'
+  };
+
+  const FIELD_COUNT = Object.keys(FIELD_IDS).length;
+
+  /** The choice shown in the upload dialogs when the category is a blood or lab report. */
+  function readingChoiceHTML(docType) {
+    const show = isBloodReportType(docType);
+    return `
+    <fieldset class="report-reading" data-report-reading ${show ? '' : 'hidden'}>
+      <legend class="field__label">Blood test values</legend>
+      <label class="report-reading__option">
+        <input type="radio" name="valuesEntry" value="type" checked>
+        <span><b>I'll type the values myself</b><small>Add them later on the Checkups &amp; tests tab.</small></span>
+      </label>
+      <label class="report-reading__option">
+        <input type="radio" name="valuesEntry" value="read">
+        <span><b>Read the values from this report</b> <em class="badge badge--blue">Beta</em><small>The values are filled in for you to check before saving. Nothing is saved until you press Save.</small></span>
+      </label>
+    </fieldset>`;
+  }
+
+  /** Show the choice only for blood and lab report categories. */
+  function initReadingChoiceToggle() {
+    document.addEventListener('change', event => {
+      const select = event.target.closest('#profile-doc-upload-form [name="docType"], #direct-doc-form [name="docType"]');
+      if (!select) return;
+      const fieldset = select.form && select.form.querySelector('[data-report-reading]');
+      if (!fieldset) return;
+      const show = isBloodReportType(select.value);
+      fieldset.hidden = !show;
+      if (!show) fieldset.querySelector('input[value="type"]').checked = true;
+    });
+  }
+
+  /** True when the dialog asked for the values to be read. */
+  function wantsReading(form) {
+    const fieldset = form && form.querySelector('[data-report-reading]');
+    return !!(fieldset && !fieldset.hidden && fieldset.querySelector('input[value="read"]')?.checked);
+  }
+
+  function progressWindow(fileName) {
+    document.querySelector('#report-reading-overlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'report-reading-overlay';
+    overlay.className = 'report-reading-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-labelledby', 'report-reading-title');
+    overlay.innerHTML = `
+    <div class="card report-reading-overlay__card">
+      <h2 id="report-reading-title">Reading the report…</h2>
+      <p class="report-reading-overlay__file">${escapeHTML$1(fileName || '')}</p>
+      <div class="progress"><div class="progress__bar" data-reading-bar style="width:5%"></div></div>
+      <p class="report-reading-overlay__status" data-reading-status aria-live="polite">Getting ready</p>
+      <p class="report-reading-overlay__note">This stays on your device. A photo can take up to a minute.</p>
+    </div>`;
+    document.body.appendChild(overlay);
+    const bar = overlay.querySelector('[data-reading-bar]');
+    const status = overlay.querySelector('[data-reading-status]');
+    return {
+      update({ stage, page, pages, progress }) {
+        let pct = 5;
+        let text = 'Getting ready';
+        if (stage === 'pdf') { pct = 10 + Math.round(((page || 1) / (pages || 1)) * 30); text = `Reading page ${page} of ${pages}`; }
+        if (stage === 'loading') { pct = 15; text = 'Loading the text recogniser (first time only)'; }
+        if (stage === 'ocr') {
+          const done = ((page || 1) - 1 + (progress || 0)) / (pages || 1);
+          pct = 20 + Math.round(done * 75);
+          text = pages > 1 ? `Recognising text, page ${page} of ${pages}` : 'Recognising text';
+        }
+        bar.style.width = `${Math.min(pct, 97)}%`;
+        status.textContent = text;
+      },
+      close() { overlay.remove(); }
+    };
+  }
+
+  /**
+   * Read the report and keep the values for the person's blood test form.
+   * Never throws: when nothing can be read the upload carries on as usual.
+   * @returns {Promise<boolean>} true when values were found
+   */
+  async function readReportForForm(file, { childId, childName, title }) {
+    const progress = progressWindow(file && file.name);
+    try {
+      const { text, source } = await readReportText(file, p => progress.update(p));
+      const { values, found, date, lines } = parseBloodReport(text);
+      if (!found.length) {
+        toast('No blood test values found', 'The report is saved. Add the values yourself on the Checkups & tests tab.', 'info');
+        return false;
+      }
+      sessionStorage.setItem(PREFILL_KEY, JSON.stringify({ childId, childName, title, values, date, lines, source, at: Date.now() }));
+      sessionStorage.setItem('chm_active_profile_tab', 'clinical');
+      return true;
+    } catch (err) {
+      console.warn('[Report reading]', err);
+      toast('Could not read this report', 'The report is saved. Add the values yourself on the Checkups & tests tab.');
+      return false;
+    } finally {
+      progress.close();
+    }
+  }
+
+  /**
+   * Where the page should go after an upload: the person's profile when values
+   * are waiting to be checked, otherwise the page it was on.
+   */
+  function reloadAfterUpload() {
+    const pending = pendingPrefill();
+    if (pending && pending.childId) {
+      window.location.href = `${pagePath('child-profile')}?id=${encodeURIComponent(pending.childId)}`;
+    }
+    window.location.reload();
+  }
+
+  /**
+   * The values waiting for the form. They are kept for a few seconds after they
+   * are first shown, because the page can be drawn again while it loads.
+   */
+  function pendingPrefill() {
+    try {
+      const p = JSON.parse(sessionStorage.getItem(PREFILL_KEY) || 'null');
+      const now = Date.now();
+      // Values not shown within 10 minutes belong to an abandoned upload.
+      const fresh = p && now - (p.at || 0) < 10 * 60 * 1000 && (!p.shownAt || now - p.shownAt < 20 * 1000);
+      if (fresh) return p;
+    } catch (e) { }
+    sessionStorage.removeItem(PREFILL_KEY);
+    return null;
+  }
+
+  /**
+   * On the person's profile, put the values read from their report into the
+   * blood test form and mark them for checking. Called after every render.
+   */
+  function applyReportPrefill() {
+    const pending = pendingPrefill();
+    if (!pending) return;
+    const form = document.querySelector('#profile-clinical-data-form');
+    const childId = form && form.querySelector('[name="childId"]')?.value;
+    if (!form || childId !== pending.childId) return;
+    if (!pending.shownAt) sessionStorage.setItem(PREFILL_KEY, JSON.stringify({ ...pending, shownAt: Date.now() }));
+    const forget = () => sessionStorage.removeItem(PREFILL_KEY);
+
+    const filled = [];
+    Object.entries(FIELD_IDS).forEach(([key, id]) => {
+      const input = form.querySelector(`#prof-${id}`);
+      if (!input) return;
+      if (pending.values[key] !== undefined) {
+        input.value = pending.values[key];
+        input.classList.add('clinical-input--read');
+        if (pending.lines && pending.lines[key]) input.title = `Read from: ${pending.lines[key]}`;
+        filled.push(input);
+      } else {
+        input.value = '';
+      }
+    });
+    const dateInput = form.querySelector('#prof-blood-date');
+    if (dateInput && pending.date) {
+      dateInput.value = pending.date;
+      dateInput.classList.add('clinical-input--read');
+      filled.push(dateInput);
+    }
+    // A new entry, not an edit of an older one.
+    const bloodId = form.querySelector('#prof-blood-id');
+    if (bloodId) bloodId.value = '';
+
+    const count = Object.keys(pending.values).length;
+    const banner = document.createElement('div');
+    banner.className = 'report-read-banner';
+    banner.setAttribute('role', 'status');
+    banner.innerHTML = `
+    <div>
+      <b>${count} of ${FIELD_COUNT} values read from “${escapeHTML$1(pending.title || 'the report')}”${pending.date ? '' : ' (date not found: set it below)'}</b>
+      <p>Check each highlighted value against the report and correct anything that is wrong. Hover a value to see the line it was read from. Nothing is saved until you press <b>Save &amp; Sync to Sheet</b>.</p>
+    </div>
+    <button type="button" class="button button--ghost button--sm" data-clear-report-read>Clear these values</button>`;
+    const anchor = form.querySelector('#prof-edit-banner') || form.firstElementChild;
+    anchor.parentNode.insertBefore(banner, anchor);
+
+    const clearMarks = () => {
+      form.querySelectorAll('.clinical-input--read').forEach(el => { el.classList.remove('clinical-input--read'); el.removeAttribute('title'); });
+      banner.remove();
+    };
+    banner.querySelector('[data-clear-report-read]').addEventListener('click', () => {
+      Object.values(FIELD_IDS).forEach(id => { const el = form.querySelector(`#prof-${id}`); if (el) el.value = ''; });
+      forget();
+      clearMarks();
+    });
+    form.addEventListener('input', event => { forget(); event.target.classList.remove('clinical-input--read'); });
+    form.addEventListener('submit', () => { forget(); clearMarks(); }, { once: true });
+
+    if (!pending.shownAt) (filled[0] || banner).scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  /**
    * googleDriveSync.js
    * Automatic synchronization and upload of child health documents to Google Drive.
    * Organizes files into: "Child Health Documents — [NGO Name]" / "[Child Name]" / "[File]"
@@ -40121,6 +40827,7 @@
         app.innerHTML = renderPage(page);
         applyColumnVisibility();
         initFormListeners();
+        if (page === 'child-profile') applyReportPrefill();
         if (page === 'children') {
           // The page is drawn at page 1 in the saved order; match the table state to it.
           currentPage = 1;
@@ -40813,6 +41520,7 @@
             <span class="field__label">Select Document File (JPG, PNG, PDF) *</span>
             <input class="input" type="file" name="docFile" accept=".jpg,.jpeg,.png,.pdf" required />
           </label>
+          ${readingChoiceHTML(isFamilySpace() ? 'Lab Report' : 'Bi-Annual CBC')}
         </form>
       `,
         confirmText: 'Upload Document',
@@ -40827,44 +41535,9 @@
             return;
           }
           const file = fileInput.files[0];
-          if (isFamilySpace()) {
-            saveFamilyReport(file, { title, childName, childId, docType });
-            return;
-          }
-          toast('Saving document...', 'Saving and syncing to Google Drive...');
-          const reader = new FileReader();
-          reader.onload = async function(e) {
-            let newDoc;
-            try {
-              newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
-            } catch (storageErr) {
-              console.warn('[Upload] Could not keep the file:', storageErr);
-              toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
-              return;
-            }
-            logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
-
-            try {
-              const driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
-              if (driveRes && driveRes.success && driveRes.driveUrl) {
-                updateUploadedDoc(newDoc.id, {
-                  driveFileId: driveRes.driveFileId,
-                  driveUrl: driveRes.driveUrl,
-                  childFolderId: driveRes.childFolderId,
-                  childFolderUrl: driveRes.childFolderUrl
-                });
-                toast('Google Drive Synced', `${title} backed up in ${childName}'s Google Drive folder.`, 'success');
-              } else {
-                toast('Document saved', `${title} saved.`);
-              }
-            } catch (uploadErr) {
-              console.warn('[Drive Upload]', uploadErr);
-              toast('Document saved', `${title} saved.`);
-            } finally {
-              window.setTimeout(() => { window.location.reload(); }, 300);
-            }
-          };
-          reader.readAsDataURL(file);
+          const save = () => saveProfileUpload(file, { title, childName, childId, docType });
+          if (wantsReading(form)) readReportForForm(file, { childId, childName, title }).finally(save);
+          else save();
         }
       });
     }
@@ -40892,7 +41565,6 @@
       }
       return;
     }
-
     // Bulk auto-sync all documents to Google Drive
     if (target.closest('[data-auto-sync-drive]')) {
       const btn = target.closest('[data-auto-sync-drive]');
@@ -41272,6 +41944,7 @@
               <span class="field__label">Choose File (Image / PDF) *</span>
               <input class="input" type="file" name="docFile" accept=".jpg,.jpeg,.png,.pdf" required id="modal-upload-input">
             </label>
+            ${readingChoiceHTML(isFamilySpace() ? 'Lab Report' : 'Bi-Annual CBC')}
           </form>
         `,
         confirmText: 'Upload Document',
@@ -41286,44 +41959,10 @@
 
           if (fileInput && fileInput.files && fileInput.files[0]) {
             const file = fileInput.files[0];
-            if (isFamilySpace()) {
-              saveFamilyReport(file, { title: docName, childName, docType });
-              return;
-            }
-            toast('Saving document...', 'Saving and syncing to Google Drive...');
-            const reader = new FileReader();
-            reader.onload = async function (e) {
-              let newDoc;
-              try {
-                newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
-              } catch (storageErr) {
-                console.warn('[Upload] Could not keep the file:', storageErr);
-                toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
-                return;
-              }
-              logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
-
-              try {
-                const driveRes = await uploadDocumentToDrive(file, { childName, docName, docType });
-                if (driveRes && driveRes.success && driveRes.driveUrl) {
-                  updateUploadedDoc(newDoc.id, {
-                    driveFileId: driveRes.driveFileId,
-                    driveUrl: driveRes.driveUrl,
-                    childFolderId: driveRes.childFolderId,
-                    childFolderUrl: driveRes.childFolderUrl
-                  });
-                  toast('Google Drive Synced', `${docName} backed up in ${childName}'s Google Drive folder.`, 'success');
-                } else {
-                  toast('Document saved', `${docName} saved.`);
-                }
-              } catch (uploadErr) {
-                console.warn('[Drive Upload]', uploadErr);
-                toast('Document saved', `${docName} saved.`);
-              } finally {
-                window.setTimeout(() => window.location.reload(), 300);
-              }
-            };
-            reader.readAsDataURL(file);
+            const childId = getChildren().find(c => c.name === childName)?.id || null;
+            const save = () => saveProfileUpload(file, { title: docName, childName, childId, docType });
+            if (wantsReading(form) && childId) readReportForForm(file, { childId, childName, title: docName }).finally(save);
+            else save();
           } else {
             toast('Upload error', 'Please select a document file.');
           }
@@ -41483,6 +42122,51 @@
   }
 
   /**
+   * Save a document uploaded from a person's profile, then reload: to the
+   * person's blood test form when values were read from the report.
+   */
+  function saveProfileUpload(file, { title, childName, childId, docType }) {
+    if (isFamilySpace()) {
+      saveFamilyReport(file, { title, childName, childId, docType });
+      return;
+    }
+    toast('Saving document...', 'Saving and syncing to Google Drive...');
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      let newDoc;
+      try {
+        newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+      } catch (storageErr) {
+        console.warn('[Upload] Could not keep the file:', storageErr);
+        toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
+        return;
+      }
+      logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
+
+      try {
+        const driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
+        if (driveRes && driveRes.success && driveRes.driveUrl) {
+          updateUploadedDoc(newDoc.id, {
+            driveFileId: driveRes.driveFileId,
+            driveUrl: driveRes.driveUrl,
+            childFolderId: driveRes.childFolderId,
+            childFolderUrl: driveRes.childFolderUrl
+          });
+          toast('Google Drive Synced', `${title} backed up in ${childName}'s Google Drive folder.`, 'success');
+        } else {
+          toast('Document saved', `${title} saved.`);
+        }
+      } catch (uploadErr) {
+        console.warn('[Drive Upload]', uploadErr);
+        toast('Document saved', `${title} saved.`);
+      } finally {
+        window.setTimeout(reloadAfterUpload, 300);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /**
    * Save a family's report. It goes to Google Drive first and the record keeps
    * only the Drive link, so a large PDF never has to fit in the tab's working
    * copy. Only when Drive cannot take it is the file kept in the record, to be
@@ -41516,7 +42200,7 @@
         return;
       }
     }
-    window.setTimeout(() => window.location.reload(), 300);
+    window.setTimeout(reloadAfterUpload, 300);
   }
 
   // ─── Drag-and-Drop Row Reorder (Apple-style) ───
@@ -41759,6 +42443,7 @@
   function initFormListeners() {
     if (formListenersInitialized) return;
     formListenersInitialized = true;
+    initReadingChoiceToggle();
 
     // Child registration form
     document.addEventListener('submit', (event) => {
@@ -42032,7 +42717,10 @@
         const rawBloodId = (values.existingBloodId || '').trim();
 
         const hasGrowthData = values.temperature || values.bp || values.weight || values.pulse || values.spo2 || values.complaint || values.prescription || values.eyeCheckup;
-        if (hasGrowthData || checkupDate) {
+        // The checkup date is always filled in, and clinic and doctor are carried
+        // over from the last visit, so on their own they are no checkup: saving
+        // only blood test values must not add an empty checkup entry.
+        if (hasGrowthData || rawGrowthId) {
           const growthRecord = {
             id: rawGrowthId || undefined,
             childId: childId,

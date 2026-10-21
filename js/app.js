@@ -10,6 +10,7 @@ import { initChart } from './chart.js';
 import { loginWithGoogle, logoutUser } from './auth.js';
 import { isSessionActive, clearSession } from './session.js';
 import { isFamilySpace, term, forgetSpaceType, familyCategoryOptions } from './space.js';
+import { readingChoiceHTML, initReadingChoiceToggle, wantsReading, readReportForForm, reloadAfterUpload, applyReportPrefill } from './reportReading.js';
 import { showSheetsSyncLoader, openGoogleSheetsTemplateModal, fetchSheetsConfig, getSheetsConfig, openChildGoogleSheet, pullChildrenFromGoogleSheets, autoSyncDeleteChildFromGoogleSheets, autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
 import { fetchDocsConfig } from './googleDocsSync.js';
 import { uploadDocumentToDrive, syncSingleDocToDrive, autoSyncPendingDocuments } from './googleDriveSync.js';
@@ -214,6 +215,7 @@ let renderCurrentPage = null;
       app.innerHTML = renderPage(page);
       applyColumnVisibility();
       initFormListeners();
+      if (page === 'child-profile') applyReportPrefill();
       if (page === 'children') {
         // The page is drawn at page 1 in the saved order; match the table state to it.
         currentPage = 1;
@@ -906,6 +908,7 @@ document.addEventListener('click', (event) => {
             <span class="field__label">Select Document File (JPG, PNG, PDF) *</span>
             <input class="input" type="file" name="docFile" accept=".jpg,.jpeg,.png,.pdf" required />
           </label>
+          ${readingChoiceHTML(isFamilySpace() ? 'Lab Report' : 'Bi-Annual CBC')}
         </form>
       `,
       confirmText: 'Upload Document',
@@ -920,44 +923,9 @@ document.addEventListener('click', (event) => {
           return;
         }
         const file = fileInput.files[0];
-        if (isFamilySpace()) {
-          saveFamilyReport(file, { title, childName, childId, docType });
-          return;
-        }
-        toast('Saving document...', 'Saving and syncing to Google Drive...', 'info');
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-          let newDoc;
-          try {
-            newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
-          } catch (storageErr) {
-            console.warn('[Upload] Could not keep the file:', storageErr);
-            toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
-            return;
-          }
-          logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
-
-          try {
-            const driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
-            if (driveRes && driveRes.success && driveRes.driveUrl) {
-              updateUploadedDoc(newDoc.id, {
-                driveFileId: driveRes.driveFileId,
-                driveUrl: driveRes.driveUrl,
-                childFolderId: driveRes.childFolderId,
-                childFolderUrl: driveRes.childFolderUrl
-              });
-              toast('Google Drive Synced', `${title} backed up in ${childName}'s Google Drive folder.`, 'success');
-            } else {
-              toast('Document saved', `${title} saved.`);
-            }
-          } catch (uploadErr) {
-            console.warn('[Drive Upload]', uploadErr);
-            toast('Document saved', `${title} saved.`);
-          } finally {
-            window.setTimeout(() => { window.location.reload(); }, 300);
-          }
-        };
-        reader.readAsDataURL(file);
+        const save = () => saveProfileUpload(file, { title, childName, childId, docType });
+        if (wantsReading(form)) readReportForForm(file, { childId, childName, title }).finally(save);
+        else save();
       }
     });
   }
@@ -985,7 +953,6 @@ document.addEventListener('click', (event) => {
     }
     return;
   }
-
   // Bulk auto-sync all documents to Google Drive
   if (target.closest('[data-auto-sync-drive]')) {
     const btn = target.closest('[data-auto-sync-drive]');
@@ -1365,6 +1332,7 @@ document.addEventListener('click', (event) => {
               <span class="field__label">Choose File (Image / PDF) *</span>
               <input class="input" type="file" name="docFile" accept=".jpg,.jpeg,.png,.pdf" required id="modal-upload-input">
             </label>
+            ${readingChoiceHTML(isFamilySpace() ? 'Lab Report' : 'Bi-Annual CBC')}
           </form>
         `,
       confirmText: 'Upload Document',
@@ -1379,44 +1347,10 @@ document.addEventListener('click', (event) => {
 
         if (fileInput && fileInput.files && fileInput.files[0]) {
           const file = fileInput.files[0];
-          if (isFamilySpace()) {
-            saveFamilyReport(file, { title: docName, childName, docType });
-            return;
-          }
-          toast('Saving document...', 'Saving and syncing to Google Drive...', 'info');
-          const reader = new FileReader();
-          reader.onload = async function (e) {
-            let newDoc;
-            try {
-              newDoc = addUploadedDoc(docName, childName, e.target.result, 'Verified', docType);
-            } catch (storageErr) {
-              console.warn('[Upload] Could not keep the file:', storageErr);
-              toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
-              return;
-            }
-            logActivity('doc_uploaded', childName, `Uploaded ${docType}: ${docName}`);
-
-            try {
-              const driveRes = await uploadDocumentToDrive(file, { childName, docName, docType });
-              if (driveRes && driveRes.success && driveRes.driveUrl) {
-                updateUploadedDoc(newDoc.id, {
-                  driveFileId: driveRes.driveFileId,
-                  driveUrl: driveRes.driveUrl,
-                  childFolderId: driveRes.childFolderId,
-                  childFolderUrl: driveRes.childFolderUrl
-                });
-                toast('Google Drive Synced', `${docName} backed up in ${childName}'s Google Drive folder.`, 'success');
-              } else {
-                toast('Document saved', `${docName} saved.`);
-              }
-            } catch (uploadErr) {
-              console.warn('[Drive Upload]', uploadErr);
-              toast('Document saved', `${docName} saved.`);
-            } finally {
-              window.setTimeout(() => window.location.reload(), 300);
-            }
-          };
-          reader.readAsDataURL(file);
+          const childId = getChildren().find(c => c.name === childName)?.id || null;
+          const save = () => saveProfileUpload(file, { title: docName, childName, childId, docType });
+          if (wantsReading(form) && childId) readReportForForm(file, { childId, childName, title: docName }).finally(save);
+          else save();
         } else {
           toast('Upload error', 'Please select a document file.');
         }
@@ -1576,6 +1510,51 @@ function readFileAsDataURL(file) {
 }
 
 /**
+ * Save a document uploaded from a person's profile, then reload: to the
+ * person's blood test form when values were read from the report.
+ */
+function saveProfileUpload(file, { title, childName, childId, docType }) {
+  if (isFamilySpace()) {
+    saveFamilyReport(file, { title, childName, childId, docType });
+    return;
+  }
+  toast('Saving document...', 'Saving and syncing to Google Drive...', 'info');
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    let newDoc;
+    try {
+      newDoc = addUploadedDoc(title, childName, e.target.result, 'Verified', docType, childId);
+    } catch (storageErr) {
+      console.warn('[Upload] Could not keep the file:', storageErr);
+      toast('Not enough space for this file', 'Connect Google in Settings so reports are saved to your Google Drive, then upload it again.');
+      return;
+    }
+    logActivity('doc_uploaded', childName, `Uploaded ${title} (${docType})`);
+
+    try {
+      const driveRes = await uploadDocumentToDrive(file, { childName, childId, docName: title, docType });
+      if (driveRes && driveRes.success && driveRes.driveUrl) {
+        updateUploadedDoc(newDoc.id, {
+          driveFileId: driveRes.driveFileId,
+          driveUrl: driveRes.driveUrl,
+          childFolderId: driveRes.childFolderId,
+          childFolderUrl: driveRes.childFolderUrl
+        });
+        toast('Google Drive Synced', `${title} backed up in ${childName}'s Google Drive folder.`, 'success');
+      } else {
+        toast('Document saved', `${title} saved.`);
+      }
+    } catch (uploadErr) {
+      console.warn('[Drive Upload]', uploadErr);
+      toast('Document saved', `${title} saved.`);
+    } finally {
+      window.setTimeout(reloadAfterUpload, 300);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+/**
  * Save a family's report. It goes to Google Drive first and the record keeps
  * only the Drive link, so a large PDF never has to fit in the tab's working
  * copy. Only when Drive cannot take it is the file kept in the record, to be
@@ -1609,7 +1588,7 @@ async function saveFamilyReport(file, { title, childName, childId = null, docTyp
       return;
     }
   }
-  window.setTimeout(() => window.location.reload(), 300);
+  window.setTimeout(reloadAfterUpload, 300);
 }
 
 // ─── Drag-and-Drop Row Reorder (Apple-style) ───
@@ -1852,6 +1831,7 @@ let formListenersInitialized = false;
 function initFormListeners() {
   if (formListenersInitialized) return;
   formListenersInitialized = true;
+  initReadingChoiceToggle();
 
   // Child registration form
   document.addEventListener('submit', (event) => {
@@ -2125,7 +2105,10 @@ function initFormListeners() {
       const rawBloodId = (values.existingBloodId || '').trim();
 
       const hasGrowthData = values.temperature || values.bp || values.weight || values.pulse || values.spo2 || values.complaint || values.prescription || values.eyeCheckup;
-      if (hasGrowthData || checkupDate) {
+      // The checkup date is always filled in, and clinic and doctor are carried
+      // over from the last visit, so on their own they are no checkup: saving
+      // only blood test values must not add an empty checkup entry.
+      if (hasGrowthData || rawGrowthId) {
         const growthRecord = {
           id: rawGrowthId || undefined,
           childId: childId,
