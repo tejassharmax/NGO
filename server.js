@@ -117,6 +117,8 @@ app.get('/js/bundle.js', sendPublicFile('js/bundle.js'));
 app.get('/google-logo.png', sendPublicFile('google-logo.png'));
 app.use('/css', express.static(path.join(__dirname, 'css'), { etag: true, setHeaders: noCacheCode }));
 app.use('/assets', express.static(path.join(__dirname, 'assets'), { etag: true }));
+// Report-reading libraries (pdf.js, Tesseract), loaded only when a report is read.
+app.use('/vendor', express.static(path.join(__dirname, 'vendor'), { etag: true, maxAge: '30d' }));
 
 
 
