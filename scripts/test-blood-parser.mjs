@@ -125,7 +125,7 @@ TOTAL LEUCOCYTES COUNT       FLOW CYTOMETRY      6.21     X 10^3 / uL
 PLATELET COUNT               ELECTRICAL IMPEDANCE  198    X 10^3 / uL
 HEMATOCRIT(PCV)              CALCULATED          L 38.9   %
 NEUTROPHILS                  FLOW CYTOMETRY      H 74.6   %
-`, { hemoglobin: 14.2, wbc: 6210, platelets: 1.98, pcv: 38.9, neutrophil: 74.6 });
+`, { hemoglobin: 14.2, wbc: 6210, platelets: 1.98, pcv: 38.9, neutrophil: undefined }); // a lone differential value cannot be checked, so it stays blank
 
 // 10. Real Tesseract output from a photographed report: "x10^3" read as "x1073",
 //     decimals dropped from the reference ranges, columns kept apart.
@@ -139,7 +139,7 @@ Platelet Count                                        312            x1073/uL   
 RBC Count                                        4.21           x1076/uL            40-52
 Hematocrit                                            34.8            %                      35-45
 Basophils                                         1              %                    0-1
-`, { hemoglobin: 11.4, wbc: 9200, platelets: 3.12, rbc: 4.21, pcv: 34.8, basophils: 1 }, '2026-10-03');
+`, { hemoglobin: 11.4, wbc: 9200, platelets: 3.12, rbc: 4.21, pcv: 34.8, basophils: undefined }, '2026-10-03'); // lone differential value
 
 // 11. Unit before the result, as some reports print it.
 check('unit column before result', `
@@ -148,14 +148,14 @@ WBC   x1073/uL   5.6   4-11
 `, { platelets: 2.45, wbc: 5600 });
 
 // 12. OCR slips seen on a scanned report: doubled separators, a dropped decimal
-//     point (left blank rather than guessed), dotted test names.
+//     point (restored: 49 million/cumm is impossible, 4.9 is the only reading), dotted test names.
 check('scanned report slips', `
 Sample Date: 11-Jul-2026
 PLATELET COUNT                                  2.,80,000          /cumm               1.5-4.5 lakhs
 R.B.C. COUNT                                      49                mill/cumm         4.0-5.5
 P.C.V.                                                       41                   %                      36-46
 POLYMORPHS   60   %
-`, { platelets: 2.8, rbc: undefined, pcv: 41, neutrophil: 60 }, '2026-07-11');
+`, { platelets: 2.8, rbc: 4.9, pcv: 41, neutrophil: undefined }, '2026-07-11'); // lone differential value
 
 console.log(failures ? `\n${failures} failing` : '\nAll passing');
 process.exit(failures ? 1 : 0);

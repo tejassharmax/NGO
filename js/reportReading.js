@@ -123,7 +123,7 @@ export async function readReportForForm(file, { childId, childName, title }) {
   const progress = progressWindow(file && file.name);
   try {
     const { text, source } = await readReportText(file, p => progress.update(p));
-    const { values, found, date, lines } = parseBloodReport(text);
+    const { values, found, date, lines } = parseBloodReport(text, { ocr: source !== 'pdf' });
     if (!found.length) {
       toast('No blood test values found', 'The report is saved. Add the values yourself on the Checkups & tests tab.', 'info');
       return false;
@@ -133,7 +133,11 @@ export async function readReportForForm(file, { childId, childName, title }) {
     return true;
   } catch (err) {
     console.warn('[Report reading]', err);
-    toast('Could not read this report', 'The report is saved. Add the values yourself on the Checkups & tests tab.', 'info');
+    if (err && err.code === 'blurry') {
+      toast('Photo too blurry to read', 'The report is saved. To have the values read, upload a sharper photo (page flat, good light, phone held steady) or the lab\'s PDF. You can also type them on the Checkups & tests tab.');
+    } else {
+      toast('Could not read this report', 'The report is saved. Add the values yourself on the Checkups & tests tab.', 'info');
+    }
     return false;
   } finally {
     progress.close();
