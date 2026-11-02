@@ -1,14 +1,16 @@
 {
-  "name": "child-health-management",
+  "name": "ayusha-health",
   "version": "3.0.0",
-  "description": "NGO Child Health Management Platform with Google Sheets, Drive and Calendar sync",
+  "description": "Health records for children in care, with Google Sheets and Drive sync and lab report reading",
+  "private": true,
   "main": "server.js",
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node server.js",
     "start:prod": "npm install --omit=dev --no-audit --no-fund && node server.js",
     "setup:firestore": "node scripts/setupFirestore.js",
-    "setup:firestore:dry": "node scripts/setupFirestore.js --dry-run"
+    "setup:firestore:dry": "node scripts/setupFirestore.js --dry-run",
+    "test": "node scripts/test-blood-parser.mjs && node scripts/test-blood-parser-more.mjs"
   },
   "engines": {
     "node": ">=22.0.0"

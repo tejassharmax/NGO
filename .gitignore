@@ -1,48 +1,43 @@
 # Dependencies
 node_modules/
 
-# Environment & secrets
+# Environment and secrets
 .env
-.env.production
-.env.local
+.env.*
 !.env.example
+
+# JSON at any level can be a credential (service account keys, OAuth client
+# files), so only the package manifests are tracked.
 *.json
 !package.json
 !package-lock.json
 
-# Local data store and exports. These hold real child records — never commit them.
+# Local data store and exports. These hold real child records; never commit them.
 data/
 
-# Google service account key
-sinuous-tine-482007-v3-96edde2df8ba.json
-
-# Loose test images
-*.jpeg
-*.jpg
-!assets/**/*.jpeg
-!assets/**/*.jpg
-
-# OS files
-Thumbs.db
-.DS_Store
-
-# IDE
-.vscode/
-.idea/
-
-# Design docs (not needed in production)
-DESIGN_SYSTEM.md
-
-# Backup directories
-orbit-original/
-
-# Scratch & test scripts
-scratch/
-remove appointments, emergency, exp.txt
+# Images outside assets/ are local test files (report photos and the like).
 *.png
-!assets/**/*.png
+*.jpg
+*.jpeg
+!assets/**
 !google-logo.png
 
-
-# Stray boot log from local debugging runs.
+# Logs and local notes
+*.log
 _startup_log.txt
+/*.txt
+
+# Local working folders
+scratch/
+docs/
+brag-output*/
+github-profile/
+orbit-original/
+.agents/
+DESIGN_SYSTEM.md
+
+# OS and editors
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
