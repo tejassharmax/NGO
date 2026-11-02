@@ -88,8 +88,8 @@ You do not need to add environment variables here. They come from the `.env` fil
 > `ngo-app`, your domain, environment **Production** → **Deploy**, then click
 > **Ensure Dependencies**. It starts `app.js` automatically, which loads `server.js`.
 
-> **If Node 22 is not in the version list,** tell Claude. The Firebase library can
-> be switched to a version that runs on Node 18/20.
+> **If Node 22 is not in the version list,** the Firebase library can be switched
+> to a version that runs on Node 18/20.
 
 ---
 
