@@ -9,6 +9,8 @@
  * behaviour here is deliberately unchanged from the file-store version.
  */
 
+const { sanitizePersonRecord } = require('./recordValidation');
+
 /**
  * Every key the client packs into a sync payload, in the order it is persisted.
  * Keys prefixed `chm-` hold JSON arrays; `sample-org-` keys hold plain strings.
@@ -151,7 +153,7 @@ function mergeNamespace(clientData = {}, serverData = {}) {
         }
       } catch (e) { }
       if (Array.isArray(clientArr)) {
-        merged[key] = JSON.stringify(clientArr);
+        merged[key] = JSON.stringify(clientArr.map(sanitizePersonRecord));
       } else if (serverData[key]) {
         merged[key] = serverData[key];
       } else {

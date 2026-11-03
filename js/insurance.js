@@ -83,7 +83,7 @@ function newEntryId() {
 /** One editable entry. Inputs carry no `name`, so the main form data is unchanged. */
 export function insuranceRowHTML(entry = {}) {
   const input = (label, key, type, placeholder) =>
-    `<label class="field"><span class="field__label">${label}</span><input class="input" type="${type}" data-ins-field="${key}" value="${escapeHTML(entry[key] || '')}" ${placeholder ? `placeholder="${placeholder}"` : ''}></label>`;
+    `<label class="field"><span class="field__label">${label}</span><input class="input" type="${type}" data-ins-field="${key}" value="${escapeHTML(entry[key] || '')}" ${type === 'text' ? 'maxlength="120"' : ''} ${placeholder ? `placeholder="${placeholder}"` : ''}></label>`;
   return `
     <div data-insurance-row data-ins-id="${escapeHTML(entry.id || newEntryId())}" style="border:1px solid var(--color-border); border-radius:8px; padding:14px; display:flex; gap:12px; align-items:flex-start;">
       <div class="form-grid--two" style="flex:1;">
