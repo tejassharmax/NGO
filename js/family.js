@@ -13,6 +13,7 @@ import { icon, initials, pagePath, escapeHTML, formatDate } from './utils.js';
 import { getChildren, getChild, getUploadedDocs, getAppointments, getGrowthRecords, getHealthRecords, calculateAge } from './storage.js';
 import { heading, statCard, formatDateForInput, getURLParam, getDynamicGreeting } from './ui.js';
 import { clinicalSectionHTML } from './clinicalSection.js';
+import { insuranceCardHTML, insuranceFormSection } from './insurance.js';
 import { computeAppointmentStatus, formatSingleDisplayTime } from './googleCalendar.js';
 import { personLabel, RELATIONS } from './space.js';
 
@@ -239,6 +240,7 @@ export function familyMemberContent() {
           ${row('Notes', member.notes)}
         </div></div>
       </section>
+      ${insuranceCardHTML(member, { stacked: false })}
       <section class="card">
         <header class="card__header"><div><h2 class="card__title">Latest readings</h2><p class="card__caption">From the most recent checkup and blood test</p></div><button class="button button--sm" type="button" data-switch-profile-tab="clinical">${icon('plus')}Add</button></header>
         <div class="card__body"><div class="detail-list">
@@ -323,6 +325,7 @@ export function familyMemberFormContent() {
         ${textarea('Notes', 'notes', 'Anything else worth remembering')}
       </div>
     </section>
+    ${insuranceFormSection(member)}
   </form></div>`;
 }
 

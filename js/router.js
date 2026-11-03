@@ -9,6 +9,7 @@ import { heading, statCard, field, formatDateForInput, getURLParam, getDynamicGr
 import { isFamilySpace, term, personLabel } from './space.js';
 import { familyOverviewContent, familyMembersContent, familyMemberContent, familyMemberFormContent, familyDocumentsContent } from './family.js';
 import { clinicalSectionHTML } from './clinicalSection.js';
+import { insuranceCardHTML, insuranceFormSection } from './insurance.js';
 
 /* ═══════════════════════════════════════════════════════
    NAVIGATION
@@ -652,6 +653,7 @@ export function childProfilePage() {
           </div>
         </div>
       </section>
+      ${insuranceCardHTML(child)}
 
       <!-- CLINICAL & BLOOD TEST OVERVIEW CARD -->
       <section class="card" style="margin-top: 20px;">
@@ -788,6 +790,7 @@ export function registerChildPage() {
 
   return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName, 'required')}${field('Last name', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '', 'required')}<label class="field"><span class="field__label">Gender *</span><select class="input" name="gender" required><option value="" disabled ${!child || !child.gender ? 'selected' : ''}>Select gender</option><option value="Male" ${child && child.gender === 'Male' ? 'selected' : ''}>Male</option><option value="Female" ${child && child.gender === 'Female' ? 'selected' : ''}>Female</option><option value="Other" ${child && child.gender === 'Other' ? 'selected' : ''}>Other</option></select></label>${field('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
+  ${insuranceFormSection(child)}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '', 'step="any" min="0"')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '', 'step="any" min="0"')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML(child.allergies) : ''}</textarea></label>
   <div class="field form-span-all">
     <span class="field__label">Current medications</span>

@@ -17,6 +17,7 @@ import { uploadDocumentToDrive, syncSingleDocToDrive, autoSyncPendingDocuments }
 import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEventDetailsModalMarkup, renderEditAppointmentModalMarkup, renderClinicalDataModalMarkup, buildGoogleCalendarUrl, formatSingleDisplayTime } from './googleCalendar.js';
 import { initCombobox } from './combobox.js';
 import { apiFetch } from './apiClient.js';
+import { initInsuranceListeners } from './insurance.js';
 
 /** Column the children table is sorted by; null keeps the saved (drag-and-drop) order. */
 let activeSort = null;
@@ -1832,6 +1833,7 @@ function initFormListeners() {
   if (formListenersInitialized) return;
   formListenersInitialized = true;
   initReadingChoiceToggle();
+  initInsuranceListeners();
 
   // Child registration form
   document.addEventListener('submit', (event) => {

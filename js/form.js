@@ -2,16 +2,18 @@ import { updateChild, getChild, getChildren } from './storage.js';
 import { autoSyncChildToGoogleSheets } from './googleSheetsSync.js';
 import { autoSyncToGoogleDocs } from './googleDocsSync.js';
 import { toast } from './toast.js';
+import { collectInsurance } from './insurance.js';
 
 export function collectChild(form) {
   const values = Object.fromEntries(new FormData(form));
   let id = values.id;
   let registeredDate = values.registeredDate || new Date().toISOString().slice(0, 10);
   let status = 'Active';
+  let existing = null;
 
   // If editing, preserve existing registration date and status
   if (id) {
-    const existing = getChild(id);
+    existing = getChild(id);
     if (existing) {
       registeredDate = existing.registeredDate || registeredDate;
       status = existing.status || status;
@@ -36,6 +38,8 @@ export function collectChild(form) {
   const dob = values.dob || values.birthDate || '';
   const idNumber = values.idNumber || '';
   const fullName = values.name || `${values.firstName || ''} ${values.lastName || ''}`.trim() || 'Unnamed Child';
+  // A form without the insurance section leaves the record's entries as they are.
+  const insurance = collectInsurance(form) ?? existing?.insurance;
 
   return {
     id,
@@ -63,6 +67,7 @@ export function collectChild(form) {
     emergencyContact: values.emergencyContact || '',
     emergencyPhone: values.emergencyPhone || '',
     hospitalName: values.hospitalName || '',
+    ...(insurance ? { insurance } : {}),
     // Only the family member form has this field; a child record is unchanged.
     ...(values.relation !== undefined ? { relation: values.relation } : {})
   };

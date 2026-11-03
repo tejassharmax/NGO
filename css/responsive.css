@@ -100,6 +100,13 @@ img, svg, canvas {
   .form-grid--two {
     grid-template-columns: 1fr !important;
   }
+  /* Forms take the full width; the steps panel moves below them. */
+  .form-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .form-aside {
+    position: static;
+  }
   .document-grid {
     grid-template-columns: repeat(2, 1fr) !important;
   }
