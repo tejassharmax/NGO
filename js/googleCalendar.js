@@ -259,7 +259,7 @@ export function renderCalendarGrid(year, month, selectedDay = null) {
     if (dayAppts.length > 0) {
       const visible = dayAppts.slice(0, 2);
       chipsHTML = visible.map(a => `
-        <div class="gcal-event-chip gcal-event-chip--${typeColor(a.type)}" data-event-id="${a.id}" title="${escapeHTML(a.childName)} - ${escapeHTML(a.type)}">
+        <div class="gcal-event-chip gcal-event-chip--${typeColor(a.type)}" data-event-id="${escapeHTML(a.id)}" title="${escapeHTML(a.childName)} - ${escapeHTML(a.type)}">
           <span class="gcal-chip-time">${a.time || '10:00'}</span>
           <span class="gcal-chip-title">${escapeHTML(a.childName)}</span>
         </div>
@@ -350,7 +350,7 @@ export function renderDayView(year, month, day) {
       slotContent = matchingAppts.map(a => {
         const currentStatus = computeAppointmentStatus(a);
         return `
-          <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${a.id}">
+          <div class="gcal-event-card gcal-event-card--${typeColor(a.type)}" data-event-id="${escapeHTML(a.id)}">
             <div class="gcal-event-card-main">
               <div class="gcal-event-title-row">
                 <span class="gcal-event-name">${escapeHTML(a.childName)}</span>
@@ -602,7 +602,7 @@ export function renderEventDetailsModalMarkup(eventId) {
             </div>
             <div class="gcal-popover-time" style="margin-top:8px; display:flex; align-items:center; gap:6px; font-size:13px; color:var(--color-text-muted); font-weight:500;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              <span>${dayStr} · ${timeRangeFormatted}</span>
+              <span>${escapeHTML(dayStr)} · ${escapeHTML(timeRangeFormatted)}</span>
             </div>
           </div>
 
