@@ -2518,7 +2518,7 @@ function applyColumnVisibility() {
  */
 const LIVE_SITE = 'https://ayushahealth.in';
 async function migrateToLiveSite() {
-  if (!/.onrender.com$/i.test(window.location.hostname)) return;
+  if (!/\.onrender\.com$/i.test(window.location.hostname)) return;
   if (sessionStorage.getItem('chm_migrated_to_live')) return;
   const backup = exportBackup();
   const res = await apiFetch(`${LIVE_SITE}/api/import`, {

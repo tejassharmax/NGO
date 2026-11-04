@@ -208,7 +208,7 @@ async function isAuthorizedEmail(email) {
       }
     }
   } catch (err) {
-    console.warn(`[auth] Dynamic authorization lookup error for ${normalized}:`, err.message);
+    console.warn('[auth] Dynamic authorization lookup error for %s:', normalized, err.message);
   }
 
   firestoreApproved.delete(normalized);
@@ -227,7 +227,9 @@ async function isAuthorizedEmail(email) {
  */
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
-  const match = header.match(/^Bearer\s+(.+)$/i);
+  // A token is one run of non-space characters. `\s+(.+)` let a long run of
+  // spaces backtrack quadratically.
+  const match = header.match(/^Bearer\s+(\S+)\s*$/i);
 
   if (!match) {
     if (LOCAL_BYPASS_ENABLED && isLoopbackPeer(req)) {

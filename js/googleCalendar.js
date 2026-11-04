@@ -566,13 +566,13 @@ export function renderEventDetailsModalMarkup(eventId) {
         <div class="gcal-popover-banner" style="background-image: url('assets/gcal_event_banner.png');">
           <div class="gcal-popover-banner-overlay"></div>
           <div class="gcal-popover-actions">
-            <button class="gcal-popover-btn gcal-popover-btn--edit" type="button" data-edit-event-id="${appt.id}" title="Edit appointment">
+            <button class="gcal-popover-btn gcal-popover-btn--edit" type="button" data-edit-event-id="${escapeHTML(appt.id)}" title="Edit appointment">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" style="pointer-events:none;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             </button>
-            <button class="gcal-popover-btn gcal-popover-btn--delete" type="button" data-delete-event-id="${appt.id}" title="Delete appointment">
+            <button class="gcal-popover-btn gcal-popover-btn--delete" type="button" data-delete-event-id="${escapeHTML(appt.id)}" title="Delete appointment">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" style="pointer-events:none;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
             </button>
-            <button class="gcal-popover-btn gcal-popover-btn--sync" type="button" data-sync-event-id="${appt.id}" title="Open in Google Calendar">
+            <button class="gcal-popover-btn gcal-popover-btn--sync" type="button" data-sync-event-id="${escapeHTML(appt.id)}" title="Open in Google Calendar">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" style="pointer-events:none;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
             </button>
             <button class="gcal-popover-btn gcal-popover-btn--close" type="button" data-close-cal-modal title="Close">
@@ -592,7 +592,7 @@ export function renderEventDetailsModalMarkup(eventId) {
                   <span class="gcal-event-chip gcal-event-chip--${typeColor(appt.type)}" style="font-size:12px; font-weight:700; padding:3px 10px; border-radius:12px; display:inline-flex;">
                     ${escapeHTML(appt.type || 'Appointment')}
                   </span>
-                  ${appt.childId ? `<span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:var(--color-bg-alt, #f1f5f9); padding:2px 8px; border-radius:10px;">ID: ${appt.childId}</span>` : ''}
+                  ${appt.childId ? `<span style="font-size:11px; font-weight:600; color:var(--color-text-muted); background:var(--color-bg-alt, #f1f5f9); padding:2px 8px; border-radius:10px;">ID: ${escapeHTML(appt.childId)}</span>` : ''}
                 </div>
                 <h2 class="gcal-popover-title" style="font-size:20px; font-weight:700; color:var(--color-text); margin:0; line-height:1.3;">${escapeHTML(appt.childName)}</h2>
               </div>
@@ -658,17 +658,17 @@ export function renderEventDetailsModalMarkup(eventId) {
                 <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
                 Clinical Notes
               </div>
-              <button class="gcal-notes-inline-edit-btn" id="notes-btn-${appt.id}" type="button" data-toggle-notes-edit="${appt.id}" title="Edit clinical notes" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#1a73e8; background:transparent; border:none; cursor:pointer; padding:2px 6px; border-radius:4px; transition:background 0.15s;">
+              <button class="gcal-notes-inline-edit-btn" id="notes-btn-${escapeHTML(appt.id)}" type="button" data-toggle-notes-edit="${escapeHTML(appt.id)}" title="Edit clinical notes" style="display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; color:#1a73e8; background:transparent; border:none; cursor:pointer; padding:2px 6px; border-radius:4px; transition:background 0.15s;">
                 <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 <span>Edit</span>
               </button>
             </div>
-            <div class="gcal-notes-view-mode" id="notes-view-${appt.id}" style="font-size:13px; color:var(--color-text); line-height:1.5; white-space:pre-wrap;">${escapeHTML(appt.notes || 'No specific clinical instructions provided.')}</div>
-            <div class="gcal-notes-edit-mode" id="notes-edit-${appt.id}" style="display:none; margin-top:6px;">
-              <textarea class="gcal-popup-notes" id="notes-input-${appt.id}" rows="3" style="width:100%; font-size:13px; padding:8px 10px; border:1px solid #1a73e8; border-radius:6px; outline:none; resize:vertical; font-family:inherit; background:var(--color-surface, #fff); color:var(--color-text);" placeholder="Type clinical notes...">${escapeHTML(appt.notes || '')}</textarea>
+            <div class="gcal-notes-view-mode" id="notes-view-${escapeHTML(appt.id)}" style="font-size:13px; color:var(--color-text); line-height:1.5; white-space:pre-wrap;">${escapeHTML(appt.notes || 'No specific clinical instructions provided.')}</div>
+            <div class="gcal-notes-edit-mode" id="notes-edit-${escapeHTML(appt.id)}" style="display:none; margin-top:6px;">
+              <textarea class="gcal-popup-notes" id="notes-input-${escapeHTML(appt.id)}" rows="3" style="width:100%; font-size:13px; padding:8px 10px; border:1px solid #1a73e8; border-radius:6px; outline:none; resize:vertical; font-family:inherit; background:var(--color-surface, #fff); color:var(--color-text);" placeholder="Type clinical notes...">${escapeHTML(appt.notes || '')}</textarea>
               <div style="display:flex; justify-content:flex-end; gap:6px; margin-top:8px;">
-                <button type="button" class="button button--secondary button--sm" data-cancel-notes-edit="${appt.id}" style="padding:4px 10px; font-size:11px;">Cancel</button>
-                <button type="button" class="button button--primary button--sm" data-save-notes-inline="${appt.id}" style="padding:4px 12px; font-size:11px; gap:4px;">
+                <button type="button" class="button button--secondary button--sm" data-cancel-notes-edit="${escapeHTML(appt.id)}" style="padding:4px 10px; font-size:11px;">Cancel</button>
+                <button type="button" class="button button--primary button--sm" data-save-notes-inline="${escapeHTML(appt.id)}" style="padding:4px 12px; font-size:11px; gap:4px;">
                   <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                   Save Notes
                 </button>
@@ -678,11 +678,11 @@ export function renderEventDetailsModalMarkup(eventId) {
 
           <!-- Dual Action Footer -->
           <div class="gcal-popover-footer-dual">
-            <button class="gcal-btn gcal-btn--secondary" type="button" data-open-clinical-modal="${appt.id}" style="flex:1; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
+            <button class="gcal-btn gcal-btn--secondary" type="button" data-open-clinical-modal="${escapeHTML(appt.id)}" style="flex:1; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               Edit details
             </button>
-            <button class="gcal-btn gcal-btn--create" type="button" data-sync-event-id="${appt.id}" style="flex:1.4; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
+            <button class="gcal-btn gcal-btn--create" type="button" data-sync-event-id="${escapeHTML(appt.id)}" style="flex:1.4; justify-content:center; gap:6px; font-size:13px; padding:8px 14px;">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
               Open in Google Calendar
             </button>
@@ -957,7 +957,7 @@ export function renderClinicalDataModalMarkup(eventId, childIdParam = null, chil
 
         <form id="clinical-data-form" style="display:flex; flex-direction:column; flex:1; min-height:0; overflow:hidden;">
           <input type="hidden" name="appointmentId" value="${appt?.id || ''}" />
-          <input type="hidden" name="childId" value="${childId || ''}" />
+          <input type="hidden" name="childId" value="${escapeHTML(childId || '')}" />
           <input type="hidden" name="childName" value="${escapeHTML(childName)}" />
           <input type="hidden" name="existingGrowthId" value="${existingGrowth.id || ''}" />
           <input type="hidden" name="existingBloodId" value="${existingBlood.id || ''}" />
@@ -1027,7 +1027,7 @@ export function renderEditAppointmentModalMarkup(eventId) {
         </div>
 
         <form class="gcal-popup-form" id="cal-edit-appointment-form" style="padding:16px 20px;">
-          <input type="hidden" name="id" value="${appt.id}" />
+          <input type="hidden" name="id" value="${escapeHTML(appt.id)}" />
 
           <!-- Title / Doctor row -->
           <div class="gcal-popup-title-row" style="margin-bottom:12px;">
@@ -1132,7 +1132,7 @@ export function renderEditAppointmentModalMarkup(eventId) {
 
           <!-- Footer buttons -->
           <div class="gcal-popup-footer" style="display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-top:14px;">
-            <button class="gcal-popup-more-btn" type="button" data-event-id="${appt.id}">Cancel</button>
+            <button class="gcal-popup-more-btn" type="button" data-event-id="${escapeHTML(appt.id)}">Cancel</button>
             <button class="gcal-popup-save-btn" type="submit">Save Changes</button>
           </div>
         </form>

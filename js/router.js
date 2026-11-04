@@ -1317,7 +1317,9 @@ function renderFamilyPage(page) {
   if (page === 'appointments') return appointmentsPage();
   if (page === 'settings') return settingsPage();
   // Children's-home pages (growth charts, reports, medicine stock) open the overview.
-  const key = familyPages[page] ? page : 'dashboard';
+  // `page` comes from the URL: only the table's own entries count, never
+  // inherited names such as "constructor".
+  const key = Object.hasOwn(familyPages, page) ? page : 'dashboard';
   return shell(key === 'child_profile' ? 'child-profile' : key, familyPages[key]());
 }
 
@@ -1337,5 +1339,5 @@ export function renderPage(page) {
     growth: growthPage,
     medicines: medicinesPage
   };
-  return (pages[page] || dashboardPage)();
+  return (Object.hasOwn(pages, page) ? pages[page] : dashboardPage)();
 }

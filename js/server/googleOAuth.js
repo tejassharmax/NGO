@@ -239,7 +239,8 @@ function stripMarkup(val) {
 
 function formatCellLink(text, url) {
   if (!text) return '';
-  if (!url || typeof url !== 'string' || !url.trim() || url === '#' || url.startsWith('javascript:')) {
+  // Only web links become HYPERLINK formulas; javascript:, data: and the rest stay plain text.
+  if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url.trim())) {
     return cleanCell(text);
   }
   const safeUrl = String(url).replace(/"/g, '%22');
@@ -1935,7 +1936,7 @@ async function findOrCreateFolder(authClient, folderName, parentId = null) {
       };
     }
   } catch (searchErr) {
-    console.warn(`[Google Drive] Folder search notice (${folderName}):`, searchErr.message);
+    console.warn('[Google Drive] Folder search notice (%s):', folderName, searchErr.message);
   }
 
   // Create folder if not found

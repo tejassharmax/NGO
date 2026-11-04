@@ -35,8 +35,11 @@ const { requireAuth, isAuthorizedEmail } = require('./js/server/auth');
 
 const { createRateLimiter } = require('./js/server/rateLimiter');
 
-// Rate Limiters
-const apiLimiter = createRateLimiter({ windowMs: 60000, max: 60, message: 'Too many API calls. Please wait a minute.' });
+// Rate Limiters. Every request counts toward siteLimiter, every /api call also
+// toward apiLimiter, and document uploads toward uploadLimiter as well. Staff at
+// one home can share an address, so the limits leave room for several people.
+const siteLimiter = createRateLimiter({ windowMs: 60000, max: 600, message: 'Too many requests. Please wait a minute.' });
+const apiLimiter = createRateLimiter({ windowMs: 60000, max: 120, message: 'Too many API calls. Please wait a minute.' });
 const uploadLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: 'Too many document uploads. Please wait a minute.' });
 
 const app = express();
@@ -57,6 +60,9 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(siteLimiter);
+app.use('/api', apiLimiter);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -578,7 +584,7 @@ app.delete('/api/children/:id', requireAuth, async (req, res) => {
 // POST /api/import - Add records from another deployment's backup.
 // Only records missing here are added (same rules as Settings -> Restore from
 // backup): nothing existing is overwritten and deleted records are not revived.
-app.post('/api/import', requireAuth, apiLimiter, async (req, res) => {
+app.post('/api/import', requireAuth, async (req, res) => {
   try {
     const { validateBackup, planRestore } = await import('./js/backup.js');
     const backup = req.body || {};
@@ -615,7 +621,7 @@ app.post('/api/import', requireAuth, apiLimiter, async (req, res) => {
 });
 
 // POST /api/sync - Merges and saves this NGO's database
-app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
+app.post('/api/sync', requireAuth, async (req, res) => {
   try {
     const clientData = req.body || {};
     const tenant = await tenantFor(req);
@@ -659,7 +665,7 @@ app.post('/api/sync', requireAuth, apiLimiter, async (req, res) => {
 
 // Central Error Handling Middleware
 app.use((err, req, res, next) => {
-  console.error(`[Express] Unhandled Error [${req.method} ${req.url}]:`, err.stack || err.message || err);
+  console.error('[Express] Unhandled Error [%s %s]:', req.method, req.url, err.stack || err.message || err);
   res.status(500).json({ error: 'Internal Server Error', message: process.env.NODE_ENV === 'production' ? 'An error occurred' : err.message });
 });
 
