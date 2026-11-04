@@ -37215,7 +37215,7 @@
 
   function renderBookingForm(preselectedDate, preselectedTime = '10:00') {
     const children = getChildren();
-    const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)}${isFamilySpace() ? '' : ` (${c.id})`}</option>`).join('');
+    const childOptions = children.map(c => `<option value="${escapeHTML(c.id)}">${escapeHTML(c.name)}${isFamilySpace() ? '' : ` (${escapeHTML(c.id)})`}</option>`).join('');
     const specialtyOptions = DOCTOR_SPECIALTIES.map(s => `<option value="${escapeHTML(s)}">${escapeHTML(s)}</option>`).join('');
     const dateVal = preselectedDate || new Date().toISOString().slice(0, 10);
     const lastUsed = getLastClinicDoctor();
@@ -37243,10 +37243,10 @@
           </div>
           <div class="gcal-popup-row-content">
             <div class="gcal-popup-datetime">
-              <input class="gcal-popup-date-input" name="date" type="date" value="${dateVal}" required />
-              <input class="gcal-popup-time-input" name="time" type="time" value="${preselectedTime}" />
+              <input class="gcal-popup-date-input" name="date" type="date" value="${escapeHTML(dateVal)}" required />
+              <input class="gcal-popup-time-input" name="time" type="time" value="${escapeHTML(preselectedTime)}" />
             </div>
-            <div class="gcal-popup-date-display">${displayDate} · ${displayTime}</div>
+            <div class="gcal-popup-date-display">${escapeHTML(displayDate)} · ${escapeHTML(displayTime)}</div>
           </div>
         </div>
 
