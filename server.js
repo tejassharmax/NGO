@@ -13,6 +13,8 @@ const path = require('path');
 // Load .env from this folder, not the working directory: hosting panels
 // (cPanel / Passenger / LiteSpeed) do not always start the app from its root.
 require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
+// The field encryption key may sit in its own file, kept apart from the other settings.
+require('dotenv').config({ path: path.join(__dirname, '.env.fieldkey'), quiet: true });
 
 // Per-NGO OAuth Integration Module
 const {
