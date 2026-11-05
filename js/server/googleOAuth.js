@@ -14,6 +14,7 @@ const { Readable } = require('stream');
 const { readTenantArrays, writeTenantChildren } = require('./dataSource');
 const { DEFAULT_NGO, sanitizeNgoSlug: tenantSlug, spaceTypeFor } = require('./ngoStore');
 const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
+const { sanitizeInsurance } = require('./recordValidation');
 
 // Where the refresh token and the created sheet/doc IDs live. Firestore-backed so
 // the Google connection is not lost every time the host restarts.
@@ -361,6 +362,96 @@ function buildChildSheetData(c, growthList, medicinesList, healthRecList, ngoNam
 }
 
 /**
+ * Which column of the master directory holds each field, found by header name
+ * (the first header containing any candidate wins). Columns added after the
+ * existing ones never change these positions.
+ * @param {string[]} headerRow
+ * @returns {Record<string, number>} -1 for a field the sheet does not have
+ */
+function masterColumnIndexes(headerRow) {
+  const headers = (headerRow || []).map(h => String(h || '').trim().toLowerCase());
+  const getColIdx = (candidates) => headers.findIndex(h => candidates.some(c => h.includes(c)));
+  return {
+    idCol: getColIdx(['id', 'child id']),
+    nameCol: getColIdx(['child name', 'name', 'student name']),
+    dobCol: getColIdx(['date of birth', 'dob', 'birth date']),
+    ageCol: getColIdx(['age']),
+    genderCol: getColIdx(['gender', 'sex']),
+    bloodCol: getColIdx(['blood group', 'blood']),
+    idNumCol: getColIdx(['aadhaar', 'id number', 'aadhaar id', 'gov id']),
+    guardianCol: getColIdx(['guardian', 'father', 'parent', 'mother']),
+    phoneCol: getColIdx(['phone', 'contact phone', 'mobile', 'contact']),
+    heightCol: getColIdx(['height']),
+    weightCol: getColIdx(['weight']),
+    medCondCol: getColIdx(['medical conditions', 'medical condition', 'condition', 'diagnosis']),
+    allergiesCol: getColIdx(['allergies', 'allergy']),
+    statusCol: getColIdx(['status']),
+    regDateCol: getColIdx(['registration date', 'registered date', 'reg date', 'date']),
+    medsCol: getColIdx(['current medications', 'medications', 'medicine']),
+    dentalCol: getColIdx(['dental remarks', 'dental']),
+    hygieneCol: getColIdx(['oral hygiene index', 'hygiene index', 'hygiene']),
+    relationCol: getColIdx(['relation'])
+  };
+}
+
+/**
+ * Health insurance columns, appended after a directory's existing columns. They
+ * are written from the app only; the pull does not read them back, so the
+ * insurance entries kept in the app are never changed by edits in the sheet.
+ */
+const INSURANCE_HEADERS = [
+  'Insurance ID', 'Insurer', 'Insurance Valid From', 'Insurance Valid To', 'Insurance Status', 'All Insurance Entries'
+];
+
+/** Today's date in India, YYYY-MM-DD, so "current" matches what staff see. */
+function todayInIndia() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
+function insuranceStatusOn(entry, today) {
+  if (entry.startDate && entry.startDate > today) return 'Upcoming';
+  if (entry.expiryDate && entry.expiryDate < today) return 'Expired';
+  return 'Active';
+}
+
+/** 0-based column index to its letter(s): 0 -> A, 25 -> Z, 26 -> AA. */
+function columnLetter(index) {
+  let n = index + 1;
+  let s = '';
+  while (n > 0) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = Math.floor((n - 1) / 26); }
+  return s;
+}
+
+/**
+ * The six insurance cells for one row: the current policy (active first, then
+ * upcoming, then the most recent expired one), a live status formula, and every
+ * entry, one per line.
+ * @param {object} person
+ * @param {number} rowNumber 1-based sheet row of this person
+ * @param {number} firstCol 0-based column of "Insurance ID"
+ * @param {string} [today]
+ */
+function insuranceCells(person, rowNumber, firstCol, today = todayInIndia()) {
+  const order = { Active: 0, Upcoming: 1, Expired: 2 };
+  const entries = sanitizeInsurance(person && person.insurance)
+    .map(entry => ({ entry, status: insuranceStatusOn(entry, today) }))
+    .sort((a, b) => order[a.status] - order[b.status] || String(b.entry.startDate).localeCompare(String(a.entry.startDate)));
+  if (!entries.length) return ['', '', '', '', '', ''];
+
+  const current = entries[0].entry;
+  // Status is worked out by Sheets each day, so it never goes stale between syncs.
+  const [id, from, to] = [firstCol, firstCol + 2, firstCol + 3].map(c => `${columnLetter(c)}${rowNumber}`);
+  const status = `=IF(${id}="","",IF(AND(${to}<>"",${to}<TODAY()),"Expired",IF(AND(${from}<>"",${from}>TODAY()),"Upcoming","Active")))`;
+  const all = entries.map(({ entry }) => [
+    entry.number,
+    entry.insurer || 'Insurer not specified',
+    entry.startDate || entry.expiryDate ? `${entry.startDate || '…'} to ${entry.expiryDate || '…'}` : 'dates not set'
+  ].join(' · ')).join('\n');
+
+  return [plainTextCell(current.number), plainTextCell(current.insurer), current.startDate, current.expiryDate, status, plainTextCell(all)];
+}
+
+/**
  * The master directory (Sheet1): one row per person.
  *
  * A family's columns use names the pull (pullChildrenFromGoogleSheets) reads the
@@ -395,7 +486,11 @@ function masterDirectoryTable(children, family) {
       cleanCell(c.status || 'Active'),
       cleanCell(c.registeredDate || new Date().toISOString().slice(0, 10))
     ]);
-    return [headers, ...rows];
+    const firstInsuranceCol = headers.length;
+    return [
+      [...headers, ...INSURANCE_HEADERS],
+      ...rows.map((row, i) => [...row, ...insuranceCells(children[i], i + 2, firstInsuranceCol)])
+    ];
   }
 
   const overviewHeaders = [
@@ -426,7 +521,11 @@ function masterDirectoryTable(children, family) {
     cleanCell(c.hygieneIndex || '')
   ]);
 
-  return [overviewHeaders, ...overviewRows];
+  const firstInsuranceCol = overviewHeaders.length;
+  return [
+    [...overviewHeaders, ...INSURANCE_HEADERS],
+    ...overviewRows.map((row, i) => [...row, ...insuranceCells(children[i], i + 2, firstInsuranceCol)])
+  ];
 }
 
 /** Active staff of one NGO, from authorized_users (cached for 5 minutes). */
@@ -1545,31 +1644,11 @@ async function pullChildrenFromGoogleSheets(ngoSlug, ngoName) {
 
     const rawRows = readRes.data.values || [];
     if (rawRows.length >= 2) {
-      const headers = rawRows[0].map(h => String(h || '').trim().toLowerCase());
-
-      const getColIdx = (candidates) => {
-        return headers.findIndex(h => candidates.some(c => h.includes(c)));
-      };
-
-      const idCol = getColIdx(['id', 'child id']);
-      const nameCol = getColIdx(['child name', 'name', 'student name']);
-      const dobCol = getColIdx(['date of birth', 'dob', 'birth date']);
-      const ageCol = getColIdx(['age']);
-      const genderCol = getColIdx(['gender', 'sex']);
-      const bloodCol = getColIdx(['blood group', 'blood']);
-      const idNumCol = getColIdx(['aadhaar', 'id number', 'aadhaar id', 'gov id']);
-      const guardianCol = getColIdx(['guardian', 'father', 'parent', 'mother']);
-      const phoneCol = getColIdx(['phone', 'contact phone', 'mobile', 'contact']);
-      const heightCol = getColIdx(['height']);
-      const weightCol = getColIdx(['weight']);
-      const medCondCol = getColIdx(['medical conditions', 'medical condition', 'condition', 'diagnosis']);
-      const allergiesCol = getColIdx(['allergies', 'allergy']);
-      const statusCol = getColIdx(['status']);
-      const regDateCol = getColIdx(['registration date', 'registered date', 'reg date', 'date']);
-      const medsCol = getColIdx(['current medications', 'medications', 'medicine']);
-      const dentalCol = getColIdx(['dental remarks', 'dental']);
-      const hygieneCol = getColIdx(['oral hygiene index', 'hygiene index', 'hygiene']);
-      const relationCol = getColIdx(['relation']);
+      const {
+        idCol, nameCol, dobCol, ageCol, genderCol, bloodCol, idNumCol, guardianCol, phoneCol,
+        heightCol, weightCol, medCondCol, allergiesCol, statusCol, regDateCol, medsCol,
+        dentalCol, hygieneCol, relationCol
+      } = masterColumnIndexes(rawRows[0]);
 
       for (let i = 1; i < rawRows.length; i++) {
         const row = rawRows[i];
@@ -2180,5 +2259,9 @@ module.exports = {
   syncExecutiveDocToGoogleDocs,
   findOrCreateFolder,
   uploadFileToDrive,
-  uploadDocumentToChildDrive
+  uploadDocumentToChildDrive,
+  // For scripts/test-sheet-insurance.mjs
+  masterDirectoryTable,
+  masterColumnIndexes,
+  INSURANCE_HEADERS
 };
