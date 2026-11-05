@@ -31,7 +31,20 @@ const {
 } = require('./js/server/googleOAuth');
 
 // Server-side authentication (Firebase ID token + email allowlist)
-const { requireAuth, isAuthorizedEmail } = require('./js/server/auth');
+const { requireAuth, requireRole, roleFor, isAuthorizedEmail, IS_PRODUCTION } = require('./js/server/auth');
+
+// Field-level encryption of Aadhaar and insurance IDs (stored encrypted, sent masked)
+const { isEncryptionReady, maskPayload, maskForClient, unmaskFromStored, storedValue } = require('./js/server/fieldCrypto');
+const { audit } = require('./js/server/auditLog');
+
+// Fail closed: in production, IDs must never be stored unencrypted.
+if (IS_PRODUCTION && !isEncryptionReady()) {
+  console.error('CRITICAL: FIELD_ENCRYPTION_KEY is missing or invalid. Refusing to start so IDs are never stored unencrypted.');
+  process.exit(1);
+}
+
+/** Admin-only routes; a refusal is recorded in the audit log. */
+const adminOnly = requireRole('Admin', req => audit(req, 'denied', { reason: 'admin-only' }));
 
 const { createRateLimiter } = require('./js/server/rateLimiter');
 
@@ -43,6 +56,8 @@ const apiLimiter = createRateLimiter({ windowMs: 60000, max: 120, message: 'Too 
 const uploadLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: 'Too many document uploads. Please wait a minute.' });
 
 const app = express();
+// Don't advertise the framework (OWASP A02).
+app.disable('x-powered-by');
 
 // Render terminates TLS at its edge proxy and forwards over plain HTTP, so without
 // this `req.protocol` reports "http" and `req.secure` is false for every request.
@@ -78,6 +93,22 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
 const MIGRATION_ORIGINS = ['https://ngo-4xde.onrender.com'];
 MIGRATION_ORIGINS.forEach(o => { if (!ALLOWED_ORIGINS.includes(o)) ALLOWED_ORIGINS.push(o); });
 
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  // One inline boot script in index.html; Google sign-in loads apis.google.com.
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://apis.google.com https://www.gstatic.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com data:",
+  "img-src 'self' data: blob: https:",
+  "connect-src 'self' https://*.googleapis.com https://*.google.com https://*.firebaseio.com https://*.firebaseapp.com",
+  "frame-src https://*.firebaseapp.com https://accounts.google.com https://*.google.com",
+  "worker-src 'self' blob:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'self'"
+].join('; ');
+
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   if (origin && ALLOWED_ORIGINS.includes(origin)) {
@@ -90,6 +121,18 @@ app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Browser features the app never uses stay off.
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');
+  // Google sign-in opens a popup that must be able to report back.
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  if (req.secure) {
+    // HTTPS only for 180 days. Subdomains are left out: not all of them may serve HTTPS.
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000');
+  }
+  // Content Security Policy in report-only mode first: the browser reports what
+  // it would block, nothing is blocked, so sign-in and report reading can't break.
+  // Switch the header name to Content-Security-Policy once reports are clean.
+  res.setHeader('Content-Security-Policy-Report-Only', CONTENT_SECURITY_POLICY);
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -164,18 +207,21 @@ if (!fs.existsSync(DB_DIR)) {
  * @returns {Promise<{slug: string, name: string}>}
  */
 async function tenantFor(req) {
-  return resolveNgoForEmail(req.user && req.user.email);
+  const tenant = await resolveNgoForEmail(req.user && req.user.email);
+  if (req && tenant) req.tenantSlug = tenant.slug;
+  return tenant;
 }
 
 // GET /api/sync - Returns this NGO's entire database
 app.get('/api/sync', requireAuth, async (req, res) => {
   try {
     if (!isFirestoreEnabled()) {
-      return res.json(readFileStore());
+      return res.json(maskPayload(readFileStore()));
     }
     const tenant = await tenantFor(req);
     const { payload } = await readTenant(tenant.slug);
-    return res.json(payload);
+    // IDs leave the server masked; the full value only through /api/reveal.
+    return res.json(maskPayload(payload));
   } catch (err) {
     console.error('[sync] Read failed:', err);
     return res.status(500).json({ error: 'Failed to read database' });
@@ -280,6 +326,11 @@ app.get('/auth/google/callback', async (req, res) => {
       console.warn(`[oauth] Refused workspace connect from non-allowlisted account: ${connectingEmail}`);
       return res.redirect('/index.html?google_error=unauthorized#/settings');
     }
+    // Connecting Google Workspace is an Admin action.
+    if (roleFor(connectingEmail) !== 'Admin') {
+      audit({ user: { email: connectingEmail, role: roleFor(connectingEmail) }, ip: req.ip, originalUrl: req.originalUrl }, 'denied', { reason: 'staff-google-connect' });
+      return res.redirect('/index.html?google_error=unauthorized#/settings');
+    }
 
 
     // The NGO comes from the connecting admin's own allowlist record, not from the
@@ -349,7 +400,7 @@ app.get('/auth/google/callback', async (req, res) => {
 // Requires auth: this endpoint used to be open to the internet, so anyone could
 // disconnect an NGO's Google Workspace. The NGO is resolved from the verified
 // token, not from the query string, so one tenant cannot disconnect another.
-app.all('/api/google/disconnect', requireAuth, async (req, res) => {
+app.all('/api/google/disconnect', requireAuth, adminOnly, async (req, res) => {
   try {
     const { slug: ngoSlug } = await tenantFor(req);
     const existing = await getNgoIntegration(ngoSlug);
@@ -477,7 +528,9 @@ app.post('/api/sheets/sync', requireAuth, async (req, res) => {
   try {
     const { children } = req.body || {};
     const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
-    const result = await oauthSyncSheets(children || [], ngoSlug, ngoName);
+    // The sheet keeps full IDs: replace the browser's masked values with the real ones.
+    const stored = await readChildrenFor({ slug: ngoSlug });
+    const result = await oauthSyncSheets(unmaskFromStored(Array.isArray(children) ? children : [], stored), ngoSlug, ngoName);
     res.json(result);
   } catch (err) {
     console.warn('Per-NGO Sheets sync notice:', err.message);
@@ -490,6 +543,7 @@ app.post('/api/sheets/pull', requireAuth, async (req, res) => {
   try {
     const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
     const result = await oauthPullSheets(ngoSlug, ngoName);
+    if (result && Array.isArray(result.children)) result.children = result.children.map(maskForClient);
     res.json(result);
   } catch (err) {
     console.warn('Per-NGO Sheets pull notice:', err.message);
@@ -568,11 +622,12 @@ app.post('/api/drive/upload', requireAuth, uploadLimiter, upload.single('documen
 // so the Firestore store and the legacy file store cannot drift apart.
 
 // DELETE /api/children/:id - Delete a specific child from the DB and Google Sheets
-app.delete('/api/children/:id', requireAuth, async (req, res) => {
+app.delete('/api/children/:id', requireAuth, adminOnly, async (req, res) => {
   try {
     const childId = req.params.id;
     const { slug: ngoSlug, name: ngoName } = await tenantFor(req);
     const result = await oauthDeleteChild(childId, ngoSlug, ngoName);
+    audit(req, 'delete-child', { childId, success: !!(result && result.success) });
     res.json(result);
   } catch (err) {
     console.error('[API] Error deleting child:', err);
@@ -580,11 +635,35 @@ app.delete('/api/children/:id', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/reveal -> The full value of one masked ID, for a signed-in staff member.
+// Every reveal is recorded in the audit log (who, which child, which field; never
+// the value itself). Body: { childId, field: 'idNumber' | 'insurance', entryId? }
+app.post('/api/reveal', requireAuth, async (req, res) => {
+  try {
+    const { childId, field, entryId } = req.body || {};
+    if (typeof childId !== 'string' || !['idNumber', 'insurance'].includes(field) ||
+        (field === 'insurance' && typeof entryId !== 'string')) {
+      return res.status(400).json({ error: 'childId and field are required' });
+    }
+    const tenant = await tenantFor(req);
+    const children = await readChildrenFor(tenant);
+    const child = children.find(c => c && c.id === childId);
+    const value = child ? storedValue(child, field, entryId) : undefined;
+    if (!value) return res.status(404).json({ error: 'Not found' });
+    audit(req, 'reveal-id', { childId, field, entryId: entryId || null });
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ value });
+  } catch (err) {
+    console.error('[reveal] Failed:', err.message);
+    return res.status(500).json({ error: 'Could not reveal this value' });
+  }
+});
+
 
 // POST /api/import - Add records from another deployment's backup.
 // Only records missing here are added (same rules as Settings -> Restore from
 // backup): nothing existing is overwritten and deleted records are not revived.
-app.post('/api/import', requireAuth, async (req, res) => {
+app.post('/api/import', requireAuth, adminOnly, async (req, res) => {
   try {
     const { validateBackup, planRestore } = await import('./js/backup.js');
     const backup = req.body || {};
@@ -623,9 +702,38 @@ app.post('/api/import', requireAuth, async (req, res) => {
 // POST /api/sync - Merges and saves this NGO's database
 app.post('/api/sync', requireAuth, async (req, res) => {
   try {
-    const clientData = req.body || {};
+    const clientData = { ...(req.body || {}) };
     const tenant = await tenantFor(req);
     const { payload: serverData, index, firestore } = await readTenant(tenant.slug);
+
+    let serverChildren = [];
+    try { serverChildren = JSON.parse(serverData['chm-children'] || '[]'); } catch (e) { }
+    if (!Array.isArray(serverChildren)) serverChildren = [];
+
+    let clientChildren = null;
+    try { clientChildren = clientData['chm-children'] != null ? JSON.parse(clientData['chm-children']) : null; } catch (e) { }
+    if (Array.isArray(clientChildren)) {
+      // The browser holds IDs masked; put the real values back before merging.
+      clientChildren = unmaskFromStored(clientChildren, serverChildren);
+
+      // Only an Admin may remove a child. A Staff copy missing a child keeps it.
+      if (req.user.role !== 'Admin') {
+        const sent = new Set(clientChildren.filter(c => c && c.id).map(c => c.id));
+        const kept = serverChildren.filter(c => c && c.id && !sent.has(c.id));
+        if (kept.length) {
+          audit(req, 'denied', { reason: 'staff-delete-child', childIds: kept.map(c => c.id) });
+          clientChildren = [...clientChildren, ...kept];
+          try {
+            const keptIds = new Set(kept.map(c => String(c.id)));
+            const tombs = JSON.parse(clientData['chm-deleted'] || '[]');
+            if (Array.isArray(tombs)) {
+              clientData['chm-deleted'] = JSON.stringify(tombs.filter(t => !(t && t.key === 'chm-children' && keptIds.has(String(t.recordId)))));
+            }
+          } catch (e) { }
+        }
+      }
+      clientData['chm-children'] = JSON.stringify(clientChildren);
+    }
 
     const mergedData = mergeNamespace(clientData, serverData);
 
@@ -656,7 +764,7 @@ app.post('/api/sync', requireAuth, async (req, res) => {
       } catch (e) { }
     }
 
-    return res.json(mergedData);
+    return res.json(maskPayload(mergedData));
   } catch (err) {
     console.error('[Sync] Error merging database:', err);
     return res.status(500).json({ error: 'Failed to sync database' });

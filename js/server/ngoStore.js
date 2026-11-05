@@ -30,6 +30,7 @@
 const crypto = require('crypto');
 const { getDb, getAuth } = require('./firebaseAdmin');
 const { COLLECTION_KEYS, SCALAR_KEYS, TOMBSTONE_KEY, tombstonesByKey } = require('./syncMerge');
+const { protectForStorage, revealForServer } = require('./fieldCrypto');
 
 /** chm-* key -> Firestore subcollection name. */
 const COLLECTION_NAMES = {
@@ -376,7 +377,9 @@ async function readSnapshot(ngoSlug, forceRefresh = false) {
         const seq = typeof data._seq === 'number' ? data._seq : Number.MAX_SAFE_INTEGER;
         const item = { ...data };
         delete item._seq;
-        rows.push({ seq, item });
+        // The index keeps the stored (encrypted) form, which is what the next
+        // write compares against; server code works on decrypted values.
+        rows.push({ seq, item: key === 'chm-children' ? revealForServer(item) : item });
         docIndex.set(doc.id, { json: canonicalJSON(item), seq });
       });
 
@@ -445,11 +448,15 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
   // documents created here are known to the next sync (a record created and then
   // deleted within the cache lifetime used to be left behind in Firestore).
   const nextIndex = new Map(index);
+  // Children exactly as stored, so the cache matches Firestore after this write.
+  const writtenChildren = [];
+  let childrenWritten = false;
 
   COLLECTION_KEYS.forEach(key => {
     let items = [];
     try { items = JSON.parse(merged[key] || '[]'); } catch (e) { return; }
     if (!Array.isArray(items)) return;
+    if (key === 'chm-children') childrenWritten = true;
 
     const collectionName = COLLECTION_NAMES[key];
     const stored = index.get(key) || new Map();
@@ -460,12 +467,20 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
     items.forEach((rawItem, position) => {
       if (!rawItem || typeof rawItem !== 'object') return;
 
-      const item = fitToDocumentLimit(rawItem, collectionName);
+      let item = fitToDocumentLimit(rawItem, collectionName);
       const docId = deriveDocId(item);
       seen.add(docId);
 
       // Skip only when both the content AND the position are already correct.
       const previous = stored.get(docId);
+      if (key === 'chm-children') {
+        // IDs are encrypted; unchanged ones keep their stored ciphertext so this
+        // record compares equal and is not rewritten.
+        let previousItem = null;
+        try { previousItem = previous ? JSON.parse(previous.json) : null; } catch (e) { }
+        item = protectForStorage(item, previousItem);
+        writtenChildren.push(item);
+      }
       const json = canonicalJSON(item);
       if (previous && previous.json === json && previous.seq === position) {
         return;
@@ -559,7 +574,9 @@ async function writeSnapshot(ngoSlug, merged, index = new Map()) {
 
   // Keep in-memory cache synchronized with the latest written data
   const slug = sanitizeNgoSlug(ngoSlug);
-  updateSnapshotMemoryCache(slug, merged, nextIndex);
+  const cachedPayload = !childrenWritten ? merged
+    : { ...merged, 'chm-children': JSON.stringify(writtenChildren.map(revealForServer)) };
+  updateSnapshotMemoryCache(slug, cachedPayload, nextIndex);
 
   return { writes, deletes };
 }

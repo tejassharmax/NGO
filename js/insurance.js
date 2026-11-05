@@ -9,6 +9,7 @@
  */
 
 import { icon, escapeHTML, formatDate } from './utils.js';
+import { maskedValueHTML, partlyEditedMask, PARTLY_EDITED_MESSAGE } from './reveal.js';
 
 const FIELDS = ['number', 'insurer', 'startDate', 'expiryDate'];
 
@@ -56,7 +57,7 @@ export function insuranceCardHTML(person, { stacked = true } = {}) {
     ? `<div style="display:flex; flex-direction:column;">${items.map(({ entry, status }, i) => `
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 0; ${i ? 'border-top:1px solid var(--color-border);' : ''} ${status === 'Expired' ? 'opacity:0.7;' : ''}">
           <div style="min-width:0;">
-            <div style="font-weight:600; font-size:14px; color:var(--color-text); overflow-wrap:anywhere;">${escapeHTML(entry.number || '—')}</div>
+            <div style="font-weight:600; font-size:14px; color:var(--color-text); overflow-wrap:anywhere;">${entry.number ? maskedValueHTML(entry.number, person.id, 'insurance', entry.id) : '—'}</div>
             <div style="font-size:12.5px; color:var(--color-text-muted);">${escapeHTML(entry.insurer || 'Insurer not specified')}</div>
           </div>
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -130,7 +131,8 @@ function validateRow(row) {
   const number = get('number');
   const expiry = get('expiryDate');
   const filled = FIELDS.some(key => get(key)?.value.trim());
-  number?.setCustomValidity(filled && !number.value.trim() ? 'Enter the Ayushman or insurance ID, or remove this entry.' : '');
+  number?.setCustomValidity(filled && !number.value.trim() ? 'Enter the Ayushman or insurance ID, or remove this entry.'
+    : partlyEditedMask(number) ? PARTLY_EDITED_MESSAGE : '');
   const start = get('startDate')?.value;
   expiry?.setCustomValidity(start && expiry.value && expiry.value < start ? 'Expiry date must be on or after the start date.' : '');
 }

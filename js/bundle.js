@@ -38260,6 +38260,108 @@
   }
 
   /**
+   * reveal.js
+   * Aadhaar and insurance IDs arrive from the server masked to their last four
+   * characters. A Reveal button asks the server for the full value, which shows
+   * for 30 seconds and is never kept in the page's copy of the records. The
+   * server records every reveal in its audit log.
+   */
+
+
+  const MASK_CHAR = '•';
+  const SHOW_FOR_MS = 30000;
+
+  function isMaskedValue(value) {
+    return typeof value === 'string' && value.includes(MASK_CHAR);
+  }
+
+  const PARTLY_EDITED_MESSAGE = 'Type the full number. The dots hide the saved one; delete them first.';
+
+  /** A masked field whose dots were edited instead of replaced. */
+  function partlyEditedMask(input) {
+    return !!input && !!input.dataset.maskedOriginal && isMaskedValue(input.value) && input.value !== input.dataset.maskedOriginal;
+  }
+
+  /** Is the signed-in account an Admin? Roles are stored as "Admin" or "admin". */
+  function isAdmin() {
+    return String(getSession()?.role || 'Admin').trim().toLowerCase() === 'admin';
+  }
+
+  /**
+   * A masked value with its Reveal button.
+   * @param {string} value masked text from the server
+   * @param {string} childId
+   * @param {'idNumber'|'insurance'} field
+   * @param {string} [entryId] insurance entry id
+   */
+  function maskedValueHTML(value, childId, field, entryId = '') {
+    const text = `<span data-reveal-text>${escapeHTML$1(value)}</span>`;
+    if (!isMaskedValue(value)) return text;
+    return `<span style="display:inline-flex; align-items:center; gap:6px; flex-wrap:wrap;">${text}<button class="button button--sm button--ghost" type="button" data-reveal-id="${escapeHTML$1(childId)}" data-reveal-field="${field}" data-reveal-entry="${escapeHTML$1(entryId)}" aria-label="Reveal the full number" style="min-height:26px; padding:0 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px;">${icon('eye')}Reveal</button></span>`;
+  }
+
+  let ready = false;
+
+  function initRevealListeners() {
+    if (ready) return;
+    ready = true;
+
+    document.addEventListener('click', async (event) => {
+      const button = event.target.closest('[data-reveal-id]');
+      if (!button) return;
+      const holder = button.parentElement?.querySelector('[data-reveal-text]');
+      if (!holder) return;
+      const masked = holder.textContent;
+      button.disabled = true;
+      try {
+        const res = await apiFetch('/api/reveal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            childId: button.dataset.revealId,
+            field: button.dataset.revealField,
+            entryId: button.dataset.revealEntry || undefined
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || !data.value) throw new Error(data.error || 'Could not reveal this number');
+        holder.textContent = data.value;
+        // The button's inline display style would override the hidden attribute.
+        button.style.display = 'none';
+        setTimeout(() => {
+          if (!holder.isConnected) return;
+          holder.textContent = masked;
+          button.style.display = 'inline-flex';
+          button.disabled = false;
+        }, SHOW_FOR_MS);
+      } catch (err) {
+        button.disabled = false;
+        toast('Could not reveal', err.message);
+      }
+    });
+
+    // A masked value in a form is kept unless replaced: focusing it selects it all,
+    // so typing replaces the whole number instead of editing the dots.
+    document.addEventListener('focusin', (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement) || !isMaskedValue(input.value)) return;
+      if (!input.dataset.maskedOriginal) input.dataset.maskedOriginal = input.value;
+      // After the click has placed the caret, so the selection sticks.
+      setTimeout(() => input.select(), 0);
+    });
+
+    // Partly editing the dots would leave a value the server reads as "unchanged",
+    // silently keeping the old number. Require the whole number instead.
+    document.addEventListener('input', (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement) || !input.dataset.maskedOriginal) return;
+      // Insurance rows run this check inside their own validation (insurance.js).
+      if (input.closest('[data-insurance-row]')) return;
+      input.setCustomValidity(partlyEditedMask(input) ? PARTLY_EDITED_MESSAGE : '');
+    });
+  }
+
+  /**
    * insurance.js
    * Health insurance on a person's record: Ayushman Bharat (PM-JAY) cards and any
    * other policy. Optional. A record can hold several entries, each valid for its
@@ -38316,7 +38418,7 @@
       ? `<div style="display:flex; flex-direction:column;">${items.map(({ entry, status }, i) => `
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:12px 0; ${i ? 'border-top:1px solid var(--color-border);' : ''} ${status === 'Expired' ? 'opacity:0.7;' : ''}">
           <div style="min-width:0;">
-            <div style="font-weight:600; font-size:14px; color:var(--color-text); overflow-wrap:anywhere;">${escapeHTML$1(entry.number || '—')}</div>
+            <div style="font-weight:600; font-size:14px; color:var(--color-text); overflow-wrap:anywhere;">${entry.number ? maskedValueHTML(entry.number, person.id, 'insurance', entry.id) : '—'}</div>
             <div style="font-size:12.5px; color:var(--color-text-muted);">${escapeHTML$1(entry.insurer || 'Insurer not specified')}</div>
           </div>
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
@@ -38390,7 +38492,8 @@
     const number = get('number');
     const expiry = get('expiryDate');
     const filled = FIELDS.some(key => get(key)?.value.trim());
-    number?.setCustomValidity(filled && !number.value.trim() ? 'Enter the Ayushman or insurance ID, or remove this entry.' : '');
+    number?.setCustomValidity(filled && !number.value.trim() ? 'Enter the Ayushman or insurance ID, or remove this entry.'
+      : partlyEditedMask(number) ? PARTLY_EDITED_MESSAGE : '');
     const start = get('startDate')?.value;
     expiry?.setCustomValidity(start && expiry.value && expiry.value < start ? 'Expiry date must be on or after the start date.' : '');
   }
@@ -39405,7 +39508,7 @@
             <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
             <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
             <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
-            <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber || 'Not specified'}</b></div>
+            <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber ? maskedValueHTML(child.idNumber, child.id, 'idNumber') : 'Not specified'}</b></div>
             <div class="detail-row"><span>Parent / Guardian</span><b>${child.father || 'Not specified'}</b></div>
             <div class="detail-row"><span>Mother name</span><b>${child.mother || 'Not specified'}</b></div>
             <div class="detail-row"><span>Contact phone</span><b>${child.phone || 'Not specified'}</b></div>
@@ -39535,7 +39638,7 @@
     const curMed = child ? child.medications : '';
 
     return shell('register-child', `${heading(title, desc, `<a class="button button--ghost" href="${child ? `${pagePath('child-profile')}?id=${child.id}` : pagePath('children')}">Cancel</a><button class="button button--primary" form="child-form" type="submit">${submitText}</button>`)}<div class="form-layout"><form class="card" id="child-form">${child ? `<input type="hidden" name="id" value="${child.id}">` : ''}
-  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName, 'required')}${field('Last name', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '', 'required')}<label class="field"><span class="field__label">Gender *</span><select class="input" name="gender" required><option value="" disabled ${!child || !child.gender ? 'selected' : ''}>Select gender</option><option value="Male" ${child && child.gender === 'Male' ? 'selected' : ''}>Male</option><option value="Female" ${child && child.gender === 'Female' ? 'selected' : ''}>Female</option><option value="Other" ${child && child.gender === 'Other' ? 'selected' : ''}>Other</option></select></label>${field('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', '', child ? child.idNumber : '')}</div></section>
+  <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Child information</h2><p>Use the child's legal name as it appears on official documents.</p></div><div class="form-grid--two">${field('First name *', 'firstName', 'e.g. Naveen', 'text', '', firstName, 'required')}${field('Last name', 'lastName', 'e.g. Roy', 'text', '', lastName)}${field('Date of birth *', 'birthDate', '', 'date', '', child ? formatDateForInput(child.dob) : '', 'required')}<label class="field"><span class="field__label">Gender *</span><select class="input" name="gender" required><option value="" disabled ${!child || !child.gender ? 'selected' : ''}>Select gender</option><option value="Male" ${child && child.gender === 'Male' ? 'selected' : ''}>Male</option><option value="Female" ${child && child.gender === 'Female' ? 'selected' : ''}>Female</option><option value="Other" ${child && child.gender === 'Other' ? 'selected' : ''}>Other</option></select></label>${field('Blood group', 'blood', 'e.g. O+', 'text', '', blood)}${field('ID number (Aadhaar)', 'idNumber', '0000 0000 0000', 'text', child && isMaskedValue(child.idNumber) ? 'Stored securely. Leave as is to keep it, or type the full number to replace it.' : '', child ? child.idNumber : '')}</div></section>
   ${insuranceFormSection(child)}
   <section class="form-section"><div class="form-section__heading"><h2 class="card__title">Health baseline</h2><p>Initial health measurements, medications, and dental records.</p></div><div class="form-grid--two">${field('Height (cm)', 'height', 'e.g. 140', 'number', '', child ? child.height : '', 'step="any" min="0"')}${field('Weight (kg)', 'weight', 'e.g. 35', 'number', '', child ? child.weight : '', 'step="any" min="0"')}<label class="field form-span-all"><span class="field__label">Known medical conditions</span><textarea class="textarea" name="medicalConditions" placeholder="e.g. Asthma, Diabetes, Epilepsy">${child ? escapeHTML$1(child.medicalConditions) : ''}</textarea></label><label class="field form-span-all"><span class="field__label">Allergies</span><textarea class="textarea" name="allergies" placeholder="e.g. Peanuts, Penicillin, Dust">${child ? escapeHTML$1(child.allergies) : ''}</textarea></label>
   <div class="field form-span-all">
@@ -43082,6 +43185,11 @@
     }
 
     if (target.matches('[data-delete]')) {
+      // The server refuses deletions from Staff accounts, so say so up front.
+      if (!isAdmin()) {
+        toast('Admins only', 'Only an Admin can remove a record. Please ask your administrator.');
+        return;
+      }
       const id = target.dataset.delete;
       const child = getChildren().find((item) => item.id === id);
       const childName = child?.name || term('personLower');
@@ -44085,6 +44193,7 @@
     formListenersInitialized = true;
     initReadingChoiceToggle();
     initInsuranceListeners();
+    initRevealListeners();
 
     // Child registration form
     document.addEventListener('submit', (event) => {

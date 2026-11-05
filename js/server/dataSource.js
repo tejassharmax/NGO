@@ -19,6 +19,7 @@ const path = require('path');
 const { isFirestoreEnabled, getDb } = require('./firebaseAdmin');
 const { readSnapshot, writeSnapshot, clearSnapshotMemoryCache, sanitizeNgoSlug } = require('./ngoStore');
 const { SYNC_KEYS } = require('./syncMerge');
+const { protectForStorage } = require('./fieldCrypto');
 
 const DB_FILE = path.join(__dirname, '../../data/db.json');
 
@@ -134,6 +135,8 @@ async function writeTenantChildren(ngoSlug, children) {
         const snap = await childrenCol.get();
         const keepDocIds = new Set();
         const operations = [];
+        const storedById = new Map();
+        snap.forEach(doc => storedById.set(doc.id, doc.data() || {}));
 
         safeChildren.forEach((c, idx) => {
           if (c && c.id) {
@@ -142,7 +145,8 @@ async function writeTenantChildren(ngoSlug, children) {
             operations.push({
               type: 'set',
               ref: childrenCol.doc(safeDocId),
-              data: { ...c, _seq: idx }
+              // IDs are encrypted before they are stored (fieldCrypto.js).
+              data: { ...protectForStorage(c, storedById.get(safeDocId)), _seq: idx }
             });
           }
         });

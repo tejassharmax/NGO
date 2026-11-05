@@ -18,6 +18,7 @@ import { bookAppointment, updateCalendarView, renderBookingModalMarkup, renderEv
 import { initCombobox } from './combobox.js';
 import { apiFetch } from './apiClient.js';
 import { initInsuranceListeners } from './insurance.js';
+import { initRevealListeners, isAdmin } from './reveal.js';
 
 /** Column the children table is sorted by; null keeps the saved (drag-and-drop) order. */
 let activeSort = null;
@@ -831,6 +832,11 @@ document.addEventListener('click', (event) => {
   }
 
   if (target.matches('[data-delete]')) {
+    // The server refuses deletions from Staff accounts, so say so up front.
+    if (!isAdmin()) {
+      toast('Admins only', 'Only an Admin can remove a record. Please ask your administrator.');
+      return;
+    }
     const id = target.dataset.delete;
     const child = getChildren().find((item) => item.id === id);
     const childName = child?.name || term('personLower');
@@ -1834,6 +1840,7 @@ function initFormListeners() {
   formListenersInitialized = true;
   initReadingChoiceToggle();
   initInsuranceListeners();
+  initRevealListeners();
 
   // Child registration form
   document.addEventListener('submit', (event) => {

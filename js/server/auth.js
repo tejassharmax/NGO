@@ -175,6 +175,27 @@ const firestoreApproved = new Map(); // email -> expiry time (ms)
 const FIRESTORE_APPROVAL_TTL_MS = 5 * 60 * 1000;
 
 /**
+ * Roles. Admin can do everything. Staff can read and edit records and reveal
+ * IDs, but cannot delete records, connect or disconnect Google Workspace, or
+ * import data. Accounts on the server allowlist are Admin; a Firestore
+ * authorized_users entry without a role is Admin, as the app has always shown.
+ */
+const ROLES = ['Admin', 'Staff'];
+const roleByEmail = new Map(); // email -> role, kept alongside firestoreApproved
+
+function normalizeRole(value) {
+  const r = String(value || 'Admin').trim().toLowerCase();
+  return ROLES.find(x => x.toLowerCase() === r) || 'Staff';
+}
+
+/** The role of an account that has passed isAuthorizedEmail. */
+function roleFor(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  if (ALLOWED_EMAILS.has(normalized)) return 'Admin';
+  return roleByEmail.get(normalized) || 'Staff';
+}
+
+/**
  * Check if an email is authorized:
  * 1. Matches static environment allowlist (fast path)
  * 2. Or matches an active document in Firebase Firestore `authorized_users` collection
@@ -202,6 +223,7 @@ async function isAuthorizedEmail(email) {
         const storedEmail = String(data.email || '').trim().toLowerCase();
         if ((!storedEmail || storedEmail === normalized) && data.active === true) {
           firestoreApproved.set(normalized, Date.now() + FIRESTORE_APPROVAL_TTL_MS);
+          roleByEmail.set(normalized, normalizeRole(data.role));
           console.log(`[auth] Dynamically authorized admin from Firestore authorized_users: ${normalized} (NGO: ${data.ngo || 'default'})`);
           return true;
         }
@@ -212,6 +234,7 @@ async function isAuthorizedEmail(email) {
   }
 
   firestoreApproved.delete(normalized);
+  roleByEmail.delete(normalized);
   return false;
 }
 
@@ -233,7 +256,8 @@ async function requireAuth(req, res, next) {
 
   if (!match) {
     if (LOCAL_BYPASS_ENABLED && isLoopbackPeer(req)) {
-      req.user = { email: LOCAL_DEV_EMAIL, emailVerified: true };
+      // LOCAL_DEV_ROLE=Staff tests the Staff restrictions locally.
+      req.user = { email: LOCAL_DEV_EMAIL, emailVerified: true, role: normalizeRole(process.env.LOCAL_DEV_ROLE || 'Admin') };
       return next();
     }
     return res.status(401).json({ error: 'Authentication required' });
@@ -257,8 +281,20 @@ async function requireAuth(req, res, next) {
     return res.status(403).json({ error: 'This account is not authorized. Please ask your NGO administrator to add your email in Firebase authorized_users.' });
   }
 
-  req.user = user;
+  req.user = { ...user, role: roleFor(user.email) };
   next();
 }
 
-module.exports = { requireAuth, verifyIdToken, isAuthorizedEmail, ALLOWED_EMAILS, IS_PRODUCTION };
+/**
+ * Express middleware, after requireAuth: only the given role may continue.
+ * Refusals are logged for the audit trail.
+ */
+function requireRole(role, onDenied) {
+  return (req, res, next) => {
+    if (req.user && req.user.role === role) return next();
+    if (onDenied) onDenied(req);
+    return res.status(403).json({ error: `Only an ${role} can do this. Please ask your administrator.` });
+  };
+}
+
+module.exports = { requireAuth, requireRole, roleFor, verifyIdToken, isAuthorizedEmail, ALLOWED_EMAILS, IS_PRODUCTION, ROLES };
