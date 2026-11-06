@@ -19,12 +19,18 @@ const MASK_CHAR = '•';
 /** Shown in place of a value that is stored but cannot be decrypted (wrong or missing key). */
 const LOCKED = '•••• (locked)';
 
+/** A base64 key string as a 32-byte Buffer, or null when it is not one. */
+function parseKey(raw) {
+  const s = String(raw || '').trim();
+  const buf = s ? Buffer.from(s, 'base64') : null;
+  return buf && buf.length === 32 ? buf : null;
+}
+
 let cachedKey;
 function key() {
   if (cachedKey !== undefined) return cachedKey;
   const raw = (process.env.FIELD_ENCRYPTION_KEY || '').trim();
-  const buf = raw ? Buffer.from(raw, 'base64') : null;
-  cachedKey = buf && buf.length === 32 ? buf : null;
+  cachedKey = parseKey(raw);
   if (raw && !cachedKey) console.error('[crypto] FIELD_ENCRYPTION_KEY must be 32 bytes in base64; field encryption is OFF.');
   return cachedKey;
 }
@@ -43,7 +49,11 @@ function isMasked(value) {
 }
 
 function encrypt(plain) {
-  const k = key();
+  return encryptWith(plain, key());
+}
+
+/** Encrypt with an explicit key (the key-change and recovery tools use this). */
+function encryptWith(plain, k) {
   if (!k) throw new Error('Field encryption key is not configured');
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', k, iv);
@@ -54,8 +64,12 @@ function encrypt(plain) {
 
 /** Plain text, or null when the value cannot be decrypted. Plain input is returned as is. */
 function decrypt(value) {
+  return decryptWith(value, key());
+}
+
+/** Decrypt with an explicit key; null when that key does not fit. */
+function decryptWith(value, k) {
   if (!isEncrypted(value)) return value;
-  const k = key();
   if (!k) return null;
   try {
     const [iv, tag, ct] = value.slice(PREFIX.length).split(':').map(p => Buffer.from(p, 'base64url'));
@@ -208,6 +222,10 @@ module.exports = {
   isMasked,
   encrypt,
   decrypt,
+  parseKey,
+  encryptWith,
+  decryptWith,
+  eachSensitive,
   mask,
   storedValue,
   protectForStorage,
