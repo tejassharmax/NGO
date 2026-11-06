@@ -172,9 +172,6 @@ img, svg, canvas {
   .topbar-profile__name {
     display: none;
   }
-  .topbar__actions .icon-button:nth-child(2) {
-    display: none;
-  }
   .topbar__actions {
     gap: 4px;
   }

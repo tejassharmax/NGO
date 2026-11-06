@@ -19,7 +19,9 @@ import { initCombobox } from './combobox.js';
 import { apiFetch } from './apiClient.js';
 import { initInsuranceListeners } from './insurance.js';
 import { initRevealListeners, isAdmin } from './reveal.js';
+import { initAssistant } from './assistant.js';
 
+let assistantStarted = false;
 /** Column the children table is sorted by; null keeps the saved (drag-and-drop) order. */
 let activeSort = null;
 let currentPage = 1;
@@ -211,6 +213,12 @@ let renderCurrentPage = null;
 
     // On the retired Render site, copy this browser's records to the live site.
     migrateToLiveSite().catch(() => {});
+
+    // Ask Ayusha shows only when the server has the assistant turned on.
+    if (!assistantStarted) {
+      assistantStarted = true;
+      initAssistant().catch(() => {});
+    }
 
     const app = document.querySelector('#app');
     if (app) {

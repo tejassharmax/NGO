@@ -45,6 +45,8 @@
     lock: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
     // New health-related icons
     heart: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.3l7.8-7.8 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
+    sparkles: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
+    send: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>',
     heartPulse: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19.5 12.6l-7.5 7.7-7.5-7.7A5 5 0 0 1 7.5 4a5 5 0 0 1 4.5 2.8A5 5 0 0 1 16.5 4a5 5 0 0 1 3 8.6z"/><path d="M3.2 12h4.3l1.5-3 2 6 1.5-3h4.3"/></svg>',
     pill: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z"/><path d="m8.5 8.5 7 7"/></svg>',
     apple: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2C9.8 2 8 3.3 8 5c0 .8.3 1.5.8 2H6a4 4 0 0 0-4 4c0 5 4 10 7 11h6c3-1 7-6 7-11a4 4 0 0 0-4-4h-2.8c.5-.5.8-1.2.8-2 0-1.7-1.8-3-4-3z"/></svg>',
@@ -38994,6 +38996,7 @@
         <div class="topbar__crumbs"><span>${escapeHTML$1(ngoName)}</span><span aria-hidden="true"> / </span><b>${titles[page] || 'Workspace'}</b></div>
         <label class="topbar-search"><span class="sr-only">${term('searchLabel')}</span>${icon('search')}<input type="search" placeholder="${term('searchPlaceholder')}" data-global-search><kbd>⌘ K</kbd></label>
         <div class="topbar__actions">
+          <button class="assistant-trigger" data-assistant-open type="button" aria-label="Ask Ayusha" aria-controls="assistant-panel">${icon('sparkles')}<span>Ask Ayusha</span></button>
           <button class="icon-button" data-theme-toggle type="button" aria-label="Toggle color theme" style="cursor: pointer;">
             <span class="theme-icon-container">
               ${document.body?.classList?.contains('theme-dark') || (typeof localStorage !== 'undefined' && localStorage.getItem('sample-theme') === 'dark') ? icon('sun') : icon('moon')}
@@ -42373,6 +42376,238 @@
     }
   }
 
+  /**
+   * assistant.js
+   * "Ask Ayusha": a side panel where staff ask questions about this space's records.
+   * The server runs the model and its read-only tools; this file only shows the
+   * conversation and turns the children an answer names into links to their profiles.
+   * The panel appears only when the server says the assistant is enabled.
+   */
+
+
+  const SUGGESTIONS = [
+    'Which children are due for a checkup?',
+    'Whose insurance expires in the next 60 days?',
+    'Show Kavya Menon\'s hemoglobin over time',
+    'What appointments are coming up?'
+  ];
+
+  /** @type {{role: 'user'|'assistant', text: string, refs?: {id: string, name: string}[], error?: boolean}[]} */
+  let messages = [];
+  let busy = false;
+  let panel = null;
+
+  async function initAssistant() {
+    try {
+      const res = await apiFetch('/api/assistant/status');
+      if (!res.ok) return;
+      const { enabled } = await res.json();
+      if (!enabled) return;
+    } catch {
+      return;
+    }
+    document.body.classList.add('assistant-on');
+    buildPanel();
+    document.addEventListener('click', (event) => {
+      if (event.target.closest('[data-assistant-open]')) togglePanel();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && panel && !panel.hidden) closePanel();
+    });
+  }
+
+  function buildPanel() {
+    panel = document.createElement('aside');
+    panel.id = 'assistant-panel';
+    panel.className = 'assistant-panel';
+    panel.setAttribute('aria-label', 'Ask Ayusha');
+    panel.hidden = true;
+    panel.innerHTML = `
+    <header class="assistant-panel__head">
+      <span class="assistant-panel__mark">${icon('sparkles')}</span>
+      <div class="assistant-panel__title"><b>Ask Ayusha</b><span>Reads this space's records. It cannot change them.</span></div>
+      <button class="icon-button" type="button" data-assistant-new aria-label="New conversation" title="New conversation">${icon('rotate')}</button>
+      <button class="icon-button" type="button" data-assistant-close aria-label="Close">${icon('x')}</button>
+    </header>
+    <div class="assistant-panel__log" data-assistant-log aria-live="polite"></div>
+    <form class="assistant-panel__form" data-assistant-form>
+      <label class="sr-only" for="assistant-input">Your question</label>
+      <textarea id="assistant-input" rows="1" maxlength="1000" placeholder="Ask about checkups, blood tests, insurance…" data-assistant-input></textarea>
+      <button class="assistant-panel__send" type="submit" aria-label="Send">${icon('send')}</button>
+    </form>
+    <p class="assistant-panel__note">Answers come from the records but can still be wrong. Open the linked profile to check.</p>`;
+    document.body.appendChild(panel);
+
+    panel.querySelector('[data-assistant-close]').addEventListener('click', closePanel);
+    panel.querySelector('[data-assistant-new]').addEventListener('click', () => {
+      if (busy) return;
+      messages = [];
+      render();
+      focusInput();
+    });
+    const input = panel.querySelector('[data-assistant-input]');
+    input.addEventListener('input', () => autoGrow(input));
+    input.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        send(input.value);
+      }
+    });
+    panel.querySelector('[data-assistant-form]').addEventListener('submit', (event) => {
+      event.preventDefault();
+      send(input.value);
+    });
+    panel.addEventListener('click', (event) => {
+      const chip = event.target.closest('[data-assistant-suggest]');
+      if (chip) send(chip.dataset.assistantSuggest);
+      const retry = event.target.closest('[data-assistant-retry]');
+      if (retry) retryLast();
+      // On a phone the panel covers the page, so close it when a record is opened.
+      if (event.target.closest('a[data-assistant-record]') && window.matchMedia('(max-width: 768px)').matches) closePanel();
+    });
+    render();
+  }
+
+  function togglePanel() {
+    if (panel.hidden) openPanel();
+    else closePanel();
+  }
+
+  function openPanel() {
+    panel.hidden = false;
+    document.body.classList.add('assistant-open');
+    document.querySelectorAll('[data-assistant-open]').forEach(b => b.setAttribute('aria-expanded', 'true'));
+    focusInput();
+  }
+
+  function closePanel() {
+    panel.hidden = true;
+    document.body.classList.remove('assistant-open');
+    document.querySelectorAll('[data-assistant-open]').forEach(b => b.setAttribute('aria-expanded', 'false'));
+    document.querySelector('[data-assistant-open]')?.focus();
+  }
+
+  function focusInput() {
+    panel.querySelector('[data-assistant-input]').focus();
+  }
+
+  function autoGrow(input) {
+    input.style.height = 'auto';
+    input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+  }
+
+  async function send(raw) {
+    const text = String(raw || '').trim();
+    if (!text || busy) return;
+    const input = panel.querySelector('[data-assistant-input]');
+    input.value = '';
+    autoGrow(input);
+    messages.push({ role: 'user', text });
+    await ask();
+  }
+
+  function retryLast() {
+    if (busy) return;
+    if (messages.length && messages[messages.length - 1].error) messages.pop();
+    ask();
+  }
+
+  async function ask() {
+    busy = true;
+    render();
+    const history = messages.filter(m => !m.error).slice(-10).map(({ role, text }) => ({ role, text }));
+    try {
+      const res = await apiFetch('/api/assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: history })
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'The assistant could not answer right now.');
+      messages.push({ role: 'assistant', text: String(body.answer || ''), refs: Array.isArray(body.refs) ? body.refs : [] });
+    } catch (err) {
+      messages.push({ role: 'assistant', text: err.message || 'The assistant could not answer right now.', error: true });
+    } finally {
+      busy = false;
+      render();
+    }
+  }
+
+  function render() {
+    const log = panel.querySelector('[data-assistant-log]');
+    if (!messages.length) {
+      log.innerHTML = `
+      <div class="assistant-empty">
+        <p>Ask a question about the children in this space. Each child in an answer links to their profile.</p>
+        <div class="assistant-empty__chips">${SUGGESTIONS.map(s => `<button type="button" class="assistant-chip" data-assistant-suggest="${escapeHTML$1(s)}">${escapeHTML$1(s)}</button>`).join('')}</div>
+      </div>`;
+    } else {
+      log.innerHTML = messages.map(messageHTML).join('') +
+        (busy ? '<div class="assistant-msg assistant-msg--bot assistant-msg--busy" role="status"><span></span><span></span><span></span><span class="sr-only">Looking through the records</span></div>' : '');
+    }
+    panel.querySelector('.assistant-panel__send').disabled = busy;
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function messageHTML(m) {
+    if (m.role === 'user') return `<div class="assistant-msg assistant-msg--user">${escapeHTML$1(m.text)}</div>`;
+    if (m.error) {
+      return `<div class="assistant-msg assistant-msg--bot assistant-msg--error">${escapeHTML$1(m.text)} <button type="button" class="assistant-retry" data-assistant-retry>Try again</button></div>`;
+    }
+    const refs = m.refs || [];
+    const records = refs.length
+      ? `<div class="assistant-records"><span>Records</span>${refs.map(r => `<a class="assistant-record" data-assistant-record href="${recordHref(r.id)}">${escapeHTML$1(r.name)} <small>${escapeHTML$1(r.id)}</small></a>`).join('')}</div>`
+      : '';
+    return `<div class="assistant-msg assistant-msg--bot">${formatAnswer(m.text, refs)}${records}</div>`;
+  }
+
+  function recordHref(id) {
+    return `${pagePath('child-profile')}?id=${encodeURIComponent(id)}`;
+  }
+
+  /**
+   * Escapes the answer, links the children the server confirmed (refs), and applies
+   * a small subset of formatting: **bold**, and "- " / "* " / "1. " list lines.
+   */
+  function formatAnswer(text, refs) {
+    const links = [];
+    const token = (html) => `\u0000${links.push(html) - 1}\u0000`;
+    let out = escapeHTML$1(text);
+
+    // Longest names first, so "Kavya Menon" wins over a shorter name inside it.
+    [...refs].sort((a, b) => b.name.length - a.name.length).forEach(r => {
+      const name = escapeRegExp(escapeHTML$1(r.name));
+      const id = escapeRegExp(escapeHTML$1(r.id));
+      const link = (label) => token(`<a class="assistant-link" data-assistant-record href="${recordHref(r.id)}">${label}</a>`);
+      out = out.replace(new RegExp(`${name}\\s*\\(${id}\\)`, 'g'), () => link(`${escapeHTML$1(r.name)} <small>${escapeHTML$1(r.id)}</small>`));
+      out = out.replace(new RegExp(`\\b${id}\\b`, 'g'), () => link(escapeHTML$1(r.id)));
+    });
+
+    out = out.replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+
+    const lines = out.split('\n');
+    let html = '';
+    let list = null;
+    for (const line of lines) {
+      const bullet = line.match(/^\s*(?:[-*•]|\d+\.)\s+(.*)$/);
+      if (bullet) {
+        if (!list) { html += '<ul>'; list = true; }
+        html += `<li>${bullet[1]}</li>`;
+        continue;
+      }
+      if (list) { html += '</ul>'; list = null; }
+      if (line.trim()) html += `<p>${line}</p>`;
+    }
+    if (list) html += '</ul>';
+
+    return html.replace(/\u0000(\d+)\u0000/g, (_, i) => links[Number(i)]);
+  }
+
+  function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  let assistantStarted = false;
   /** Column the children table is sorted by; null keeps the saved (drag-and-drop) order. */
   let activeSort = null;
   let currentPage = 1;
@@ -42564,6 +42799,12 @@
 
       // On the retired Render site, copy this browser's records to the live site.
       migrateToLiveSite().catch(() => {});
+
+      // Ask Ayusha shows only when the server has the assistant turned on.
+      if (!assistantStarted) {
+        assistantStarted = true;
+        initAssistant().catch(() => {});
+      }
 
       const app = document.querySelector('#app');
       if (app) {

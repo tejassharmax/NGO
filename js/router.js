@@ -122,6 +122,7 @@ export function shell(page, content) {
         <div class="topbar__crumbs"><span>${escapeHTML(ngoName)}</span><span aria-hidden="true"> / </span><b>${titles[page] || 'Workspace'}</b></div>
         <label class="topbar-search"><span class="sr-only">${term('searchLabel')}</span>${icon('search')}<input type="search" placeholder="${term('searchPlaceholder')}" data-global-search><kbd>⌘ K</kbd></label>
         <div class="topbar__actions">
+          <button class="assistant-trigger" data-assistant-open type="button" aria-label="Ask Ayusha" aria-controls="assistant-panel">${icon('sparkles')}<span>Ask Ayusha</span></button>
           <button class="icon-button" data-theme-toggle type="button" aria-label="Toggle color theme" style="cursor: pointer;">
             <span class="theme-icon-container">
               ${document.body?.classList?.contains('theme-dark') || (typeof localStorage !== 'undefined' && localStorage.getItem('sample-theme') === 'dark') ? icon('sun') : icon('moon')}

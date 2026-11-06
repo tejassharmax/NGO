@@ -15,6 +15,8 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '.env'), quiet: true });
 // The field encryption key may sit in its own file, kept apart from the other settings.
 require('dotenv').config({ path: path.join(__dirname, '.env.fieldkey'), quiet: true });
+// The "Ask Ayusha" prototype's API key (sandbox only; the assistant stays off unless ASSISTANT_ENABLED=true).
+require('dotenv').config({ path: path.join(__dirname, '.env.assistant'), quiet: true });
 
 // Per-NGO OAuth Integration Module
 const {
@@ -56,6 +58,7 @@ const { createRateLimiter } = require('./js/server/rateLimiter');
 const siteLimiter = createRateLimiter({ windowMs: 60000, max: 600, message: 'Too many requests. Please wait a minute.' });
 const apiLimiter = createRateLimiter({ windowMs: 60000, max: 120, message: 'Too many API calls. Please wait a minute.' });
 const uploadLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: 'Too many document uploads. Please wait a minute.' });
+const assistantLimiter = createRateLimiter({ windowMs: 60000, max: 10, message: 'Too many questions at once. Please wait a minute.' });
 
 const app = express();
 // Don't advertise the framework (OWASP A02).
@@ -634,6 +637,36 @@ app.delete('/api/children/:id', requireAuth, adminOnly, async (req, res) => {
   } catch (err) {
     console.error('[API] Error deleting child:', err);
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// "Ask Ayusha" assistant (prototype). Off unless ASSISTANT_ENABLED=true; answers
+// only from this space's records through read-only tools (js/server/assistant).
+const assistant = require('./js/server/assistant/agent');
+
+app.get('/api/assistant/status', requireAuth, (req, res) => {
+  res.json({ enabled: assistant.isAssistantEnabled(), model: assistant.isAssistantEnabled() ? assistant.MODEL : null });
+});
+
+app.post('/api/assistant', assistantLimiter, requireAuth, async (req, res) => {
+  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+  try {
+    const { messages } = req.body || {};
+    const conversation = (Array.isArray(messages) ? messages : [])
+      .filter(m => m && typeof m.text === 'string' && m.text.trim() && ['user', 'assistant'].includes(m.role))
+      .slice(-10);
+    if (!conversation.length || conversation[conversation.length - 1].role !== 'user') {
+      return res.status(400).json({ error: 'Ask a question' });
+    }
+    const tenant = await tenantFor(req);
+    const { payload } = await readTenant(tenant.slug);
+    const result = await assistant.ask(payload, tenant.name || tenant.slug, conversation);
+    audit(req, 'assistant-query', { tools: result.toolsUsed, questionLength: conversation[conversation.length - 1].text.length });
+    return res.json(result);
+  } catch (err) {
+    console.error('[assistant] Failed:', err.message);
+    if (err.busy) return res.status(503).json({ error: 'The assistant has reached its usage limit for now. Please try again in a minute.' });
+    return res.status(502).json({ error: 'The assistant could not answer right now. Please try again.' });
   }
 });
 

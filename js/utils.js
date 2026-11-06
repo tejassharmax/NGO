@@ -42,6 +42,8 @@ export const icons = {
   lock: '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>',
   // New health-related icons
   heart: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.3l7.8-7.8 1-1.1a5.5 5.5 0 0 0 0-7.8z"/></svg>',
+  sparkles: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>',
+  send: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>',
   heartPulse: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M19.5 12.6l-7.5 7.7-7.5-7.7A5 5 0 0 1 7.5 4a5 5 0 0 1 4.5 2.8A5 5 0 0 1 16.5 4a5 5 0 0 1 3 8.6z"/><path d="M3.2 12h4.3l1.5-3 2 6 1.5-3h4.3"/></svg>',
   pill: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7z"/><path d="m8.5 8.5 7 7"/></svg>',
   apple: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 2C9.8 2 8 3.3 8 5c0 .8.3 1.5.8 2H6a4 4 0 0 0-4 4c0 5 4 10 7 11h6c3-1 7-6 7-11a4 4 0 0 0-4-4h-2.8c.5-.5.8-1.2.8-2 0-1.7-1.8-3-4-3z"/></svg>',
