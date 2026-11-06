@@ -213,7 +213,7 @@ export function dashboardPage() {
   } else {
     attentionHTML = flaggedChildren.slice(0, 4).map(child => {
       const hs = healthStatus(child);
-      return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${child.id}"><span class="table-avatar">${initials(child.name)}</span><span class="table-person__info"><b class="table-person__name">${child.name}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
+      return `<tr><td><a class="table-person" href="${pagePath('child-profile')}?id=${encodeURIComponent(child.id)}"><span class="table-avatar">${escapeHTML(initials(child.name))}</span><span class="table-person__info"><b class="table-person__name">${escapeHTML(child.name)}</b><span class="table-person__id">${child.id}</span></span></a></td><td>${calculateAge(child.dob) || '—'}</td><td class="hide-tablet">${hs.flags.join(', ')}</td><td>${statusBadge(hs.level === 'critical' ? 'Critical' : 'Pending')}</td></tr>`;
     }).join('');
   }
 
@@ -315,19 +315,19 @@ export function childProfilePage() {
         </button>
         <div class="document-card__body" style="padding:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; padding-right:24px; gap:8px;">
-            <h3 style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${d.name || d.title || 'Medical Document'}</h3>
+            <h3 style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(d.name || d.title || 'Medical Document')}</h3>
             <div style="display:flex; gap:6px; align-items:center; flex-shrink:0;">
               ${d.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:13px; height:13px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Not in Drive yet</span>`}
               <span class="badge badge--success">${d.status || 'Verified'}</span>
             </div>
           </div>
           <div class="detail-list detail-list--single" style="font-size:13px;">
-            <div class="detail-row"><span>Category</span><b>${d.docType || d.category || 'Medical Report'}</b></div>
+            <div class="detail-row"><span>Category</span><b>${escapeHTML(d.docType || d.category || 'Medical Report')}</b></div>
             <div class="detail-row"><span>Uploaded</span><b>${d.uploadDate || formatDate(d.timestamp) || 'Recently'}</b></div>
           </div>
           <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
             ${d.driveUrl ? `<a class="button button--sm button--primary" href="${d.driveUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex; align-items:center; gap:6px;">${icon('external')} Open in Drive</a>` : ''}
-            ${d.fileData || d.image ? `<a class="button button--sm ${d.driveUrl ? 'button--ghost' : 'button--primary'}" href="${d.fileData || d.image}" target="_blank" download="${d.name || 'document'}.png" style="display:inline-flex; align-items:center; gap:6px;">${icon('download')} View / Download</a>` : ''}
+            ${d.fileData || d.image ? `<a class="button button--sm ${d.driveUrl ? 'button--ghost' : 'button--primary'}" href="${d.fileData || d.image}" target="_blank" download="${escapeHTML(d.name || 'document')}.png" style="display:inline-flex; align-items:center; gap:6px;">${icon('download')} View / Download</a>` : ''}
             ${!d.driveUrl && (d.fileData || d.image) ? `<button class="button button--sm button--ghost" type="button" data-sync-doc-id="${d.id}" style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')} Sync to Drive</button>` : ''}
           </div>
         </div>
@@ -354,9 +354,9 @@ export function childProfilePage() {
             </table>
           </div>` : ''}
         <div class="detail-list">
-          <div class="detail-row"><span>Known Medical Conditions</span><b>${child.medicalConditions || 'None reported'}</b></div>
-          <div class="detail-row"><span>Allergies</span><b>${child.allergies || 'None reported'}</b></div>
-          <div class="detail-row"><span>Active Prescriptions</span><b>${meds.length > 0 ? meds.map(m => `${m.medicineName} (${m.dosage})`).join(', ') : 'None active'}</b></div>
+          <div class="detail-row"><span>Known Medical Conditions</span><b>${escapeHTML(child.medicalConditions || 'None reported')}</b></div>
+          <div class="detail-row"><span>Allergies</span><b>${escapeHTML(child.allergies || 'None reported')}</b></div>
+          <div class="detail-row"><span>Active Prescriptions</span><b>${meds.length > 0 ? meds.map(m => `${escapeHTML(m.medicineName)} (${escapeHTML(m.dosage)})`).join(', ') : 'None active'}</b></div>
         </div>
       </div>`;
   }
@@ -606,12 +606,12 @@ export function childProfilePage() {
     <div class="profile-header">
       <span class="profile-header__avatar">${initials(child.name)}</span>
       <div class="profile-header__copy">
-        <h1>${child.name}</h1>
+        <h1>${escapeHTML(child.name)}</h1>
         <p>${child.id} · ${age ? age + ' old' : 'Age unknown'}</p>
         <div class="profile-header__meta">
           ${statusBadge(child.status)}
-          <span class="badge badge--neutral">${child.gender || 'Not specified'}</span>
-          <span class="badge badge--blue">Blood: ${child.blood || 'Unknown'}</span>
+          <span class="badge badge--neutral">${escapeHTML(child.gender || 'Not specified')}</span>
+          <span class="badge badge--blue">Blood: ${escapeHTML(child.blood || 'Unknown')}</span>
           ${hs.flags.length ? `<span class="badge badge--warning">${hs.flags.join(', ')}</span>` : ''}
         </div>
       </div>
@@ -642,15 +642,15 @@ export function childProfilePage() {
         </header>
         <div class="card__body">
           <div class="detail-list">
-            <div class="detail-row"><span>Full name</span><b>${child.name}</b></div>
+            <div class="detail-row"><span>Full name</span><b>${escapeHTML(child.name)}</b></div>
             <div class="detail-row"><span>Date of birth</span><b>${child.dob ? formatDate(child.dob) : 'Not specified'}</b></div>
             <div class="detail-row"><span>Age</span><b>${age || 'Not specified'}</b></div>
-            <div class="detail-row"><span>Gender</span><b>${child.gender || 'Not specified'}</b></div>
-            <div class="detail-row"><span>Blood group</span><b>${child.blood || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Gender</span><b>${escapeHTML(child.gender || 'Not specified')}</b></div>
+            <div class="detail-row"><span>Blood group</span><b>${escapeHTML(child.blood || 'Not specified')}</b></div>
             <div class="detail-row"><span>ID number (Aadhaar)</span><b>${child.idNumber ? maskedValueHTML(child.idNumber, child.id, 'idNumber') : 'Not specified'}</b></div>
-            <div class="detail-row"><span>Parent / Guardian</span><b>${child.father || 'Not specified'}</b></div>
-            <div class="detail-row"><span>Mother name</span><b>${child.mother || 'Not specified'}</b></div>
-            <div class="detail-row"><span>Contact phone</span><b>${child.phone || 'Not specified'}</b></div>
+            <div class="detail-row"><span>Parent / Guardian</span><b>${escapeHTML(child.father || 'Not specified')}</b></div>
+            <div class="detail-row"><span>Mother name</span><b>${escapeHTML(child.mother || 'Not specified')}</b></div>
+            <div class="detail-row"><span>Contact phone</span><b>${escapeHTML(child.phone || 'Not specified')}</b></div>
             <div class="detail-row"><span>Registration date</span><b>${child.registeredDate ? formatDate(child.registeredDate) : 'Not specified'}</b></div>
           </div>
         </div>
@@ -855,7 +855,7 @@ export function growthPage() {
     tableHTML = recentGrowth.map(r => `<tr><td><b>${r.childName || '—'}</b></td><td>${r.date || '—'}</td><td>${r.height} cm</td><td>${r.weight} kg</td><td>${r.bmi || '—'}</td><td>${r.bmi ? (r.bmi < 16 ? '<span class="badge badge--danger">Underweight</span>' : r.bmi > 25 ? '<span class="badge badge--warning">Overweight</span>' : '<span class="badge badge--success">Normal</span>') : '—'}</td></tr>`).join('');
   }
 
-  const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
 
   return shell('growth', `${heading('Growth tracking', 'Track height, weight, and BMI for every child.', `<button class="button button--primary" type="button" data-add-measurement>${icon('plus')}Add measurement</button>`)}
   <div class="form-layout">
@@ -902,11 +902,11 @@ export function medicinesPage() {
       const totalDays = Math.max(1, Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
       const elapsed = Math.max(0, Math.ceil((now - startDate) / (1000 * 60 * 60 * 24)));
       const pct = Math.min(100, Math.round((elapsed / totalDays) * 100));
-      return `<article class="card document-card card--interactive"><div class="document-card__body" style="padding:14px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px"><h3 style="font-size:14px; font-weight:600; margin:0">${m.medicineName}</h3>${statusBadge(m.status)}</div><p style="font-size:13px; color:var(--color-text-muted); margin:0 0 4px">${m.childName || '—'} · ${m.dosage}</p><p style="font-size:12px; color:var(--color-text-muted); margin:0 0 8px">${m.frequency} · ${m.startDate} → ${m.endDate}</p><div class="progress" style="height:6px"><div class="progress__bar" style="width:${pct}%; background:${m.status === 'Completed' ? 'var(--color-success)' : 'var(--color-primary)'}"></div></div><span style="font-size:11px; color:var(--color-text-muted)">${pct}% complete</span></div></article>`;
+      return `<article class="card document-card card--interactive"><div class="document-card__body" style="padding:14px"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px"><h3 style="font-size:14px; font-weight:600; margin:0">${escapeHTML(m.medicineName)}</h3>${statusBadge(m.status)}</div><p style="font-size:13px; color:var(--color-text-muted); margin:0 0 4px">${escapeHTML(m.childName || '—')} · ${escapeHTML(m.dosage)}</p><p style="font-size:12px; color:var(--color-text-muted); margin:0 0 8px">${escapeHTML(m.frequency)} · ${m.startDate} → ${m.endDate}</p><div class="progress" style="height:6px"><div class="progress__bar" style="width:${pct}%; background:${m.status === 'Completed' ? 'var(--color-success)' : 'var(--color-primary)'}"></div></div><span style="font-size:11px; color:var(--color-text-muted)">${pct}% complete</span></div></article>`;
     }).join('')}</div>`;
   }
 
-  const childOptions = children.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  const childOptions = children.map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
 
   return shell('medicines', `${heading('Prescriptions', 'Track all prescriptions given to children.', `<button class="button button--primary" type="submit" form="medicine-form">${icon('plus')}Add prescription</button>`)}
   <div class="stat-grid" style="margin-bottom:24px">${statCard('Active prescriptions', activeMeds.length.toLocaleString(), activeMeds.length > 0 ? 'Ongoing' : 'None', 'pill', 'blue')}${statCard('Completed', completedMeds.length.toLocaleString(), completedMeds.length > 0 ? 'Finished' : 'None', 'check', 'green')}</div>
@@ -946,19 +946,19 @@ export function documentsPage() {
           </div>
           <div class="document-card__body" style="padding-top:12px;">
             <div class="document-card__title-line" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${doc.name}</h2>
+              <h2 class="document-card__title" style="font-size:14px; font-weight:600; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(doc.name)}</h2>
               <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
                 ${doc.driveUrl ? `<span class="badge" style="background:#e8f0fe; color:#1a73e8; border:1px solid #cce0ff; display:inline-flex; align-items:center; gap:4px; font-size:11px; padding:2px 8px; border-radius:12px; font-weight:600;"><span style="display:inline-flex; width:12px; height:12px;">${icon('googleDrive')}</span> Drive</span>` : `<span class="badge" style="background:#f1f3f4; color:#5f6368; border:1px solid #dadce0; font-size:11px; padding:2px 8px; border-radius:12px;">Not in Drive yet</span>`}
                 ${statusBadge(doc.status || 'Verified')}
               </div>
             </div>
             <div class="document-card__meta" style="margin-top:6px; font-size:12px; color:var(--color-text-muted); display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-weight:600; color:var(--color-text);">${doc.child || doc.childName || doc.student || '—'}</span>
-              <span>${doc.docType || doc.category || doc.meta || 'Medical Document'}</span>
+              <span style="font-weight:600; color:var(--color-text);">${escapeHTML(doc.child || doc.childName || doc.student || '—')}</span>
+              <span>${escapeHTML(doc.docType || doc.category || doc.meta || 'Medical Document')}</span>
             </div>
             <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
               ${doc.driveUrl ? `<a class="button button--sm button--primary" href="${doc.driveUrl}" target="_blank" rel="noopener noreferrer" style="flex:1; justify-content:center; display:inline-flex; align-items:center; gap:6px;">${icon('external')} View in Drive</a>` : ''}
-              ${doc.image || doc.fileData ? `<a class="button button--sm ${doc.driveUrl ? 'button--ghost' : 'button--primary'}" href="${doc.image || doc.fileData}" target="_blank" download="${doc.name || 'document'}.png" style="flex:1; justify-content:center; display:inline-flex; align-items:center; gap:6px;">${icon('download')} Download</a>` : ''}
+              ${doc.image || doc.fileData ? `<a class="button button--sm ${doc.driveUrl ? 'button--ghost' : 'button--primary'}" href="${doc.image || doc.fileData}" target="_blank" download="${escapeHTML(doc.name || 'document')}.png" style="flex:1; justify-content:center; display:inline-flex; align-items:center; gap:6px;">${icon('download')} Download</a>` : ''}
               ${!doc.driveUrl && (doc.image || doc.fileData) ? `<button class="button button--sm button--ghost" type="button" data-sync-doc-id="${doc.id}" style="width:100%; justify-content:center; display:inline-flex; align-items:center; gap:6px; margin-top:2px;">${icon('refresh')} Sync to Google Drive</button>` : ''}
             </div>
           </div>
@@ -967,7 +967,7 @@ export function documentsPage() {
     </div>`;
   }
 
-  const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${c.name} (${c.id})</option>`).join('');
+  const childOptions = children.map(c => `<option value="${c.name.toLowerCase()}">${escapeHTML(c.name)} (${c.id})</option>`).join('');
 
   return shell('documents', `${heading('Health records & documents', 'Google Drive Storage for medical reports, Aadhaar cards, and certificates.', `<button class="button button--primary" type="button" data-open-upload-modal>${icon('upload')}Upload document</button>${unsyncedCount > 0 ? `<button class="button button--ghost" type="button" data-auto-sync-drive style="display:inline-flex; align-items:center; gap:6px;">${icon('refresh')}Sync ${unsyncedCount} to Drive</button>` : ''}`)}<section class="card"><div class="table-toolbar" style="flex-wrap:wrap; gap:12px;"><label class="input-group table-toolbar__search" style="flex:1; min-width:220px;">${icon('search')}<input class="input" type="search" placeholder="Search documents or children" data-document-search></label><div style="display:flex; align-items:center; gap:10px;"><label class="field" style="margin:0; min-width:210px;"><select class="select" data-child-document-filter><option value="">Filter by Child: All (${children.length})</option>${childOptions}</select></label></div></div><div class="card__body">${contentHTML}</div></section>`);
 }

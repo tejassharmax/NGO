@@ -18,6 +18,7 @@ const { rateLimit } = require('express-rate-limit');
  * @param {number} options.windowMs Time frame in milliseconds (e.g. 60000 = 1 min)
  * @param {number} options.max Maximum requests per windowMs
  * @param {string} [options.message] Custom error message
+ * @param {(req) => void} [options.onLimit] Called each time a request is refused
  */
 function createRateLimiter(options = {}) {
   const windowMs = options.windowMs || 60000; // 1 min default
@@ -32,6 +33,9 @@ function createRateLimiter(options = {}) {
     handler: (req, res, next, opts) => {
       const retryAfterSeconds = Math.max(1, Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000));
       console.warn('[RateLimit] %s exceeded request limit (%d/%d)', req.ip, req.rateLimit.used, opts.limit);
+      if (typeof options.onLimit === 'function') {
+        try { options.onLimit(req); } catch (e) { /* the limit still applies */ }
+      }
       res.status(opts.statusCode).json({ error: message, retryAfterSeconds });
     }
   });

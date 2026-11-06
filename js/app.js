@@ -277,6 +277,9 @@ document.addEventListener('click', (event) => {
   const target = event.target.closest('button, a, input[data-global-search], [data-close-sidebar], [data-topbar-back], [data-calendar-day], [data-open-booking-modal], [data-close-cal-modal], [data-toggle-cal-more], [data-open-child-sheet], [data-open-clinical-modal], [data-event-id], [data-delete-event-id], [data-edit-event-id], [data-sync-event-id], .modal-backdrop, .gcal-popup-backdrop');
   if (!target) return;
 
+  // Buttons in a hand-built modal that just close it (the link still navigates).
+  if (target.matches('[data-clear-modal-root]')) closeModal();
+
   if (target.matches('[data-topbar-back]')) {
     const prevPageMap = {
       'child-profile': 'children',
@@ -1314,7 +1317,7 @@ document.addEventListener('click', (event) => {
     const children = getChildren();
     // A family's per-person "Upload" buttons name the person to preselect.
     const selectedFilter = (target.closest('[data-open-upload-modal]').dataset.personName || document.querySelector('[data-child-document-filter]')?.value || '').toLowerCase();
-    const childOptions = children.map(c => `<option value="${c.name}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${c.name}${isFamilySpace() ? '' : ` (${c.id})`}</option>`).join('');
+    const childOptions = children.map(c => `<option value="${escapeHTML(c.name)}" ${c.name.toLowerCase() === selectedFilter ? 'selected' : ''}>${escapeHTML(c.name)}${isFamilySpace() ? '' : ` (${c.id})`}</option>`).join('');
 
     modal({
       title: term('uploadForPerson'),

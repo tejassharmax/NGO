@@ -59,6 +59,12 @@ const siteLimiter = createRateLimiter({ windowMs: 60000, max: 600, message: 'Too
 const apiLimiter = createRateLimiter({ windowMs: 60000, max: 120, message: 'Too many API calls. Please wait a minute.' });
 const uploadLimiter = createRateLimiter({ windowMs: 60000, max: 15, message: 'Too many document uploads. Please wait a minute.' });
 const assistantLimiter = createRateLimiter({ windowMs: 60000, max: 10, message: 'Too many questions at once. Please wait a minute.' });
+// Full ID numbers: 30 per 10 minutes is far above normal use; more looks like
+// someone copying IDs, so it is stopped and written to the audit log.
+const revealLimiter = createRateLimiter({
+  windowMs: 10 * 60000, max: 30, message: 'Too many IDs revealed in a short time. Please wait a few minutes.',
+  onLimit: (req) => audit(req, 'reveal-limit-reached', { limit: 30, windowMinutes: 10 })
+});
 
 const app = express();
 // Don't advertise the framework (OWASP A02).
@@ -84,9 +90,30 @@ app.use((req, res, next) => {
 app.use(siteLimiter);
 app.use('/api', apiLimiter);
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// Request bodies: 1 MB by default. The bulk routes (a whole space's records) take
+// up to 50 MB, and only after the sign-in check, so nobody can make the server
+// read a huge body without being signed in (OWASP A10, resource exhaustion).
+const LARGE_BODY_ROUTES = new Set(['/api/sync', '/api/import', '/api/sheets/sync', '/api/sheets/pull', '/api/docs/sync']);
+const smallJson = express.json({ limit: '1mb' });
+const largeJson = express.json({ limit: '50mb' });
+app.use((req, res, next) => {
+  if (req.method === 'POST' && LARGE_BODY_ROUTES.has(req.path)) {
+    return requireAuth(req, res, () => largeJson(req, res, next));
+  }
+  return smallJson(req, res, next);
+});
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 const upload = multer({ limits: { fileSize: 15 * 1024 * 1024 } }); // Max 15MB
+
+/**
+ * The error text a browser may see. Messages the app writes itself (for example
+ * "Not connected") are shown as they are; errors from Google's APIs or the
+ * operating system can carry internal details, so they get a plain message.
+ */
+function publicMessage(err) {
+  const internal = !err || err.response || err.config || err.syscall || err.errors || typeof err.code === 'number' || /^\d{3}$/.test(String(err.code || ''));
+  return internal ? 'Something went wrong while talking to Google. Please try again.' : String(err.message || 'Something went wrong. Please try again.');
+}
 
 // CORS & Security Headers
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ||
@@ -100,8 +127,10 @@ MIGRATION_ORIGINS.forEach(o => { if (!ALLOWED_ORIGINS.includes(o)) ALLOWED_ORIGI
 
 const CONTENT_SECURITY_POLICY = [
   "default-src 'self'",
-  // One inline boot script in index.html; Google sign-in loads apis.google.com.
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://apis.google.com https://www.gstatic.com",
+  // No inline scripts at all: text typed into a record can never run as code
+  // (OWASP A05). Google sign-in loads apis.google.com; report reading needs wasm.
+  "script-src 'self' 'wasm-unsafe-eval' https://apis.google.com https://www.gstatic.com",
+  "script-src-attr 'none'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   "img-src 'self' data: blob: https:",
@@ -134,10 +163,8 @@ app.use((req, res, next) => {
     // HTTPS only for 180 days. Subdomains are left out: not all of them may serve HTTPS.
     res.setHeader('Strict-Transport-Security', 'max-age=15552000');
   }
-  // Content Security Policy in report-only mode first: the browser reports what
-  // it would block, nothing is blocked, so sign-in and report reading can't break.
-  // Switch the header name to Content-Security-Policy once reports are clean.
-  res.setHeader('Content-Security-Policy-Report-Only', CONTENT_SECURITY_POLICY);
+  // Enforced Content Security Policy (it ran in report-only mode first).
+  res.setHeader('Content-Security-Policy', CONTENT_SECURITY_POLICY);
   if (req.method === 'OPTIONS') return res.sendStatus(200);
   next();
 });
@@ -168,6 +195,8 @@ app.get('/privacy', sendPublicFile('public/privacy.html'));
 app.get('/terms', sendPublicFile('public/terms.html'));
 app.get(['/app', '/index.html'], sendPublicFile('index.html'));
 app.get('/js/bundle.js', sendPublicFile('js/bundle.js'));
+app.get('/js/preload.js', sendPublicFile('js/preload.js'));
+app.get('/home-redirect.js', sendPublicFile('public/home-redirect.js'));
 app.get('/google-logo.png', sendPublicFile('google-logo.png'));
 app.use('/css', express.static(path.join(__dirname, 'css'), { etag: true, setHeaders: noCacheCode }));
 app.use('/assets', express.static(path.join(__dirname, 'assets'), { etag: true }));
@@ -539,7 +568,7 @@ app.post('/api/sheets/sync', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     console.warn('Per-NGO Sheets sync notice:', err.message);
-    res.json({ success: false, message: err.message });
+    res.json({ success: false, message: publicMessage(err) });
   }
 });
 
@@ -552,7 +581,7 @@ app.post('/api/sheets/pull', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     console.warn('Per-NGO Sheets pull notice:', err.message);
-    res.json({ success: false, message: err.message });
+    res.json({ success: false, message: publicMessage(err) });
   }
 });
 
@@ -578,7 +607,7 @@ app.post('/api/docs/sync', requireAuth, async (req, res) => {
     res.json(result);
   } catch (err) {
     console.warn('Per-NGO Docs sync notice:', err.message);
-    res.json({ success: false, message: err.message });
+    res.json({ success: false, message: publicMessage(err) });
   }
 });
 
@@ -619,7 +648,7 @@ app.post('/api/drive/upload', requireAuth, uploadLimiter, upload.single('documen
     res.json(result);
   } catch (err) {
     console.warn('[API Drive Upload] Error uploading document to Google Drive:', err.message);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: publicMessage(err) });
   }
 });
 
@@ -636,7 +665,7 @@ app.delete('/api/children/:id', requireAuth, adminOnly, async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error('[API] Error deleting child:', err);
-    res.status(500).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, message: publicMessage(err) });
   }
 });
 
@@ -673,7 +702,7 @@ app.post('/api/assistant', assistantLimiter, requireAuth, async (req, res) => {
 // POST /api/reveal -> The full value of one masked ID, for a signed-in staff member.
 // Every reveal is recorded in the audit log (who, which child, which field; never
 // the value itself). Body: { childId, field: 'idNumber' | 'insurance', entryId? }
-app.post('/api/reveal', requireAuth, async (req, res) => {
+app.post('/api/reveal', requireAuth, revealLimiter, async (req, res) => {
   try {
     const { childId, field, entryId } = req.body || {};
     if (typeof childId !== 'string' || !['idNumber', 'insurance'].includes(field) ||
@@ -808,8 +837,13 @@ app.post('/api/sync', requireAuth, async (req, res) => {
 
 // Central Error Handling Middleware
 app.use((err, req, res, next) => {
+  // Client mistakes (a body over the size limit, broken JSON) keep their 4xx status.
+  const status = Number(err && (err.status || err.statusCode));
+  if (status >= 400 && status < 500) {
+    return res.status(status).json({ error: status === 413 ? 'This request is too large.' : 'This request could not be read.' });
+  }
   console.error('[Express] Unhandled Error [%s %s]:', req.method, req.url, err.stack || err.message || err);
-  res.status(500).json({ error: 'Internal Server Error', message: process.env.NODE_ENV === 'production' ? 'An error occurred' : err.message });
+  res.status(500).json({ error: 'Internal Server Error', message: IS_PRODUCTION ? 'An error occurred' : err.message });
 });
 
 const PORT = process.env.PORT || 3000;

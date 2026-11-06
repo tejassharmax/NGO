@@ -10,7 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="css/global.css?v=3.0.0" />
     <link rel="stylesheet" href="css/layout.css?v=3.0.0" />
-    <link rel="stylesheet" href="css/components.css?v=3.1.0" />
+    <link rel="stylesheet" href="css/components.css?v=3.1.1" />
     <link rel="stylesheet" href="css/pages.css?v=3.0.2" />
     <link rel="stylesheet" href="css/animations.css?v=3.0.0" />
     <link rel="stylesheet" href="css/responsive.css?v=3.0.2" />
@@ -327,11 +327,7 @@
     <div id="global-progress-bar" class="global-progress-bar" aria-hidden="true"></div>
 
     <!-- Instant Preloader (Paints immediately on initial cold boot, eliminates white screen) -->
-    <script>
-      if (sessionStorage.getItem('chm_session_booted')) {
-        document.write('<style>#initial-loader { display: none !important; }</style>');
-      }
-    </script>
+    <script src="js/preload.js"></script>
     <div id="initial-loader" class="initial-loader" aria-label="Loading Child Health Management Platform">
       <div class="initial-loader__card">
         <div class="initial-loader__typewriter-box">
@@ -356,6 +352,6 @@
     <div id="app"></div>
     <div id="modal-root"></div>
     <div id="toast-root" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
-    <script defer src="js/bundle.js?v=3.7.0"></script>
+    <script defer src="js/bundle.js?v=3.7.1"></script>
   </body>
 </html>

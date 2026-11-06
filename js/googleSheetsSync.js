@@ -267,8 +267,8 @@ export async function openChildGoogleSheet(childId, childName) {
               To view <b>${escapeHTML(childName || `this ${term('personLower')}`)}'s</b> live Google Spreadsheet tab, please connect your Google Account in <b>Settings</b>.
             </p>
             <div style="display:flex; gap:10px; justify-content:center;">
-              <button class="button button--ghost" type="button" onclick="document.querySelector('#modal-root').replaceChildren();">Cancel</button>
-              <a class="button button--primary" href="#/settings" onclick="document.querySelector('#modal-root').replaceChildren();">Go to Settings</a>
+              <button class="button button--ghost" type="button" data-clear-modal-root>Cancel</button>
+              <a class="button button--primary" href="#/settings" data-clear-modal-root>Go to Settings</a>
             </div>
           </div>
         </div>`;
@@ -521,7 +521,7 @@ export function showSheetsSyncLoader(childName, onComplete) {
 
       <!-- Action buttons revealed on 100% complete -->
       <div id="sync-actions-area" style="display:none; flex-direction:column; gap:10px; margin-top:10px; animation:fadeIn 0.3s ease;">
-        <a id="sync-open-sheet-btn" href="javascript:void(0)" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
+        <a id="sync-open-sheet-btn" href="#" class="button button--primary" style="width:100%; justify-content:center; gap:10px; background:#0f9d58; border-color:#0b8043; padding:12px; font-size:14px; font-weight:600; text-decoration:none;">
           <svg width="20" height="20" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M28 4H12C9.79086 4 8 5.79086 8 8V40C8 42.2091 9.79086 44 12 44H36C38.2091 44 40 42.2091 40 40V16L28 4Z" fill="#0F9D58"/><path d="M28 4V16H40L28 4Z" fill="#87CEAC"/><path d="M16 22H32V38H16V22Z" fill="#FFFFFF"/><path d="M16 22V27H32V22H16ZM16 27V32H32V27H16ZM16 32V37H32V32H16Z" fill="#0F9D58"/><path d="M22 22V38M27 22V38" stroke="#FFFFFF" stroke-width="1.5"/></svg>
           Open Connected Live Google Sheet
         </a>

@@ -241,15 +241,15 @@ export function renderSpotlightPreviewHTML(item) {
           </div>
           <div class="spotlight-preview-cell">
             <span class="spotlight-cell-label">Gender</span>
-            <span class="spotlight-cell-val">${item.gender || '—'}</span>
+            <span class="spotlight-cell-val">${escapeHTML(item.gender || '—')}</span>
           </div>
           <div class="spotlight-preview-cell">
             <span class="spotlight-cell-label">Blood Group</span>
-            <span class="spotlight-cell-val" style="color:#ef4444; font-weight:700;">${item.blood || '—'}</span>
+            <span class="spotlight-cell-val" style="color:#ef4444; font-weight:700;">${escapeHTML(item.blood || '—')}</span>
           </div>
           <div class="spotlight-preview-cell">
             <span class="spotlight-cell-label">${spaceTerm('searchContactLabel')}</span>
-            <span class="spotlight-cell-val">${isFamilySpace() ? escapeHTML(item.relation || '—') : (item.father || item.guardian || 'Guardian')}${item.phone ? ` • <a href="tel:${item.phone}" style="color:var(--color-primary); text-decoration:none;">${item.phone}</a>` : ''}</span>
+            <span class="spotlight-cell-val">${isFamilySpace() ? escapeHTML(item.relation || '—') : escapeHTML(item.father || item.guardian || 'Guardian')}${item.phone ? ` • <a href="tel:${escapeHTML(item.phone)}" style="color:var(--color-primary); text-decoration:none;">${escapeHTML(item.phone)}</a>` : ''}</span>
           </div>
         </div>
 

@@ -8,10 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=IBM+Plex+Sans:wght@400;600&display=swap" rel="stylesheet">
-<script>
-  // Staff who are already signed in go straight to the app.
-  try { if (localStorage.getItem('sample-logged-in') === 'true') location.replace('/app' + location.hash); } catch (e) {}
-</script>
+<script src="/home-redirect.js"></script>
 <style>
   :root { --ink: #0E2A2F; --muted: #4A5A5E; --paper: #F6F3EC; --card: #FDFCF8; --teal: #0F9D8A; --teal-dark: #0B7A6B; --orange: #E8772E; --line: #E4E0D6; }
   * { box-sizing: border-box; }
