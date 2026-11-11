@@ -160,10 +160,14 @@ function getAuthUrl(ngoSlug, req = null, state = null) {
   return oauthClient.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
+    // drive.file only: every workbook, folder and upload is created by the app,
+    // and drive.file covers the Sheets API on those files. The full
+    // `spreadsheets` scope is "sensitive" and made Google show its
+    // "Google hasn't verified this app" screen. Checked on 10 Nov 2026: all of
+    // Ayusha Nilayam's and Pandya Family's workbooks open with drive.file alone.
     scope: [
       'openid',
       'email',
-      'https://www.googleapis.com/auth/spreadsheets',
       'https://www.googleapis.com/auth/drive.file'
     ],
     state: state || safeSlug,
