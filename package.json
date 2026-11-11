@@ -10,7 +10,7 @@
     "start:prod": "npm install --omit=dev --no-audit --no-fund && node server.js",
     "setup:firestore": "node scripts/setupFirestore.js",
     "setup:firestore:dry": "node scripts/setupFirestore.js --dry-run",
-    "test": "node scripts/test-blood-parser.mjs && node scripts/test-blood-parser-more.mjs && node scripts/test-record-validation.mjs && node scripts/test-sheet-insurance.mjs && node scripts/test-field-crypto.mjs && node scripts/test-key-tools.mjs && node scripts/test-assistant-tools.mjs"
+    "test": "node scripts/test-blood-parser.mjs && node scripts/test-blood-parser-more.mjs && node scripts/test-record-validation.mjs && node scripts/test-sheet-insurance.mjs && node scripts/test-field-crypto.mjs && node scripts/test-key-tools.mjs && node scripts/test-assistant-tools.mjs && node scripts/test-assistant-sources.mjs"
   },
   "engines": {
     "node": ">=22.0.0"

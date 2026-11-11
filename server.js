@@ -670,32 +670,114 @@ app.delete('/api/children/:id', requireAuth, adminOnly, async (req, res) => {
 });
 
 // "Ask Ayusha" assistant (prototype). Off unless ASSISTANT_ENABLED=true; answers
-// only from this space's records through read-only tools (js/server/assistant).
+// only from the sources the user ticks: this space's own workbooks and
+// appointments calendar (js/server/assistant/sources.js).
 const assistant = require('./js/server/assistant/agent');
+const assistantSources = require('./js/server/assistant/sources');
+const assistantChats = require('./js/server/assistant/chatStore');
 
 app.get('/api/assistant/status', requireAuth, (req, res) => {
   res.json({ enabled: assistant.isAssistantEnabled(), model: assistant.isAssistantEnabled() ? assistant.MODEL : null });
 });
 
+// GET /api/assistant/sources -> the sources this space offers, for the sources panel.
+app.get('/api/assistant/sources', requireAuth, async (req, res) => {
+  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+  try {
+    const tenant = await tenantFor(req);
+    const isFamily = (await spaceTypeFor(tenant.slug)) === 'family';
+    res.json({ sources: await assistantSources.listSources(tenant.slug, tenant.name || tenant.slug, isFamily) });
+  } catch (err) {
+    console.error('[assistant] Sources failed:', err.message);
+    res.status(502).json({ error: 'Could not load the sources. Please try again.' });
+  }
+});
+
+// POST /api/assistant -> answer one question. Body: { question, chatId?, sources? }.
+// Earlier turns come from the stored conversation, never from the browser, and
+// the question and its answer are saved to it (see chatStore.js).
 app.post('/api/assistant', assistantLimiter, requireAuth, async (req, res) => {
   if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
   try {
-    const { messages } = req.body || {};
-    const conversation = (Array.isArray(messages) ? messages : [])
-      .filter(m => m && typeof m.text === 'string' && m.text.trim() && ['user', 'assistant'].includes(m.role))
-      .slice(-10);
-    if (!conversation.length || conversation[conversation.length - 1].role !== 'user') {
-      return res.status(400).json({ error: 'Ask a question' });
-    }
+    const { question, chatId, sources } = req.body || {};
+    const text = typeof question === 'string' ? question.trim().slice(0, 2000) : '';
+    if (!text) return res.status(400).json({ error: 'Ask a question' });
     const tenant = await tenantFor(req);
+    const email = req.user && req.user.email;
+    const isFamily = (await spaceTypeFor(tenant.slug)) === 'family';
+    const known = assistantSources.definitions(isFamily).map(d => d.id);
+    const chosen = Array.isArray(sources) ? known.filter(id => sources.includes(id)) : known;
+    if (!chosen.length) return res.status(400).json({ error: 'Tick at least one source.' });
+
+    let earlier = [];
+    let storedId = null;
+    if (chatId) {
+      try {
+        const chat = await assistantChats.getChat(tenant.slug, email, chatId);
+        earlier = chat.messages;
+        storedId = chat.id;
+      } catch (err) {
+        if (!(err instanceof assistantChats.ChatNotFound)) throw err;
+      }
+    }
+    const askedAt = Date.now();
+    const conversation = [...earlier.slice(-9).map(m => ({ role: m.role, text: m.text })), { role: 'user', text }];
+
+    const spaceName = tenant.name || tenant.slug;
     const { payload } = await readTenant(tenant.slug);
-    const result = await assistant.ask(payload, tenant.name || tenant.slug, conversation);
-    audit(req, 'assistant-query', { tools: result.toolsUsed, questionLength: conversation[conversation.length - 1].text.length });
-    return res.json(result);
+    const loaded = await assistantSources.loadSources(tenant.slug, spaceName, isFamily, payload, chosen);
+    const result = await assistant.ask(spaceName, loaded, conversation);
+
+    let savedId = storedId;
+    try {
+      savedId = await assistantChats.appendTurn(tenant.slug, email, storedId, { text, at: askedAt }, { text: result.answer, refs: result.refs });
+    } catch (err) {
+      console.error('[assistant] Saving the conversation failed:', err.message);
+    }
+    audit(req, 'assistant-query', { sources: result.sourcesUsed, questionLength: text.length, chatId: savedId });
+    return res.json({ ...result, chatId: savedId });
   } catch (err) {
     console.error('[assistant] Failed:', err.message);
     if (err.busy) return res.status(503).json({ error: 'The assistant has reached its usage limit for now. Please try again in a minute.' });
     return res.status(502).json({ error: 'The assistant could not answer right now. Please try again.' });
+  }
+});
+
+// The signed-in person's own Ask Ayusha conversations, kept 90 days.
+app.get('/api/assistant/chats', requireAuth, async (req, res) => {
+  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+  try {
+    const tenant = await tenantFor(req);
+    res.json({ chats: await assistantChats.listChats(tenant.slug, req.user && req.user.email), retentionDays: assistantChats.RETENTION_DAYS });
+  } catch (err) {
+    console.error('[assistant] Listing chats failed:', err.message);
+    res.status(502).json({ error: 'Your conversations could not be loaded. Please try again.' });
+  }
+});
+
+app.get('/api/assistant/chats/:id', requireAuth, async (req, res) => {
+  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+  try {
+    const tenant = await tenantFor(req);
+    res.json(await assistantChats.getChat(tenant.slug, req.user && req.user.email, req.params.id));
+  } catch (err) {
+    if (err instanceof assistantChats.ChatNotFound) return res.status(404).json({ error: 'That conversation no longer exists.' });
+    console.error('[assistant] Opening a chat failed:', err.message);
+    res.status(502).json({ error: 'That conversation could not be opened. Please try again.' });
+  }
+});
+
+app.delete('/api/assistant/chats/:id', requireAuth, async (req, res) => {
+  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+  try {
+    const tenant = await tenantFor(req);
+    await assistantChats.deleteChat(tenant.slug, req.user && req.user.email, req.params.id);
+    audit(req, 'assistant-chat-delete', { chatId: req.params.id });
+    res.json({ deleted: true });
+  } catch (err) {
+    if (err instanceof assistantChats.ChatNotFound) return res.status(404).json({ error: 'That conversation no longer exists.' });
+    console.error('[assistant] Deleting a chat failed:', err.message);
+    res.status(502).json({ error: 'That conversation could not be deleted. Please try again.' });
   }
 });
 
