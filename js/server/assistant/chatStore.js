@@ -129,4 +129,37 @@ async function deleteChat(slug, email, chatId) {
   await ref.delete();
 }
 
-module.exports = { isAvailable, listChats, getChat, appendTurn, deleteChat, ChatNotFound, RETENTION_DAYS };
+/**
+ * Deletes every conversation, in every space, whose expiresAt has passed (90 days
+ * after its last question). Touches nothing but the assistantChats collections.
+ * Free replacement for a Firestore TTL policy, which needs billing enabled.
+ * @returns {Promise<number>} how many conversations were deleted
+ */
+async function purgeExpired() {
+  const db = getDb();
+  if (!db) return 0;
+  const now = new Date();
+  let deleted = 0;
+  const spaces = await db.collection('ngos').listDocuments();
+  for (const space of spaces) {
+    const snap = await space.collection('assistantChats').where('expiresAt', '<=', now).get();
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const batch = db.batch();
+      snap.docs.slice(i, i + 400).forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+    deleted += snap.size;
+  }
+  return deleted;
+}
+
+/** Runs purgeExpired a minute after start-up and then every 24 hours. */
+function scheduleDailyPurge() {
+  const run = () => purgeExpired()
+    .then(n => { if (n) console.log(`[assistant] Deleted ${n} conversation(s) older than ${RETENTION_DAYS} days`); })
+    .catch(err => console.warn('[assistant] Clean-up of old conversations failed:', err.message));
+  setTimeout(run, 60 * 1000).unref();
+  setInterval(run, 24 * 60 * 60 * 1000).unref();
+}
+
+module.exports = { isAvailable, listChats, getChat, appendTurn, deleteChat, purgeExpired, scheduleDailyPurge, ChatNotFound, RETENTION_DAYS };

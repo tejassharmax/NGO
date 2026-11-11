@@ -19,6 +19,18 @@ function isAssistantEnabled() {
   return process.env.ASSISTANT_ENABLED === 'true' && !!process.env.GEMINI_API_KEY;
 }
 
+/**
+ * Whether Ask Ayusha is on for one space. ASSISTANT_SPACES (comma-separated
+ * slugs) limits it to those spaces; unset means every space. On the live site it
+ * lists only the test spaces while the key is a free-tier one, because Google's
+ * free-tier terms forbid sending personal information.
+ */
+function isEnabledForSpace(slug) {
+  if (!isAssistantEnabled()) return false;
+  const list = String(process.env.ASSISTANT_SPACES || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  return !list.length || list.includes(String(slug || '').toLowerCase());
+}
+
 function systemPrompt(spaceName, titles) {
   return [
     `You are Ayusha, the assistant inside Ayusha Health, a health records app, helping the staff of "${spaceName}".`,
@@ -112,4 +124,4 @@ async function ask(spaceName, sources, conversation) {
   return { answer: answer || 'I could not form an answer from the sources.', refs, sourcesUsed: sources.blocks.map(b => b.id), model: state.model };
 }
 
-module.exports = { ask, isAssistantEnabled, MODEL, FALLBACK_MODELS };
+module.exports = { ask, isAssistantEnabled, isEnabledForSpace, MODEL, FALLBACK_MODELS };

@@ -675,14 +675,38 @@ app.delete('/api/children/:id', requireAuth, adminOnly, async (req, res) => {
 const assistant = require('./js/server/assistant/agent');
 const assistantSources = require('./js/server/assistant/sources');
 const assistantChats = require('./js/server/assistant/chatStore');
+// Old conversations are deleted daily whether or not Ask Ayusha is switched on.
+assistantChats.scheduleDailyPurge();
 
-app.get('/api/assistant/status', requireAuth, (req, res) => {
-  res.json({ enabled: assistant.isAssistantEnabled(), model: assistant.isAssistantEnabled() ? assistant.MODEL : null });
+// Ask Ayusha is on only where ASSISTANT_ENABLED is set and, when ASSISTANT_SPACES
+// lists spaces, only for those spaces (see agent.isEnabledForSpace).
+async function assistantGate(req, res, next) {
+  try {
+    if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+    const tenant = await tenantFor(req);
+    if (!tenant || !assistant.isEnabledForSpace(tenant.slug)) return res.status(404).json({ error: 'The assistant is not enabled' });
+    next();
+  } catch (err) {
+    console.error('[assistant] Gate failed:', err.message);
+    res.status(502).json({ error: 'The assistant could not be reached. Please try again.' });
+  }
+}
+
+app.get('/api/assistant/status', requireAuth, async (req, res) => {
+  let enabled = false;
+  try {
+    if (assistant.isAssistantEnabled()) {
+      const tenant = await tenantFor(req);
+      enabled = !!tenant && assistant.isEnabledForSpace(tenant.slug);
+    }
+  } catch (err) {
+    enabled = false;
+  }
+  res.json({ enabled, model: enabled ? assistant.MODEL : null });
 });
 
 // GET /api/assistant/sources -> the sources this space offers, for the sources panel.
-app.get('/api/assistant/sources', requireAuth, async (req, res) => {
-  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+app.get('/api/assistant/sources', requireAuth, assistantGate, async (req, res) => {
   try {
     const tenant = await tenantFor(req);
     const isFamily = (await spaceTypeFor(tenant.slug)) === 'family';
@@ -696,8 +720,7 @@ app.get('/api/assistant/sources', requireAuth, async (req, res) => {
 // POST /api/assistant -> answer one question. Body: { question, chatId?, sources? }.
 // Earlier turns come from the stored conversation, never from the browser, and
 // the question and its answer are saved to it (see chatStore.js).
-app.post('/api/assistant', assistantLimiter, requireAuth, async (req, res) => {
-  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+app.post('/api/assistant', assistantLimiter, requireAuth, assistantGate, async (req, res) => {
   try {
     const { question, chatId, sources } = req.body || {};
     const text = typeof question === 'string' ? question.trim().slice(0, 2000) : '';
@@ -744,8 +767,7 @@ app.post('/api/assistant', assistantLimiter, requireAuth, async (req, res) => {
 });
 
 // The signed-in person's own Ask Ayusha conversations, kept 90 days.
-app.get('/api/assistant/chats', requireAuth, async (req, res) => {
-  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+app.get('/api/assistant/chats', requireAuth, assistantGate, async (req, res) => {
   try {
     const tenant = await tenantFor(req);
     res.json({ chats: await assistantChats.listChats(tenant.slug, req.user && req.user.email), retentionDays: assistantChats.RETENTION_DAYS });
@@ -755,8 +777,7 @@ app.get('/api/assistant/chats', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/assistant/chats/:id', requireAuth, async (req, res) => {
-  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+app.get('/api/assistant/chats/:id', requireAuth, assistantGate, async (req, res) => {
   try {
     const tenant = await tenantFor(req);
     res.json(await assistantChats.getChat(tenant.slug, req.user && req.user.email, req.params.id));
@@ -767,8 +788,7 @@ app.get('/api/assistant/chats/:id', requireAuth, async (req, res) => {
   }
 });
 
-app.delete('/api/assistant/chats/:id', requireAuth, async (req, res) => {
-  if (!assistant.isAssistantEnabled()) return res.status(404).json({ error: 'The assistant is not enabled' });
+app.delete('/api/assistant/chats/:id', requireAuth, assistantGate, async (req, res) => {
   try {
     const tenant = await tenantFor(req);
     await assistantChats.deleteChat(tenant.slug, req.user && req.user.email, req.params.id);
